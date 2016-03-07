@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  ******************************************************************************/
 #ifndef OPENER_ENDIANCONV_H_
@@ -110,4 +110,9 @@ void DetermineEndianess(void);
 int GetEndianess(void);
 
 void MoveMessageNOctets(CipOctet **message_runner, int n);
+
+int FillNextNMessageOctetsWithValueAndMoveToNextPosition( EipByte value,
+        int count, CipOctet **message_runner);
+
+
 #endif /* OPENER_ENDIANCONV_H_ */

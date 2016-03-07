@@ -1,12 +1,12 @@
 #######################################
 # Required CMake version              #
 #######################################
-cmake_minimum_required( VERSION 2.8.9 )
+cmake_minimum_required( VERSION 2.8.3 )
 
 #######################################
 # Project name                        #
 #######################################
-project( OpENer C )
+project( OpENer )
 
 #######################################
 # Project version                     #
@@ -14,8 +14,12 @@ project( OpENer C )
 set( OpENer_VERSION_MAJOR 1 )
 set( OpENer_VERSION_MINOR 2 )
 
-find_path( OpENer_BUILDSUPPORT_DIR OpENer.cmake ${PROJECT_SOURCE_DIR}/buildsupport )
- 
+set( USER_INCLUDE_DIR "" CACHE PATH "Location of user specific include file (opener_user_conf.h)" )
+
+include_directories( ${USER_INCLUDE_DIR} ${TOOLKIT_INCLUDE_DIR} )
+
+set( OpENer_BUILDSUPPORT_DIR ${PROJECT_SOURCE_DIR}/buildsupport )
+
 INCLUDE( ${OpENer_BUILDSUPPORT_DIR}/OpENer.cmake )
 
 #######################################
@@ -62,7 +66,10 @@ endif( OpENer_TESTS )
 #######################################
 # OpENer C flags                      #
 #######################################
-set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w -Wall -DCMAKE_EXPORT_COMPILE_COMMANDS=ON" )
+set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Werror=implicit-function-declaration" )
+
+# enable clock_gettime:
+add_definitions( -D_POSIX_C_SOURCE=199309L )
 
 ####################################################
 # Internal cache holding the available CIP objects #

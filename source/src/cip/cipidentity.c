@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  ******************************************************************************/
 
@@ -35,15 +35,26 @@
 
 /* attributes in CIP Identity Object */
 
-EipUint16 vendor_id_ = OPENER_DEVICE_VENDOR_ID; /**< Attribute 1: Vendor ID */
-EipUint16 device_type_ = OPENER_DEVICE_TYPE; /**< Attribute 2: Device Type */
-EipUint16 product_code_ = OPENER_DEVICE_PRODUCT_CODE; /**< Attribute 3: Product Code */
-CipRevision revision_ = { OPENER_DEVICE_MAJOR_REVISION,
-    OPENER_DEVICE_MINOR_REVISION }; /**< Attribute 4: Revision / USINT Major, USINT Minor */
-EipUint16 status_ = 0; /**< Attribute 5: Status */
-EipUint32 serial_number_ = 0; /**< Attribute 6: Serial Number, has to be set prior to OpENer initialization */
-CipShortString product_name_ = { sizeof(OPENER_DEVICE_NAME) - 1,
-    OPENER_DEVICE_NAME }; /**< Attribute 7: Product Name */
+EipUint16 vendor_id_ = OPENER_DEVICE_VENDOR_ID;         /**< Attribute 1: Vendor ID */
+
+EipUint16 device_type_ = OPENER_DEVICE_TYPE;            /**< Attribute 2: Device Type */
+
+EipUint16 product_code_ = OPENER_DEVICE_PRODUCT_CODE;   /**< Attribute 3: Product Code */
+
+CipRevision revision_ = {                               /**< Attribute 4: Revision / USINT Major, USINT Minor */
+    OPENER_DEVICE_MAJOR_REVISION,
+    OPENER_DEVICE_MINOR_REVISION
+};
+
+EipUint16 status_ = 0;                                  /**< Attribute 5: Status */
+
+EipUint32 serial_number_ = 0;                           /**< Attribute 6: Serial Number, has to be set prior to OpENer initialization */
+
+CipShortString product_name_ = {                        /**< Attribute 7: Product Name */
+    sizeof(OPENER_DEVICE_NAME) - 1,
+    (EipByte *) OPENER_DEVICE_NAME
+};
+
 
 /** Private functions, sets the devices serial number
  * @param serial_number The serial number of the device
@@ -75,8 +86,7 @@ static EipStatus Reset(CipInstance *instance, /* pointer to instance*/
 
   eip_status = kEipStatusOkSend;
 
-  message_router_response->reply_service = (0x80
-      | message_router_request->service);
+  message_router_response->reply_service = (0x80 | message_router_request->service);
   message_router_response->size_of_additional_status = 0;
   message_router_response->general_status = kCipErrorSuccess;
 

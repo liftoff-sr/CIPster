@@ -8,9 +8,14 @@
 
 #include <assert.h>
 
+#if __cplusplus
+extern "C" {
+#endif
+
+
 #include "typedefs.h"
-#include "ciptypes.h"
-#include "ciperror.h"
+#include "cip/ciptypes.h"
+#include "cip/ciperror.h"
 #include "opener_user_conf.h"
 
 /**  @defgroup CIP_API OpENer User interface
@@ -502,8 +507,7 @@ void CloseSession(int socket);
  *  return status EIP_ERROR .. error
  *                EIP_OK ... successful finish
  */
-EipStatus
-ApplicationInitialization(void);
+EipStatus ApplicationInitialization(void);
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Allow the device specific application to perform its execution
@@ -581,6 +585,20 @@ ResetDevice(void);
 EipStatus
 ResetDeviceToInitialConfiguration(void);
 
+#if defined(__linux__)
+
+#include <stdlib.h>
+
+static inline void* CipCalloc(unsigned pa_nNumberOfElements, unsigned pa_nSizeOfElement) {
+  return calloc(pa_nNumberOfElements, pa_nSizeOfElement);
+}
+
+static inline void CipFree(void *pa_poData) {
+  free(pa_poData);
+}
+
+#else
+
 /** @ingroup CIP_CALLBACK_API
  * @brief Allocate memory for the CIP stack
  *
@@ -601,6 +619,9 @@ void *CipCalloc(unsigned int number_of_elements, unsigned int size_of_element);
  * @param pa_poData pointer to the allocated memory
  */
 void CipFree(void *data);
+
+#endif
+
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Inform the application that the Run/Idle State has been changed
@@ -649,6 +670,11 @@ SendUdpData(struct sockaddr_in *socket_data, int socket, EipUint8 *data,
  * @param socket_handle socket descriptor to close
  */
 void CloseSocket(int socket);
+
+
+void IApp_CloseSocket_udp( int socket_handle );
+void IApp_CloseSocket_tcp( int socket_handle );
+
 
 /** @mainpage OpENer - Open Source EtherNet/IP(TM) Communication Stack
  *Documentation
@@ -830,5 +856,10 @@ void CloseSocket(int socket);
  * @include "license.txt"
  *
  */
+
+#if __cplusplus
+ }
+#endif
+
 
 #endif /*OPENER_OPENER_API_H_*/

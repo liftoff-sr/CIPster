@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  ******************************************************************************/
 #ifndef OPENER_USER_CONF_H_
@@ -8,9 +8,9 @@
 
 /** @file opener_user_conf.h
  * @brief OpENer configuration setup
- * 
+ *
  * This file contains the general application specific configuration for OpENer.
- * 
+ *
  * Furthermore you have to specific platform specific network include files.
  * OpENer needs definitions for the following data-types
  * and functions:
@@ -26,12 +26,13 @@
 #include <arpa/inet.h>
 
 /** @brief Identity configuration of the device */
-#define OPENER_DEVICE_VENDOR_ID           1
-#define OPENER_DEVICE_TYPE               12
+#define OPENER_DEVICE_VENDOR_ID         60000
+#define OPENER_DEVICE_TYPE              12
 #define OPENER_DEVICE_PRODUCT_CODE      65001
-#define OPENER_DEVICE_MAJOR_REVISION      1
-#define OPENER_DEVICE_MINOR_REVISION      2
-#define OPENER_DEVICE_NAME      "OpENer PC"
+#define OPENER_DEVICE_MAJOR_REVISION    1
+#define OPENER_DEVICE_MINOR_REVISION    2
+#define OPENER_DEVICE_NAME              "SoftPLC runtime"
+
 
 /** @brief Define the number of objects that may be used in connections
  *
@@ -100,13 +101,12 @@ static const int kOpenerConsumedDataHasRunIdleHeader = 1;
  */
 static const int kOpenerProducedDataHasRunIdleHeader = 0;
 
+
 #ifdef OPENER_WITH_TRACES
 /* If we have tracing enabled provide print tracing macro */
 #include <stdio.h>
 
-#define LOG_TRACE(...)  fprintf(stderr,__VA_ARGS__)
-
-/*#define PRINT_TRACE(args...)  fprintf(stderr,args);*/
+#define LOG_TRACE(...)  printf(__VA_ARGS__)
 
 /** @brief A specialized assertion command that will log the assertion and block
  *  further execution in an while(1) loop.
@@ -126,7 +126,7 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
 #else
 
 /* for release builds execute the assertion, but don't test it */
-#define OPENER_ASSERT(assertion) (assertion)
+#define OPENER_ASSERT(assertion)
 
 /* the above may result in "statement with no effect" warnings.
  *  If you do not use assert()s to run functions, the an empty

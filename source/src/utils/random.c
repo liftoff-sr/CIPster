@@ -6,6 +6,8 @@
  */
 
 #include "random.h"
+#include <stdlib.h>
+
 
 Random *RandomNew(SetSeed set_seed, GetNextUInt32 get_next_uint32) {
   Random *out = malloc(sizeof(Random));

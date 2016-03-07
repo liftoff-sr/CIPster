@@ -12,6 +12,18 @@ opener_common_includes()
 #######################################
 opener_platform_support("INCLUDES")
 
-set( CIP_SRC appcontype.c cipassembly.c cipclass3connection.c cipcommon.c cipconnectionmanager.c ciperror.h cipethernetlink.c cipidentity.c cipioconnection.c cipmessagerouter.c ciptcpipinterface.c ciptypes.h )
+set( CIP_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/appcontype.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cipassembly.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cipclass3connection.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cipcommon.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cipconnectionmanager.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cipethernetlink.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cipidentity.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cipioconnection.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cipmessagerouter.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ciptcpipinterface.c
+    PARENT_SCOPE
+    )
 
-add_library( CIP ${CIP_SRC} )
+#add_library( CIP OBJECT CIP ${CIP_SRC} )
