@@ -1,28 +1,41 @@
 
-add_definitions( -fPIC )
+opener_common_includes()
+opener_platform_support("INCLUDES")
 
-#if( CMAKE_BUILD_TYPE STREQUALS Debug )
+add_definitions( -fPIC )
 
 set( CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined" )
 
 
-#######################################
-# Add subdirectories                  #
-#######################################
-add_subdirectory( cip )
+set( CIP_SRCS
+    cip/appcontype.c
+    cip/cipassembly.c
+    cip/cipclass3connection.c
+    cip/cipcommon.c
+    cip/cipconnectionmanager.c
+    cip/cipethernetlink.c
+    cip/cipidentity.c
+    cip/cipioconnection.c
+    cip/cipmessagerouter.c
+    cip/ciptcpipinterface.c
+    )
+
+set( ENCAP_SRCS
+    enet_encap/cpf.c
+    enet_encap/encap.c
+    enet_encap/endianconv.c
+    )
+
+set( UTILS_SRCS
+    utils/random.c
+    utils/xorshiftrandom.c
+    )
+
+
 add_subdirectory( cip_objects )
-add_subdirectory( enet_encap )
-#add_subdirectory( ports )
-add_subdirectory( utils )
 
-#######################################
-# Add common includes                 #
-#######################################
+
 opener_common_includes()
-
-#######################################
-# Add platfrom specific things        #
-#######################################
 
 opener_platform_support( "INCLUDES" )
 
@@ -31,11 +44,9 @@ message( "CIP_SRC:${CIP_SRC}" )
 
 add_library( eip STATIC
     ${OpENer_ADD_CIP_OBJECTS}
-    ${CIP_SRC}
-    ${ENET_ENCAP_SRC}
-    )
-target_link_libraries( eip
-    Utils
+    ${CIP_SRCS}
+    ${ENCAP_SRCS}
+    ${UTILS_SRCS}
     )
 
 message( "CMAKE_INSTALL_PREFIX:${CMAKE_INSTALL_PREFIX}" )
