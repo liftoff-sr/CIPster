@@ -59,6 +59,8 @@ void CipStackInit( EipUint16 unique_connection_id )
     eip_status = ApplicationInitialization();
     OPENER_ASSERT( kEipStatusOk == eip_status );
 #endif
+
+    (void) eip_status;
 }
 
 
