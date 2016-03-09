@@ -28,4 +28,4 @@ int EstablishClass3Connection(ConnectionObject *connection_object,
 
 void InitializeClass3ConnectionData(void);
 
-#endif /* OPENER_CIPCLASS3CONNECTION_H_ */
+#endif // OPENER_CIPCLASS3CONNECTION_H_

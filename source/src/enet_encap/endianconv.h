@@ -115,4 +115,4 @@ int FillNextNMessageOctetsWithValueAndMoveToNextPosition( EipByte value,
         int count, CipOctet **message_runner);
 
 
-#endif /* OPENER_ENDIANCONV_H_ */
+#endif // OPENER_ENDIANCONV_H_

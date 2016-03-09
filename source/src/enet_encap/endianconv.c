@@ -19,7 +19,7 @@
 
 OpenerEndianess g_opener_platform_endianess = kOpenerEndianessUnknown;
 
-/* THESE ROUTINES MODIFY THE BUFFER POINTER*/
+// THESE ROUTINES MODIFY THE BUFFER POINTER
 
 /**
  *   @brief Reads EIP_UINT8 from *buffer and converts little endian to host.
@@ -36,7 +36,7 @@ EipUint8 GetSintFromMessage( EipUint8** buffer )
 }
 
 
-/* little-endian-to-host unsigned 16 bit*/
+// little-endian-to-host unsigned 16 bit
 
 /**
  *   @brief Reads EIP_UINT16 from *buffer and converts little endian to host.

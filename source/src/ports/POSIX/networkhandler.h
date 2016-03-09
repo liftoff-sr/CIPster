@@ -25,4 +25,4 @@ EipStatus NetworkHandlerFinish(void);
 }
 #endif
 
-#endif /* OPENER_NETWORKHANDLER_H_ */
+#endif // OPENER_NETWORKHANDLER_H_

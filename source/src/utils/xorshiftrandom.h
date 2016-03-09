@@ -27,4 +27,4 @@ void SetXorShiftSeed(uint32_t seed);
  */
 uint32_t NextXorShiftUint32(void);
 
-#endif /* OPENER__XORSHIFTRANDOM_H_ */
+#endif // OPENER__XORSHIFTRANDOM_H_

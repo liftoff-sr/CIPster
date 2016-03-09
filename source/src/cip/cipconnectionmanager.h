@@ -22,7 +22,7 @@ typedef enum
     kRoutingTypeMulticastConnection = 0x2000
 } RoutingType;
 
-/** @brief Connection Manager Error codes */
+//* @brief Connection Manager Error codes
 typedef enum
 {
     kConnectionManagerStatusCodeSuccess = 0x00,
@@ -75,19 +75,19 @@ typedef enum
 #define SEQ_LEQ16( a, b )   ( (short) ( (a) - (b) ) <= 0 )
 #define SEQ_GEQ16( a, b )   ( (short) ( (a) - (b) ) >= 0 )
 
-/** @brief States of a connection */
+//* @brief States of a connection
 typedef enum
 {
     kConnectionStateNonExistent = 0,
     kConnectionStateConfiguring = 1,
-    kConnectionStateWaitingForConnectionId = 2    /**< only used in DeviceNet */,
+    kConnectionStateWaitingForConnectionId = 2,    ///< only used in DeviceNet
     kConnectionStateEstablished = 3,
     kConnectionStateTimedOut = 4,
-    kConnectionStateDeferredDelete = 5    /**< only used in DeviceNet */,
+    kConnectionStateDeferredDelete = 5,    ///< only used in DeviceNet
     kConnectionStateClosing
 } ConnectionState;
 
-/** @brief instance_type attributes */
+//* @brief instance_type attributes
 typedef enum
 {
     kConnectionTypeExplicit = 0,
@@ -96,14 +96,14 @@ typedef enum
     kConnectionTypeIoListenOnly = 0x21
 } ConnectionType;
 
-/** @brief Possible values for the watch dog time out action of a connection */
+//* @brief Possible values for the watch dog time out action of a connection
 typedef enum
 {
-    kWatchdogTimeoutActionTransitionToTimedOut = 0, /**< , invalid for explicit message connections */
+    kWatchdogTimeoutActionTransitionToTimedOut = 0, ///< , invalid for explicit message connections
     kWatchdogTimeoutActionAutoDelete    = 1,        /**< Default for explicit message connections,
                                                      *  default for I/O connections on EIP */
-    kWatchdogTimeoutActionAutoReset     = 2,        /**< Invalid for explicit message connections */
-    kWatchdogTimeoutActionDeferredDelete = 3        /**< Only valid for DeviceNet, invalid for I/O connections */
+    kWatchdogTimeoutActionAutoReset     = 2,        ///< Invalid for explicit message connections
+    kWatchdogTimeoutActionDeferredDelete = 3        ///< Only valid for DeviceNet, invalid for I/O connections
 } WatchdogTimeoutAction;
 
 typedef struct
@@ -146,7 +146,7 @@ typedef struct connection_object
     EipUint16   consumed_connection_size;
     EipUint16   expected_packet_rate;
 
-    /*conditional*/
+    //conditional
     EipUint32   produced_connection_id;
     EipUint32   consumed_connection_id;
 
@@ -160,7 +160,7 @@ typedef struct connection_object
     /* conditional
      *  UINT16 ProductionInhibitTime;
      */
-    /* non CIP Attributes, only relevant for opened connections */
+    // non CIP Attributes, only relevant for opened connections
     EipByte priority_timetick;
     EipUint8 timeout_ticks;
     EipUint16   connection_serial_number;
@@ -174,16 +174,16 @@ typedef struct connection_object
     EipByte     transport_type_class_trigger;
     EipUint8    connection_path_size;
     CipElectronicKey electronic_key;
-    CipConnectionPath connection_path; /* padded EPATH*/
+    CipConnectionPath connection_path; // padded EPATH
     LinkObject link_object;
 
     CipInstance* consuming_instance;
 
-    /*S_CIP_CM_Object *p_stConsumingCMObject; */
+    // S_CIP_CM_Object *p_stConsumingCMObject;
 
     CipInstance* producing_instance;
 
-    /*S_CIP_CM_Object *p_stProducingCMObject; */
+    // S_CIP_CM_Object *p_stProducingCMObject;
 
     EipUint32 eip_level_sequence_count_producing;   /* the EIP level sequence Count
                                                      *  for Class 0/1
@@ -214,20 +214,20 @@ typedef struct connection_object
      */
     EipInt32 production_inhibit_timer;
 
-    struct sockaddr_in  remote_address;     /* socket address for produce */
+    struct sockaddr_in  remote_address;     // socket address for produce
     struct sockaddr_in  originator_address; /* the address of the originator that
                                              *  established the connection. needed
                                              *  for scanning if the right packet is
                                              *  arriving */
-    int socket[2];                          /* socket handles, indexed by kConsuming or kProducing */
+    int socket[2];                          // socket handles, indexed by kConsuming or kProducing
 
-    /* pointers to connection handling functions */
+    // pointers to connection handling functions
     ConnectionCloseFunction connection_close_function;
     ConnectionTimeoutFunction connection_timeout_function;
     ConnectionSendDataFunction connection_send_data_function;
     ConnectionReceiveDataFunction connection_receive_data_function;
 
-    /* pointers to be used in the active connection list */
+    // pointers to be used in the active connection list
     struct connection_object*   next_connection_object;
     struct connection_object*   first_connection_object;
 
@@ -235,10 +235,10 @@ typedef struct connection_object
     EipUint16   correct_target_to_originator_size;
 } ConnectionObject;
 
-/** @brief Connection Manager class code */
+//* @brief Connection Manager class code
 static const int g_kCipConnectionManagerClassCode = 0x06;
 
-/* public functions */
+// public functions
 
 /** @brief Initialize the data of the connection manager object
  */
@@ -274,7 +274,7 @@ void CopyConnectionData( ConnectionObject* destination, ConnectionObject* source
  */
 void CloseConnection( ConnectionObject* connection_object );
 
-/* TODO: Missing documentation */
+// TODO: Missing documentation
 EipBool8 IsConnectedOutputAssembly( EipUint32 instance_number );
 
 /** @brief Generate the ConnectionIDs and set the general configuration
@@ -296,7 +296,7 @@ void GeneralConnectionConfiguration( ConnectionObject* connection_object );
  */
 void AddNewActiveConnection( ConnectionObject* connection_object );
 
-/* TODO: Missing documentation */
+// TODO: Missing documentation
 void RemoveFromActiveConnections( ConnectionObject* connection_object );
 
-#endif /* OPENER_CIPCONNECTIONMANAGER_H_ */
+#endif // OPENER_CIPCONNECTIONMANAGER_H_

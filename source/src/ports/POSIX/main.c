@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  ******************************************************************************/
 #include <stdio.h>
@@ -14,19 +14,19 @@
 
 extern int newfd;
 
-/******************************************************************************/
+//****************************************************************************
 /** @brief Signal handler function for ending stack execution
  *
  * @param signal the signal we received
  */
 void LeaveStack(int signal);
 
-/*****************************************************************************/
+//***************************************************************************
 /** @brief Flag indicating if the stack should end its execution
  */
 int g_end_stack = 0;
 
-/******************************************************************************/
+//****************************************************************************
 int main(int argc, char *arg[]) {
   EipUint8 my_mac_address[6];
   EipUint16 unique_connection_id;
@@ -40,7 +40,7 @@ int main(int argc, char *arg[]) {
         "    e.g. ./OpENer 192.168.0.2 255.255.255.0 192.168.0.1 test.com testdevice 00 15 C5 BF D0 87\n");
     exit(0);
   } else {
-    /* fetch Internet address info from the platform */
+    // fetch Internet address info from the platform
     ConfigureNetworkInterface(arg[1], arg[2], arg[3]);
     ConfigureDomainName(arg[4]);
     ConfigureHostName(arg[5]);
@@ -54,7 +54,7 @@ int main(int argc, char *arg[]) {
     ConfigureMacAddress(my_mac_address);
   }
 
-  /*for a real device the serial number should be unique per device */
+  //for a real device the serial number should be unique per device
   SetDeviceSerialNumber(123456789);
 
   /* nUniqueConnectionID should be sufficiently random or incremented and stored
@@ -62,35 +62,35 @@ int main(int argc, char *arg[]) {
    */
   unique_connection_id = rand();
 
-  /* Setup the CIP Layer */
+  // Setup the CIP Layer
   CipStackInit(unique_connection_id);
 
-  /* Setup Network Handles */
+  // Setup Network Handles
   if (kEipStatusOk == NetworkHandlerInitialize()) {
     g_end_stack = 0;
 #ifndef WIN32
-    /* register for closing signals so that we can trigger the stack to end */
+    // register for closing signals so that we can trigger the stack to end
     signal(SIGHUP, LeaveStack);
 #endif
 
-    /* The event loop. Put other processing you need done continually in here */
+    // The event loop. Put other processing you need done continually in here
     while (1 != g_end_stack) {
       if (kEipStatusOk != NetworkHandlerProcessOnce()) {
         break;
       }
     }
 
-    /* clean up network state */
+    // clean up network state
     NetworkHandlerFinish();
   }
-  /* close remaining sessions and connections, cleanup used data */
+  // close remaining sessions and connections, cleanup used data
   ShutdownCipStack();
 
   return -1;
 }
 
 void LeaveStack(int signal) {
-  (void) signal; /* kill unused parameter warning */
+  (void) signal; // kill unused parameter warning
   OPENER_TRACE_STATE("got signal HUP\n");
   g_end_stack = 1;
 }

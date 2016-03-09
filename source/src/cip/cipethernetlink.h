@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  ******************************************************************************/
 #ifndef OPENER_CIPETHERNETLINK_H_
@@ -11,9 +11,9 @@
 
 #define CIP_ETHERNETLINK_CLASS_CODE 0xF6
 
-/* public functions */
+// public functions
 /** @brief Initialize the Ethernet Link Objects data
  */
 EipStatus CipEthernetLinkInit(void);
 
-#endif /* OPENER_CIPETHERNETLINK_H_*/
+#endif // OPENER_CIPETHERNETLINK_H_

@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  ******************************************************************************/
 #ifndef OPENER_USER_CONF_H_
@@ -8,9 +8,9 @@
 
 /** @file
  * @brief OpENer configuration setup
- * 
+ *
  * This file contains the general application specific configuration for OpENer.
- * 
+ *
  * Furthermore you have to specific platform specific network include files.
  * OpENer needs definitions for the following data-types
  * and functions:
@@ -24,7 +24,7 @@
 #include <windows.h>
 typedef unsigned short in_port_t;
 
-/*! Identity configuration of the device */
+//! Identity configuration of the device
 #define OPENER_DEVICE_VENDOR_ID           1
 #define OPENER_DEVICE_TYPE               12
 #define OPENER_DEVICE_PRODUCT_CODE      65001
@@ -100,12 +100,12 @@ static const int kOpenerConsumedDataHasRunIdleHeader = 1;
 static const int kOpenerProducedDataHasRunIdleHeader = 0;
 
 #ifdef OPENER_WITH_TRACES
-/* If we have tracing enabled provide print tracing macro */
+// If we have tracing enabled provide print tracing macro
 #include <stdio.h>
 
 #define LOG_TRACE(...)  fprintf(stderr,__VA_ARGS__)
 
-/*#define PRINT_TRACE(args...)  fprintf(stderr,args);*/
+//#define PRINT_TRACE(args...)  fprintf(stderr,args);
 
 /** @brief A specialized assertion command that will log the assertion and block
  *  further execution in an while(1) loop.
@@ -118,13 +118,13 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
       } \
     } while(0)
 
-/* else use standard assert() */
+// else use standard assert()
 //#include <assert.h>
 //#include <stdio.h>
 //#define OPENER_ASSERT(assertion) assert(assertion)
 #else
 
-/* for release builds execute the assertion, but don't test it */
+// for release builds execute the assertion, but don't test it
 #define OPENER_ASSERT(assertion) (assertion)
 
 /* the above may result in "statement with no effect" warnings.
@@ -132,9 +132,9 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
  *  macro can be used as below
  */
 //#define OPENER_ASSERT(assertion)
-/* else if you still want assertions to stop execution but without tracing, use the following */
+// else if you still want assertions to stop execution but without tracing, use the following
 //#define OPENER_ASSERT(assertion) do { if(!(assertion)) { while(1){;} } } while (0)
-/* else use standard assert() */
+// else use standard assert()
 //#include <assert.h>
 //#include <stdio.h>
 //#define OPENER_ASSERT(assertion) assert(assertion)
@@ -142,7 +142,7 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
 #endif
 
 /** @brief The number of bytes used for the Ethernet message buffer on
- * the pc port. For different platforms it may makes sense to 
+ * the pc port. For different platforms it may makes sense to
  * have more than one buffer.
  *
  *  This buffer size will be used for any received message.
@@ -150,4 +150,4 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
  */
 #define PC_OPENER_ETHERNET_BUFFER_SIZE 512
 
-#endif /*OPENER_USER_CONF_H_*/
+#endif //OPENER_USER_CONF_H_

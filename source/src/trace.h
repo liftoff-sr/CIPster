@@ -19,13 +19,13 @@
  */
 #define OPENER_TRACE_LEVEL_ERROR 0x01
 
-/** @def OPENER_TRACE_LEVEL_WARNING Enable tracing of warning messages */
+//* @def OPENER_TRACE_LEVEL_WARNING Enable tracing of warning messages
 #define OPENER_TRACE_LEVEL_WARNING 0x02
 
-/** @def OPENER_TRACE_LEVEL_WARNING Enable tracing of state messages */
+//* @def OPENER_TRACE_LEVEL_WARNING Enable tracing of state messages
 #define OPENER_TRACE_LEVEL_STATE 0x04
 
-/** @def OPENER_TRACE_LEVEL_INFO Enable tracing of info messages*/
+//* @def OPENER_TRACE_LEVEL_INFO Enable tracing of info messages
 #define OPENER_TRACE_LEVEL_INFO 0x08
 
 #ifndef OPENER_TRACE_LEVEL
@@ -39,7 +39,7 @@
 #define OPENER_TRACE_LEVEL OPENER_TRACE_LEVEL_ERROR
 #endif
 
-/* @def OPENER_TRACE_ENABLED Can be used for conditional code compilation */
+// @def OPENER_TRACE_ENABLED Can be used for conditional code compilation
 #define OPENER_TRACE_ENABLED
 
 /** @def OPENER_TRACE_ERR(...) Trace error messages.
@@ -80,13 +80,13 @@
   } while (0)
 
 #else
-/* define the tracing macros empty in order to save space */
+// define the tracing macros empty in order to save space
 
 #define OPENER_TRACE_ERR(...)
 #define OPENER_TRACE_WARN(...)
 #define OPENER_TRACE_STATE(...)
 #define OPENER_TRACE_INFO(...)
 #endif
-/* TRACING *******************************************************************/
+// TRACING ******************************************************************
 
-#endif /*OPENER_TRACE_H_*/
+#endif //OPENER_TRACE_H_

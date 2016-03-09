@@ -25,7 +25,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-/** @brief Identity configuration of the device */
+//* @brief Identity configuration of the device
 #define OPENER_DEVICE_VENDOR_ID         60000
 #define OPENER_DEVICE_TYPE              12
 #define OPENER_DEVICE_PRODUCT_CODE      65001
@@ -103,7 +103,7 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
 
 
 #ifdef OPENER_WITH_TRACES
-/* If we have tracing enabled provide print tracing macro */
+// If we have tracing enabled provide print tracing macro
 #include <stdio.h>
 
 #define LOG_TRACE(...)  printf(__VA_ARGS__)
@@ -119,13 +119,13 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
       } \
     } while(0)
 
-/* else use standard assert() */
+// else use standard assert()
 //#include <assert.h>
 //#include <stdio.h>
 //#define OPENER_ASSERT(assertion) assert(assertion)
 #else
 
-/* for release builds execute the assertion, but don't test it */
+// for release builds execute the assertion, but don't test it
 #define OPENER_ASSERT(assertion)
 
 /* the above may result in "statement with no effect" warnings.
@@ -133,9 +133,9 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
  *  macro can be used as below
  */
 //#define OPENER_ASSERT(assertion)
-/* else if you still want assertions to stop execution but without tracing, use the following */
+// else if you still want assertions to stop execution but without tracing, use the following
 //#define OPENER_ASSERT(assertion) do { if(!(assertion)) { while(1){;} } } while (0)
-/* else use standard assert() */
+// else use standard assert()
 //#include <assert.h>
 //#include <stdio.h>
 //#define OPENER_ASSERT(assertion) assert(assertion)
@@ -151,4 +151,4 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
  */
 #define PC_OPENER_ETHERNET_BUFFER_SIZE 512
 
-#endif /*OPENER_USER_CONF_H_*/
+#endif //OPENER_USER_CONF_H_

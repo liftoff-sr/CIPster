@@ -15,33 +15,33 @@
 #include "cipethernetlink.h"
 #include "opener_api.h"
 
-CipDword tcp_status_ = 0x1;                         /**< #1  TCP status with 1 we indicate that we got a valid configuration from DHCP or BOOTP */
+CipDword tcp_status_ = 0x1;                         //*< #1  TCP status with 1 we indicate that we got a valid configuration from DHCP or BOOTP
 
-CipDword configuration_capability_ = 0x04 | 0x20;   /**< #2  This is a default value meaning that it is a DHCP client see 5-3.2.2.2 EIP specification; 0x20 indicates "Hardware Configurable" */
+CipDword configuration_capability_ = 0x04 | 0x20;   //*< #2  This is a default value meaning that it is a DHCP client see 5-3.2.2.2 EIP specification; 0x20 indicates "Hardware Configurable"
 
-CipDword configuration_control_ = 0;                /**< #3  This is a TCP/IP object attribute. For now it is always zero and is not used for anything. */
+CipDword configuration_control_ = 0;                //*< #3  This is a TCP/IP object attribute. For now it is always zero and is not used for anything.
 
-CipEpath physical_link_object_ =                    /**< #4 */
+CipEpath physical_link_object_ =                    //*< #4
 {
-    2,                                              /**< EIP_UINT16 (UINT) PathSize in 16 Bit chunks*/
-    CIP_ETHERNETLINK_CLASS_CODE,                    /**< EIP_UINT16 ClassID*/
-    1,                                              /**< EIP_UINT16 InstanceNr*/
-    0                                               /**< EIP_UINT16 AttributNr (not used as this is the EPATH the EthernetLink object)*/
+    2,                                              //*< EIP_UINT16 (UINT) PathSize in 16 Bit chunks
+    CIP_ETHERNETLINK_CLASS_CODE,                    //*< EIP_UINT16 ClassID
+    1,                                              //*< EIP_UINT16 InstanceNr
+    0                                               //*< EIP_UINT16 AttributNr (not used as this is the EPATH the EthernetLink object)
 };
 
-CipTcpIpNetworkInterfaceConfiguration interface_configuration_ =    /**< #5 IP, network mask, gateway, name server 1 & 2, domain name*/
+CipTcpIpNetworkInterfaceConfiguration interface_configuration_ =    //*< #5 IP, network mask, gateway, name server 1 & 2, domain name
 {
-    0,                                                              /* default IP address */
-    0,                                                              /* NetworkMask */
-    0,                                                              /* Gateway */
-    0,                                                              /* NameServer */
-    0,                                                              /* NameServer2 */
-    {                                                               /* DomainName */
+    0,                                                              // default IP address
+    0,                                                              // NetworkMask
+    0,                                                              // Gateway
+    0,                                                              // NameServer
+    0,                                                              // NameServer2
+    {                                                               // DomainName
         0, NULL,
     }
 };
 
-CipString hostname_ =    /**< #6 Hostname*/
+CipString hostname_ =    //*< #6 Hostname
 { 0, NULL };
 
 /** @brief #8 the time to live value to be used for multi-cast connections
@@ -57,13 +57,13 @@ EipUint8 g_time_to_live_value = 1;
  */
 MulticastAddressConfiguration g_multicast_configuration =
 {
-    0,  /* us the default allocation algorithm */
-    0,  /* reserved */
-    1,  /* we currently use only one multicast address */
-    0   /* the multicast address will be allocated on ip address configuration */
+    0,  // us the default allocation algorithm
+    0,  // reserved
+    1,  // we currently use only one multicast address
+    0   // the multicast address will be allocated on ip address configuration
 };
 
-/************** Functions ****************************************/
+//************* Functions ***************************************
 EipStatus GetAttributeSingleTcpIpInterface( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response );
@@ -80,9 +80,9 @@ EipStatus ConfigureNetworkInterface( const char* ip_address,
     interface_configuration_.network_mask = inet_addr( subnet_mask );
     interface_configuration_.gateway = inet_addr( gateway );
 
-    /* calculate the CIP multicast address. The multicast address is calculated, not input*/
+    // calculate the CIP multicast address. The multicast address is calculated, not input
     EipUint32 host_id = ntohl( interface_configuration_.ip_address )
-                        & ~ntohl( interface_configuration_.network_mask ); /* see CIP spec 3-5.3 for multicast address algorithm*/
+                        & ~ntohl( interface_configuration_.network_mask ); // see CIP spec 3-5.3 for multicast address algorithm
     host_id -= 1;
     host_id &= 0x3ff;
 
@@ -150,18 +150,18 @@ EipStatus SetAttributeSingleTcp( CipInstance* instance,
     CipAttributeStruct* attribute = GetCipAttribute(
             instance, request->request_path.attribute_number );
 
-    (void) instance; /*Suppress compiler warning */
+    (void) instance; //Suppress compiler warning
 
     if( 0 != attribute )
     {
-        /* it is an attribute we currently support, however no attribute is setable */
-        /* TODO: if you like to have a device that can be configured via this CIP object add your code here */
-        /* TODO: check for flags associated with attributes */
+        // it is an attribute we currently support, however no attribute is setable
+        // TODO: if you like to have a device that can be configured via this CIP object add your code here
+        // TODO: check for flags associated with attributes
         response->general_status = kCipErrorAttributeNotSetable;
     }
     else
     {
-        /* we don't have this attribute */
+        // we don't have this attribute
         response->general_status = kCipErrorAttributeNotSupported;
     }
 
@@ -177,19 +177,19 @@ EipStatus CipTcpIpInterfaceInit()
 {
     CipClass* tcp_ip_class = NULL;
 
-    if( ( tcp_ip_class = CreateCipClass( kCipTcpIpInterfaceClassCode, 0,    /* # class attributes*/
-                  0xffffffff,                                               /* class getAttributeAll mask*/
-                  0,                                                        /* # class services*/
-                  8,                                                        /* # instance attributes*/
-                  0xffffffff,                                               /* instance getAttributeAll mask*/
-                  1,                                                        /* # instance services*/
-                  1,                                                        /* # instances*/
+    if( ( tcp_ip_class = CreateCipClass( kCipTcpIpInterfaceClassCode, 0,    // # class attributes
+                  0xffffffff,                                               // class getAttributeAll mask
+                  0,                                                        // # class services
+                  8,                                                        // # instance attributes
+                  0xffffffff,                                               // instance getAttributeAll mask
+                  1,                                                        // # instance services
+                  1,                                                        // # instances
                   "TCP/IP interface", 3 ) ) == 0 )
     {
         return kEipStatusError;
     }
 
-    CipInstance* instance = GetCipInstance( tcp_ip_class, 1 ); /* bind attributes to the instance #1 that was created above*/
+    CipInstance* instance = GetCipInstance( tcp_ip_class, 1 ); // bind attributes to the instance #1 that was created above
 
     InsertAttribute( instance, 1, kCipDword, (void*) &tcp_status_, kGetableSingleAndAll );
     InsertAttribute( instance, 2, kCipDword, (void*) &configuration_capability_, kGetableSingleAndAll );
@@ -226,7 +226,7 @@ EipStatus CipTcpIpInterfaceInit()
 
 void ShutdownTcpIpInterface( void )
 {
-    /*Only free the resources if they are initialized */
+    //Only free the resources if they are initialized
     if( NULL != hostname_.string )
     {
         CipFree( hostname_.string );
@@ -296,16 +296,16 @@ EipStatus GetAttributeAllTcpIpInterface( CipInstance* instance,
 
     CipAttributeStruct* attribute = instance->attributes;
 
-    for( int j = 0; j < instance->cip_class->number_of_attributes; j++ ) /* for each instance attribute of this class */
+    for( int j = 0; j < instance->cip_class->number_of_attributes; j++ ) // for each instance attribute of this class
     {
         int attribute_number = attribute->attribute_number;
 
         if( attribute_number < 32
-            && (instance->cip_class->get_attribute_all_mask & 1 << attribute_number) ) /* only return attributes that are flagged as being part of GetAttributeALl */
+            && (instance->cip_class->get_attribute_all_mask & 1 << attribute_number) ) // only return attributes that are flagged as being part of GetAttributeALl
         {
             request->request_path.attribute_number = attribute_number;
 
-            if( 8 == attribute_number ) /* insert 6 zeros for the required empty safety network number according to Table 5-3.10 */
+            if( 8 == attribute_number ) // insert 6 zeros for the required empty safety network number according to Table 5-3.10
             {
                 memset( response->data, 0, 6 );
                 response->data += 6;

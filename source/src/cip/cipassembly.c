@@ -4,7 +4,7 @@
  *
  ******************************************************************************/
 
-#include <string.h>    /*needed for memcpy */
+#include <string.h>    //needed for memcpy
 
 #include "cipassembly.h"
 
@@ -25,16 +25,16 @@ CipClass* CreateAssemblyClass( void )
 {
     CipClass* assembly_class;
 
-    /* create the CIP Assembly object with zero instances */
-    assembly_class = CreateCipClass( kCipAssemblyClassCode, 0,  /* # class attributes*/
-            0,                                                  /* 0 as the assembly object should not have a get_attribute_all service*/
-            0,                                                  /* # class services*/
-            2,                                                  /* # instance attributes*/
-            0,                                                  /* 0 as the assembly object should not have a get_attribute_all service*/
-            1,                                                  /* # instance services*/
-            0,                                                  /* # instances*/
-            "assembly",                                         /* name */
-            2                                                   /* Revision, according to the CIP spec currently this has to be 2 */
+    // create the CIP Assembly object with zero instances
+    assembly_class = CreateCipClass( kCipAssemblyClassCode, 0,  // # class attributes
+            0,                                                  // 0 as the assembly object should not have a get_attribute_all service
+            0,                                                  // # class services
+            2,                                                  // # instance attributes
+            0,                                                  // 0 as the assembly object should not have a get_attribute_all service
+            1,                                                  // # instance services
+            0,                                                  // # instances
+            "assembly",                                         // name
+            2                                                   // Revision, according to the CIP spec currently this has to be 2
             );
 
     if( NULL != assembly_class )
@@ -49,7 +49,7 @@ CipClass* CreateAssemblyClass( void )
 
 EipStatus CipAssemblyInitialize( void )
 {
-    /* create the CIP Assembly object with zero instances */
+    // create the CIP Assembly object with zero instances
     return ( NULL != CreateAssemblyClass() ) ? kEipStatusOk : kEipStatusError;
 }
 
@@ -94,12 +94,12 @@ CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
         }
     }
 
-    instance = AddCIPInstance( assembly_class, instance_id ); /* add instances (always succeeds (or asserts))*/
+    instance = AddCIPInstance( assembly_class, instance_id ); // add instances (always succeeds (or asserts))
 
     if( ( assembly_byte_array = (CipByteArray*) CipCalloc( 1, sizeof(CipByteArray) ) )
         == NULL )
     {
-        return NULL; /*TODO remove assembly instance in case of error*/
+        return NULL; //TODO remove assembly instance in case of error
     }
 
     assembly_byte_array->length = data_length;
@@ -108,7 +108,7 @@ CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
     InsertAttribute( instance, 3, kCipByteArray, assembly_byte_array,
             kSetAndGetAble );
 
-    /* Attribute 4 Number of bytes in Attribute 3 */
+    // Attribute 4 Number of bytes in Attribute 3
     InsertAttribute( instance, 4, kCipUint, &(assembly_byte_array->length),
             kGetableSingle );
 
@@ -122,19 +122,19 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
 {
     CipByteArray* assembly_byte_array;
 
-    /* empty path (path size = 0) need to be checked and taken care of in future */
-    /* copy received data to Attribute 3 */
+    // empty path (path size = 0) need to be checked and taken care of in future
+    // copy received data to Attribute 3
     assembly_byte_array = (CipByteArray*) instance->attributes->data;
 
     if( assembly_byte_array->length != data_length )
     {
         OPENER_TRACE_ERR( "wrong amount of data arrived for assembly object\n" );
-        return kEipStatusError; /*TODO question should we notify the application that wrong data has been recieved???*/
+        return kEipStatusError; //TODO question should we notify the application that wrong data has been recieved???
     }
     else
     {
         memcpy( assembly_byte_array->data, data, data_length );
-        /* call the application that new data arrived */
+        // call the application that new data arrived
     }
 
     return AfterAssemblyDataReceived( instance );
@@ -167,7 +167,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
         {
             CipByteArray* data = (CipByteArray*) attribute->data;
 
-            /* TODO: check for ATTRIBUTE_SET/GETABLE MASK */
+            // TODO: check for ATTRIBUTE_SET/GETABLE MASK
             if( true == IsConnectedOutputAssembly( instance->instance_number ) )
             {
                 OPENER_TRACE_WARN(
@@ -216,7 +216,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
         }
         else
         {
-            /* the attribute was zero we are a heartbeat assembly */
+            // the attribute was zero we are a heartbeat assembly
             response->general_status = kCipErrorTooMuchData;
         }
     }

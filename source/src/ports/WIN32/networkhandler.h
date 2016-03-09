@@ -17,4 +17,4 @@ EipStatus NetworkHandlerInitialize(void);
 EipStatus NetworkHandlerProcessOnce(void);
 EipStatus NetworkHandlerFinish(void);
 
-#endif /*NETWORKHANDLER_H_*/
+#endif //NETWORKHANDLER_H_

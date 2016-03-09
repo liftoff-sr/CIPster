@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  ******************************************************************************/
 #ifndef OPENER_CPF_H_
@@ -20,17 +20,17 @@
  * <data> := <the number of bytes specified by Length>
  */
 
-/** @brief Definition of Item ID numbers used for address and data items in CPF structures */
+//* @brief Definition of Item ID numbers used for address and data items in CPF structures
 typedef enum {
-  kCipItemIdNullAddress = 0x0000, /**< Type: Address; Indicates that encapsulation routing is not needed. */
+  kCipItemIdNullAddress = 0x0000, ///< Type: Address; Indicates that encapsulation routing is not needed.
   kCipItemIdListIdentityResponse = 0x000C,
-  kCipItemIdConnectionAddress = 0x00A1, /**< Type: Address; Connection-based, used for connected messages, see Vol.2, p.42 */
-  kCipItemIdConnectedDataItem = 0x00B1, /**< Type: Data; Connected data item, see Vol.2, p.43 */
-  kCipItemIdUnconnectedDataItem = 0x00B2, /**< Type: Data; Unconnected message */
+  kCipItemIdConnectionAddress = 0x00A1, ///< Type: Address; Connection-based, used for connected messages, see Vol.2, p.42
+  kCipItemIdConnectedDataItem = 0x00B1, ///< Type: Data; Connected data item, see Vol.2, p.43
+  kCipItemIdUnconnectedDataItem = 0x00B2, ///< Type: Data; Unconnected message
   kCipItemIdListServiceResponse = 0x0100,
-  kCipItemIdSocketAddressInfoOriginatorToTarget = 0x8000, /**< Type: Data; Sockaddr info item originator to target */
-  kCipItemIdSocketAddressInfoTargetToOriginator = 0x8001, /**< Type: Data; Sockaddr info item target to originator */
-  kCipItemIdSequencedAddressItem = 0x8002 /**< Sequenced Address item */
+  kCipItemIdSocketAddressInfoOriginatorToTarget = 0x8000, ///< Type: Data; Sockaddr info item originator to target
+  kCipItemIdSocketAddressInfoTargetToOriginator = 0x8001, ///< Type: Data; Sockaddr info item target to originator
+  kCipItemIdSequencedAddressItem = 0x8002 ///< Sequenced Address item
 } CipItemId;
 
 typedef struct {
@@ -59,7 +59,7 @@ typedef struct {
   CipUsint nasin_zero[8];
 } SocketAddressInfoItem;
 
-/* this one case of a CPF packet is supported:*/
+// this one case of a CPF packet is supported:
 
 typedef struct {
   EipUint16 item_count;
@@ -70,7 +70,7 @@ typedef struct {
 
 /** @ingroup ENCAP
  * Parse the CPF data from a received unconnected explicit message and
- * hand the data on to the message router 
+ * hand the data on to the message router
  *
  * @param  received_data pointer to the encapsulation structure with the received message
  * @param  reply_buffer reply buffer
@@ -81,8 +81,8 @@ int NotifyCommonPacketFormat(EncapsulationData *received_data,
 
 /** @ingroup ENCAP
  * Parse the CPF data from a received connected explicit message, check
- * the connection status, update any timers, and hand the data on to 
- * the message router 
+ * the connection status, update any timers, and hand the data on to
+ * the message router
  *
  * @param  received_data pointer to the encapsulation structure with the received message
  * @param  reply_buffer reply buffer
@@ -137,4 +137,4 @@ int AssembleLinearMessage(
  */
 extern CipCommonPacketFormatData g_common_packet_format_data_item;
 
-#endif /* OPENER_CPF_H_ */
+#endif // OPENER_CPF_H_

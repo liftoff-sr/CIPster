@@ -31,6 +31,13 @@ set( UTILS_SRCS
     utils/xorshiftrandom.c
     )
 
+if( true )
+    # compile all sources with the C++ compiler:
+    set_source_files_properties( ${CIP_SRCS} ${ENCAP_SRCS} ${UTILS_SRCS}
+        PROPERTIES
+            LANGUAGE CXX
+        )
+endif()
 
 add_subdirectory( cip_objects )
 

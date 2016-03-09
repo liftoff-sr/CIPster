@@ -68,4 +68,4 @@ void CloseAllConnections(void);
  */
 EipBool8 ConnectionWithSameConfigPointExists(EipUint32 config_point);
 
-#endif /* OPENER_APPCONTYPE_H_ */
+#endif // OPENER_APPCONTYPE_H_

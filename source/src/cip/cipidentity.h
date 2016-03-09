@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  ******************************************************************************/
 #ifndef OPENER_CIPIDENTITY_H_
@@ -11,9 +11,9 @@
 
 static const int kIdentityClassCode = 0x01;
 
-/** @brief Status of the CIP Identity object */
+//* @brief Status of the CIP Identity object
 typedef enum {
-  kOwned = 0x0001, /**< Indicates that the device has an owner */
+  kOwned = 0x0001, ///< Indicates that the device has an owner
   kConfigured = 0x0004, /**< Indicates that the device is configured to do
    something different, than the out-of-the-box default. */
   kMinorRecoverableFault = 0x0100, /**< Indicates that the device detected a
@@ -41,13 +41,13 @@ typedef enum {
   kAtLeastOneIoConnectionEstablishedAllInIdleMode = 0x0070
 } CipIdentityExtendedStatus;
 
-/* global public variables */
+// global public variables
 
-/* public functions */
+// public functions
 /** @brief CIP Identity object constructor
  *
  * @returns EipError if the class could not be created, otherwise EipOk
  */
 EipStatus CipIdentityInit(void);
 
-#endif /* OPENER_CIPIDENTITY_H_ */
+#endif // OPENER_CIPIDENTITY_H_

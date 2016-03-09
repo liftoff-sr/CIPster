@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  ******************************************************************************/
 #ifndef OPENER_CIPCOMMON_H_
@@ -23,7 +23,7 @@ extern EipUint8 g_message_data_reply_buffer[];
 
 /** @brief Check if requested service present in class/instance and call appropriate service.
  *
- * @param class class receiving the message
+ * @param clazz class receiving the message
  * @param message_router_request request message
  * @param message_router_response reply message
  * @return
@@ -31,7 +31,7 @@ extern EipUint8 g_message_data_reply_buffer[];
  *     - EIP_OK  ... no reply to send back
  *     - EIP_ERROR ... error
  */
-EipStatus NotifyClass(CipClass *class,
+EipStatus NotifyClass(CipClass *clazz,
                       CipMessageRouterRequest *message_router_request,
                       CipMessageRouterResponse *message_router_response);
 
@@ -69,4 +69,4 @@ EipStatus GetAttributeAll(CipInstance *instance,
  */
 int DecodePaddedEPath(CipEpath *epath, EipUint8 **data);
 
-#endif /* OPENER_CIPCOMMON_H_ */
+#endif // OPENER_CIPCOMMON_H_

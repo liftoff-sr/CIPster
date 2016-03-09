@@ -15,34 +15,34 @@
 #define DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM 153 //0x099
 #define DEMO_APP_EXPLICT_ASSEMBLY_NUM              154 //0x09A
 
-/* global variables for demo application (4 assembly data fields)  ************/
+// global variables for demo application (4 assembly data fields)  ***********
 
-EipUint8 g_assembly_data064[32]; /* Input */
-EipUint8 g_assembly_data096[32]; /* Output */
-EipUint8 g_assembly_data097[10]; /* Config */
-EipUint8 g_assembly_data09A[32]; /* Explicit */
+EipUint8 g_assembly_data064[32]; // Input
+EipUint8 g_assembly_data096[32]; // Output
+EipUint8 g_assembly_data097[10]; // Config
+EipUint8 g_assembly_data09A[32]; // Explicit
 
 EipStatus ApplicationInitialization(void) {
-  /* create 3 assembly object instances*/
-  /*INPUT*/
+  // create 3 assembly object instances
+  //INPUT
   CreateAssemblyObject(DEMO_APP_INPUT_ASSEMBLY_NUM, &g_assembly_data064[0],
                        sizeof(g_assembly_data064));
 
-  /*OUTPUT*/
+  //OUTPUT
   CreateAssemblyObject(DEMO_APP_OUTPUT_ASSEMBLY_NUM, &g_assembly_data096[0],
                        sizeof(g_assembly_data096));
 
-  /*CONFIG*/
+  //CONFIG
   CreateAssemblyObject(DEMO_APP_CONFIG_ASSEMBLY_NUM, &g_assembly_data097[0],
                        sizeof(g_assembly_data097));
 
-  /*Heart-beat output assembly for Input only connections */
+  //Heart-beat output assembly for Input only connections
   CreateAssemblyObject(DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM, 0, 0);
 
-  /*Heart-beat output assembly for Listen only connections */
+  //Heart-beat output assembly for Listen only connections
   CreateAssemblyObject(DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM, 0, 0);
 
-  /* assembly for explicit messaging */
+  // assembly for explicit messaging
   CreateAssemblyObject(DEMO_APP_EXPLICT_ASSEMBLY_NUM, &g_assembly_data09A[0],
                        sizeof(g_assembly_data09A));
 
@@ -62,23 +62,23 @@ EipStatus ApplicationInitialization(void) {
 }
 
 void HandleApplication(void) {
-  /* check if application needs to trigger an connection */
+  // check if application needs to trigger an connection
 }
 
 void CheckIoConnectionEvent(unsigned int pa_unOutputAssembly,
                        unsigned int pa_unInputAssembly,
                        IoConnectionEvent pa_eIOConnectionEvent) {
-  /* maintain a correct output state according to the connection state*/
+  // maintain a correct output state according to the connection state
 
-  (void) pa_unOutputAssembly; /* suppress compiler warning */
-  (void) pa_unInputAssembly; /* suppress compiler warning */
-  (void) pa_eIOConnectionEvent; /* suppress compiler warning */
+  (void) pa_unOutputAssembly; // suppress compiler warning
+  (void) pa_unInputAssembly; // suppress compiler warning
+  (void) pa_eIOConnectionEvent; // suppress compiler warning
 }
 
 EipStatus AfterAssemblyDataReceived(CipInstance *pa_pstInstance) {
   EipStatus nRetVal = kEipStatusOk;
 
-  /*handle the data received e.g., update outputs of the device */
+  //handle the data received e.g., update outputs of the device
   switch (pa_pstInstance->instance_number) {
     case DEMO_APP_OUTPUT_ASSEMBLY_NUM:
       /* Data for the output assembly has been received.
@@ -103,7 +103,7 @@ EipStatus AfterAssemblyDataReceived(CipInstance *pa_pstInstance) {
 }
 
 EipBool8 BeforeAssemblyDataSend(CipInstance *pa_pstInstance) {
-  /*update data to be sent e.g., read inputs of the device */
+  //update data to be sent e.g., read inputs of the device
   /*In this sample app we mirror the data from out to inputs on data receive
    * therefore we need nothing to do here. Just return true to inform that
    * the data is new.
@@ -117,14 +117,14 @@ EipBool8 BeforeAssemblyDataSend(CipInstance *pa_pstInstance) {
 }
 
 EipStatus ResetDevice(void) {
-  /* add reset code here*/
+  // add reset code here
   return kEipStatusOk;
 }
 
 EipStatus ResetDeviceToInitialConfiguration(void) {
-  /*rest the parameters */
+  //rest the parameters
 
-  /*than perform device reset*/
+  //than perform device reset
   ResetDevice();
   return kEipStatusOk;
 }
