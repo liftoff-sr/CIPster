@@ -31,7 +31,7 @@ include_directories( ${USER_INCLUDE_DIR} )
 
 set( OpENer_BUILDSUPPORT_DIR ${PROJECT_SOURCE_DIR}/buildsupport )
 
-INCLUDE( ${OpENer_BUILDSUPPORT_DIR}/OpENer.cmake )
+include( ${OpENer_BUILDSUPPORT_DIR}/OpENer.cmake )
 
 
 include( ${OpENer_BUILDSUPPORT_DIR}/OpENer_function_checks.cmake )

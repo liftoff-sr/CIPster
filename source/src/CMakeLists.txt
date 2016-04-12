@@ -6,7 +6,6 @@ add_definitions( -fPIC )
 
 set( CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined" )
 
-
 set( CIP_SRCS
     cip/appcontype.c
     cip/cipassembly.c
@@ -37,6 +36,8 @@ if( true )
         PROPERTIES
             LANGUAGE CXX
         )
+
+    add_definitions( -D__STDC_FORMAT_MACROS )       # <inttypes.h>'s PRIX32
 endif()
 
 add_subdirectory( cip_objects )

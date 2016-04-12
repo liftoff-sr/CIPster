@@ -213,7 +213,7 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
         int number_of_instances, const char* name,
         EipUint16 revision )
 {
-    OPENER_TRACE_INFO( "creating class '%s' with id: 0x%" PRIX32 "\n", name,
+    OPENER_TRACE_INFO( "creating class '%s' with id: 0x%08x\n", name,
             class_id );
 
     OPENER_ASSERT( !GetCipClass( class_id ) );   // should never try to redefine a class
