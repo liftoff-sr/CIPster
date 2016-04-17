@@ -13,25 +13,25 @@ extern ConnectionObject* g_active_connection_list;
 
 typedef struct
 {
-    unsigned int output_assembly;       ///< the O-to-T point for the connection
-    unsigned int input_assembly;        ///< the T-to-O point for the connection
-    unsigned int config_assembly;       ///< the config point for the connection
+    unsigned output_assembly;       ///< the O-to-T point for the connection
+    unsigned input_assembly;        ///< the T-to-O point for the connection
+    unsigned config_assembly;       ///< the config point for the connection
     ConnectionObject connection_data;   ///< the connection data, only one connection is allowed per O-to-T point
 } ExclusiveOwnerConnection;
 
 typedef struct
 {
-    unsigned int output_assembly;                                                   ///< the O-to-T point for the connection
-    unsigned int input_assembly;                                                    ///< the T-to-O point for the connection
-    unsigned int config_assembly;                                                   ///< the config point for the connection
+    unsigned output_assembly;                                                   ///< the O-to-T point for the connection
+    unsigned input_assembly;                                                    ///< the T-to-O point for the connection
+    unsigned config_assembly;                                                   ///< the config point for the connection
     ConnectionObject connection_data[OPENER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH]; // < the connection data
 } InputOnlyConnection;
 
 typedef struct
 {
-    unsigned int output_assembly;                                                       ///< the O-to-T point for the connection
-    unsigned int input_assembly;                                                        ///< the T-to-O point for the connection
-    unsigned int config_assembly;                                                       ///< the config point for the connection
+    unsigned output_assembly;                                                       ///< the O-to-T point for the connection
+    unsigned input_assembly;                                                        ///< the T-to-O point for the connection
+    unsigned config_assembly;                                                       ///< the config point for the connection
     ConnectionObject connection_data[OPENER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH];    ///< the connection data
 } ListenOnlyConnection;
 
@@ -50,10 +50,10 @@ ConnectionObject* GetInputOnlyConnection( ConnectionObject* connection_object,
 ConnectionObject* GetListenOnlyConnection( ConnectionObject* connection_object,
         EipUint16* extended_error );
 
-void ConfigureExclusiveOwnerConnectionPoint( unsigned int connection_number,
-        unsigned int output_assembly,
-        unsigned int input_assembly,
-        unsigned int config_assembly )
+void ConfigureExclusiveOwnerConnectionPoint( unsigned connection_number,
+        unsigned output_assembly,
+        unsigned input_assembly,
+        unsigned config_assembly )
 {
     if( OPENER_CIP_NUM_EXLUSIVE_OWNER_CONNS > connection_number )
     {
@@ -67,10 +67,10 @@ void ConfigureExclusiveOwnerConnectionPoint( unsigned int connection_number,
 }
 
 
-void ConfigureInputOnlyConnectionPoint( unsigned int connection_number,
-        unsigned int output_assembly,
-        unsigned int input_assembly,
-        unsigned int config_assembly )
+void ConfigureInputOnlyConnectionPoint( unsigned connection_number,
+        unsigned output_assembly,
+        unsigned input_assembly,
+        unsigned config_assembly )
 {
     if( OPENER_CIP_NUM_INPUT_ONLY_CONNS > connection_number )
     {
@@ -83,10 +83,10 @@ void ConfigureInputOnlyConnectionPoint( unsigned int connection_number,
 }
 
 
-void ConfigureListenOnlyConnectionPoint( unsigned int connection_number,
-        unsigned int output_assembly,
-        unsigned int input_assembly,
-        unsigned int config_assembly )
+void ConfigureListenOnlyConnectionPoint( unsigned connection_number,
+        unsigned output_assembly,
+        unsigned input_assembly,
+        unsigned config_assembly )
 {
     if( OPENER_CIP_NUM_LISTEN_ONLY_CONNS > connection_number )
     {

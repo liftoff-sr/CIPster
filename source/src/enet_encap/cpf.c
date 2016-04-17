@@ -23,7 +23,7 @@ int NotifyCommonPacketFormat( EncapsulationData* receive_data,
     int return_value = kEipStatusError;
 
     if( ( return_value = CreateCommonPacketFormatStructure(
-                  receive_data->current_communication_buffer_position,
+                  receive_data->buf_pos,
                   receive_data->data_length, &g_common_packet_format_data_item ) )
         == kEipStatusError )
     {
@@ -75,7 +75,7 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
         EipUint8* reply_buffer )
 {
     int return_value = CreateCommonPacketFormatStructure(
-            received_data->current_communication_buffer_position,
+            received_data->buf_pos,
             received_data->data_length, &g_common_packet_format_data_item );
 
     if( kEipStatusError == return_value )

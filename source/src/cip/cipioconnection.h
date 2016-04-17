@@ -74,6 +74,6 @@ void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList(
         ConnectionObject* connection_object );
 
 extern EipUint8* g_config_data_buffer;
-extern unsigned int g_config_data_length;
+extern unsigned g_config_data_length;
 
 #endif // OPENER_CIPIOCONNECTION_H_

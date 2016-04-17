@@ -65,8 +65,8 @@ void HandleApplication(void) {
   // check if application needs to trigger an connection
 }
 
-void CheckIoConnectionEvent(unsigned int pa_unOutputAssembly,
-                       unsigned int pa_unInputAssembly,
+void CheckIoConnectionEvent(unsigned pa_unOutputAssembly,
+                       unsigned pa_unInputAssembly,
                        IoConnectionEvent pa_eIOConnectionEvent) {
   // maintain a correct output state according to the connection state
 

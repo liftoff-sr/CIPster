@@ -65,8 +65,8 @@ void HandleApplication(void) {
   // check if application needs to trigger an connection
 }
 
-void CheckIoConnectionEvent(unsigned int output_assembly_id,
-                       unsigned int input_assembly_id,
+void CheckIoConnectionEvent(unsigned output_assembly_id,
+                       unsigned input_assembly_id,
                        IoConnectionEvent io_connection_event) {
   // maintain a correct output state according to the connection state
 
@@ -130,7 +130,7 @@ EipStatus ResetDeviceToInitialConfiguration(void) {
 }
 
 void *
-CipCalloc(unsigned int number_of_elements, unsigned size_of_element) {
+CipCalloc(unsigned number_of_elements, unsigned size_of_element) {
   return calloc(number_of_elements, size_of_element);
 }
 

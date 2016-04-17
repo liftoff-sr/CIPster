@@ -807,7 +807,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
 
 int EncodeEPath( CipEpath* epath, EipUint8** message )
 {
-    unsigned int length = epath->path_size;
+    unsigned length = epath->path_size;
 
     AddIntToMessage( epath->path_size, message );
 
@@ -877,7 +877,7 @@ int EncodeEPath( CipEpath* epath, EipUint8** message )
 
 int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
 {
-    unsigned int number_of_decoded_elements;
+    unsigned number_of_decoded_elements;
     EipUint8* message_runner = *message;
 
     epath->path_size = *message_runner;

@@ -75,10 +75,10 @@ typedef enum cip_data_types
     kCipInt = 0xC3,         ///< 16-bit signed integer
     kCipDint = 0xC4,        ///< 32-bit signed integer
     kCipLint = 0xC5,        ///< 64-bit signed integer
-    kCipUsint = 0xC6,       ///< 8-bit unsigned integer
-    kCipUint = 0xC7,        ///< 16-bit unsigned integer
-    kCipUdint = 0xC8,       ///< 32-bit unsigned integer
-    kCipUlint = 0xC9,       ///< 64-bit unsigned integer
+    kCipUsint = 0xC6,       ///< 8-bit unsignedeger
+    kCipUint = 0xC7,        ///< 16-bit unsignedeger
+    kCipUdint = 0xC8,       ///< 32-bit unsignedeger
+    kCipUlint = 0xC9,       ///< 64-bit unsignedeger
     kCipReal = 0xCA,        ///< Single precision floating point
     kCipLreal = 0xCB,       ///< Double precision floating point
     kCipStime = 0xCC,       ///< Synchronous time information*, type of DINT

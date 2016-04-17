@@ -49,14 +49,14 @@
 
 /** @brief Define the number of supported exclusive owner connections.
  *  Each of these connections has to be configured with the function
- *  void configureExclusiveOwnerConnectionPoint(unsigned int pa_unConnNum, unsigned int pa_unOutputAssembly, unsigned int pa_unInputAssembly, unsigned int pa_unConfigAssembly)
+ *  void configureExclusiveOwnerConnectionPoint(unsigned pa_unConnNum, unsigned pa_unOutputAssembly, unsigned pa_unInputAssembly, unsigned pa_unConfigAssembly)
  *
  */
 #define OPENER_CIP_NUM_EXLUSIVE_OWNER_CONNS 1
 
 /** @brief  Define the number of supported input only connections.
  *  Each of these connections has to be configured with the function
- *  void configureInputOnlyConnectionPoint(unsigned int pa_unConnNum, unsigned int pa_unOutputAssembly, unsigned int pa_unInputAssembly, unsigned int pa_unConfigAssembly)
+ *  void configureInputOnlyConnectionPoint(unsigned pa_unConnNum, unsigned pa_unOutputAssembly, unsigned pa_unInputAssembly, unsigned pa_unConfigAssembly)
  *
  */
 #define OPENER_CIP_NUM_INPUT_ONLY_CONNS 1
@@ -67,7 +67,7 @@
 
 /** @brief Define the number of supported listen only connections.
  *  Each of these connections has to be configured with the function
- *  void configureListenOnlyConnectionPoint(unsigned int pa_unConnNum, unsigned int pa_unOutputAssembly, unsigned int pa_unInputAssembly, unsigned int pa_unConfigAssembly)
+ *  void configureListenOnlyConnectionPoint(unsigned pa_unConnNum, unsigned pa_unOutputAssembly, unsigned pa_unInputAssembly, unsigned pa_unConfigAssembly)
  *
  */
 #define OPENER_CIP_NUM_LISTEN_ONLY_CONNS 1

@@ -131,9 +131,9 @@ void InitializeConnectionManagerData( void );
  * @param logical_path_segment TheLogical Path Segment
  *
  */
-unsigned int GetPaddedLogicalPath( unsigned char** logical_path_segment )
+unsigned GetPaddedLogicalPath( unsigned char** logical_path_segment )
 {
-    unsigned int padded_logical_path = *(*logical_path_segment)++;
+    unsigned padded_logical_path = *(*logical_path_segment)++;
 
     if( (padded_logical_path & 3) == 0 )
     {
@@ -1398,8 +1398,8 @@ ConnectionManagementHandling* GetConnMgmEntry( EipUint32 class_id )
 }
 
 
-EipStatus TriggerConnections( unsigned int pa_unOutputAssembly,
-        unsigned int pa_unInputAssembly )
+EipStatus TriggerConnections( unsigned pa_unOutputAssembly,
+        unsigned pa_unInputAssembly )
 {
     EipStatus nRetVal = kEipStatusError;
 

@@ -59,7 +59,7 @@ EipStatus HandleReceivedIoConnectionData( ConnectionObject* conn,
 
 //*** Global variables ***
 EipUint8* g_config_data_buffer = NULL;    //*< buffers for the config data coming with a forward open request.
-unsigned int g_config_data_length = 0;
+unsigned g_config_data_length = 0;
 
 EipUint32 g_run_idle_state;    //*< buffer for holding the run idle information.
 
@@ -827,7 +827,7 @@ EipStatus HandleReceivedIoConnectionData( ConnectionObject* conn,
         // we have no heartbeat connection
         if( kOpenerConsumedDataHasRunIdleHeader )
         {
-            EipUint32 nRunIdleBuf = GetDintFromMessage( &(data) );
+            EipUint32 nRunIdleBuf = GetDintFromMessage( &data );
 
             if( g_run_idle_state != nRunIdleBuf )
             {

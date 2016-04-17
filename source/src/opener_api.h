@@ -347,10 +347,10 @@ EipStatus AddConnectableObject( EipUint32 class_id,
  * @param configuration_assembly_id ID of the configuration point to be used for
  * this connection
  */
-void ConfigureExclusiveOwnerConnectionPoint( unsigned int connection_number,
-        unsigned int output_assembly_id,
-        unsigned int input_assembly_id,
-        unsigned int configuration_assembly_id );
+void ConfigureExclusiveOwnerConnectionPoint( unsigned connection_number,
+        unsigned output_assembly_id,
+        unsigned input_assembly_id,
+        unsigned configuration_assembly_id );
 
 /** @ingroup CIP_API
  * @brief Configures the connection point for an input only connection.
@@ -365,10 +365,10 @@ void ConfigureExclusiveOwnerConnectionPoint( unsigned int connection_number,
  * @param configuration_assembly_id ID of the configuration point to be used for
  * this connection
  */
-void ConfigureInputOnlyConnectionPoint( unsigned int connection_number,
-        unsigned int output_assembly_id,
-        unsigned int input_assembly_id,
-        unsigned int configuration_assembly_id );
+void ConfigureInputOnlyConnectionPoint( unsigned connection_number,
+        unsigned output_assembly_id,
+        unsigned input_assembly_id,
+        unsigned configuration_assembly_id );
 
 /** \ingroup CIP_API
  * \brief Configures the connection point for a listen only connection.
@@ -383,10 +383,10 @@ void ConfigureInputOnlyConnectionPoint( unsigned int connection_number,
  * @param configuration_assembly_id ID of the configuration point to be used for
  * this connection
  */
-void ConfigureListenOnlyConnectionPoint( unsigned int connection_number,
-        unsigned int output_assembly_id,
-        unsigned int input_assembly_id,
-        unsigned int configuration_assembly_id );
+void ConfigureListenOnlyConnectionPoint( unsigned connection_number,
+        unsigned output_assembly_id,
+        unsigned input_assembly_id,
+        unsigned configuration_assembly_id );
 
 /** @ingroup CIP_API
  * @brief Notify the encapsulation layer that an explicit message has been
@@ -401,7 +401,7 @@ void ConfigureListenOnlyConnectionPoint( unsigned int connection_number,
  * @return length of reply that needs to be sent back
  */
 int HandleReceivedExplictTcpData( int socket, EipUint8* buffer,
-        unsigned int buffer_length,
+        unsigned buffer_length,
         int* number_of_remaining_bytes );
 
 /** @ingroup CIP_API
@@ -418,7 +418,7 @@ int HandleReceivedExplictTcpData( int socket, EipUint8* buffer,
  * @return length of reply that need to be sent back
  */
 int HandleReceivedExplictUdpData( int socket, struct sockaddr_in* from_address,
-        EipUint8* buffer, unsigned int buffer_length,
+        EipUint8* buffer, unsigned buffer_length,
         int* number_of_remaining_bytes, int unicast );
 
 /** @ingroup CIP_API
@@ -467,8 +467,8 @@ EipStatus ManageConnections( void );
  * connection
  * @return EIP_OK on success
  */
-EipStatus TriggerConnections( unsigned int output_assembly_id,
-        unsigned int input_assembly_id );
+EipStatus TriggerConnections( unsigned output_assembly_id,
+        unsigned input_assembly_id );
 
 /** @ingroup CIP_API
  * @brief Inform the encapsulation layer that the remote host has closed the
@@ -521,8 +521,8 @@ void HandleApplication( void );
  * connection
  * @param io_connection_event information on the change occurred
  */
-void CheckIoConnectionEvent( unsigned int output_assembly_id,
-        unsigned int input_assembly_id,
+void CheckIoConnectionEvent( unsigned output_assembly_id,
+        unsigned input_assembly_id,
         IoConnectionEvent io_connection_event );
 
 /** @ingroup CIP_CALLBACK_API
@@ -603,7 +603,7 @@ static inline void CipFree( void* pa_poData )
  * @param size_of_element size in bytes of one element
  * @return pointer to the allocated memory, 0 on error
  */
-void* CipCalloc( unsigned int number_of_elements, unsigned int size_of_element );
+void* CipCalloc( unsigned number_of_elements, unsigned size_of_element );
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Free memory allocated by the OpENer
@@ -782,7 +782,7 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  *      int HandleReceivedExplictTCPData(int socket_handle, EIP_UINT8* buffer, int
  * buffer_length, int *number_of_remaining_bytes),\n
  *      int HandleReceivedExplictUDPData(int socket_handle, struct sockaddr_in
- * *from_address, EIP_UINT8* buffer, unsigned int buffer_length, int
+ * *from_address, EIP_UINT8* buffer, unsigned buffer_length, int
  * *number_of_remaining_bytes).\n
  *     Depending if the data has been received from a TCP or from a UDP socket.
  *     As a result of this function a response may have to be sent. The data to

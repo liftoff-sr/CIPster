@@ -42,9 +42,9 @@ typedef uint8_t     CipBool;    ///< Boolean data type
 typedef uint8_t     CipByte;    ///< 8-bit bit string
 typedef uint16_t    CipWord;    ///< 16-bit bit string
 typedef uint32_t    CipDword;   ///< 32-bit bit string
-typedef uint8_t     CipUsint;   ///< 8-bit unsigned integer
-typedef uint16_t    CipUint;    ///< CipUint 16-bit unsigned integer
-typedef uint32_t    CipUdint;   ///< CipUdint 32-bit unsigned integer
+typedef uint8_t     CipUsint;   ///< 8-bit unsignedeger
+typedef uint16_t    CipUint;    ///< CipUint 16-bit unsignedeger
+typedef uint32_t    CipUdint;   ///< CipUdint 32-bit unsignedeger
 typedef int8_t      CipSint;    ///< 8-bit signed integer
 typedef int16_t     CipInt;     ///< 16-bit signed integer
 typedef int32_t     CipDint;    ///< 32-bit signed integer
@@ -56,7 +56,7 @@ typedef int64_t     EipInt64;   ///< 64-bit signed number
 typedef uint64_t    EipUint64;  ///< 64-bit unsigned number
 
 typedef int64_t     CipLint;    ///< 64-bit signed integer
-typedef uint64_t    CipUlint;   ///< 64-bit unsigned integer
+typedef uint64_t    CipUlint;   ///< 64-bit unsignedeger
 typedef uint64_t    CipLword;   ///< 64-bit bit string
 #endif // OPENER_SUPPORT_64BIT_DATATYPES
 
