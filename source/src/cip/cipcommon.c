@@ -86,25 +86,21 @@ EipStatus NotifyClass( CipClass* cip_class,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    int i;
-    CipInstance* instance;
-    CipServiceStruct* service;
-    unsigned instance_number; // my instance number
-
     // find the instance: if instNr==0, the class is addressed, else find the instance
-    instance_number = request->request_path.instance_number; // get the instance number
-    instance = GetCipInstance( cip_class, instance_number );                // look up the instance (note that if inst==0 this will be the class itself)
+    unsigned instance_number = request->request_path.instance_number; // get the instance number
+
+    CipInstance* instance = GetCipInstance( cip_class, instance_number );                // look up the instance (note that if inst==0 this will be the class itself)
 
     if( instance )                                                          // if instance is found
     {
         OPENER_TRACE_INFO( "notify: found instance %d%s\n", instance_number,
                 instance_number == 0 ? " (class object)" : "" );
 
-        service = instance->cip_class->services;                                    // get pointer to array of services
+        CipServiceStruct* service = instance->cip_class->services;                                    // get pointer to array of services
 
         if( service )                                                               // if services are defined
         {
-            for( i = 0; i < instance->cip_class->number_of_services; i++ )          // seach the services list
+            for( int i = 0; i < instance->cip_class->number_of_services; i++ )          // seach the services list
             {
                 if( request->service == service->service_number )    // if match is found
                 {
@@ -129,14 +125,18 @@ EipStatus NotifyClass( CipClass* cip_class,
     {
         OPENER_TRACE_WARN( "notify: instance number %d unknown\n", instance_number );
 
-        // if instance not found, return an error reply
-        response->general_status = kCipErrorPathDestinationUnknown; //according to the test tool this should be the correct error flag instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
+        // If instance not found, return an error reply.
+        // According to the test tool this should be the correct error flag
+        // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
+        response->general_status = kCipErrorPathDestinationUnknown;
     }
 
     // handle error replies
     response->size_of_additional_status = 0; // fill in the rest of the reply with not much of anything
     response->data_length = 0;
-    response->reply_service = (0x80 | request->service); // except the reply code is an echo of the command + the reply flag
+
+    // but the reply code is an echo of the command + the reply flag
+    response->reply_service = 0x80 | request->service;
 
     return kEipStatusOkSend;
 }
@@ -144,19 +144,22 @@ EipStatus NotifyClass( CipClass* cip_class,
 
 CipInstance* AddCipInstances( CipClass* cip_class, int number_of_instances )
 {
-    CipInstance* first_instance, * current_instance, ** next_instance;
-    int i;
-    int instance_number = 1; // the first instance is number 1
+    CipInstance*    first_instance;
+    CipInstance*    current_instance;
+    CipInstance**   next_instance;
+
+    int instance_number = 1;    // the first instance is number 1
 
     OPENER_TRACE_INFO( "adding %d instances to class %s\n", number_of_instances,
             cip_class->class_name );
 
-    next_instance = &cip_class->instances;          // get address of pointer to head of chain
+    next_instance = &cip_class->instances;
 
-    while( *next_instance )                         // as long as what pp points to is not zero
+    // count the instances
+    while( *next_instance )
     {
-        next_instance = &(*next_instance)->next;    //    follow the chain until pp points to pointer that contains a zero
-        instance_number++;                          //    keep track of what the first new instance number will be
+        next_instance = &(*next_instance)->next;
+        instance_number++;          // what first new instance number will be
     }
 
     first_instance = current_instance = (CipInstance*) CipCalloc(
@@ -165,11 +168,13 @@ CipInstance* AddCipInstances( CipClass* cip_class, int number_of_instances )
     OPENER_ASSERT( NULL != current_instance );
     // fail if run out of memory
 
-    cip_class->number_of_instances += number_of_instances;      // add the number of instances just created to the total recorded by the class
+    // add the number of instances just created to the total recorded by the class
+    cip_class->number_of_instances += number_of_instances;
 
-    for( i = 0; i < number_of_instances; i++ )                  // initialize all the new instances
+    // initialize all the new instances
+    for( int i = 0; i < number_of_instances; i++ )
     {
-        *next_instance = current_instance;                      // link the previous pointer to this new node
+        *next_instance = current_instance;
 
         current_instance->instance_number = instance_number;    // assign the next sequential instance number
         current_instance->cip_class = cip_class;                // point each instance to its class
@@ -237,7 +242,9 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
     clazz->number_of_services = number_of_instance_services
                                 + ( (0 == get_all_instance_attributes_mask) ? 1 : 2 );      // the class manages the behavior of the instances
     clazz->services = 0;
-    clazz->class_name = name;                                                               // initialize the class-specific fields of the metaClass struct
+    clazz->class_name = name;
+
+    // initialize the class-specific fields of the metaClass struct
     meta_class->class_id = 0xffffffff;                                                      // set metaclass ID (this should never be referenced)
     meta_class->number_of_instances = 1;                                                    // the class object is the only instance of the metaclass
     meta_class->instances = (CipInstance*) clazz;
@@ -245,7 +252,7 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
     meta_class->get_attribute_all_mask = get_all_class_attributes_mask;                     // indicate which attributes are included in class getAttributeAll
     meta_class->number_of_services = number_of_class_services
                                      + ( (0 == get_all_class_attributes_mask) ? 1 : 2 );    // the metaclass manages the behavior of the class itself
-    clazz->services = 0;
+
     meta_class->class_name = (char*) CipCalloc( 1, strlen( name ) + 6 );                    // fabricate the name "meta<classname>"
     strcpy( (char*) meta_class->class_name, "meta-" );
     strcat( (char*) meta_class->class_name, name );
@@ -256,15 +263,14 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
     clazz->m_stSuper.cip_class  = meta_class;           // the class's class is the metaclass (like SmallTalk)
     clazz->m_stSuper.next = 0;                          // the next link will always be zero, sinc there is only one instance of any particular class object
 
-    meta_class->m_stSuper.instance_number = 0xffffffff; //the metaclass object does not really have a valid instance number
+    meta_class->m_stSuper.instance_number = 0xffffffff; // the metaclass object does not really have a valid instance number
     meta_class->m_stSuper.attributes = 0;               // the metaclass has no attributes
     meta_class->m_stSuper.cip_class = 0;                // the metaclass has no class
     meta_class->m_stSuper.next = 0;                     // the next link will always be zero, since there is only one instance of any particular metaclass object
 
-    // further initialization of the class object
-
     clazz->m_stSuper.attributes = (CipAttributeStruct*) CipCalloc(
             meta_class->number_of_attributes, sizeof(CipAttributeStruct) );
+
     // TODO -- check that we didn't run out of memory?
 
     meta_class->services = (CipServiceStruct*) CipCalloc(
@@ -278,9 +284,9 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
         AddCipInstances( clazz, number_of_instances ); //TODO handle return value and clean up if necessary
     }
 
-    if( ( RegisterCipClass( clazz ) ) == kEipStatusError )  // no memory to register class in Message Router
+    if( RegisterCipClass( clazz ) == kEipStatusError )  // no memory to register class in Message Router
     {
-        return 0;                                           //TODO handle return value and clean up if necessary
+        return 0;       // TODO handle return value and clean up if necessary
     }
 
     // create the standard class attributes
@@ -308,7 +314,7 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
             kGetableSingleAndAll );      // max instance attribute number
 
     // create the standard class services
-    if( 0 != get_all_class_attributes_mask ) //only if the mask has values add the get_attribute_all service
+    if( 0 != get_all_class_attributes_mask )
     {
         InsertService( meta_class, kGetAttributeAll, &GetAttributeAll,
                 "GetAttributeAll" );  // bind instance services to the metaclass
@@ -318,9 +324,10 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
             "GetAttributeSingle" );
 
     // create the standard instance services
-    if( 0 != get_all_instance_attributes_mask )                                         //only if the mask has values add the get_attribute_all service
+    if( 0 != get_all_instance_attributes_mask )
     {
-        InsertService( clazz, kGetAttributeAll, &GetAttributeAll, "GetAttributeAll" );  // bind instance services to the class
+        // bind instance services to the class
+        InsertService( clazz, kGetAttributeAll, &GetAttributeAll, "GetAttributeAll" );
     }
 
     InsertService( clazz, kGetAttributeSingle, &GetAttributeSingle,
@@ -397,10 +404,9 @@ void InsertService( CipClass* clazz, EipUint8 service_number,
 CipAttributeStruct* GetCipAttribute( CipInstance* instance,
         EipUint16 attribute_number )
 {
-    int i;
     CipAttributeStruct* attribute = instance->attributes; // init pointer to array of attributes
 
-    for( i = 0; i < instance->cip_class->number_of_attributes; i++ )
+    for( int i = 0; i < instance->cip_class->number_of_attributes; i++ )
     {
         if( attribute_number == attribute->attribute_number )
             return attribute;
@@ -428,7 +434,7 @@ EipStatus GetAttributeSingle( CipInstance* instance,
     EipByte* message = response->data;
 
     response->data_length = 0;
-    response->reply_service = (0x80 | request->service);
+    response->reply_service = 0x80 | request->service;
 
     response->general_status = kCipErrorAttributeNotSupported;
     response->size_of_additional_status = 0;
@@ -485,47 +491,47 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
     switch( cip_type )
     // check the data type of attribute
     {
-    case (kCipBool):
-    case (kCipSint):
-    case (kCipUsint):
-    case (kCipByte):
+    case kCipBool:
+    case kCipSint:
+    case kCipUsint:
+    case kCipByte:
         **message = *(EipUint8*) (data);
         ++(*message);
         counter = 1;
         break;
 
-    case (kCipInt):
-    case (kCipUint):
-    case (kCipWord):
+    case kCipInt:
+    case kCipUint:
+    case kCipWord:
         AddIntToMessage( *(EipUint16*) (data), message );
         counter = 2;
         break;
 
-    case (kCipDint):
-    case (kCipUdint):
-    case (kCipDword):
-    case (kCipReal):
+    case kCipDint:
+    case kCipUdint:
+    case kCipDword:
+    case kCipReal:
         AddDintToMessage( *(EipUint32*) (data), message );
         counter = 4;
         break;
 
 #ifdef OPENER_SUPPORT_64BIT_DATATYPES
-    case (kCipLint):
-    case (kCipUlint):
-    case (kCipLword):
-    case (kCipLreal):
+    case kCipLint:
+    case kCipUlint:
+    case kCipLword:
+    case kCipLreal:
         AddLintToMessage( *(EipUint64*) (data), message );
         counter = 8;
         break;
 #endif
 
-    case (kCipStime):
-    case (kCipDate):
-    case (kCipTimeOfDay):
-    case (kCipDateAndTime):
+    case kCipStime:
+    case kCipDate:
+    case kCipTimeOfDay:
+    case kCipDateAndTime:
         break;
 
-    case (kCipString):
+    case kCipString:
         {
             CipString* string = (CipString*) data;
 
@@ -535,7 +541,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
 
             counter = string->length + 2; // we have a two byte length field
 
-            if( counter & 0x01 )
+            if( counter & 1 )
             {
                 // we have an odd byte count
                 **message = 0;
@@ -545,14 +551,14 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         }
         break;
 
-    case (kCipString2):
-    case (kCipFtime):
-    case (kCipLtime):
-    case (kCipItime):
-    case (kCipStringN):
+    case kCipString2:
+    case kCipFtime:
+    case kCipLtime:
+    case kCipItime:
+    case kCipStringN:
         break;
 
-    case (kCipShortString):
+    case kCipShortString:
         {
             CipShortString* short_string = (CipShortString*) data;
 
@@ -566,17 +572,17 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         }
         break;
 
-    case (kCipTime):
+    case kCipTime:
         break;
 
-    case (kCipEpath):
+    case kCipEpath:
         counter = EncodeEPath( (CipEpath*) data, message );
         break;
 
-    case (kCipEngUnit):
+    case kCipEngUnit:
         break;
 
-    case (kCipUsintUsint):
+    case kCipUsintUsint:
         {
             CipRevision* revision = (CipRevision*) data;
 
@@ -588,7 +594,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         }
         break;
 
-    case (kCipUdintUdintUdintUdintUdintString):
+    case kCipUdintUdintUdintUdintUdintString:
         {
             // TCP/IP attribute 5
             CipTcpIpNetworkInterfaceConfiguration* tcp_ip_network_interface_configuration =
@@ -611,7 +617,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         }
         break;
 
-    case (kCip6Usint):
+    case kCip6Usint:
         {
             EipUint8* p = (EipUint8*) data;
             memcpy( *message, p, 6 );
@@ -619,10 +625,10 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         }
         break;
 
-    case (kCipMemberList):
+    case kCipMemberList:
         break;
 
-    case (kCipByteArray):
+    case kCipByteArray:
         {
             CipByteArray* cip_byte_array;
             OPENER_TRACE_INFO( " -> get attribute byte array\r\n" );
@@ -633,16 +639,16 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         }
         break;
 
-    case (kInternalUint6):    // TODO for port class attribute 9, hopefully we can find a better way to do this
+    case kInternalUint6:    // TODO for port class attribute 9, hopefully we can find a better way to do this
         {
-            EipUint16* internal_unit16_6 = (EipUint16*) data;
+            EipUint16* internal_uint16_6 = (EipUint16*) data;
 
-            AddIntToMessage( internal_unit16_6[0], message );
-            AddIntToMessage( internal_unit16_6[1], message );
-            AddIntToMessage( internal_unit16_6[2], message );
-            AddIntToMessage( internal_unit16_6[3], message );
-            AddIntToMessage( internal_unit16_6[4], message );
-            AddIntToMessage( internal_unit16_6[5], message );
+            AddIntToMessage( internal_uint16_6[0], message );
+            AddIntToMessage( internal_uint16_6[1], message );
+            AddIntToMessage( internal_uint16_6[2], message );
+            AddIntToMessage( internal_uint16_6[3], message );
+            AddIntToMessage( internal_uint16_6[4], message );
+            AddIntToMessage( internal_uint16_6[5], message );
             counter = 12;
         }
         break;
@@ -659,44 +665,44 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
 {
     int number_of_decoded_bytes = -1;
 
-    switch( cip_type )
     // check the data type of attribute
+    switch( cip_type )
     {
-    case (kCipBool):
-    case (kCipSint):
-    case (kCipUsint):
-    case (kCipByte):
-        *(EipUint8*) (data) = **message;
+    case kCipBool:
+    case kCipSint:
+    case kCipUsint:
+    case kCipByte:
+        *(EipUint8*) data = **message;
         ++(*message);
         number_of_decoded_bytes = 1;
         break;
 
-    case (kCipInt):
-    case (kCipUint):
-    case (kCipWord):
-        ( *(EipUint16*) (data) ) = GetIntFromMessage( message );
+    case kCipInt:
+    case kCipUint:
+    case kCipWord:
+        *(EipUint16*) data = GetIntFromMessage( message );
         number_of_decoded_bytes = 2;
         break;
 
-    case (kCipDint):
-    case (kCipUdint):
-    case (kCipDword):
-        ( *(EipUint32*) (data) ) = GetDintFromMessage( message );
+    case kCipDint:
+    case kCipUdint:
+    case kCipDword:
+        *(EipUint32*) data = GetDintFromMessage( message );
         number_of_decoded_bytes = 4;
         break;
 
 #ifdef OPENER_SUPPORT_64BIT_DATATYPES
-    case (kCipLint):
-    case (kCipUlint):
-    case (kCipLword):
+    case kCipLint:
+    case kCipUlint:
+    case kCipLword:
         {
-            ( *(EipUint64*) (data) ) = GetLintFromMessage( message );
+            *(EipUint64*) data = GetLintFromMessage( message );
             number_of_decoded_bytes = 8;
         }
         break;
 #endif
 
-    case (kCipString):
+    case kCipString:
         {
             CipString* string = (CipString*) data;
             string->length = GetIntFromMessage( message );
@@ -705,7 +711,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
 
             number_of_decoded_bytes = string->length + 2; // we have a two byte length field
 
-            if( number_of_decoded_bytes & 0x01 )
+            if( number_of_decoded_bytes & 1 )
             {
                 // we have an odd byte count
                 ++(*message);
@@ -714,7 +720,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
         }
         break;
 
-    case (kCipShortString):
+    case kCipShortString:
         {
             CipShortString* short_string = (CipShortString*) data;
 
@@ -740,21 +746,16 @@ EipStatus GetAttributeAll( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    int i, j;
-    EipUint8* reply;
-    CipAttributeStruct* attribute;
-    CipServiceStruct*   service;
-
-    reply = response->data;      // pointer into the reply
-    attribute = instance->attributes;           // pointer to list of attributes
-    service = instance->cip_class->services;    // pointer to list of services
+    EipUint8*           reply = response->data;
+    CipAttributeStruct* attribute = instance->attributes;
+    CipServiceStruct*   service = instance->cip_class->services;
 
     if( instance->instance_number == 2 )
     {
         OPENER_TRACE_INFO( "GetAttributeAll: instance number 2\n" );
     }
 
-    for( i = 0; i < instance->cip_class->number_of_services; i++ )  // hunt for the GET_ATTRIBUTE_SINGLE service
+    for( int i = 0; i < instance->cip_class->number_of_services; i++ )  // hunt for the GET_ATTRIBUTE_SINGLE service
     {
         if( service->service_number == kGetAttributeSingle )        // found the service
         {
@@ -768,18 +769,18 @@ EipStatus GetAttributeAll( CipInstance* instance,
             }
             else
             {
-                for( j = 0; j < instance->cip_class->number_of_attributes; j++ ) // for each instance attribute of this class
+                for( int j = 0; j < instance->cip_class->number_of_attributes; j++ ) // for each instance attribute of this class
                 {
                     int attrNum = attribute->attribute_number;
 
-                    if( attrNum < 32
-                        && (instance->cip_class->get_attribute_all_mask & 1 << attrNum) ) // only return attributes that are flagged as being part of GetAttributeALl
+                    // only return attributes that are flagged as being part of GetAttributeALl
+                    if( attrNum < 32 &&
+                        (instance->cip_class->get_attribute_all_mask & 1 << attrNum) )
                     {
                         request->request_path.attribute_number = attrNum;
 
-                        if( kEipStatusOkSend
-                            != service->service_function( instance, request,
-                                    response ) )
+                        if( kEipStatusOkSend != service->service_function(
+                                instance, request, response ) )
                         {
                             response->data = reply;
                             return kEipStatusError;
@@ -807,25 +808,22 @@ EipStatus GetAttributeAll( CipInstance* instance,
 
 int EncodeEPath( CipEpath* epath, EipUint8** message )
 {
-    unsigned length = epath->path_size;
+    unsigned    length = epath->path_size;
+    EipUint8*   p = *message;
 
-    AddIntToMessage( epath->path_size, message );
+    AddIntToMessage( epath->path_size, &p );
 
     if( epath->class_id < 256 )
     {
-        **message = 0x20; //8Bit Class Id
-        ++(*message);
-        **message = (EipUint8) epath->class_id;
-        ++(*message);
+        *p++ = 0x20;   // 8 Bit Class Id
+        *p++ = (EipUint8) epath->class_id;
         length -= 1;
     }
     else
     {
-        **message = 0x21;   //16Bit Class Id
-        ++(*message);
-        **message = 0;      //pad byte
-        ++(*message);
-        AddIntToMessage( epath->class_id, message );
+        *p++ = 0x21;   // 16 Bit Class Id
+        *p++ = 0;      // pad byte
+        AddIntToMessage( epath->class_id, &p );
         length -= 2;
     }
 
@@ -833,19 +831,15 @@ int EncodeEPath( CipEpath* epath, EipUint8** message )
     {
         if( epath->instance_number < 256 )
         {
-            **message = 0x24; //8Bit Instance Id
-            ++(*message);
-            **message = (EipUint8) epath->instance_number;
-            ++(*message);
+            *p++ = 0x24;   // 8 Bit Instance Id
+            *p++ = (EipUint8) epath->instance_number;
             length -= 1;
         }
         else
         {
-            **message = 0x25;   //16Bit Instance Id
-            ++(*message);
-            **message = 0;      //padd byte
-            ++(*message);
-            AddIntToMessage( epath->instance_number, message );
+            *p++ = 0x25;   // 16 Bit Instance Id
+            *p++ = 0;      // pad byte
+            AddIntToMessage( epath->instance_number, &p );
             length -= 2;
         }
 
@@ -853,23 +847,21 @@ int EncodeEPath( CipEpath* epath, EipUint8** message )
         {
             if( epath->attribute_number < 256 )
             {
-                **message = 0x30; //8Bit Attribute Id
-                ++(*message);
-                **message = (EipUint8) epath->attribute_number;
-                ++(*message);
+                *p++ = 0x30;   // 8 Bit Attribute Id
+                *p++ = (EipUint8) epath->attribute_number;
                 length -= 1;
             }
             else
             {
-                **message = 0x31;   //16Bit Attribute Id
-                ++(*message);
-                **message = 0;      //pad byte
-                ++(*message);
-                AddIntToMessage( epath->attribute_number, message );
+                *p++ = 0x31;   // 16 Bit Attribute Id
+                *p++ = 0;      // pad byte
+                AddIntToMessage( epath->attribute_number, &p );
                 length -= 2;
             }
         }
     }
+
+    *message = p;
 
     return 2 + epath->path_size * 2; // path size is in 16 bit chunks according to the specification
 }
@@ -877,13 +869,13 @@ int EncodeEPath( CipEpath* epath, EipUint8** message )
 
 int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
 {
-    unsigned number_of_decoded_elements;
-    EipUint8* message_runner = *message;
+    unsigned    number_of_decoded_elements;
+    EipUint8*   p = *message;
 
-    epath->path_size = *message_runner;
-    message_runner++;
+    epath->path_size = *p++;
 
-    // copy path to structure, in version 0.1 only 8 bit for Class,Instance and Attribute, need to be replaced with function
+    // Copy path to structure, in version 0.1 only 8 bit for Class,Instance
+    // and Attribute, need to be replaced with function
     epath->class_id = 0;
     epath->instance_number  = 0;
     epath->attribute_number = 0;
@@ -892,51 +884,50 @@ int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
          number_of_decoded_elements < epath->path_size;
          number_of_decoded_elements++ )
     {
-        if( kSegmentTypeSegmentTypeReserved ==
-            ( (*message_runner) & kSegmentTypeSegmentTypeReserved ) )
+        if( kSegmentTypeSegmentTypeReserved == ( *p & kSegmentTypeSegmentTypeReserved ) )
         {
             // If invalid/reserved segment type, segment type greater than 0xE0
             return kEipStatusError;
         }
 
-        switch( *message_runner )
+        switch( *p )
         {
         case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeClassId +
-            kLogicalSegmentLogicalFormatEightBitValue:
-            epath->class_id = *(EipUint8*) (message_runner + 1);
-            message_runner  += 2;
+                kLogicalSegmentLogicalFormatEightBitValue:
+            epath->class_id = p[1];
+            p += 2;
             break;
 
         case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeClassId +
-            kLogicalSegmentLogicalFormatSixteenBitValue:
-            message_runner  += 2;
-            epath->class_id = GetIntFromMessage( &(message_runner) );
+                kLogicalSegmentLogicalFormatSixteenBitValue:
+            p += 2;
+            epath->class_id = GetIntFromMessage( &p );
             number_of_decoded_elements++;
             break;
 
         case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeInstanceId +
-            kLogicalSegmentLogicalFormatEightBitValue:
-            epath->instance_number = *(EipUint8*) (message_runner + 1);
-            message_runner += 2;
+                kLogicalSegmentLogicalFormatEightBitValue:
+            epath->instance_number = p[1];
+            p += 2;
             break;
 
         case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeInstanceId +
-            kLogicalSegmentLogicalFormatSixteenBitValue:
-            message_runner += 2;
-            epath->instance_number = GetIntFromMessage( &(message_runner) );
+                kLogicalSegmentLogicalFormatSixteenBitValue:
+            p += 2;
+            epath->instance_number = GetIntFromMessage( &p );
             number_of_decoded_elements++;
             break;
 
         case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeAttributeId +
-            kLogicalSegmentLogicalFormatEightBitValue:
-            epath->attribute_number = *(EipUint8*) (message_runner + 1);
-            message_runner += 2;
+                kLogicalSegmentLogicalFormatEightBitValue:
+            epath->attribute_number = p[1];
+            p += 2;
             break;
 
         case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeAttributeId +
-            kLogicalSegmentLogicalFormatSixteenBitValue:
-            message_runner += 2;
-            epath->attribute_number = GetIntFromMessage( &(message_runner) );
+                kLogicalSegmentLogicalFormatSixteenBitValue:
+            p += 2;
+            epath->attribute_number = GetIntFromMessage( &p );
             number_of_decoded_elements++;
             break;
 
@@ -947,6 +938,6 @@ int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
         }
     }
 
-    *message = message_runner;
-    return number_of_decoded_elements * 2 + 1; // i times 2 as every encoding uses 2 bytes
+    *message = p;
+    return number_of_decoded_elements * 2 + 1;  // times 2 since every encoding uses 2 bytes
 }

@@ -27,7 +27,7 @@
 extern EipUint16    vendor_id_;
 extern EipUint16    device_type_;
 extern EipUint16    product_code_;
-extern CipRevision revision_;
+extern CipRevision  revision_;
 
 #define CIP_CONN_TYPE_MASK 0x6000           //*< Bit mask filter on bit 13 & 14
 
@@ -125,7 +125,7 @@ EipUint8 ParseConnectionPath( ConnectionObject* connection_object,
 
 ConnectionManagementHandling* GetConnMgmEntry( EipUint32 class_id );
 
-void InitializeConnectionManagerData( void );
+void InitializeConnectionManagerData();
 
 /** @brief gets the padded logical path TODO: enhance documentation
  * @param logical_path_segment TheLogical Path Segment
@@ -161,7 +161,7 @@ unsigned GetPaddedLogicalPath( unsigned char** logical_path_segment )
  * and the per-new-connection-incremented connection number/counter.
  * @return new connection id
  */
-EipUint32 GetConnectionId( void )
+EipUint32 GetConnectionId()
 {
     static EipUint32 connection_id = 18;
 
@@ -190,10 +190,10 @@ EipStatus ConnectionManagerInit( EipUint16 unique_connection_id )
         return kEipStatusError;
 
     InsertService( connection_manager, kForwardOpen, &ForwardOpen, "ForwardOpen" );
-    InsertService( connection_manager, kForwardClose, &ForwardClose,
-            "ForwardClose" );
-    InsertService( connection_manager, kGetConnectionOwner, &GetConnectionOwner,
-            "GetConnectionOwner" );
+
+    InsertService( connection_manager, kForwardClose, &ForwardClose, "ForwardClose" );
+
+    InsertService( connection_manager, kGetConnectionOwner, &GetConnectionOwner, "GetConnectionOwner" );
 
     g_incarnation_id = ( (EipUint32) unique_connection_id ) << 16;
 
@@ -240,18 +240,12 @@ EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
                                 conn->eip_level_sequence_count_consuming ) )
                     {
                         // reset the watchdog timer
-                        conn->inactivity_watchdog_timer = (conn
-                                                                        ->
-                                                                        o_to_t_requested_packet_interval
-                                                                        / 1000)
-                                                                       << (2 +
-                                                                           conn->
-                                                                           connection_timeout_multiplier);
+                        conn->inactivity_watchdog_timer =
+                            (conn->o_to_t_requested_packet_interval / 1000) << (2 + conn->connection_timeout_multiplier);
 
                         // only inform assembly object if the sequence counter is greater or equal
                         conn->eip_level_sequence_count_consuming =
-                            g_common_packet_format_data_item.address_item.data
-                            .sequence_number;
+                            g_common_packet_format_data_item.address_item.data.sequence_number;
 
                         if( NULL != conn->connection_receive_data_function )
                         {
@@ -341,13 +335,10 @@ EipStatus ForwardOpen( CipInstance* instance,
             s_dummy_conn.produced_connection_id,
             s_dummy_conn.connection_serial_number );
 
-    s_dummy_conn.o_to_t_requested_packet_interval =
-        GetDintFromMessage( &request->data );
+    s_dummy_conn.o_to_t_requested_packet_interval = GetDintFromMessage( &request->data );
 
-    s_dummy_conn.o_to_t_network_connection_parameter =
-        GetIntFromMessage( &request->data );
-    s_dummy_conn.t_to_o_requested_packet_interval =
-        GetDintFromMessage( &request->data );
+    s_dummy_conn.o_to_t_network_connection_parameter = GetIntFromMessage( &request->data );
+    s_dummy_conn.t_to_o_requested_packet_interval    = GetDintFromMessage( &request->data );
 
     EipUint32 temp = s_dummy_conn.t_to_o_requested_packet_interval
                      % (kOpenerTimerTickInMilliSeconds * 1000);
@@ -361,8 +352,7 @@ EipStatus ForwardOpen( CipInstance* instance,
             + (kOpenerTimerTickInMilliSeconds * 1000);
     }
 
-    s_dummy_conn.t_to_o_network_connection_parameter =
-        GetIntFromMessage( &request->data );
+    s_dummy_conn.t_to_o_network_connection_parameter = GetIntFromMessage( &request->data );
 
     //check if Network connection parameters are ok
     if( CIP_CONN_TYPE_MASK == (s_dummy_conn.o_to_t_network_connection_parameter & CIP_CONN_TYPE_MASK) )
@@ -381,8 +371,7 @@ EipStatus ForwardOpen( CipInstance* instance,
                 kConnectionManagerStatusCodeErrorInvalidTToOConnectionType );
     }
 
-    s_dummy_conn.transport_type_class_trigger =
-        *request->data++;
+    s_dummy_conn.transport_type_class_trigger = *request->data++;
 
     //check if the trigger type value is ok
     if( 0x40 & s_dummy_conn.transport_type_class_trigger )
@@ -393,8 +382,7 @@ EipStatus ForwardOpen( CipInstance* instance,
                 kConnectionManagerStatusCodeErrorTransportTriggerNotSupported );
     }
 
-    temp = ParseConnectionPath( &s_dummy_conn, request,
-            &connection_status );
+    temp = ParseConnectionPath( &s_dummy_conn, request, &connection_status );
 
     if( kEipStatusOk != temp )
     {
@@ -469,8 +457,11 @@ void GeneralConnectionConfiguration( ConnectionObject* conn )
     if( (conn->transport_type_class_trigger & 0x80) == 0x00 )          // Client Type Connection requested
     {
         conn->expected_packet_rate = (EipUint16) ( (conn->t_to_o_requested_packet_interval) / 1000 );
-        /* As soon as we are ready we should produce the connection. With the 0 here we will produce with the next timer tick
-         * which should be sufficient. */
+
+        /* As soon as we are ready we should produce the connection. With the 0
+         * here we will produce with the next timer tick
+         * which should be sufficient.
+         */
         conn->transmission_trigger_timer = 0;
     }
     else
@@ -481,7 +472,7 @@ void GeneralConnectionConfiguration( ConnectionObject* conn )
 
     conn->production_inhibit_timer = conn->production_inhibit_time = 0;
 
-    //setup the preconsuption timer: max(ConnectionTimeoutMultiplier * EpectetedPacketRate, 10s)
+    // setup the preconsuption timer: max(ConnectionTimeoutMultiplier * EpectetedPacketRate, 10s)
     conn->inactivity_watchdog_timer =
         ( ( ( (conn->o_to_t_requested_packet_interval) / 1000 )
             << (2 + conn->connection_timeout_multiplier) ) > 10000 ) ?
@@ -505,6 +496,7 @@ EipStatus ForwardClose( CipInstance* instance,
     // check connection_serial_number && originator_vendor_id && originator_serial_number if connection is established
     ConnectionManagerStatusCode connection_status =
         kConnectionManagerStatusCodeErrorConnectionNotFoundAtTargetApplication;
+
     ConnectionObject* active = g_active_connection_list;
 
     // set AddressInfo Items to invalid TypeID to prevent assembleLinearMsg to read them
@@ -513,12 +505,9 @@ EipStatus ForwardClose( CipInstance* instance,
 
     request->data += 2; // ignore Priority/Time_tick and Time-out_ticks
 
-    EipUint16 connection_serial_number = GetIntFromMessage(
-            &request->data );
-    EipUint16 originator_vendor_id = GetIntFromMessage(
-            &request->data );
-    EipUint32 originator_serial_number = GetDintFromMessage(
-            &request->data );
+    EipUint16 connection_serial_number = GetIntFromMessage( &request->data );
+    EipUint16 originator_vendor_id = GetIntFromMessage( &request->data );
+    EipUint32 originator_serial_number = GetDintFromMessage( &request->data );
 
     OPENER_TRACE_INFO( "ForwardClose: ConnSerNo %d\n", connection_serial_number );
 
@@ -568,7 +557,7 @@ EipStatus GetConnectionOwner( CipInstance* instance,
 }
 
 
-EipStatus ManageConnections( void )
+EipStatus ManageConnections()
 {
     EipStatus eip_status;
 
@@ -643,7 +632,7 @@ EipStatus ManageConnections( void )
 
 
 /* TODO: Update Documentation  INT8 assembleFWDOpenResponse(S_CIP_ConnectionObject *pa_pstConnObj, S_CIP_MR_Response * pa_MRResponse, EIP_UINT8 pa_nGeneralStatus, EIP_UINT16 pa_nExtendedStatus,
- *  void * deleteMeSomeday, EIP_UINT8 * pa_msg)
+ * * deleteMeSomeday, EIP_UINT8 * pa_msg)
  *   create FWDOpen response dependent on status.
  *      pa_pstConnObj pointer to connection Object
  *      pa_MRResponse	pointer to message router response
@@ -1312,8 +1301,8 @@ void RemoveFromActiveConnections( ConnectionObject* pa_pstConn )
 {
     if( NULL != pa_pstConn->first_connection_object )
     {
-        pa_pstConn->first_connection_object->next_connection_object = pa_pstConn
-                                                                      ->next_connection_object;
+        pa_pstConn->first_connection_object->next_connection_object =
+            pa_pstConn->next_connection_object;
     }
     else
     {
@@ -1322,8 +1311,8 @@ void RemoveFromActiveConnections( ConnectionObject* pa_pstConn )
 
     if( NULL != pa_pstConn->next_connection_object )
     {
-        pa_pstConn->next_connection_object->first_connection_object = pa_pstConn
-                                                                      ->first_connection_object;
+        pa_pstConn->next_connection_object->first_connection_object =
+            pa_pstConn->first_connection_object;
     }
 
     pa_pstConn->first_connection_object = NULL;
@@ -1356,13 +1345,10 @@ EipBool8 IsConnectedOutputAssembly( EipUint32 pa_nInstanceNr )
 EipStatus AddConnectableObject( EipUint32 pa_nClassId,
         OpenConnectionFunction pa_pfOpenFunc )
 {
-    int i;
-    EipStatus nRetVal;
-
-    nRetVal = kEipStatusError;
+    EipStatus nRetVal = kEipStatusError;
 
     //parsing is now finished all data is available and check now establish the connection
-    for( i = 0; i < g_kNumberOfConnectableObjects; ++i )
+    for( int i = 0; i < g_kNumberOfConnectableObjects; ++i )
     {
         if( (0 == g_astConnMgmList[i].class_id)
             || (pa_nClassId == g_astConnMgmList[i].class_id) )
@@ -1380,12 +1366,9 @@ EipStatus AddConnectableObject( EipUint32 pa_nClassId,
 
 ConnectionManagementHandling* GetConnMgmEntry( EipUint32 class_id )
 {
-    int i;
-    ConnectionManagementHandling* pstRetVal;
+    ConnectionManagementHandling* pstRetVal = NULL;
 
-    pstRetVal = NULL;
-
-    for( i = 0; i < g_kNumberOfConnectableObjects; ++i )
+    for( int i = 0; i < g_kNumberOfConnectableObjects; ++i )
     {
         if( class_id == g_astConnMgmList[i].class_id )
         {
@@ -1415,8 +1398,8 @@ EipStatus TriggerConnections( unsigned pa_unOutputAssembly,
                     & kConnectionTriggerTypeProductionTriggerMask) )
             {
                 // produce at the next allowed occurrence
-                pstRunner->transmission_trigger_timer = pstRunner
-                                                        ->production_inhibit_timer;
+                pstRunner->transmission_trigger_timer =
+                    pstRunner->production_inhibit_timer;
                 nRetVal = kEipStatusOk;
             }
 
@@ -1432,6 +1415,7 @@ void InitializeConnectionManagerData()
 {
     memset( g_astConnMgmList, 0,
             g_kNumberOfConnectableObjects * sizeof(ConnectionManagementHandling) );
+
     InitializeClass3ConnectionData();
     InitializeIoConnectionData();
 }

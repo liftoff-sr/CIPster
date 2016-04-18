@@ -67,12 +67,16 @@ EipUint32 g_run_idle_state;    //*< buffer for holding the run idle information.
 int EstablishIoConnction( ConnectionObject* conn,
         EipUint16* extended_error )
 {
-    int originator_to_target_connection_type,
-        target_to_originator_connection_type;
+    int originator_to_target_connection_type;
+    int target_to_originator_connection_type;
     int eip_status = kEipStatusOk;
+
     CipAttributeStruct* attribute;
+
     // currently we allow I/O connections only to assembly objects
+
     CipClass* assembly_class = GetCipClass( kCipAssemblyClassCode ); // we don't need to check for zero as this is handled in the connection path parsing
+
     CipInstance* instance = NULL;
 
     ConnectionObject* io_conn = GetIoConnectionForConnectionData(
@@ -148,8 +152,7 @@ int EstablishIoConnction( ConnectionObject* conn,
 
         if( originator_to_target_connection_type != 0 ) //setup consumer side
         {
-            if( 0
-                != ( instance = GetCipInstance(
+            if( 0 != ( instance = GetCipInstance(
                              assembly_class,
                              io_conn->connection_path.connection_point[0] ) ) ) // consuming Connection Point is present
             {
@@ -165,6 +168,7 @@ int EstablishIoConnction( ConnectionObject* conn,
 
                 attribute = GetCipAttribute( instance, 3 );
                 OPENER_ASSERT( attribute != NULL );
+
                 // an assembly object should always have an attribute 3
                 data_size   = io_conn->consumed_connection_size;
                 diff_size   = 0;
@@ -177,8 +181,8 @@ int EstablishIoConnction( ConnectionObject* conn,
                     diff_size   += 2;
                 }
 
-                if( (kOpenerConsumedDataHasRunIdleHeader) &&(data_size > 0)
-                    && (!is_heartbeat) )    // we only have an run idle header if it is not an heartbeat connection
+                if( (kOpenerConsumedDataHasRunIdleHeader) && data_size > 0
+                    && !is_heartbeat )    // we only have an run idle header if it is not an heartbeat connection
                 {
                     data_size   -= 4;       // remove the 4 bytes needed for run/idle header
                     diff_size   += 4;
@@ -189,8 +193,10 @@ int EstablishIoConnction( ConnectionObject* conn,
                     //wrong connection size
                     conn->correct_originator_to_target_size =
                         ( (CipByteArray*) attribute->data )->length + diff_size;
+
                     *extended_error =
                         kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize;
+
                     return kCipErrorConnectionFailure;
                 }
             }
@@ -198,15 +204,14 @@ int EstablishIoConnction( ConnectionObject* conn,
             {
                 *extended_error =
                     kConnectionManagerStatusCodeInvalidConsumingApllicationPath;
+
                 return kCipErrorConnectionFailure;
             }
         }
 
         if( target_to_originator_connection_type != 0 ) //setup producer side
         {
-            if( 0
-                != ( instance =
-                         GetCipInstance(
+            if( 0 != ( instance = GetCipInstance(
                                  assembly_class,
                                  io_conn->connection_path.connection_point[
                                      producing_index] ) ) )
@@ -315,6 +320,7 @@ EipStatus OpenConsumingPointToPointConnection( ConnectionObject* conn,
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
+
     //addr.in_port = htons(nUDPPort++);
     addr.sin_port = htons( kOpenerEipIoUdpPort );
 
@@ -336,10 +342,13 @@ EipStatus OpenConsumingPointToPointConnection( ConnectionObject* conn,
         kCipItemIdSocketAddressInfoOriginatorToTarget;
 
     common_packet_format_data->address_info_item[j].sin_port = addr.sin_port;
+
     //TODO should we add our own address here?
     common_packet_format_data->address_info_item[j].sin_addr = addr.sin_addr
                                                                .s_addr;
+
     memset( common_packet_format_data->address_info_item[j].nasin_zero, 0, 8 );
+
     common_packet_format_data->address_info_item[j].sin_family = htons( AF_INET );
 
     return kEipStatusOk;

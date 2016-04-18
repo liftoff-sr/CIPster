@@ -180,8 +180,8 @@ typedef enum
  */
 typedef struct
 {
-    EipUint16 length;   ///< Length of the Byte Array
-    EipByte* data;      ///< Pointer to the data
+    EipUint16   length;     ///< Length of the Byte Array
+    EipByte*    data;       ///< Pointer to the data
 } CipByteArray;
 
 /** @brief CIP Short String
@@ -189,8 +189,8 @@ typedef struct
  */
 typedef struct
 {
-    EipUint8 length;    ///< Length of the String (8 bit value)
-    EipByte* string;    ///< Pointer to the string data
+    EipUint8    length;     ///< Length of the String (8 bit value)
+    EipByte*    string;     ///< Pointer to the string data
 } CipShortString;
 
 /** @brief CIP String
@@ -198,8 +198,8 @@ typedef struct
  */
 typedef struct
 {
-    EipUint16 length;   ///< Length of the String (16 bit value)
-    EipByte* string;    ///< Pointer to the string data
+    EipUint16   length;     ///< Length of the String (16 bit value)
+    EipByte*    string;     ///< Pointer to the string data
 } CipString;
 
 /** @brief Struct for padded EPATHs
@@ -207,12 +207,12 @@ typedef struct
  */
 typedef struct
 {
-    EipUint8 path_size;         ///< Size of the Path in 16-bit words
+    EipUint8    path_size;          ///< Size of the Path in 16-bit words
     // TODO: Fix, should be UINT (EIP_UINT16)
 
-    EipUint16 class_id;         ///< Class ID of the linked object
-    EipUint16 instance_number;  ///< Requested Instance Number of the linked object
-    EipUint16 attribute_number; ///< Requested Attribute Number of the linked object
+    EipUint16   class_id;           ///< Class ID of the linked object
+    EipUint16   instance_number;    ///< Requested Instance Number of the linked object
+    EipUint16   attribute_number;   ///< Requested Attribute Number of the linked object
 } CipEpath;
 
 /** @brief CIP Connection Path
@@ -220,13 +220,13 @@ typedef struct
  */
 typedef struct
 {
-    EipUint8 path_size;         ///< Size of the Path in 16-bit words
+    EipUint8    path_size;          ///< Size of the Path in 16-bit words
     // TODO: Fix, should be UINT (EIP_UINT16)
 
-    EipUint32 class_id;             ///< Class ID of the linked object
-    EipUint32 connection_point[3];  // TODO:  Why array length 3?
-    EipUint8 data_segment;
-    EipUint8* segment_data;
+    EipUint32   class_id;           ///< Class ID of the linked object
+    EipUint32   connection_point[3];// TODO:  Why array length 3?
+    EipUint8    data_segment;
+    EipUint8*   segment_data;
 } CipConnectionPath;
 
 /** @brief Struct representing the key data format of the electronic key segment
@@ -234,18 +234,18 @@ typedef struct
  */
 typedef struct
 {
-    CipUint vendor_id;          ///< Vendor ID
-    CipUint device_type;        ///< Device Type
-    CipUint product_code;       ///< Product Code
-    CipByte major_revision;     /**< Major Revision and Compatibility (Bit 0-6 = Major
-                                 *  Revision) Bit 7 = Compatibility */
-    CipUsint minor_revision;    ///< Minor Revision
+    CipUint     vendor_id;          ///< Vendor ID
+    CipUint     device_type;        ///< Device Type
+    CipUint     product_code;       ///< Product Code
+    CipByte     major_revision;     /**< Major Revision and Compatibility (Bit 0-6 = Major
+                                     *  Revision) Bit 7 = Compatibility */
+    CipUsint    minor_revision;     ///< Minor Revision
 } CipKeyData;
 
 typedef struct
 {
-    EipUint8 major_revision;
-    EipUint8 minor_revision;
+    EipUint8    major_revision;
+    EipUint8    minor_revision;
 } CipRevision;
 
 /** @brief CIP Electronic Key Segment struct
@@ -253,11 +253,11 @@ typedef struct
  */
 typedef struct
 {
-    CipUsint segment_type;  ///< Specifies the Segment Type
-    CipUsint key_format;    /**< Key Format 0-3 reserved, 4 = see Key Format Table,
-                             *  5-255 = Reserved */
-    CipKeyData key_data;    /**< Depends on key format used, usually Key Format 4 as
-                             *  specified in CIP Specification, Volume 1*/
+    CipUsint    segment_type;  ///< Specifies the Segment Type
+    CipUsint    key_format;    /**< Key Format 0-3 reserved, 4 = see Key Format Table,
+                                *  5-255 = Reserved */
+    CipKeyData  key_data;       /**< Depends on key format used, usually Key Format 4 as
+                                 *  specified in CIP Specification, Volume 1*/
 } CipElectronicKey;
 
 /** @brief CIP Message Router Request
@@ -295,12 +295,15 @@ typedef struct
 
 typedef struct
 {
-    EipUint16 attribute_number;
-    EipUint8 type;
-    EipUint8 attribute_flags;         /*< 0 => getable_all, 1 => getable_single; 2 =>
-                                       *  setable_single; 3 => get and setable; all other
-                                       *  values reserved */
-    void* data;
+    EipUint16   attribute_number;
+    EipUint8    type;
+    EipUint8    attribute_flags;         /**<   0 => getable_all,
+                                                1 => getable_single;
+                                                2 => setable_single;
+                                                3 => get and setable;
+                                                all other values reserved
+                                         */
+    void*       data;
 } CipAttributeStruct;
 
 // type definition of CIP service structure
@@ -308,12 +311,12 @@ typedef struct
 // instances are stored in a linked list
 typedef struct cip_instance
 {
-    EipUint32 instance_number;      ///< this instance's number (unique within the class)
-    CipAttributeStruct* attributes; /**< pointer to an array of attributes which
-                                     *  is unique to this instance */
-    struct cip_class* cip_class;    ///< class the instance belongs to
-    struct cip_instance* next;      /**< next instance, all instances of a class live
-                                     *  in a linked list */
+    EipUint32           instance_number;    ///< this instance's number (unique within the class)
+    CipAttributeStruct* attributes;         /**< pointer to an array of attributes which
+                                             *  is unique to this instance */
+    struct cip_class*   cip_class;          ///< class the instance belongs to
+    struct cip_instance* next;              /**< next instance, all instances of a class live
+                                             *  in a linked list */
 } CipInstance;
 
 //* @brief Class is a subclass of Instance
@@ -405,10 +408,13 @@ typedef struct
 #define MASK4( a, b, c, d ) ( 1 << (a) | 1 << (b) | 1 << (c) | 1 << (d) )
 #define MASK5( a, b, c, d, e ) \
     ( 1 << (a) | 1 << (b) | 1 << (c) | 1 << (d) | 1 << (e) )
+
 #define MASK6( a, b, c, d, e, f ) \
     ( 1 << (a) | 1 << (b) | 1 << (c) | 1 << (d) | 1 << (e) | 1 << (f) )
+
 #define MASK7( a, b, c, d, e, f, g ) \
     ( 1 << (a) | 1 << (b) | 1 << (c) | 1 << (d) | 1 << (e) | 1 << (f) | 1 << (g) )
+
 #define MASK8( a, b, c, d, e, f, g, h )                                \
     ( 1 << (a) | 1 << (b) | 1 << (c) | 1 << (d) | 1 << (e) | 1 << (f) | \
         1 << (g) | 1 << (h) )

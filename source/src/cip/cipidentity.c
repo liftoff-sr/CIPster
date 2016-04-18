@@ -154,8 +154,8 @@ static EipStatus Reset( CipInstance* instance,              // pointer to instan
  */
 EipStatus CipIdentityInit()
 {
-    CipClass* clazz;
-    CipInstance* instance;
+    CipClass*       clazz;
+    CipInstance*    instance;
 
     clazz = CreateCipClass( kIdentityClassCode, 0,  // # of non-default class attributes
             MASK4( 1, 2, 6, 7 ),                    // class getAttributeAll mask		CIP spec 5-2.3.2
@@ -175,13 +175,12 @@ EipStatus CipIdentityInit()
     InsertAttribute( instance, 1, kCipUint, &vendor_id_, kGetableSingleAndAll );
     InsertAttribute( instance, 2, kCipUint, &device_type_, kGetableSingleAndAll );
     InsertAttribute( instance, 3, kCipUint, &product_code_, kGetableSingleAndAll );
-    InsertAttribute( instance, 4, kCipUsintUsint, &revision_,
-            kGetableSingleAndAll );
+    InsertAttribute( instance, 4, kCipUsintUsint, &revision_, kGetableSingleAndAll );
+
     InsertAttribute( instance, 5, kCipWord, &status_, kGetableSingleAndAll );
-    InsertAttribute( instance, 6, kCipUdint, &serial_number_,
-            kGetableSingleAndAll );
-    InsertAttribute( instance, 7, kCipShortString, &product_name_,
-            kGetableSingleAndAll );
+    InsertAttribute( instance, 6, kCipUdint, &serial_number_, kGetableSingleAndAll );
+
+    InsertAttribute( instance, 7, kCipShortString, &product_name_, kGetableSingleAndAll );
 
     InsertService( clazz, kReset, &Reset, "Reset" );
 

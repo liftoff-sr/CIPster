@@ -89,7 +89,7 @@ void CipStackInit( EipUint16 unique_connection_id );
  * Memory allocated by the application will not be freed. This has to be done
  * by the application!
  */
-void ShutdownCipStack( void );
+void ShutdownCipStack();
 
 /** @ingroup CIP_API
  * @brief Get a pointer to a CIP object with given class code
@@ -115,12 +115,12 @@ CipInstance* GetCipInstance( CipClass* cip_object, EipUint32 instance_number );
  *
  * As instances and objects are selfsimilar this function can also be used
  * to retrieve the attribute of an object.
- * @param cip_instance  pointer to the instance the attribute belongs to
+ * @param intance pointer to the instance the attribute belongs to
  * @param attribute_number number of the attribute to retrieve
  * @return pointer to attribute
  *          0 if instance is not in the object
  */
-CipAttributeStruct* GetCipAttribute( CipInstance* cip_instance,
+CipAttributeStruct* GetCipAttribute( CipInstance* instance,
         EipUint16 attribute_number );
 
 /** @ingroup CIP_API
@@ -198,13 +198,13 @@ CipInstance* AddCIPInstance( CipClass* cip_class_to_add_instance,
  *  the attributes array is not expandable if you insert an attributes that has
  *  already been defined, the previous attributes will be replaced
  *
- *  @param pa_pInstance pointer to CIP class. (may be also instance 0)
- *  @param pa_nAttributeNr number of attribute to be inserted.
- *  @param cip_data_type type of attribute to be inserted.
- *  @param cip_data pointer to data of attribute.
+ *  @param instance is a pointer to CIP class. (may be also instance 0)
+ *  @param attribute_number is which attribute to be inserted.
+ *  @param cip_data_type is the type of attribute to be inserted.
+ *  @param cip_data is a pointer to data of attribute.
  *  @param cip_flags flags to indicate set-ability and get-ability of attribute.
  */
-void InsertAttribute( CipInstance* cip_instance, EipUint16 attribute_number,
+void InsertAttribute( CipInstance* instance, EipUint16 attribute_number,
         EipUint8 cip_data_type, void* cip_data, EipByte cip_flags );
 
 /** @ingroup CIP_API
@@ -446,7 +446,7 @@ EipStatus HandleReceivedConnectedData( EipUint8* received_data, int received_dat
  *
  * @return EIP_OK on success
  */
-EipStatus ManageConnections( void );
+EipStatus ManageConnections();
 
 /** @ingroup CIP_API
  * @brief Trigger the production of an application triggered connection.
@@ -500,7 +500,7 @@ void CloseSession( int socket );
  *  return status EIP_ERROR .. error
  *                EIP_OK ... successful finish
  */
-EipStatus ApplicationInitialization( void );
+EipStatus ApplicationInitialization();
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Allow the device specific application to perform its execution
@@ -510,7 +510,7 @@ EipStatus ApplicationInitialization( void );
  * device specific application functions. Execution within this function should
  * be short.
  */
-void HandleApplication( void );
+void HandleApplication();
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Inform the application on changes occurred for a connection
@@ -563,7 +563,7 @@ EipBool8 BeforeAssemblyDataSend( CipInstance* instance );
  * @return if the service is supported the function will not return.
  *     EIP_ERROR if this service is not supported
  */
-EipStatus ResetDevice( void );
+EipStatus ResetDevice();
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Reset the device to the initial configuration and emulate as close as
@@ -572,7 +572,7 @@ EipStatus ResetDevice( void );
  * @return if the service is supported the function will not return.
  *     EIP_ERROR if this service is not supported
  */
-EipStatus ResetDeviceToInitialConfiguration( void );
+EipStatus ResetDeviceToInitialConfiguration();
 
 #if defined(__linux__)
 
