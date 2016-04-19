@@ -47,7 +47,7 @@ int NotifyCommonPacketFormat( EncapsulationData* receive_data,
                 if( return_value != kEipStatusError )
                 {
                     return_value = AssembleLinearMessage(
-                            &g_message_router_response, &g_common_packet_format_data_item,
+                            &g_response, &g_common_packet_format_data_item,
                             reply_buffer );
                 }
             }
@@ -121,7 +121,7 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
                         .connection_identifier = conn
                                                  ->produced_connection_id;
                         return_value = AssembleLinearMessage(
-                                &g_message_router_response, &g_common_packet_format_data_item,
+                                &g_response, &g_common_packet_format_data_item,
                                 reply_buffer );
                     }
                 }

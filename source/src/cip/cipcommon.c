@@ -1,5 +1,8 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
+ *
+ * Conversion to C++ is Copyright (C) 2016, SoftPLC Corportion.
+ *
  * All rights reserved.
  *
  ******************************************************************************/
@@ -64,7 +67,7 @@ void CipStackInit( EipUint16 unique_connection_id )
 }
 
 
-void ShutdownCipStack( void )
+void ShutdownCipStack()
 {
     // First close all connections
     CloseAllConnections();
@@ -72,12 +75,12 @@ void ShutdownCipStack( void )
     // Than free the sockets of currently active encapsulation sessions
     EncapsulationShutDown();
 
-    //clean the data needed for the assembly object's attribute 3
+    // clean the data needed for the assembly object's attribute 3
     ShutdownAssemblies();
 
     ShutdownTcpIpInterface();
 
-    //no clear all the instances and classes
+    // clear all the instances and classes
     DeleteAllClasses();
 }
 
@@ -87,33 +90,27 @@ EipStatus NotifyClass( CipClass* cip_class,
         CipMessageRouterResponse* response )
 {
     // find the instance: if instNr==0, the class is addressed, else find the instance
-    unsigned instance_number = request->request_path.instance_number; // get the instance number
+    unsigned instance_number = request->request_path.instance_number;
 
-    CipInstance* instance = GetCipInstance( cip_class, instance_number );                // look up the instance (note that if inst==0 this will be the class itself)
+    // look up the instance (note that if inst==0 this will be the class itself)
+    CipInstance* instance = GetCipInstance( cip_class, instance_number );
 
-    if( instance )                                                          // if instance is found
+    if( instance )
     {
         OPENER_TRACE_INFO( "notify: found instance %d%s\n", instance_number,
                 instance_number == 0 ? " (class object)" : "" );
 
-        CipServiceStruct* service = instance->cip_class->services;                                    // get pointer to array of services
-
-        if( service )                                                               // if services are defined
+        CipClass::CipServices& services = instance->cip_class->services;
+        for( unsigned i = 0; i < services.size(); ++i )
         {
-            for( int i = 0; i < instance->cip_class->number_of_services; i++ )          // seach the services list
+            CipService* service = services[i];
+
+            if( request->service == service->service_id )    // if match is found
             {
-                if( request->service == service->service_number )    // if match is found
-                {
-                    // call the service, and return what it returns
-                    OPENER_TRACE_INFO( "notify: calling %s service\n", service->name );
-                    OPENER_ASSERT( NULL != service->service_function );
-                    return service->service_function( instance, request,
-                            response );
-                }
-                else
-                {
-                    service++;
-                }
+                // call the service, and return what it returns
+                OPENER_TRACE_INFO( "notify: calling %s service\n", service->service_name.c_str() );
+                OPENER_ASSERT( NULL != service->service_function );
+                return service->service_function( instance, request, response );
             }
         }
 
@@ -142,56 +139,121 @@ EipStatus NotifyClass( CipClass* cip_class,
 }
 
 
-CipInstance* AddCipInstances( CipClass* cip_class, int number_of_instances )
+CipInstance::CipInstance( EipUint32 instance_id, CipClass* aClass ) :
+    instance_id( instance_id ),
+    cip_class( aClass )
 {
-    CipInstance*    first_instance;
-    CipInstance*    current_instance;
-    CipInstance**   next_instance;
-
-    int instance_number = 1;    // the first instance is number 1
-
-    OPENER_TRACE_INFO( "adding %d instances to class %s\n", number_of_instances,
-            cip_class->class_name );
-
-    next_instance = &cip_class->instances;
-
-    // count the instances
-    while( *next_instance )
+    if( aClass )
     {
-        next_instance = &(*next_instance)->next;
-        instance_number++;          // what first new instance number will be
+        for( int i = 0; i< aClass->instance_attr_count;  ++i )
+            attributes.push_back( new CipAttribute() );
+    }
+}
+
+
+CipInstance::~CipInstance()
+{
+    if( cip_class && instance_id )     // if not nested in a meta-class or a class
+    {
+        OPENER_TRACE_INFO( "deleting instance %d of class %s\n",
+            instance_id, cip_class->class_name.c_str() );
     }
 
-    first_instance = current_instance = (CipInstance*) CipCalloc(
-            number_of_instances, sizeof(CipInstance) ); // allocate a block of memory for all created instances
+    for( unsigned i=0; i< attributes.size(); ++i )
+        delete attributes[i];
+    attributes.clear();
+}
 
-    OPENER_ASSERT( NULL != current_instance );
-    // fail if run out of memory
 
-    // add the number of instances just created to the total recorded by the class
-    cip_class->number_of_instances += number_of_instances;
+CipClass::CipClass(
+        const char* aClassName,
+        EipUint32   aClassId,
+        EipUint16   aClassAttributeCount,
+        EipUint16   aClassServiceCount,
+        EipUint32   a_get_all_class_attributes_mask,
+        EipUint16   aInstanceAttributeCount,
+        EipUint16   aInstanceServiceCount,
+        EipUint32   a_get_all_instance_attributes_mask,
+        EipUint16   aRevision
+        ) :
+    CipInstance(
+        0,                  // instance_id of public class is always 0
+        new CipClass(       // class of public class is this meta-class
+                aClassName,
+                aClassAttributeCount + 7,
+                aClassServiceCount + (a_get_all_class_attributes_mask ? 1 : 2),
+                a_get_all_class_attributes_mask,
+                this
+            )
+        ),
+    class_id( aClassId ),
+    class_name( aClassName ),
+    revision( aRevision ),
+    instance_attr_count( aInstanceAttributeCount ),
+    highest_attr_id( 0 ),
+    get_attribute_all_mask( a_get_all_instance_attributes_mask )
+{
+    // The public class holds services for the instances, and attributes for itself.
 
-    // initialize all the new instances
-    for( int i = 0; i < number_of_instances; i++ )
+    for( EipUint16 i = 0; i < aInstanceServiceCount;  ++i )
+        services.push_back( new CipService() );
+
+    for( EipUint16 i = 0; i < aClassAttributeCount;  ++i )
+        attributes.push_back( new CipAttribute() );
+}
+
+
+CipClass::~CipClass()
+{
+    // cip_class is NULL for a "meta-" class, which does not own its one
+    // public class instance
+    if( cip_class )
     {
-        *next_instance = current_instance;
-
-        current_instance->instance_number = instance_number;    // assign the next sequential instance number
-        current_instance->cip_class = cip_class;                // point each instance to its class
-
-        if( cip_class->number_of_attributes )                   // if the class calls for instance attributes
+        // delete all the instances of this class
+        while( instances.size() )
         {
-            // then allocate storage for the attribute array
-            current_instance->attributes = (CipAttributeStruct*) CipCalloc(
-                    cip_class->number_of_attributes, sizeof(CipAttributeStruct) );
+            delete *instances.begin();
+
+            // There could be a faster way, but this is not time critical
+            // because the program is terminating here.
+            instances.erase( instances.begin() );
         }
 
-        next_instance = &current_instance->next;    // update pp to point to the next link of the current node
-        instance_number++;                          // update to the number of the next node
-        current_instance++;                         // point to the next node in the calloc'ed array
+        // delete the meta-class, which invokes a small bit of recursion
+        // back into this function, but on the nested call cip_class will
+        // be NULL for the meta-class.
+        delete cip_class;
     }
 
-    return first_instance;
+    while( services.size() )
+    {
+        delete *services.begin();
+
+        services.erase( services.begin() );
+    }
+
+    OPENER_TRACE_INFO( "deleting class %s\n", class_name.c_str() );
+}
+
+
+void AddCipInstances( CipClass* cip_class, int number_of_instances )
+{
+    OPENER_TRACE_INFO( "adding %d instances to class %s\n", number_of_instances,
+            cip_class->class_name.c_str() );
+
+    CipClass::CipInstances& instances = cip_class->instances;
+
+    int instance_number = instances.size()
+                            + 1;  // the first instance is number 1
+
+    // create the new instances
+    for( int i = 0; i < number_of_instances;  ++i, ++instance_number )
+    {
+        // each instance is now in a separate block of ram so each can be uniquely deleted
+        CipInstance* instance = new CipInstance( instance_number, cip_class );
+
+        instances.push_back( instance );
+    }
 }
 
 
@@ -199,10 +261,12 @@ CipInstance* AddCIPInstance( CipClass* clazz, EipUint32 instance_id )
 {
     CipInstance* instance = GetCipInstance( clazz, instance_id );
 
-    if( 0 == instance ) //we have no instance with given id
+    if( !instance )
     {
-        instance = AddCipInstances( clazz, 1 );
-        instance->instance_number = instance_id;
+        // each instance is in a separate block of ram so each can be uniquely deleted
+        instance = new CipInstance( instance_id, clazz );
+
+        clazz->instances.push_back( instance );
     }
 
     return instance;
@@ -223,61 +287,19 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
 
     OPENER_ASSERT( !GetCipClass( class_id ) );   // should never try to redefine a class
 
-    /* a metaClass is a class that holds the class attributes and services
-     *  CIP can talk to an instance, therefore an instance has a pointer to its class
-     *  CIP can talk to a class, therefore a class struct is a subclass of the instance struct,
-     *  and contains a pointer to a metaclass
-     *  CIP never explicitly addresses a metaclass*/
+    CipClass* clazz = new CipClass(
+            name,
+            class_id,
+            number_of_class_attributes,         // EipUint16   aClassAttributeCount
+            number_of_class_services,           // EipUint16   aClassServiceCount,
+            get_all_class_attributes_mask,      // EipUint32   a_get_all_class_attributes_mask,
+            number_of_instance_attributes,      // EipUint16   aInstanceAttributeCount,
+            number_of_instance_services,        // EipUint16   aInstanceServiceCount,
+            get_all_instance_attributes_mask,   // EipUint32   a_get_all_instance_attributes_mask,
+            revision
+            );
 
-    CipClass* clazz = (CipClass*) CipCalloc( 1, sizeof(CipClass) );       // create the class object
-    CipClass* meta_class = (CipClass*) CipCalloc( 1, sizeof(CipClass) );  // create the metaclass object
-
-    // initialize the class-specific fields of the Class struct
-    clazz->class_id = class_id;                                                             // the class remembers the class ID
-    clazz->revision = revision;                                                             // the class remembers the class ID
-    clazz->number_of_instances = 0;                                                         // the number of instances initially zero (more created below)
-    clazz->instances = 0;
-    clazz->number_of_attributes = number_of_instance_attributes;                            // the class remembers the number of instances of that class
-    clazz->get_attribute_all_mask = get_all_instance_attributes_mask;                       // indicate which attributes are included in instance getAttributeAll
-    clazz->number_of_services = number_of_instance_services
-                                + ( (0 == get_all_instance_attributes_mask) ? 1 : 2 );      // the class manages the behavior of the instances
-    clazz->services = 0;
-    clazz->class_name = name;
-
-    // initialize the class-specific fields of the metaClass struct
-    meta_class->class_id = 0xffffffff;                                                      // set metaclass ID (this should never be referenced)
-    meta_class->number_of_instances = 1;                                                    // the class object is the only instance of the metaclass
-    meta_class->instances = (CipInstance*) clazz;
-    meta_class->number_of_attributes = number_of_class_attributes + 7;                      // the metaclass remembers how many class attributes exist
-    meta_class->get_attribute_all_mask = get_all_class_attributes_mask;                     // indicate which attributes are included in class getAttributeAll
-    meta_class->number_of_services = number_of_class_services
-                                     + ( (0 == get_all_class_attributes_mask) ? 1 : 2 );    // the metaclass manages the behavior of the class itself
-
-    meta_class->class_name = (char*) CipCalloc( 1, strlen( name ) + 6 );                    // fabricate the name "meta<classname>"
-    strcpy( (char*) meta_class->class_name, "meta-" );
-    strcat( (char*) meta_class->class_name, name );
-
-    // initialize the instance-specific fields of the Class struct
-    clazz->m_stSuper.instance_number = 0;               // the class object is instance zero of the class it describes (weird, but that's the spec)
-    clazz->m_stSuper.attributes = 0;                    // this will later point to the class attibutes
-    clazz->m_stSuper.cip_class  = meta_class;           // the class's class is the metaclass (like SmallTalk)
-    clazz->m_stSuper.next = 0;                          // the next link will always be zero, sinc there is only one instance of any particular class object
-
-    meta_class->m_stSuper.instance_number = 0xffffffff; // the metaclass object does not really have a valid instance number
-    meta_class->m_stSuper.attributes = 0;               // the metaclass has no attributes
-    meta_class->m_stSuper.cip_class = 0;                // the metaclass has no class
-    meta_class->m_stSuper.next = 0;                     // the next link will always be zero, since there is only one instance of any particular metaclass object
-
-    clazz->m_stSuper.attributes = (CipAttributeStruct*) CipCalloc(
-            meta_class->number_of_attributes, sizeof(CipAttributeStruct) );
-
-    // TODO -- check that we didn't run out of memory?
-
-    meta_class->services = (CipServiceStruct*) CipCalloc(
-            meta_class->number_of_services, sizeof(CipServiceStruct) );
-
-    clazz->services = (CipServiceStruct*) CipCalloc( clazz->number_of_services,
-            sizeof(CipServiceStruct) );
+    CipClass* meta_class = clazz->cip_class;
 
     if( number_of_instances > 0 )
     {
@@ -290,31 +312,41 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
     }
 
     // create the standard class attributes
+
     InsertAttribute( (CipInstance*) clazz, 1, kCipUint, (void*) &clazz->revision,
             kGetableSingleAndAll );                                         // revision
 
+    // largest instance number
     InsertAttribute( (CipInstance*) clazz, 2, kCipUint,
-            (void*) &clazz->number_of_instances, kGetableSingleAndAll );    //  largest instance number
+            // (void*) &clazz->number_of_instances,
+            NULL,
+            kGetableSingleAndAll
+            );
 
+    // number of instances currently existing
     InsertAttribute( (CipInstance*) clazz, 3, kCipUint,
-            (void*) &clazz->number_of_instances, kGetableSingleAndAll );    // number of instances currently existing
+    //      (void*) &clazz->number_of_instances,
+            NULL,
+            kGetableSingleAndAll
+            );
 
+    // optional attribute list - default = 0
     InsertAttribute( (CipInstance*) clazz, 4, kCipUint, (void*) &kCipUintZero,
-            kGetableAll );                                                  // optional attribute list - default = 0
+            kGetableAll );
 
     InsertAttribute( (CipInstance*) clazz, 5, kCipUint, (void*) &kCipUintZero,
-            kGetableAll );                                                  // optional service list - default = 0
+            kGetableAll );               // optional service list - default = 0
 
     InsertAttribute( (CipInstance*) clazz, 6, kCipUint,
-            (void*) &meta_class->highest_attribute_number,
+            (void*) &meta_class->highest_attr_id,
             kGetableSingleAndAll );      // max class attribute number
 
     InsertAttribute( (CipInstance*) clazz, 7, kCipUint,
-            (void*) &clazz->highest_attribute_number,
+            (void*) &clazz->highest_attr_id,
             kGetableSingleAndAll );      // max instance attribute number
 
     // create the standard class services
-    if( 0 != get_all_class_attributes_mask )
+    if( get_all_class_attributes_mask )
     {
         InsertService( meta_class, kGetAttributeAll, &GetAttributeAll,
                 "GetAttributeAll" );  // bind instance services to the metaclass
@@ -324,7 +356,7 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
             "GetAttributeSingle" );
 
     // create the standard instance services
-    if( 0 != get_all_instance_attributes_mask )
+    if( get_all_instance_attributes_mask )
     {
         // bind instance services to the class
         InsertService( clazz, kGetAttributeAll, &GetAttributeAll, "GetAttributeAll" );
@@ -337,84 +369,85 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
 }
 
 
-void InsertAttribute( CipInstance* instance, EipUint16 attribute_number,
+void CipInstance::InsertAttribute( EipUint16 attribute_id,
         EipUint8 cip_type, void* data, EipByte cip_flags )
 {
-    CipAttributeStruct* attribute;
-
-    attribute = instance->attributes;
-    OPENER_ASSERT( NULL != attribute );
-
-    // adding a attribute to a class that was not declared to have any attributes is not allowed
-    for( int i = 0; i < instance->cip_class->number_of_attributes; i++ )
+    // remember the max attribute number that was defined
+    if( attribute_id > cip_class->highest_attr_id )
     {
-        if( attribute->data == NULL ) // found non set attribute
-        {
-            attribute->attribute_number = attribute_number;
-            attribute->type = cip_type;
-            attribute->attribute_flags = cip_flags;
-            attribute->data = data;
-
-            if( attribute_number > instance->cip_class->highest_attribute_number ) // remember the max attribute number that was defined
-            {
-                instance->cip_class->highest_attribute_number = attribute_number;
-            }
-
-            return;
-        }
-
-        attribute++;
+        cip_class->highest_attr_id = attribute_id;
     }
 
-    OPENER_TRACE_ERR(
-            "Tried to insert to many attributes into class: %" PRIu32 ", instance %" PRIu32 "\n",
-            instance->cip_class->m_stSuper.instance_number,
-            instance->instance_number );
+    // first look for a blank slot, otherwise insert a new attribute below
+    for( unsigned i = 0; i < attributes.size();  ++i )
+    {
+        CipAttribute* a = attributes[i];
 
-    OPENER_ASSERT( 0 );
-    // trying to insert too many attributes
+        if( a->data == NULL && a->type == 0 ) // found non set attribute
+        {
+            a->attribute_id = attribute_id;
+            a->type = cip_type;
+            a->attribute_flags = cip_flags;
+            a->data = data;
+            return;
+        }
+    }
+
+    attributes.push_back( new CipAttribute(
+                    attribute_id,
+                    cip_type,
+                    cip_flags,
+                    data ) );
 }
 
 
-void InsertService( CipClass* clazz, EipUint8 service_number,
+void InsertAttribute( CipInstance* instance, EipUint16 attribute_id,
+        EipUint8 cip_type, void* data, EipByte cip_flags )
+{
+    instance->InsertAttribute( attribute_id, cip_type, data, cip_flags );
+}
+
+
+void CipClass::InsertService( EipUint8 service_id,
         CipServiceFunction service_function, const char* service_name )
 {
-    CipServiceStruct* p = clazz->services;
-    OPENER_ASSERT( p != 0 );
-
-    // adding a service to a class that was not declared to have services is not allowed
-    for( int i = 0; i < clazz->number_of_services; i++ )                                // Iterate over all service slots attached to the class
+    // Iterate over all service slots attached to the class
+    for( unsigned i = 0; i < services.size();  ++i )
     {
-        if( p->service_number == service_number || p->service_function == NULL )    // found undefined service slot
+        CipService* s = services[i];
+
+        if( s->service_id == service_id || !s->service_function )    // found undefined service slot
         {
-            p->service_number = service_number;                                     // fill in service number
-            p->service_function = service_function;                                 // fill in function address
-            p->name = service_name;
+            s->service_id = service_id;
+            s->service_function = service_function;
+            s->service_name = service_name;
             return;
         }
-
-        p++;
     }
 
-    OPENER_ASSERT( 0 );
-    // adding more services than were declared is a no-no
+    // Create a new one
+    services.push_back( new CipService( service_name, service_id, service_function ) );
 }
 
 
-CipAttributeStruct* GetCipAttribute( CipInstance* instance,
-        EipUint16 attribute_number )
+void InsertService( CipClass* clazz, EipUint8 service_id,
+        CipServiceFunction service_function, const char* service_name )
 {
-    CipAttributeStruct* attribute = instance->attributes; // init pointer to array of attributes
+    clazz->InsertService( service_id, service_function, service_name );
+}
 
-    for( int i = 0; i < instance->cip_class->number_of_attributes; i++ )
+
+CipAttribute* GetCipAttribute( CipInstance* instance,
+        EipUint16 attribute_id )
+{
+    CipInstance::CipAttributes& attributes = instance->attributes;
+    for( unsigned i = 0; i < attributes.size();   ++i )
     {
-        if( attribute_number == attribute->attribute_number )
-            return attribute;
-        else
-            attribute++;
+        if( attribute_id == attributes[i]->attribute_id )
+            return attributes[i];
     }
 
-    OPENER_TRACE_WARN( "attribute %d not defined\n", attribute_number );
+    OPENER_TRACE_WARN( "attribute %d not defined\n", attribute_id );
 
     return 0;
 }
@@ -428,7 +461,7 @@ EipStatus GetAttributeSingle( CipInstance* instance,
     // Mask for filtering get-ability
     EipByte get_mask;
 
-    CipAttributeStruct* attribute = GetCipAttribute(
+    CipAttribute* attribute = GetCipAttribute(
             instance, request->request_path.attribute_number );
 
     EipByte* message = response->data;
@@ -599,21 +632,21 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
             // TCP/IP attribute 5
             CipTcpIpNetworkInterfaceConfiguration* tcp_ip_network_interface_configuration =
                 (CipTcpIpNetworkInterfaceConfiguration*) data;
-            AddDintToMessage(
-                    ntohl( tcp_ip_network_interface_configuration->ip_address ), message );
-            AddDintToMessage(
-                    ntohl( tcp_ip_network_interface_configuration->network_mask ), message );
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->gateway ),
-                    message );
-            AddDintToMessage(
-                    ntohl( tcp_ip_network_interface_configuration->name_server ), message );
-            AddDintToMessage(
-                    ntohl( tcp_ip_network_interface_configuration->name_server_2 ),
-                    message );
+
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->ip_address ), message );
+
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->network_mask ), message );
+
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->gateway ), message );
+
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->name_server ), message );
+
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->name_server_2 ), message );
+
             counter = 20;
-            counter += EncodeData(
-                    kCipString, &(tcp_ip_network_interface_configuration->domain_name),
-                    message );
+
+            counter += EncodeData( kCipString, &tcp_ip_network_interface_configuration->domain_name,
+                                message );
         }
         break;
 
@@ -746,36 +779,38 @@ EipStatus GetAttributeAll( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipUint8*           reply = response->data;
-    CipAttributeStruct* attribute = instance->attributes;
-    CipServiceStruct*   service = instance->cip_class->services;
+    EipUint8*       reply = response->data;
 
-    if( instance->instance_number == 2 )
+    if( instance->instance_id == 2 )
     {
         OPENER_TRACE_INFO( "GetAttributeAll: instance number 2\n" );
     }
 
-    for( int i = 0; i < instance->cip_class->number_of_services; i++ )  // hunt for the GET_ATTRIBUTE_SINGLE service
+    CipInstance::CipAttributes& attributes = instance->attributes;
+
+    CipClass::CipServices& services = instance->cip_class->services;
+    for( unsigned i = 0; i < services.size();  ++i )  // hunt for the GET_ATTRIBUTE_SINGLE service
     {
-        if( service->service_number == kGetAttributeSingle )        // found the service
+        CipService* service = services[i];
+
+        if( service->service_id == kGetAttributeSingle )   // found the service
         {
-            if( 0 == instance->cip_class->number_of_attributes )
+            if( 0 == attributes.size() )
             {
-                response->data_length = 0; //there are no attributes to be sent back
-                response->reply_service = (0x80 | request->service);
+                response->data_length = 0;          // there are no attributes to be sent back
+                response->reply_service = 0x80 | request->service;
 
                 response->general_status = kCipErrorServiceNotSupported;
                 response->size_of_additional_status = 0;
             }
             else
             {
-                for( int j = 0; j < instance->cip_class->number_of_attributes; j++ ) // for each instance attribute of this class
+                for( unsigned j = 0; j < attributes.size();  ++j ) // for each instance attribute of this class
                 {
-                    int attrNum = attribute->attribute_number;
+                    int attrNum = attributes[j]->attribute_id;
 
-                    // only return attributes that are flagged as being part of GetAttributeALl
-                    if( attrNum < 32 &&
-                        (instance->cip_class->get_attribute_all_mask & 1 << attrNum) )
+                    // only return attributes that are flagged as being part of GetAttributeAll
+                    if( attrNum < 32 && (instance->cip_class->get_attribute_all_mask & (1 << attrNum) ) )
                     {
                         request->request_path.attribute_number = attrNum;
 
@@ -788,8 +823,6 @@ EipStatus GetAttributeAll( CipInstance* instance,
 
                         response->data += response->data_length;
                     }
-
-                    attribute++;
                 }
 
                 response->data_length = response->data - reply;
@@ -798,8 +831,6 @@ EipStatus GetAttributeAll( CipInstance* instance,
 
             return kEipStatusOkSend;
         }
-
-        service++;
     }
 
     return kEipStatusOk; // Return kEipStatusOk if cannot find GET_ATTRIBUTE_SINGLE service

@@ -1,12 +1,22 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
+ *
+ * Conversion to C++ is Copyright (C) 2016, SoftPLC Corportion.
+ *
  * All rights reserved.
  *
  ******************************************************************************/
 #ifndef OPENER_CIPTYPES_H_
 #define OPENER_CIPTYPES_H_
 
+
+#include <string>
+#include <vector>
+
 #include "typedefs.h"
+#include "trace.h"
+#include "opener_user_conf.h"
+
 
 /** @brief Segment type Enum
  *
@@ -265,10 +275,10 @@ typedef struct
  */
 typedef struct
 {
-    CipUsint service;
-    CipEpath request_path;
-    EipInt16 data_length;
-    CipOctet* data;
+    CipUsint    service;
+    CipEpath    request_path;
+    EipInt16    data_length;
+    CipOctet*   data;
 } CipMessageRouterRequest;
 
 #define MAX_SIZE_OF_ADD_STATUS 2    // for now we support extended status codes up to 2 16bit values there is mostly only one 16bit value used
@@ -288,14 +298,23 @@ typedef struct
     EipUint16 additional_status[MAX_SIZE_OF_ADD_STATUS];    /**< Array of 16 bit words; Additional status;
                                                              *  If SizeOfAdditionalStatus is 0. there is no
                                                              *  Additional Status */
-    EipInt16 data_length;                                   // TODO: Check if this is correct
-    CipOctet* data;                                         /**< Array of octet; Response data per object definition from
+    EipInt16    data_length;                                   // TODO: Check if this is correct
+    CipOctet*   data;                                         /**< Array of octet; Response data per object definition from
                                                              *  request */
 } CipMessageRouterResponse;
 
-typedef struct
+
+
+struct CipAttribute
 {
-    EipUint16   attribute_number;
+    CipAttribute( EipUint16 aAttributeId = 0, EipUint8 aType = 0, EipUint8 aFlags = 0, void* aData = 0 ) :
+        attribute_id( aAttributeId ),
+        type( aType ),
+        attribute_flags( aFlags ),
+        data( aData )
+    {}
+
+    EipUint16   attribute_id;
     EipUint8    type;
     EipUint8    attribute_flags;         /**<   0 => getable_all,
                                                 1 => getable_single;
@@ -304,69 +323,161 @@ typedef struct
                                                 all other values reserved
                                          */
     void*       data;
-} CipAttributeStruct;
+} ;
 
 // type definition of CIP service structure
+struct CipClass;
 
-// instances are stored in a linked list
-typedef struct cip_instance
+struct CipInstance
 {
-    EipUint32           instance_number;    ///< this instance's number (unique within the class)
-    CipAttributeStruct* attributes;         /**< pointer to an array of attributes which
-                                             *  is unique to this instance */
-    struct cip_class*   cip_class;          ///< class the instance belongs to
-    struct cip_instance* next;              /**< next instance, all instances of a class live
-                                             *  in a linked list */
-} CipInstance;
+    CipInstance() :
+        instance_id( 0 ),
+        cip_class( 0 )
+    {}
 
-//* @brief Class is a subclass of Instance
-typedef struct cip_class
-{
-    CipInstance m_stSuper;
+    CipInstance( EipUint32 id, CipClass* aClazz );   // implemented in cipcommon.c
 
-    // the rest of these are specific to the Class class only.
-    EipUint32 class_id;                     ///< class ID
-    EipUint16 revision;                     ///< class revision
-    EipUint16 number_of_instances;          /**< number of instances in the class (not
-                                             *  including instance 0)*/
-    EipUint16 number_of_attributes;         ///< number of attributes of each instance
-    EipUint16 highest_attribute_number;     /**< highest defined attribute number
-                                             *  (attribute numbers are not necessarily
-                                             *  consecutive)*/
-    EipUint32 get_attribute_all_mask;       /**< mask indicating which attributes are
-                                             *  returned by getAttributeAll*/
-    EipUint16 number_of_services;           ///< number of services supported
-    CipInstance* instances;                 ///< pointer to the list of instances
-    struct cip_service_struct* services;    ///< pointer to the array of services
-    const char* class_name;                       ///< class name
-} CipClass;
+    ~CipInstance();
+
+    void InsertAttribute( EipUint16 attribute_id,
+        EipUint8 cip_type, void* data, EipByte cip_flags );
+
+
+    EipUint32           instance_id;    ///< this instance's number (unique within the class)
+
+    typedef std::vector<CipAttribute*>      CipAttributes;
+
+    CipAttributes       attributes;         ///< pointer array to attributes which are unique to this instance
+    CipClass*           cip_class;          ///< class the instance belongs to
+
+private:
+    CipInstance( CipInstance& );            // private because not implemented
+};
+
 
 /** @ingroup CIP_API
- *  @typedef  EIP_STATUS (*TCIPServiceFunc)(S_CIP_Instance *pa_pstInstance,
- * S_CIP_MR_Request *pa_MRRequest, S_CIP_MR_Response *pa_MRResponse)
+ *  @typedef  EIP_STATUS (*TCIPServiceFunc)( CipInstance *,
+ *    CipMessageRouterRequest*, CipMessageRouterResponse*)
  *  @brief Signature definition for the implementation of CIP services.
  *
  *  CIP services have to follow this signature in order to be handled correctly
  * by the stack.
- *  @param pa_pstInstance the instance which was referenced in the service
- * request
- *  @param pa_MRRequest request data
- *  @param pa_MRResponse storage for the response data, including a buffer for
- * extended data
+ *  @param instance which was referenced in the service request
+ *  @param request request data
+ *  @param response storage for the response data, including a buffer for
+ *      extended data
  *  @return EIP_OK_SEND if service could be executed successfully and a response
  * should be sent
  */
 typedef EipStatus (* CipServiceFunction)( CipInstance* instance,
-        CipMessageRouterRequest* message_router_request,
-        CipMessageRouterResponse* message_router_response );
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response );
 
-//* @brief Service descriptor. These are stored in an array
-typedef struct cip_service_struct
+
+//* @brief Service descriptor.
+struct CipService
 {
-    EipUint8 service_number;                ///< service number
+    CipService( const char* aServiceName = "", int aServiceId = 0,
+            CipServiceFunction aServiceFunction = 0 ) :
+        service_name( aServiceName ),
+        service_id( aServiceId ),
+        service_function( aServiceFunction )
+    {
+    }
+
+    std::string service_name;               ///< name of the service
+    EipUint8    service_id;                 ///< service number
+
     CipServiceFunction service_function;    ///< pointer to a function call
-    const char* name;                       ///< name of the service
-} CipServiceStruct;
+};
+
+
+/**
+ * Class CipClass
+ * implements the CIP class spec.
+ */
+class CipClass : public CipInstance
+{
+public:
+    CipClass(
+        const char* aClassName,
+        EipUint32   aClassId,
+        EipUint16   aClassAttributeCount,
+        EipUint16   aClassServiceCount,
+        EipUint32   a_get_all_class_attributes_mask,
+        EipUint16   aInstanceAttributeCount,
+        EipUint16   aInstanceServiceCount,
+        EipUint32   a_get_all_instance_attributes_mask,
+        EipUint16   aRevision = 1
+        );
+
+    ~CipClass();
+
+    void InsertService( EipUint8 service_id,
+        CipServiceFunction service_function, const char* service_name );
+
+
+    // the rest of these are specific to the Class class only.
+    EipUint32   class_id;                   ///< class ID
+    std::string class_name;                 ///< class name
+    EipUint16   revision;                   ///< class revision
+    EipUint16   instance_attr_count;        ///< number of attributes of each instance
+    EipUint16   highest_attr_id;            /**< highest defined attribute number
+                                             *  (attribute numbers are not necessarily
+                                             *  consecutive)*/
+    EipUint32   get_attribute_all_mask;     /**< mask indicating which attributes are
+                                              *  returned by getAttributeAll*/
+
+    typedef std::vector<CipInstance*>      CipInstances;
+    typedef std::vector<CipService*>       CipServices;
+
+    CipInstances    instances;              ///< collection of instances
+    CipServices     services;               ///< collection of services
+
+
+protected:
+    // Constructor for the meta-class, and only called by public constructor above.
+    // The constructor above constructs the "public" CIP class.  This one constructs
+    // the meta-class.  The meta-class is owned by the public class ( => is responsible
+    // for deleting it).
+    CipClass(
+            const char* aClassName,             ///< without "meta-" prefix
+            EipUint16   aClassAttributeCount,   ///< attributes in public class
+            EipUint16   aClassServiceCount,     ///< services in public class
+            EipUint32   a_get_all_class_attributes_mask,
+            CipClass*   aPublicClass
+            ) :
+        CipInstance( 0xffffffff, NULL ),        // instance_id and NULL class
+        class_id( 0xffffffff ),
+        class_name( std::string( "meta-" ) + aClassName ),
+        revision( 0 ),
+        instance_attr_count( aClassAttributeCount ),    // my only instance is the public class
+        highest_attr_id( 0 ),
+        get_attribute_all_mask( a_get_all_class_attributes_mask )
+    {
+        /*
+            A metaClass is a class that holds the class attributes and services.
+            CIP can talk to an instance, therefore an instance has a pointer to
+            its class. CIP can talk to a class, therefore a class struct is a
+            subclass of the instance struct, and contains a pointer to a
+            metaclass. CIP never explicitly addresses a metaclass.
+        */
+
+        // The meta class has no attributes, but holds services for the public class.
+
+        for( EipUint16 i = 0; i < aClassServiceCount;  ++i )
+            services.push_back( new CipService() );
+
+        // The meta class has only one instance and it is the public class and it
+        // is not owned by the meta-class (will not delete it during destruction).
+        // But in fact the public class owns the meta-class.
+        instances.push_back( aPublicClass );
+    }
+
+private:
+    CipClass( CipClass& );                  // private because not implemented
+};
+
 
 /**
  * @brief Struct for saving TCP/IP interface information
@@ -383,21 +494,23 @@ typedef struct
 
 typedef struct
 {
-    EipUint8 path_size;
-    EipUint32 port; // support up to 32 bit path
-    EipUint32 address;
+    EipUint8    path_size;
+    EipUint32   port; // support up to 32 bit path
+    EipUint32   address;
 } CipRoutePath;
 
 typedef struct
 {
-    EipByte priority;
-    EipUint8 timeout_ticks;
-    EipUint16 message_request_size;
-    CipMessageRouterRequest message_request;
-    CipMessageRouterResponse* message_response;
-    EipUint8 reserved;
-    CipRoutePath route_path;
-    void* data;
+    EipByte         priority;
+    EipUint8        timeout_ticks;
+    EipUint16       message_request_size;
+
+    CipMessageRouterRequest     message_request;
+    CipMessageRouterResponse*   message_response;
+
+    EipUint8        reserved;
+    CipRoutePath    route_path;
+    void*           data;
 } CipUnconnectedSendParameter;
 
 /* these are used for creating the getAttributeAll masks

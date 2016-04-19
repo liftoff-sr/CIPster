@@ -24,49 +24,49 @@ extern EipUint8 g_message_data_reply_buffer[];
 /** @brief Check if requested service present in class/instance and call appropriate service.
  *
  * @param clazz class receiving the message
- * @param message_router_request request message
- * @param message_router_response reply message
+ * @param request request message
+ * @param response reply message
  * @return
  *     - EIP_OK_SEND    ... success
  *     - EIP_OK  ... no reply to send back
  *     - EIP_ERROR ... error
  */
-EipStatus NotifyClass(CipClass *clazz,
-                      CipMessageRouterRequest *message_router_request,
-                      CipMessageRouterResponse *message_router_response);
+EipStatus NotifyClass( CipClass* clazz,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response );
 
 /** @brief Generic implementation of the GetAttributeSingle CIP service
  *
  *  Check from classID which Object requests an attribute, search if object has
  *  the appropriate attribute implemented.
  * @param instance pointer to instance.
- * @param message_router_request pointer to request.
- * @param message_router_response pointer to response.
+ * @param request pointer to request.
+ * @param response pointer to response.
  * @return status  >0 .. success
  *          -1 .. requested attribute not available
  */
-EipStatus GetAttributeSingle(CipInstance *instance,
-                             CipMessageRouterRequest *message_router_request,
-                             CipMessageRouterResponse *message_router_response);
+EipStatus GetAttributeSingle( CipInstance* instance,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response );
 
 /** @brief Generic implementation of the GetAttributeAll CIP service
  *
  * Copy all attributes from Object into the global message buffer.
  * @param instance pointer to object instance with data.
- * @param message_router_request pointer to MR request.
- * @param message_router_response pointer for MR response.
+ * @param request pointer to MR request.
+ * @param response pointer for MR response.
  * @return length of data stream >0 .. success
  *              0 .. no reply to send
  */
-EipStatus GetAttributeAll(CipInstance *instance,
-                          CipMessageRouterRequest *message_router_request,
-                          CipMessageRouterResponse *message_router_response);
+EipStatus GetAttributeAll( CipInstance* instance,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response );
 
 /** @brief Decodes padded EPath
  *  @param epath EPath to the receiving element
  *  @param message CIP Message to decode
  *  @return Number of decoded bytes
  */
-int DecodePaddedEPath(CipEpath *epath, EipUint8 **data);
+int DecodePaddedEPath( CipEpath* epath, EipUint8** data );
 
-#endif // OPENER_CIPCOMMON_H_
+#endif    // OPENER_CIPCOMMON_H_

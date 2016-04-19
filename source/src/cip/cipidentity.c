@@ -81,13 +81,13 @@ void SetDeviceStatus( EipUint16 status )
 /** Reset service
  *
  * @param instance
- * @param message_router_request
- * @param message_router_response
+ * @param request
+ * @param response
  * @returns Currently always kEipOkSend is returned
  */
 static EipStatus Reset( CipInstance* instance,              // pointer to instance
-        CipMessageRouterRequest* message_router_request,    // pointer to message router request
-        CipMessageRouterResponse* message_router_response ) // pointer to message router response
+        CipMessageRouterRequest* request,    // pointer to message router request
+        CipMessageRouterResponse* response ) // pointer to message router response
 {
     EipStatus eip_status;
 
@@ -95,19 +95,19 @@ static EipStatus Reset( CipInstance* instance,              // pointer to instan
 
     eip_status = kEipStatusOkSend;
 
-    message_router_response->reply_service = (0x80 | message_router_request->service);
-    message_router_response->size_of_additional_status = 0;
-    message_router_response->general_status = kCipErrorSuccess;
+    response->reply_service = (0x80 | request->service);
+    response->size_of_additional_status = 0;
+    response->general_status = kCipErrorSuccess;
 
-    if( message_router_request->data_length == 1 )
+    if( request->data_length == 1 )
     {
-        switch( message_router_request->data[0] )
+        switch( request->data[0] )
         {
         case 0: // Reset type 0 -> emulate device reset / Power cycle
 
             if( kEipStatusError == ResetDevice() )
             {
-                message_router_response->general_status = kCipErrorInvalidParameter;
+                response->general_status = kCipErrorInvalidParameter;
             }
 
             break;
@@ -116,7 +116,7 @@ static EipStatus Reset( CipInstance* instance,              // pointer to instan
 
             if( kEipStatusError == ResetDeviceToInitialConfiguration() )
             {
-                message_router_response->general_status = kCipErrorInvalidParameter;
+                response->general_status = kCipErrorInvalidParameter;
             }
 
             break;
@@ -124,7 +124,7 @@ static EipStatus Reset( CipInstance* instance,              // pointer to instan
         // case 2: Not supported Reset type 2 -> Return to factory defaults except communications parameters
 
         default:
-            message_router_response->general_status = kCipErrorInvalidParameter;
+            response->general_status = kCipErrorInvalidParameter;
             break;
         }
     }
@@ -135,7 +135,7 @@ static EipStatus Reset( CipInstance* instance,              // pointer to instan
 
         if( kEipStatusError == ResetDevice() )
         {
-            message_router_response->general_status = kCipErrorInvalidParameter;
+            response->general_status = kCipErrorInvalidParameter;
         }
         else
         {
@@ -143,7 +143,7 @@ static EipStatus Reset( CipInstance* instance,              // pointer to instan
         }
     }
 
-    message_router_response->data_length = 0;
+    response->data_length = 0;
     return eip_status;
 }
 

@@ -1071,7 +1071,7 @@ EipUint8 ParseConnectionPath( ConnectionObject* conn,
 
             OPENER_TRACE_INFO( "classid %" PRIx32 " (%s)\n",
                     conn->connection_path.class_id,
-                    clazz->class_name );
+                    clazz->class_name.c_str() );
         }
         else
         {

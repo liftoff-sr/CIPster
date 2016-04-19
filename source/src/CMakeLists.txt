@@ -38,6 +38,7 @@ if( true )
         )
 
     add_definitions( -D__STDC_FORMAT_MACROS )       # <inttypes.h>'s PRIX32
+    add_definitions( -std=c++0x )
 endif()
 
 add_subdirectory( cip_objects )

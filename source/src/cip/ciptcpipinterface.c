@@ -147,7 +147,7 @@ EipStatus SetAttributeSingleTcp( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    CipAttributeStruct* attribute = GetCipAttribute(
+    CipAttribute* attribute = GetCipAttribute(
             instance, request->request_path.attribute_number );
 
     (void) instance; //Suppress compiler warning
@@ -294,18 +294,20 @@ EipStatus GetAttributeAllTcpIpInterface( CipInstance* instance,
 {
     EipUint8* start = response->data;       // snapshot initial
 
-    CipAttributeStruct* attribute = instance->attributes;
-
-    for( int j = 0; j < instance->cip_class->number_of_attributes; j++ ) // for each instance attribute of this class
+    CipInstance::CipAttributes& attributes = instance->attributes;
+    for( unsigned j = 0; j < attributes.size();  ++j )
     {
-        int attribute_number = attribute->attribute_number;
+        CipAttribute* attribute = attributes[j];
 
-        if( attribute_number < 32
-            && (instance->cip_class->get_attribute_all_mask & 1 << attribute_number) ) // only return attributes that are flagged as being part of GetAttributeALl
+        int attribute_id = attribute->attribute_id;
+
+        // only return attributes that are flagged as being part of GetAttributeAll
+        if( attribute_id < 32
+            && (instance->cip_class->get_attribute_all_mask & 1 << attribute_id) )
         {
-            request->request_path.attribute_number = attribute_number;
+            request->request_path.attribute_number = attribute_id;
 
-            if( 8 == attribute_number ) // insert 6 zeros for the required empty safety network number according to Table 5-3.10
+            if( 8 == attribute_id ) // insert 6 zeros for the required empty safety network number according to Table 5-3.10
             {
                 memset( response->data, 0, 6 );
                 response->data += 6;

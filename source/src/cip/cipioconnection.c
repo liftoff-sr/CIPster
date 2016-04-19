@@ -71,7 +71,7 @@ int EstablishIoConnction( ConnectionObject* conn,
     int target_to_originator_connection_type;
     int eip_status = kEipStatusOk;
 
-    CipAttributeStruct* attribute;
+    CipAttribute* attribute;
 
     // currently we allow I/O connections only to assembly objects
 
@@ -755,8 +755,8 @@ EipStatus SendConnectedData( ConnectionObject* conn )
 
     common_packet_format_data->data_item.type_id = kCipItemIdConnectedDataItem;
 
-    CipByteArray* producing_instance_attributes =
-        (CipByteArray*) conn->producing_instance->attributes->data;
+    CipByteArray* producing_instance_attributes = (CipByteArray*) conn->producing_instance->attributes[0]->data;
+
     common_packet_format_data->data_item.length = 0;
 
     // notify the application that data will be sent immediately after the call

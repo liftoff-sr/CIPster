@@ -21,7 +21,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response );
 
-CipClass* CreateAssemblyClass( void )
+CipClass* CreateAssemblyClass()
 {
     CipClass* assembly_class;
 
@@ -47,33 +47,29 @@ CipClass* CreateAssemblyClass( void )
 }
 
 
-EipStatus CipAssemblyInitialize( void )
+EipStatus CipAssemblyInitialize()
 {
     // create the CIP Assembly object with zero instances
     return ( NULL != CreateAssemblyClass() ) ? kEipStatusOk : kEipStatusError;
 }
 
 
-void ShutdownAssemblies( void )
+void ShutdownAssemblies()
 {
     CipClass* assembly_class = GetCipClass( kCipAssemblyClassCode );
-    CipAttributeStruct* attribute;
-    CipInstance* instance;
 
-    if( NULL != assembly_class )
+    if( assembly_class )
     {
-        instance = assembly_class->instances;
-
-        while( NULL != instance )
+        for( unsigned i = 0; i < assembly_class->instances.size();  ++i )
         {
-            attribute = GetCipAttribute( instance, 3 );
+            CipInstance* instance = assembly_class->instances[i];
 
-            if( NULL != attribute )
+            CipAttribute* attribute = GetCipAttribute( instance, 3 );
+
+            if( attribute )
             {
                 CipFree( attribute->data );
             }
-
-            instance = instance->next;
         }
     }
 }
@@ -124,7 +120,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
 
     // empty path (path size = 0) need to be checked and taken care of in future
     // copy received data to Attribute 3
-    assembly_byte_array = (CipByteArray*) instance->attributes->data;
+    assembly_byte_array = (CipByteArray*) instance->attributes[0]->data;
 
     if( assembly_byte_array->length != data_length )
     {
@@ -146,7 +142,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
         CipMessageRouterResponse* response )
 {
     EipUint8* router_request_data;
-    CipAttributeStruct* attribute;
+    CipAttribute* attribute;
 
     OPENER_TRACE_INFO( " setAttribute %d\n",
             request->request_path.attribute_number );
@@ -168,7 +164,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
             CipByteArray* data = (CipByteArray*) attribute->data;
 
             // TODO: check for ATTRIBUTE_SET/GETABLE MASK
-            if( true == IsConnectedOutputAssembly( instance->instance_number ) )
+            if( IsConnectedOutputAssembly( instance->instance_id ) )
             {
                 OPENER_TRACE_WARN(
                         "Assembly AssemblyAttributeSingle: received data for connected output assembly\n\r" );

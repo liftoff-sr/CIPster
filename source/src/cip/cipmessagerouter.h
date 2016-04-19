@@ -16,7 +16,7 @@ static const int kCipMessageRouterClassCode = 0x02;
  *  This buffer will be used for storing the result. The response message will be generated
  *  by assembleLinearMsg.
  */
-extern CipMessageRouterResponse g_message_router_response;
+extern CipMessageRouterResponse g_response;
 
 // public functions
 

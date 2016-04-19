@@ -120,7 +120,7 @@ CipInstance* GetCipInstance( CipClass* cip_object, EipUint32 instance_number );
  * @return pointer to attribute
  *          0 if instance is not in the object
  */
-CipAttributeStruct* GetCipAttribute( CipInstance* instance,
+CipAttribute* GetCipAttribute( CipInstance* instance,
         EipUint16 attribute_number );
 
 /** @ingroup CIP_API
@@ -175,8 +175,7 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
  * @return pointer to the first of the new instances
  *              0 on error
  */
-CipInstance* AddCipInstances( CipClass* cip_object_to_add_instances,
-        int number_of_instances );
+void AddCipInstances( CipClass* cip_object_to_add_instances, int number_of_instances );
 
 /** @ingroup CIP_API
  * @brief Create one instance of a given class with a certain instance number

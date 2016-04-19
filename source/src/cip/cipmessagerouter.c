@@ -10,24 +10,24 @@
 #include "ciperror.h"
 #include "trace.h"
 
-CipMessageRouterRequest g_message_router_request;
-CipMessageRouterResponse g_message_router_response;
+CipMessageRouterRequest     g_request;
+CipMessageRouterResponse    g_response;
+
 
 /** @brief A class registry list node
  *
- * A linked list of this  object is the registry of classes known to the message router
- * for small devices with very limited memory it could make sense to change this list into an
- * array with a given max size for removing the need for having to dynamically allocate
- * memory. The size of the array could be a parameter in the platform config file.
+ * A linked list of this  object is the registry of classes known to the message router.
  */
-typedef struct cip_message_router_object
+struct CipMessageRouterObject
 {
-    struct cip_message_router_object* next; //< link
-    CipClass* cip_class;                    //< object
-} CipMessageRouterObject;
+    CipMessageRouterObject* next;
+    CipClass*               cip_class;
+};
+
 
 /// @brief Pointer to first registered object in MessageRouter
-CipMessageRouterObject* g_first_object = 0;
+CipMessageRouterObject* g_first_object;
+
 
 /** @brief Register an Class to the message router
  *  @param cip_class Pointer to a class object to be registered.
@@ -41,12 +41,12 @@ EipStatus RegisterCipClass( CipClass* cip_class );
  * Parses the UCMM header consisting of: service, IOI size, IOI, data into a request structure
  * @param data pointer to the message data received
  * @param data_length number of bytes in the message
- * @param message_router_request pointer to structure of MRRequest data item.
+ * @param request pointer to structure of MRRequest data item.
  * @return status  0 .. success
  *                 -1 .. error
  */
 CipError CreateMessageRouterRequestStructure( EipUint8* data, EipInt16 data_length,
-        CipMessageRouterRequest* message_router_request );
+        CipMessageRouterRequest* request );
 
 EipStatus CipMessageRouterInit()
 {
@@ -67,8 +67,8 @@ EipStatus CipMessageRouterInit()
         return kEipStatusError;
 
     // reserved for future use -> set to zero
-    g_message_router_response.reserved = 0;
-    g_message_router_response.data = g_message_data_reply_buffer; // set reply buffer, using a fixed buffer (about 100 bytes)
+    g_response.reserved = 0;
+    g_response.data = g_message_data_reply_buffer; // set reply buffer, using a fixed buffer (about 100 bytes)
 
     return kEipStatusOk;
 }
@@ -110,17 +110,17 @@ CipClass* GetCipClass( EipUint32 class_id )
 }
 
 
-CipInstance* GetCipInstance( CipClass* cip_class, EipUint32 instance_number )
+CipInstance* GetCipInstance( CipClass* cip_class, EipUint32 instance_id )
 {
-    CipInstance* instance; // pointer to linked list of instances from the class object
+    // if the instance number is zero, return the class object itself
+    if( instance_id == 0 )
+        return (CipInstance*) cip_class;
 
-    if( instance_number == 0 )
-        return (CipInstance*) cip_class;                                        // if the instance number is zero, return the class object itself
-
-    for( instance = cip_class->instances; instance; instance = instance->next ) // follow the list
+    CipClass::CipInstances& instances = cip_class->instances;
+    for( unsigned i = 0; i < instances.size();  ++i )
     {
-        if( instance->instance_number == instance_number )
-            return instance; // if the number matches, return the instance
+        if( instances[i]->instance_id == instance_id )
+            return instances[i];
     }
 
     return NULL;
@@ -152,21 +152,21 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
     EipStatus   eip_status = kEipStatusOkSend;
     EipByte     nStatus;
 
-    g_message_router_response.data = g_message_data_reply_buffer; // set reply buffer, using a fixed buffer (about 100 bytes)
+    g_response.data = g_message_data_reply_buffer; // set reply buffer, using a fixed buffer (about 100 bytes)
 
     OPENER_TRACE_INFO( "notifyMR: routing unconnected message\n" );
 
     if( kCipErrorSuccess
         != ( nStatus = CreateMessageRouterRequestStructure(
-                     data, data_length, &g_message_router_request ) ) ) // error from create MR structure
+                     data, data_length, &g_request ) ) ) // error from create MR structure
     {
         OPENER_TRACE_ERR( "notifyMR: error from createMRRequeststructure\n" );
-        g_message_router_response.general_status = nStatus;
-        g_message_router_response.size_of_additional_status = 0;
-        g_message_router_response.reserved = 0;
-        g_message_router_response.data_length = 0;
-        g_message_router_response.reply_service = (0x80
-                                                   | g_message_router_request.service);
+        g_response.general_status = nStatus;
+        g_response.size_of_additional_status = 0;
+        g_response.reserved = 0;
+        g_response.data_length = 0;
+        g_response.reply_service = (0x80
+                                                   | g_request.service);
     }
     else
     {
@@ -174,32 +174,34 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
         CipMessageRouterObject* registered_object;
 
         registered_object = GetRegisteredObject(
-                g_message_router_request.request_path.class_id );
+                g_request.request_path.class_id );
 
         if( registered_object == 0 )
         {
             OPENER_TRACE_ERR(
                     "notifyMR: sending CIP_ERROR_OBJECT_DOES_NOT_EXIST reply, class id 0x%x is not registered\n",
-                    (unsigned) g_message_router_request.request_path.class_id );
-            g_message_router_response.general_status =
+                    (unsigned) g_request.request_path.class_id );
+            g_response.general_status =
                 kCipErrorPathDestinationUnknown; //according to the test tool this should be the correct error flag instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
-            g_message_router_response.size_of_additional_status = 0;
-            g_message_router_response.reserved = 0;
-            g_message_router_response.data_length = 0;
-            g_message_router_response.reply_service = (0x80
-                                                       | g_message_router_request.service);
+            g_response.size_of_additional_status = 0;
+            g_response.reserved = 0;
+            g_response.data_length = 0;
+            g_response.reply_service = (0x80
+                                                       | g_request.service);
         }
         else
         {
             /* call notify function from Object with ClassID (gMRRequest.RequestPath.ClassID)
              *  object will or will not make an reply into gMRResponse*/
-            g_message_router_response.reserved = 0;
+            g_response.reserved = 0;
             OPENER_ASSERT( NULL != registered_object->cip_class );
+
             OPENER_TRACE_INFO( "notifyMR: calling notify function of class '%s'\n",
-                    registered_object->cip_class->class_name );
+                    registered_object->cip_class->class_name.c_str() );
+
             eip_status = NotifyClass( registered_object->cip_class,
-                    &g_message_router_request,
-                    &g_message_router_response );
+                    &g_request,
+                    &g_response );
 
 #ifdef OPENER_TRACE_ENABLED
 
@@ -207,19 +209,19 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
             {
                 OPENER_TRACE_ERR(
                         "notifyMR: notify function of class '%s' returned an error\n",
-                        registered_object->cip_class->class_name );
+                        registered_object->cip_class->class_name.c_str() );
             }
             else if( eip_status == kEipStatusOk )
             {
                 OPENER_TRACE_INFO(
                         "notifyMR: notify function of class '%s' returned no reply\n",
-                        registered_object->cip_class->class_name );
+                        registered_object->cip_class->class_name.c_str() );
             }
             else
             {
                 OPENER_TRACE_INFO(
                         "notifyMR: notify function of class '%s' returned a reply\n",
-                        registered_object->cip_class->class_name );
+                        registered_object->cip_class->class_name.c_str() );
             }
 
 #endif
@@ -231,72 +233,45 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
 
 
 CipError CreateMessageRouterRequestStructure( EipUint8* data, EipInt16 data_length,
-        CipMessageRouterRequest* message_router_request )
+        CipMessageRouterRequest* request )
 {
     int number_of_decoded_bytes;
 
-    message_router_request->service = *data;
+    request->service = *data;
     data++; //TODO: Fix for 16 bit path lengths (+1
     data_length--;
 
     number_of_decoded_bytes = DecodePaddedEPath(
-            &(message_router_request->request_path), &data );
+            &(request->request_path), &data );
 
     if( number_of_decoded_bytes < 0 )
     {
         return kCipErrorPathSegmentError;
     }
 
-    message_router_request->data = data;
-    message_router_request->data_length = data_length - number_of_decoded_bytes;
+    request->data = data;
+    request->data_length = data_length - number_of_decoded_bytes;
 
-    if( message_router_request->data_length < 0 )
+    if( request->data_length < 0 )
         return kCipErrorPathSizeInvalid;
     else
         return kCipErrorSuccess;
 }
 
 
-void DeleteAllClasses( void )
+void DeleteAllClasses()
 {
-    CipMessageRouterObject* message_router_object = g_first_object; // get pointer to head of class registration list
-    CipMessageRouterObject* message_router_object_to_delete;
-    CipInstance* instance, * instance_to_delete;
+    CipMessageRouterObject* mro = g_first_object; // get pointer to head of class registration list
 
-    while( NULL != message_router_object )
+    while( mro )
     {
-        message_router_object_to_delete = message_router_object;
-        message_router_object = message_router_object->next;
+        CipMessageRouterObject* del_mro = mro;
 
-        instance = message_router_object_to_delete->cip_class->instances;
+        mro = mro->next;
 
-        while( NULL != instance )
-        {
-            instance_to_delete = instance;
-            instance = instance->next;
+        delete del_mro->cip_class;
 
-            if( message_router_object_to_delete->cip_class->number_of_attributes ) // if the class has instance attributes
-            {
-                // then free storage for the attribute array
-                CipFree( instance_to_delete->attributes );
-            }
-
-            CipFree( instance_to_delete );
-        }
-
-        //clear meta class data
-        CipFree( (void*)
-                message_router_object_to_delete->cip_class->m_stSuper.cip_class
-                ->class_name );
-        CipFree(
-                message_router_object_to_delete->cip_class->m_stSuper.cip_class
-                ->services );
-        CipFree( message_router_object_to_delete->cip_class->m_stSuper.cip_class );
-        //clear class data
-        CipFree( message_router_object_to_delete->cip_class->m_stSuper.attributes );
-        CipFree( message_router_object_to_delete->cip_class->services );
-        CipFree( message_router_object_to_delete->cip_class );
-        CipFree( message_router_object_to_delete );
+        delete del_mro;
     }
 
     g_first_object = NULL;
