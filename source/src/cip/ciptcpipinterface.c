@@ -175,50 +175,41 @@ EipStatus SetAttributeSingleTcp( CipInstance* instance,
 
 EipStatus CipTcpIpInterfaceInit()
 {
-    CipClass* tcp_ip_class = NULL;
+    CipClass* clazz = CreateCipClass( kCipTcpIpInterfaceClassCode,
+          0xffffffff,            // class getAttributeAll mask
+          0xffffffff,            // instance getAttributeAll mask
+          1,                     // # instances
+          "TCP/IP interface",
+          3
+          );
 
-    if( ( tcp_ip_class = CreateCipClass( kCipTcpIpInterfaceClassCode, 0,    // # class attributes
-                  0xffffffff,                                               // class getAttributeAll mask
-                  0,                                                        // # class services
-                  8,                                                        // # instance attributes
-                  0xffffffff,                                               // instance getAttributeAll mask
-                  1,                                                        // # instance services
-                  1,                                                        // # instances
-                  "TCP/IP interface", 3 ) ) == 0 )
-    {
+    if( !clazz )
         return kEipStatusError;
-    }
 
-    CipInstance* instance = GetCipInstance( tcp_ip_class, 1 ); // bind attributes to the instance #1 that was created above
+    // bind attributes to the instance #1 that was created above
 
-    InsertAttribute( instance, 1, kCipDword, (void*) &tcp_status_, kGetableSingleAndAll );
-    InsertAttribute( instance, 2, kCipDword, (void*) &configuration_capability_, kGetableSingleAndAll );
+    CipInstance* i = clazz->Instance( 1 );
 
-    InsertAttribute( instance, 3, kCipDword, (void*) &configuration_control_, kGetableSingleAndAll );
+    i->AttributeInsert( 1, kCipDword, (void*) &tcp_status_, kGetableSingleAndAll );
+    i->AttributeInsert( 2, kCipDword, (void*) &configuration_capability_, kGetableSingleAndAll );
 
-    InsertAttribute( instance, 4, kCipEpath, &physical_link_object_, kGetableSingleAndAll );
+    i->AttributeInsert( 3, kCipDword, (void*) &configuration_control_, kGetableSingleAndAll );
 
-    InsertAttribute( instance, 5, kCipUdintUdintUdintUdintUdintString,
-            &interface_configuration_, kGetableSingleAndAll );
+    i->AttributeInsert( 4, kCipEpath, &physical_link_object_, kGetableSingleAndAll );
 
-    InsertAttribute( instance, 6, kCipString, (void*) &hostname_,
-            kGetableSingleAndAll );
+    i->AttributeInsert( 5, kCipUdintUdintUdintUdintUdintString, &interface_configuration_, kGetableSingleAndAll );
 
-    InsertAttribute( instance, 8, kCipUsint, (void*) &g_time_to_live_value,
-            kGetableSingleAndAll );
+    i->AttributeInsert( 6, kCipString, (void*) &hostname_, kGetableSingleAndAll );
 
-    InsertAttribute( instance, 9, kCipAny, (void*) &g_multicast_configuration,
-            kGetableSingleAndAll );
+    i->AttributeInsert( 8, kCipUsint, (void*) &g_time_to_live_value, kGetableSingleAndAll );
 
-    InsertService( tcp_ip_class, kGetAttributeSingle,
-            &GetAttributeSingleTcpIpInterface,
-            "GetAttributeSingleTCPIPInterface" );
+    i->AttributeInsert( 9, kCipAny, (void*) &g_multicast_configuration, kGetableSingleAndAll );
 
-    InsertService( tcp_ip_class, kGetAttributeAll, &GetAttributeAllTcpIpInterface,
-            "GetAttributeAllTCPIPInterface" );
+    clazz->ServiceInsert( kGetAttributeSingle, &GetAttributeSingleTcpIpInterface, "GetAttributeSingleTCPIPInterface" );
 
-    InsertService( tcp_ip_class, kSetAttributeSingle, &SetAttributeSingleTcp,
-            "SetAttributeSingle" );
+    clazz->ServiceInsert( kGetAttributeAll, &GetAttributeAllTcpIpInterface, "GetAttributeAllTCPIPInterface" );
+
+    clazz->ServiceInsert( kSetAttributeSingle, &SetAttributeSingleTcp, "SetAttributeSingle" );
 
     return kEipStatusOk;
 }

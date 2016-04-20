@@ -579,7 +579,7 @@ EipStatus HandleReceivedSendUnitDataCommand( EncapsulationData* receive_data )
         receive_data->data_length -= 6;                 // the rest is in CPF format
 
         // see if the EIP session is registered
-        if( kSessionStatusValid != CheckRegisteredSessions( receive_data ) )
+        if( kSessionStatusValid == CheckRegisteredSessions( receive_data ) )
         {
             send_size = NotifyConnectedCommonPacketFormat(
                             receive_data,

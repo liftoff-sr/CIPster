@@ -109,25 +109,21 @@ CipError CreateMessageRouterRequestStructure( EipUint8* data, EipInt16 data_leng
 
 EipStatus CipMessageRouterInit()
 {
-    CipClass* message_router;
-
-    message_router = CreateCipClass( kCipMessageRouterClassCode,    // class ID
-            0,                                                      // # of class attributes
+    CipClass* clazz = CreateCipClass( kCipMessageRouterClassCode,   // class ID
             0xffffffff,                                             // class getAttributeAll mask
-            0,                                                      // # of class services
-            0,                                                      // # of instance attributes
             0xffffffff,                                             // instance getAttributeAll mask
-            0,                                                      // # of instance services
             1,                                                      // # of instances
             "message router",                                       // class name
             1 );                                                    // revision
 
-    if( message_router == 0 )
+    if( !clazz )
         return kEipStatusError;
 
     // reserved for future use -> set to zero
     g_response.reserved = 0;
-    g_response.data = g_message_data_reply_buffer; // set reply buffer, using a fixed buffer (about 100 bytes)
+
+    // set reply buffer, using a fixed buffer (about 100 bytes)
+    g_response.data = g_message_data_reply_buffer;
 
     return kEipStatusOk;
 }

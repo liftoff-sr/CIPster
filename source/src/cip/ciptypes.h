@@ -446,11 +446,7 @@ public:
     CipClass(
         const char* aClassName,
         EipUint32   aClassId,
-        EipUint16   aClassAttributeCount,
-        EipUint16   aClassServiceCount,
         EipUint32   a_get_all_class_attributes_mask,
-        EipUint16   aInstanceAttributeCount,
-        EipUint16   aInstanceServiceCount,
         EipUint32   a_get_all_instance_attributes_mask,
         EipUint16   aRevision = 1
         );
@@ -482,12 +478,10 @@ public:
         return instances;
     }
 
-
     // the rest of these are specific to the Class class only.
     EipUint32   class_id;                   ///< class ID
     std::string class_name;                 ///< class name
     EipUint16   revision;                   ///< class revision
-    EipUint16   instance_attr_count;        ///< number of attributes of each instance
     EipUint16   highest_attr_id;            /**< highest defined attribute number
                                              *  (attribute numbers are not necessarily
                                              *  consecutive)*/
@@ -499,44 +493,26 @@ public:
 
 
 protected:
-    // Constructor for the meta-class, and only called by public constructor above.
-    // The constructor above constructs the "public" CIP class.  This one constructs
-    // the meta-class.  The meta-class is owned by the public class ( => is responsible
-    // for deleting it).
+
+    /**
+
+        Constructor for the meta-class, and only called by public constructor
+        above. The constructor above constructs the "public" CIP class. This one
+        constructs the meta-class. The meta-class is owned by the public class (
+        => is responsible for deleting it).
+
+        A metaClass is a class that holds the class attributes and services.
+        CIP can talk to an instance, therefore an instance has a pointer to
+        its class. CIP can talk to a class, therefore a class struct is a
+        subclass of the instance struct, and contains a pointer to a
+        metaclass. CIP never explicitly addresses a metaclass.
+    */
+
     CipClass(
             const char* aClassName,             ///< without "meta-" prefix
-            EipUint16   aClassAttributeCount,   ///< attributes in public class
-            EipUint16   aClassServiceCount,     ///< services in public class
             EipUint32   a_get_all_class_attributes_mask,
             CipClass*   aPublicClass
-            ) :
-        CipInstance( 0xffffffff, NULL ),        // instance_id and NULL class
-        class_id( 0xffffffff ),
-        class_name( std::string( "meta-" ) + aClassName ),
-        revision( 0 ),
-        instance_attr_count( aClassAttributeCount ),    // my only instance is the public class
-        highest_attr_id( 0 ),
-        highest_inst_id( 0 ),
-        get_attribute_all_mask( a_get_all_class_attributes_mask )
-    {
-        /*
-            A metaClass is a class that holds the class attributes and services.
-            CIP can talk to an instance, therefore an instance has a pointer to
-            its class. CIP can talk to a class, therefore a class struct is a
-            subclass of the instance struct, and contains a pointer to a
-            metaclass. CIP never explicitly addresses a metaclass.
-        */
-
-        // The meta class has no attributes, but holds services for the public class.
-
-        for( EipUint16 i = 0; i < aClassServiceCount;  ++i )
-            services.push_back( new CipService() );
-
-        // The meta class has only one instance and it is the public class and it
-        // is not owned by the meta-class (will not delete it during destruction).
-        // But in fact the public class owns the meta-class.
-        instances.push_back( aPublicClass );
-    }
+            );
 
     CipInstances    instances;              ///< collection of instances
     CipServices     services;               ///< collection of services
@@ -557,14 +533,14 @@ struct CipTcpIpNetworkInterfaceConfiguration
     CipUdint name_server;
     CipUdint name_server_2;
     CipString domain_name;
-} ;
+};
 
 struct CipRoutePath
 {
     EipUint8    path_size;
     EipUint32   port; // support up to 32 bit path
     EipUint32   address;
-} ;
+};
 
 struct CipUnconnectedSendParameter
 {

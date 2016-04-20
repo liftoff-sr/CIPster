@@ -126,35 +126,29 @@ CipAttribute* GetCipAttribute( CipInstance* instance,
 /** @ingroup CIP_API
  * @brief Allocate memory for new CIP Class and attributes
  *
- *  The new CIP class will be registered at the stack to be able
- *  for receiving explicit messages.
+ * The new CIP class will be registered at the stack to be able
+ * for receiving explicit messages.
  *
- *  @param class_id class ID of the new class
- *  @param number_of_class_attributes number of class attributes
- *  @param get_attribute_all_mask mask of which attributes are included in the
+ * @param class_id class ID of the new class
+ * @param get_attribute_all_mask mask of which attributes are included in the
  *  class getAttributeAll.
- *  If the mask is 0 the getAttributeAll service will not be added as class
- *  service
- *  @param number_of_class_services number of class services
- *  @param number_of_instance_attributes number of attributes of each instance
- *  @param instance_attributes_get_attributes_all_mask  mask of which attributes
- *  are included in the instance getAttributeAll
- *  If the mask is 0 the getAttributeAll service will not be added as class
- *  service
- *  @param number_of_instance_services number of instance services
- *  @param number_of_instances number of initial instances to create
- *  @param class_name  class name (for debugging class structure)
- *  @param class_revision class revision
- *  @return pointer to new class object
- *      0 on error
+ * If the mask is 0 the getAttributeAll service will not be added as class
+ * service
+ * @param instance_attributes_get_attributes_all_mask  mask of which attributes
+ * are included in the instance getAttributeAll
+ * If the mask is 0 the getAttributeAll service will not be added as class
+ * service
+ * @param number_of_instances number of initial instances to create
+ * @param class_name  class name (for debugging class structure)
+ * @param class_revision class revision
+ * @return pointer to new class object
+ *     0 on error
  */
-CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
+CipClass* CreateCipClass( EipUint32 class_id,
         EipUint32 class_attributes_get_attribute_all_mask,
-        int number_of_class_services,
-        int number_of_instance_attributes,
         EipUint32 instance_attributes_get_attributes_all_mask,
-        int number_of_instance_services,
-        int number_of_instances, const char* class_name,
+        int number_of_instances,
+        const char* class_name,
         EipUint16 class_revision );
 
 /** @ingroup CIP_API

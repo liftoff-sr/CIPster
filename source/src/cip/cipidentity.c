@@ -154,35 +154,29 @@ static EipStatus Reset( CipInstance* instance,              // pointer to instan
  */
 EipStatus CipIdentityInit()
 {
-    CipClass*       clazz;
-    CipInstance*    instance;
-
-    clazz = CreateCipClass( kIdentityClassCode, 0,  // # of non-default class attributes
+    CipClass* clazz = CreateCipClass( kIdentityClassCode,
             MASK4( 1, 2, 6, 7 ),                    // class getAttributeAll mask		CIP spec 5-2.3.2
-            0,                                      // # of class services
-            7,                                      // # of instance attributes
             MASK7( 1, 2, 3, 4, 5, 6, 7 ),           // instance getAttributeAll mask	CIP spec 5-2.3.2
-            1,                                      // # of instance services
             1,                                      // # of instances
             "identity",                             // class name (for debug)
             1 );                                    // class revision
 
-    if( clazz == 0 )
+    if( !clazz )
         return kEipStatusError;
 
-    instance = GetCipInstance( clazz, 1 );
+    CipInstance* i = clazz->Instance( 1 );
 
-    InsertAttribute( instance, 1, kCipUint, &vendor_id_, kGetableSingleAndAll );
-    InsertAttribute( instance, 2, kCipUint, &device_type_, kGetableSingleAndAll );
-    InsertAttribute( instance, 3, kCipUint, &product_code_, kGetableSingleAndAll );
-    InsertAttribute( instance, 4, kCipUsintUsint, &revision_, kGetableSingleAndAll );
+    i->AttributeInsert( 1, kCipUint, &vendor_id_, kGetableSingleAndAll );
+    i->AttributeInsert( 2, kCipUint, &device_type_, kGetableSingleAndAll );
+    i->AttributeInsert( 3, kCipUint, &product_code_, kGetableSingleAndAll );
+    i->AttributeInsert( 4, kCipUsintUsint, &revision_, kGetableSingleAndAll );
 
-    InsertAttribute( instance, 5, kCipWord, &status_, kGetableSingleAndAll );
-    InsertAttribute( instance, 6, kCipUdint, &serial_number_, kGetableSingleAndAll );
+    i->AttributeInsert( 5, kCipWord, &status_, kGetableSingleAndAll );
+    i->AttributeInsert( 6, kCipUdint, &serial_number_, kGetableSingleAndAll );
 
-    InsertAttribute( instance, 7, kCipShortString, &product_name_, kGetableSingleAndAll );
+    i->AttributeInsert( 7, kCipShortString, &product_name_, kGetableSingleAndAll );
 
-    InsertService( clazz, kReset, &Reset, "Reset" );
+    clazz->ServiceInsert( kReset, &Reset, "Reset" );
 
     return kEipStatusOk;
 }

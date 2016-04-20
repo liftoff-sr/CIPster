@@ -180,11 +180,7 @@ CipInstance::~CipInstance()
 CipClass::CipClass(
         const char* aClassName,
         EipUint32   aClassId,
-        EipUint16   aClassAttributeCount,
-        EipUint16   aClassServiceCount,
         EipUint32   a_get_all_class_attributes_mask,
-        EipUint16   aInstanceAttributeCount,
-        EipUint16   aInstanceServiceCount,
         EipUint32   a_get_all_instance_attributes_mask,
         EipUint16   aRevision
         ) :
@@ -192,8 +188,6 @@ CipClass::CipClass(
         0,                  // instance_id of public class is always 0
         new CipClass(       // class of public class is this meta-class
                 aClassName,
-                aClassAttributeCount + 7,
-                aClassServiceCount + (a_get_all_class_attributes_mask ? 1 : 2),
                 a_get_all_class_attributes_mask,
                 this
             )
@@ -201,12 +195,84 @@ CipClass::CipClass(
     class_id( aClassId ),
     class_name( aClassName ),
     revision( aRevision ),
-    instance_attr_count( aInstanceAttributeCount ),
     highest_attr_id( 0 ),
     highest_inst_id( 0 ),
     get_attribute_all_mask( a_get_all_instance_attributes_mask )
 {
     // The public class holds services for the instances, and attributes for itself.
+
+    CipClass* meta_class = cip_class;   // class of this class is meta-class
+
+    // create the standard class attributes
+
+    AttributeInsert( 1, kCipUint, (void*) &revision, kGetableSingleAndAll );
+
+    // largest instance number
+    AttributeInsert( 2, kCipUint, (void*) &highest_inst_id, kGetableSingleAndAll );
+
+    // number of instances currently existing, dynamically determined elsewhere
+    AttributeInsert( 3, kCipUint, NULL, kGetableSingleAndAll );
+
+    // optional attribute list - default = 0
+    AttributeInsert( 4, kCipUint, (void*) &kCipUintZero, kGetableAll );
+
+    // optional service list - default = 0
+    AttributeInsert( 5, kCipUint, (void*) &kCipUintZero, kGetableAll );
+
+    // max class attribute number
+    AttributeInsert( 6, kCipUint, (void*) &meta_class->highest_attr_id, kGetableSingleAndAll );
+
+    // max instance attribute number
+    AttributeInsert( 7, kCipUint, (void*) &highest_attr_id, kGetableSingleAndAll );
+
+    // create the standard instance services
+    ServiceInsert( kGetAttributeSingle, &GetAttributeSingle, "GetAttributeSingle" );
+
+    if( a_get_all_instance_attributes_mask )
+    {
+        // bind instance services to the class
+        ServiceInsert( kGetAttributeAll, &GetAttributeAll, "GetAttributeAll" );
+    }
+}
+
+
+CipClass::CipClass(
+        // meta-class constructor
+
+        const char* aClassName,             ///< without "meta-" prefix
+        EipUint32   a_get_all_class_attributes_mask,
+        CipClass*   aPublicClass
+        ) :
+    CipInstance( 0xffffffff, NULL ),        // instance_id and NULL class
+    class_id( 0xffffffff ),
+    class_name( std::string( "meta-" ) + aClassName ),
+    revision( 0 ),
+    highest_attr_id( 0 ),
+    highest_inst_id( 0 ),
+    get_attribute_all_mask( a_get_all_class_attributes_mask )
+{
+    /*
+        A metaClass is a class that holds the class attributes and services.
+        CIP can talk to an instance, therefore an instance has a pointer to
+        its class. CIP can talk to a class, therefore a class struct is a
+        subclass of the instance struct, and contains a pointer to a
+        metaclass. CIP never explicitly addresses a metaclass.
+    */
+
+    // The meta class has no attributes, but holds services for the public class.
+
+    // The meta class has only one instance and it is the public class and it
+    // is not owned by the meta-class (will not delete it during destruction).
+    // But in fact the public class owns the meta-class.
+    instances.push_back( aPublicClass );
+
+    ServiceInsert( kGetAttributeSingle, &GetAttributeSingle, "GetAttributeSingle" );
+
+    // create the standard class services
+    if( a_get_all_class_attributes_mask )
+    {
+        ServiceInsert( kGetAttributeAll, &GetAttributeAll, "GetAttributeAll" );
+    }
 }
 
 
@@ -356,33 +422,25 @@ CipInstance* AddCIPInstance( CipClass* clazz, EipUint32 instance_id )
 }
 
 
-CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
-        EipUint32 get_all_class_attributes_mask,
-        int number_of_class_services,
-        int number_of_instance_attributes,
-        EipUint32 get_all_instance_attributes_mask,
-        int number_of_instance_services,
-        int number_of_instances, const char* name,
-        EipUint16 revision )
+CipClass* CreateCipClass( EipUint32 class_id,
+        EipUint32 class_attributes_get_attribute_all_mask,
+        EipUint32 instance_attributes_get_attributes_all_mask,
+        int number_of_instances,
+        const char* class_name,
+        EipUint16 class_revision )
 {
-    OPENER_TRACE_INFO( "creating class '%s' with id: 0x%08x\n", name,
+    OPENER_TRACE_INFO( "creating class '%s' with id: 0x%08x\n", class_name,
             class_id );
 
     OPENER_ASSERT( !GetCipClass( class_id ) );   // should never try to redefine a class
 
     CipClass* clazz = new CipClass(
-            name,
+            class_name,
             class_id,
-            number_of_class_attributes,         // EipUint16   aClassAttributeCount
-            number_of_class_services,           // EipUint16   aClassServiceCount,
-            get_all_class_attributes_mask,      // EipUint32   a_get_all_class_attributes_mask,
-            number_of_instance_attributes,      // EipUint16   aInstanceAttributeCount,
-            number_of_instance_services,        // EipUint16   aInstanceServiceCount,
-            get_all_instance_attributes_mask,   // EipUint32   a_get_all_instance_attributes_mask,
-            revision
+            class_attributes_get_attribute_all_mask,
+            instance_attributes_get_attributes_all_mask,
+            class_revision
             );
-
-    CipClass* meta_class = clazz->cip_class;
 
     if( number_of_instances > 0 )
     {
@@ -393,59 +451,6 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
     {
         return 0;       // TODO handle return value and clean up if necessary
     }
-
-    // create the standard class attributes
-
-    InsertAttribute( clazz, 1, kCipUint, (void*) &clazz->revision,
-            kGetableSingleAndAll );                                         // revision
-
-    // largest instance number
-    InsertAttribute( clazz, 2, kCipUint,
-            (void*) &clazz->highest_inst_id,
-            kGetableSingleAndAll
-            );
-
-    // number of instances currently existing
-    InsertAttribute( clazz, 3, kCipUint,
-            // (void*) &clazz->number_of_instances,
-            NULL,
-            kGetableSingleAndAll
-            );
-
-    // optional attribute list - default = 0
-    InsertAttribute( clazz, 4, kCipUint, (void*) &kCipUintZero,
-            kGetableAll );
-
-    InsertAttribute( clazz, 5, kCipUint, (void*) &kCipUintZero,
-            kGetableAll );               // optional service list - default = 0
-
-    InsertAttribute( clazz, 6, kCipUint,
-            (void*) &meta_class->highest_attr_id,
-            kGetableSingleAndAll );      // max class attribute number
-
-    InsertAttribute( clazz, 7, kCipUint,
-            (void*) &clazz->highest_attr_id,
-            kGetableSingleAndAll );      // max instance attribute number
-
-    // create the standard class services
-    if( get_all_class_attributes_mask )
-    {
-        InsertService( meta_class, kGetAttributeAll, &GetAttributeAll,
-                "GetAttributeAll" );  // bind instance services to the metaclass
-    }
-
-    InsertService( meta_class, kGetAttributeSingle, &GetAttributeSingle,
-            "GetAttributeSingle" );
-
-    // create the standard instance services
-    if( get_all_instance_attributes_mask )
-    {
-        // bind instance services to the class
-        InsertService( clazz, kGetAttributeAll, &GetAttributeAll, "GetAttributeAll" );
-    }
-
-    InsertService( clazz, kGetAttributeSingle, &GetAttributeSingle,
-            "GetAttributeSingle" );
 
     return clazz;
 }

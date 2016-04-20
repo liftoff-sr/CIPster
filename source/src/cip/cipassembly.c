@@ -26,15 +26,12 @@ CipClass* CreateAssemblyClass()
     CipClass* assembly_class;
 
     // create the CIP Assembly object with zero instances
-    assembly_class = CreateCipClass( kCipAssemblyClassCode, 0,  // # class attributes
-            0,                                                  // 0 as the assembly object should not have a get_attribute_all service
-            0,                                                  // # class services
-            2,                                                  // # instance attributes
-            0,                                                  // 0 as the assembly object should not have a get_attribute_all service
-            1,                                                  // # instance services
-            0,                                                  // # instances
-            "assembly",                                         // name
-            2                                                   // Revision, according to the CIP spec currently this has to be 2
+    assembly_class = CreateCipClass( kCipAssemblyClassCode,
+            0,           // 0 as the assembly object should not have a get_attribute_all service
+            0,           // 0 as the assembly object should not have a get_attribute_all service
+            0,           // # instances
+            "assembly",  // name
+            2            // Revision, according to the CIP spec currently this has to be 2
             );
 
     if( NULL != assembly_class )

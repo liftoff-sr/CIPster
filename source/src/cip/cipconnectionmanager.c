@@ -176,17 +176,14 @@ EipStatus ConnectionManagerInit( EipUint16 unique_connection_id )
 
     CipClass* connection_manager = CreateCipClass(
             g_kCipConnectionManagerClassCode,   // class ID
-            0,                                  // # of class attributes
             0xC6,                               // class getAttributeAll mask
-            0,                                  // # of class services
-            0,                                  // # of instance attributes
             0xffffffff,                         // instance getAttributeAll mask
-            3,                                  // # of instance services
-            1,                                  // # of instances
+            1,                                  // no. instances
             "connection manager",               // class name
-            1 );                                // revision
+            1                                   // revision
+            );
 
-    if( connection_manager == NULL )
+    if( !connection_manager )
         return kEipStatusError;
 
     InsertService( connection_manager, kForwardOpen, &ForwardOpen, "ForwardOpen" );
@@ -1050,8 +1047,8 @@ EipUint8 ParseConnectionPath( ConnectionObject* conn,
 
             if( 0 == clazz )
             {
-                OPENER_TRACE_ERR( "classid %" PRIx32 " not found\n",
-                        conn->connection_path.class_id );
+                OPENER_TRACE_ERR( "classid %d not found\n",
+                        (int) conn->connection_path.class_id );
 
                 if( conn->connection_path.class_id >= 0xC8 ) //reserved range of class ids
                 {
@@ -1067,8 +1064,8 @@ EipUint8 ParseConnectionPath( ConnectionObject* conn,
                 return kCipErrorConnectionFailure;
             }
 
-            OPENER_TRACE_INFO( "classid %" PRIx32 " (%s)\n",
-                    conn->connection_path.class_id,
+            OPENER_TRACE_INFO( "classid %d (%s)\n",
+                    (int) conn->connection_path.class_id,
                     clazz->class_name.c_str() );
         }
         else
@@ -1176,8 +1173,8 @@ EipUint8 ParseConnectionPath( ConnectionObject* conn,
                     conn->connection_path.connection_point[i] = GetPaddedLogicalPath( &message );
 
                     OPENER_TRACE_INFO(
-                            "connection point %" PRIu32 "\n",
-                            conn->connection_path.connection_point[i] );
+                            "connection point %u\n",
+                            (unsigned) conn->connection_path.connection_point[i] );
 
                     if( 0 == GetCipInstance( clazz, conn->connection_path.connection_point[i] ) )
                     {
