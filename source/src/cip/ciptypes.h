@@ -457,7 +457,7 @@ public:
 
     ~CipClass();
 
-    bool InsertService( EipUint8 service_id,
+    CipService* ServiceInsert( EipUint8 service_id,
         CipServiceFunction service_function, const char* service_name );
 
     CipService* Service( EipUint8 service_id ) const;
@@ -491,6 +491,9 @@ public:
     EipUint16   highest_attr_id;            /**< highest defined attribute number
                                              *  (attribute numbers are not necessarily
                                              *  consecutive)*/
+
+    EipUint16   highest_inst_id;            ///< highest defined instance number, not necessarily consecutive
+
     EipUint32   get_attribute_all_mask;     /**< mask indicating which attributes are
                                               *  returned by getAttributeAll*/
 
@@ -513,6 +516,7 @@ protected:
         revision( 0 ),
         instance_attr_count( aClassAttributeCount ),    // my only instance is the public class
         highest_attr_id( 0 ),
+        highest_inst_id( 0 ),
         get_attribute_all_mask( a_get_all_class_attributes_mask )
     {
         /*

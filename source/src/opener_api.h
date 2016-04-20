@@ -219,9 +219,9 @@ bool InsertAttribute( CipInstance* instance, EipUint16 attribute_id,
  * @param service_code service code of service to be inserted.
  * @param service_function pointer to function which represents the service.
  * @param service_name name of the service
- * @return bool - true if service_code was unique, else false.
+ * @return CipService* - new service or NULL if service_code was not unique.
  */
-bool InsertService( CipClass* cip_class_to_add_service, EipUint8 service_code,
+CipService* InsertService( CipClass* cip_class_to_add_service, EipUint8 service_code,
         CipServiceFunction service_function, const char* service_name );
 
 /** @ingroup CIP_API

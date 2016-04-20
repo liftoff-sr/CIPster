@@ -17,75 +17,6 @@ CipMessageRouterRequest     g_request;
 CipMessageRouterResponse    g_response;
 
 
-#if 0
-
-typedef std::pair< int, CipClass* >     ClassEntry;     // class_id & pointer
-
-// std::set compare functor
-struct class_compare
-{
-    bool operator() ( const ClassEntry& lhs, const ClassEntry& rhs ) const
-    {
-        return lhs.first < rhs.first;
-    }
-};
-
-
-typedef std::set< ClassEntry, class_compare >   ClassSet;
-
-/**
- * Class CipClassRegistry
- * is a container for the defined CipClass()es, which in turn hold all
- * the CipInstance()s.
- */
-class CipClassRegistry : public ClassSet
-{
-
-public:
-
-    CipClass*   FindClass( int aClassId )
-    {
-        ClassEntry  e( aClassId, 0 );
-
-        ClassSet::iterator it = find( e );
-
-        if( it != end() )
-            return it->second;
-
-        return NULL;
-    }
-
-    /** @brief Register an Class to the message router
-     *  @param cip_class Pointer to a class object to be registered.
-     *  @return bool - true.. success
-     *                 false.. class already registered
-     */
-    bool RegisterClass( CipClass* aClass )
-    {
-        ClassEntry  e( aClass->class_id, aClass );
-
-        std::pair< ClassSet::iterator, bool > r = insert( e );
-
-        return r.second;
-    }
-
-    void DeleteAll()
-    {
-        while( size() )
-        {
-            delete begin()->second;     // Delete the first of remaining classes
-            erase( begin() );           // Erase first class's ClassEntry
-        }
-    }
-
-    ~CipClassRegistry()
-    {
-        DeleteAll();
-    }
-};
-
-#else
-
 /**
  * Class CipClassRegistry
  * is a container for the defined CipClass()es, which in turn hold all
@@ -106,7 +37,7 @@ public:
         return NULL;
     }
 
-    /** @brief Register an Class to the message router
+    /** @brief Register a Class in the CIP class registry for the message router
      *  @param cip_class Pointer to a class object to be registered.
      *  @return bool - true.. success
      *                 false.. class with conflicting class_id is already registered
@@ -139,8 +70,6 @@ private:
     ClassHash   container;
 };
 
-
-#endif
 
 CipClassRegistry    g_class_registry;
 
@@ -207,17 +136,7 @@ EipStatus CipMessageRouterInit()
 CipInstance* GetCipInstance( CipClass* cip_class, EipUint32 instance_id )
 {
     // if the instance number is zero, return the class object itself
-    if( instance_id == 0 )
-        return cip_class;
-
-    const CipClass::CipInstances& instances = cip_class->Instances();
-    for( unsigned i = 0; i < instances.size();  ++i )
-    {
-        if( instances[i]->instance_id == instance_id )
-            return instances[i];
-    }
-
-    return NULL;
+    return cip_class->Instance( instance_id );
 }
 
 

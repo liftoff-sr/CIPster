@@ -427,8 +427,9 @@ int EncapsulateListIdentyResponseMessage( EipByte* communication_buffer )
     AddIntToMessage( device_type_, &runner );
     AddIntToMessage( product_code_, &runner );
 
-    *(runner)++ = revision_.major_revision;
-    *(runner)++ = revision_.minor_revision;
+    *runner++ = revision_.major_revision;
+    *runner++ = revision_.minor_revision;
+
     AddIntToMessage( status_, &runner );
     AddDintToMessage( serial_number_, &runner );
 

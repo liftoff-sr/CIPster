@@ -20,16 +20,8 @@ static const int kCipAssemblyClassCode = 0x04;
  *
  * @return Returns kEipStatusOk if assembly object was successfully created, otherwise kEipStatusError
  */
-EipStatus CipAssemblyInitialize(void);
+EipStatus CipAssemblyInitialize();
 
-/** @brief clean up the data allocated in the assembly object instances
- *
- * Assembly object instances allocate per instance data to store attribute 3.
- * This will be freed here. The assembly object data given by the application
- * is not freed neither the assembly object instances. These are handled in the
- * main shutdown function.
- */
-void ShutdownAssemblies(void);
 
 /** @brief notify an Assembly object that data has been received for it.
  *

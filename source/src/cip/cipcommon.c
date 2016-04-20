@@ -115,26 +115,22 @@ EipStatus NotifyClass( CipClass* cip_class,
     unsigned instance_number = request->request_path.instance_number;
 
     // look up the instance (note that if inst==0 this will be the class itself)
-    CipInstance* instance = GetCipInstance( cip_class, instance_number );
+    CipInstance* instance = cip_class->Instance( instance_number );
 
     if( instance )
     {
         OPENER_TRACE_INFO( "notify: found instance %d%s\n", instance_number,
                 instance_number == 0 ? " (class object)" : "" );
 
-        const CipClass::CipServices& services = cip_class->Services();
-        for( unsigned i = 0;  i < services.size();  ++i )
+        CipService* service = cip_class->Service( request->service );
+
+        if( service )
         {
-            CipService* service = services[i];
+            OPENER_TRACE_INFO( "notify: calling '%s' service\n", service->service_name.c_str() );
+            OPENER_ASSERT( service->service_function );
 
-            if( request->service == service->service_id )    // if match is found
-            {
-                OPENER_TRACE_INFO( "notify: calling '%s' service\n", service->service_name.c_str() );
-                OPENER_ASSERT( service->service_function );
-
-                // call the service, and return what it returns
-                return service->service_function( instance, request, response );
-            }
+            // call the service, and return what it returns
+            return service->service_function( instance, request, response );
         }
 
         OPENER_TRACE_WARN( "notify: service 0x%x not supported\n",
@@ -207,6 +203,7 @@ CipClass::CipClass(
     revision( aRevision ),
     instance_attr_count( aInstanceAttributeCount ),
     highest_attr_id( 0 ),
+    highest_inst_id( 0 ),
     get_attribute_all_mask( a_get_all_instance_attributes_mask )
 {
     // The public class holds services for the instances, and attributes for itself.
@@ -288,6 +285,9 @@ CipInstance* CipClass::InstanceInsert( EipUint32 instance_id )
         }
     }
 
+    if( instance_id > highest_inst_id )
+        highest_inst_id = instance_id;
+
     CipInstance* instance = new CipInstance( instance_id, this );
 
     instances.insert( it, instance );
@@ -304,6 +304,9 @@ static int inst_comp( EipUint32 instance_id, CipInstance* instance )
 
 CipInstance* CipClass::Instance( EipUint32 instance_id ) const
 {
+    if( instance_id == 0 )
+        return (CipInstance*)  this;        // cast away const-ness
+
     CipInstances::const_iterator  it;
 
     // a binary search thru the vector of pointers looking for attribute_id
@@ -398,8 +401,7 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
 
     // largest instance number
     InsertAttribute( clazz, 2, kCipUint,
-            // (void*) &clazz->number_of_instances,
-            NULL,
+            (void*) &clazz->highest_inst_id,
             kGetableSingleAndAll
             );
 
@@ -509,13 +511,13 @@ bool InsertAttribute( CipInstance* instance, EipUint16 attribute_id,
 }
 
 
-bool CipClass::InsertService( EipUint8 service_id,
+CipService* CipClass::ServiceInsert( EipUint8 service_id,
         CipServiceFunction service_function, const char* service_name )
 {
     CipClass::CipServices::iterator it;
 
     // Keep sorted by id
-    for( it = services.begin(); it != services.end();  ++it )
+    for( it = services.begin();  it != services.end();  ++it )
     {
         if( service_id < (*it)->service_id )
             break;
@@ -526,22 +528,22 @@ bool CipClass::InsertService( EipUint8 service_id,
                 class_name.c_str(), service_id
                 );
 
-            return false;
+            return NULL;
         }
     }
 
-    services.insert( it,
-        new CipService( service_name, service_id, service_function )
-        );
+    CipService* service = new CipService( service_name, service_id, service_function );
 
-    return true;
+    services.insert( it, service );
+
+    return service;
 }
 
 
-bool InsertService( CipClass* clazz, EipUint8 service_id,
+CipService* InsertService( CipClass* clazz, EipUint8 service_id,
         CipServiceFunction service_function, const char* service_name )
 {
-    return clazz->InsertService( service_id, service_function, service_name );
+    return clazz->ServiceInsert( service_id, service_function, service_name );
 }
 
 
@@ -603,7 +605,7 @@ EipStatus GetAttributeSingle( CipInstance* instance,
         get_mask = kGetableSingle;
     }
 
-    if( attribute && attribute->data )
+    if( attribute )
     {
         if( attribute->attribute_flags & get_mask )
         {
@@ -620,16 +622,35 @@ EipStatus GetAttributeSingle( CipInstance* instance,
             if( attribute->type == kCipByteArray
                 && instance->cip_class->class_id == kCipAssemblyClassCode )
             {
+                OPENER_ASSERT( attribute->data );
+
                 // we are getting a byte array of a assembly object, kick out to the app callback
                 OPENER_TRACE_INFO( " -> getAttributeSingle CIP_BYTE_ARRAY\r\n" );
                 BeforeAssemblyDataSend( instance );
             }
 
-            response->data_length = EncodeData( attribute->type,
-                    attribute->data,
-                    &message );
+            if( attribute->data )
+            {
+                response->data_length = EncodeData( attribute->type,
+                        attribute->data,
+                        &message );
 
-            response->general_status = kCipErrorSuccess;
+                response->general_status = kCipErrorSuccess;
+            }
+            else if( instance->instance_id == 0 )   // instance is a CipClass
+            {
+                if( attribute->attribute_id == 3 )
+                {
+                    CipClass* clazz = dynamic_cast<CipClass*>( instance );
+                    EipUint16 instance_count = clazz->Instances().size();
+
+                    response->data_length = EncodeData( attribute->type,
+                            &instance_count,
+                            &message );
+
+                    response->general_status = kCipErrorSuccess;
+                }
+            }
         }
     }
 
