@@ -49,64 +49,40 @@ CipClass* CreateAssemblyClass()
 
 EipStatus CipAssemblyInitialize()
 {
-    // create the CIP Assembly object with zero instances
-    return ( NULL != CreateAssemblyClass() ) ? kEipStatusOk : kEipStatusError;
-}
-
-
-void ShutdownAssemblies()
-{
-    CipClass* assembly_class = GetCipClass( kCipAssemblyClassCode );
-
-    if( assembly_class )
-    {
-        for( unsigned i = 0; i < assembly_class->instances.size();  ++i )
-        {
-            CipInstance* instance = assembly_class->instances[i];
-
-            CipAttribute* attribute = GetCipAttribute( instance, 3 );
-
-            if( attribute )
-            {
-                CipFree( attribute->data );
-            }
-        }
-    }
+    // create the CIP Assembly class
+    return CreateAssemblyClass() ? kEipStatusOk : kEipStatusError;
 }
 
 
 CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
         EipUint16 data_length )
 {
-    CipClass* assembly_class;
-    CipInstance* instance;
-    CipByteArray* assembly_byte_array;
+    CipClass* assembly_class = GetCipClass( kCipAssemblyClassCode );
 
-    if( NULL == ( assembly_class = GetCipClass( kCipAssemblyClassCode ) ) )
+    if( !assembly_class )
     {
-        if( NULL == ( assembly_class = CreateAssemblyClass() ) )
+        assembly_class = CreateAssemblyClass();
+        if( !assembly_class )
         {
             return NULL;
         }
     }
 
-    instance = AddCIPInstance( assembly_class, instance_id ); // add instances (always succeeds (or asserts))
+    CipInstance* instance = AddCIPInstance( assembly_class, instance_id );
 
-    if( ( assembly_byte_array = (CipByteArray*) CipCalloc( 1, sizeof(CipByteArray) ) )
-        == NULL )
+    CipByteArray* byte_array = (CipByteArray*) CipCalloc( 1, sizeof(CipByteArray) );
+    if( !byte_array )
     {
-        return NULL; //TODO remove assembly instance in case of error
+        return NULL;    // TODO remove assembly instance in case of error
     }
 
-    assembly_byte_array->length = data_length;
-    assembly_byte_array->data = data;
+    byte_array->length = data_length;
+    byte_array->data   = data;
 
-    InsertAttribute( instance, 3, kCipByteArray, assembly_byte_array,
-            kSetAndGetAble );
+    instance->AttributeInsert( 3, kCipByteArray, byte_array, kSetAndGetAble, true );
 
     // Attribute 4 Number of bytes in Attribute 3
-    InsertAttribute( instance, 4, kCipUint, &(assembly_byte_array->length),
-            kGetableSingle );
+    instance->AttributeInsert( 4, kCipUint, &byte_array->length, kGetableSingle );
 
     return instance;
 }
@@ -116,23 +92,31 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
         EipUint8* data,
         EipUint16 data_length )
 {
-    CipByteArray* assembly_byte_array;
+    OPENER_ASSERT( instance->cip_class->class_id == kCipAssemblyClassCode );
 
     // empty path (path size = 0) need to be checked and taken care of in future
-    // copy received data to Attribute 3
-    assembly_byte_array = (CipByteArray*) instance->attributes[0]->data;
 
-    if( assembly_byte_array->length != data_length )
+    // copy received data to Attribute 3
+    CipAttribute* attr3 = instance->Attribute( 3 );
+    OPENER_ASSERT( attr3 );
+
+    CipByteArray* byte_array = (CipByteArray*) attr3->data;
+    OPENER_ASSERT( byte_array );
+
+    if( byte_array->length != data_length )
     {
         OPENER_TRACE_ERR( "wrong amount of data arrived for assembly object\n" );
-        return kEipStatusError; //TODO question should we notify the application that wrong data has been recieved???
+        return kEipStatusError;
+
+        // TODO question should we notify the application that
+        // wrong data has been recieved???
     }
     else
     {
-        memcpy( assembly_byte_array->data, data, data_length );
-        // call the application that new data arrived
+        memcpy( byte_array->data, data, data_length );
     }
 
+    // notify application that new data arrived
     return AfterAssemblyDataReceived( instance );
 }
 

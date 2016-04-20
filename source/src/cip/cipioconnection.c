@@ -755,7 +755,11 @@ EipStatus SendConnectedData( ConnectionObject* conn )
 
     common_packet_format_data->data_item.type_id = kCipItemIdConnectedDataItem;
 
-    CipByteArray* producing_instance_attributes = (CipByteArray*) conn->producing_instance->attributes[0]->data;
+    CipAttribute* attr3 = conn->producing_instance->Attribute( 3 );
+    OPENER_ASSERT( attr3 );
+
+    CipByteArray* producing_instance_attributes = (CipByteArray*) attr3->data;
+    OPENER_ASSERT( producing_instance_attributes );
 
     common_packet_format_data->data_item.length = 0;
 

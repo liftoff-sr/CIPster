@@ -294,7 +294,7 @@ EipStatus GetAttributeAllTcpIpInterface( CipInstance* instance,
 {
     EipUint8* start = response->data;       // snapshot initial
 
-    CipInstance::CipAttributes& attributes = instance->attributes;
+    const CipInstance::CipAttributes& attributes = instance->Attributes();
     for( unsigned j = 0; j < attributes.size();  ++j )
     {
         CipAttribute* attribute = attributes[j];

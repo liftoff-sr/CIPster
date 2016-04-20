@@ -172,10 +172,10 @@ CipClass* CreateCipClass( EipUint32 class_id, int number_of_class_attributes,
  *
  * @param cip_object_to_add_instances CIP object the instances should be added
  * @param number_of_instances number of instances to be generated.
- * @return pointer to the first of the new instances
- *              0 on error
+ * @return bool - true if all were added, else false.  Can fail if a collision on
+ *   instance_id happens.
  */
-void AddCipInstances( CipClass* cip_object_to_add_instances, int number_of_instances );
+bool AddCipInstances( CipClass* cip_object_to_add_instances, int number_of_instances );
 
 /** @ingroup CIP_API
  * @brief Create one instance of a given class with a certain instance number
@@ -198,16 +198,17 @@ CipInstance* AddCIPInstance( CipClass* cip_class_to_add_instance,
  *  already been defined, the previous attributes will be replaced
  *
  *  @param instance is a pointer to CIP class. (may be also instance 0)
- *  @param attribute_number is which attribute to be inserted.
+ *  @param attribute_id is which attribute to be inserted.
  *  @param cip_data_type is the type of attribute to be inserted.
  *  @param cip_data is a pointer to data of attribute.
  *  @param cip_flags flags to indicate set-ability and get-ability of attribute.
+ *  @return bool - true if attribute_id was unique, else false.
  */
-void InsertAttribute( CipInstance* instance, EipUint16 attribute_number,
+bool InsertAttribute( CipInstance* instance, EipUint16 attribute_id,
         EipUint8 cip_data_type, void* cip_data, EipByte cip_flags );
 
 /** @ingroup CIP_API
- * @brief Insert a service in an instance of a CIP object
+ * @brief Insert a service into a #CipClass
  *
  *  Note that services are stored in an array pointer in the class object
  *  the service array is not expandable if you insert a service that has
@@ -218,8 +219,9 @@ void InsertAttribute( CipInstance* instance, EipUint16 attribute_number,
  * @param service_code service code of service to be inserted.
  * @param service_function pointer to function which represents the service.
  * @param service_name name of the service
+ * @return bool - true if service_code was unique, else false.
  */
-void InsertService( CipClass* cip_class_to_add_service, EipUint8 service_code,
+bool InsertService( CipClass* cip_class_to_add_service, EipUint8 service_code,
         CipServiceFunction service_function, const char* service_name );
 
 /** @ingroup CIP_API

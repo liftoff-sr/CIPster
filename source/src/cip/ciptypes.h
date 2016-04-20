@@ -23,7 +23,7 @@
  * Bits 7-5 in the Segment Type/Format byte
  *
  */
-typedef enum
+enum SegmentType
 {
     // Segments
     kSegmentTypePortSegment = 0x00,         ///< Port segment
@@ -34,16 +34,16 @@ typedef enum
     kSegmentTypeDataTypeConstructed = 0xA0, ///< Data type constructed
     kSegmentTypeDataTypeElementary  = 0xC0, ///< Data type elementary
     kSegmentTypeSegmentTypeReserved = 0xE0
-} SegmentType;
+};
 
 //* @brief Port Segment flags
-typedef enum
+enum PortSegmentFlag
 {
     kPortSegmentFlagExtendedLinkAddressSize = 0x10 ///< Extended Link Address Size flag, Port segment
-} PortSegmentFlag;
+};
 
 //* @brief Enum containing values which kind of logical segment is encoded
-typedef enum
+enum LogicalSegmentLogicalType
 {
     kLogicalSegmentLogicalTypeClassId = 0x00,           ///< Class ID
     kLogicalSegmentLogicalTypeInstanceId = 0x04,        ///< Instance ID
@@ -53,31 +53,31 @@ typedef enum
     kLogicalSegmentLogicalTypeSpecial = 0x14,           ///< Special
     kLogicalSegmentLogicalTypeService = 0x18,           ///< Service ID
     kLogicalSegmentLogicalTypeExtendedLogical = 0x1C    ///< Extended Logical
-} LogicalSegmentLogicalType;
+};
 
 /** @brief Enum containing values how long the encoded value will be (8, 16, or
  * 32 bit) */
-typedef enum
+enum LogicalSegmentLogicalFormat
 {
     kLogicalSegmentLogicalFormatEightBitValue = 0x00,
     kLogicalSegmentLogicalFormatSixteenBitValue = 0x01,
     kLogicalSegmentLogicalFormatThirtyTwoBitValue = 0x02
-} LogicalSegmentLogicalFormat;
+};
 
-typedef enum
+enum NetworkSegmentSubType
 {
     kProductionTimeInhibitTimeNetworkSegment = 0x43 ///< identifier indicating a production inhibit time network segment
-} NetworkSegmentSubType;
+};
 
-typedef enum
+enum DataSegmentType
 {
     kDataSegmentTypeSimpleDataMessage = kSegmentTypeDataSegment + 0x00,
     kDataSegmentTypeAnsiExtendedSymbolMessage = kSegmentTypeDataSegment + 0x11
-} DataSegmentType;
+};
 
 /** @brief Enum containing the encoding values for CIP data types for CIP
  * Messages */
-typedef enum cip_data_types
+enum CipDataType
 {
     kCipAny = 0x00,         ///< data type that can not be directly encoded
     kCipBool = 0xC1,        ///< boolean data type
@@ -121,7 +121,7 @@ typedef enum cip_data_types
     kCipByteArray   = 0xA4,                     ///<
     kInternalUint6  = 0xF0                      /**< bogus hack, for port class attribute 9, TODO
                                                  *  figure out the right way to handle it */
-} CipDataType;
+};
 
 /** @brief Definition of CIP service codes
  *
@@ -129,7 +129,7 @@ typedef enum cip_data_types
  * 0x1C
  *
  */
-typedef enum
+enum CIPServiceCode
 {
     // Start CIP common services
     kGetAttributeAll = 0x01,
@@ -164,10 +164,10 @@ typedef enum
     kGetConnectionOwner = 0x5A
 
 // End CIP object-specific services
-} CIPServiceCode;
+};
 
 //* @brief Definition of Get and Set Flags for CIP Attributes
-typedef enum                    // TODO: Rework
+enum CIPAttributeFlag           // TODO: Rework
 {
     kNotSetOrGetable = 0x00,    ///< Neither set-able nor get-able
     kGetableAll = 0x01,         ///< Get-able, also part of Get Attribute All service
@@ -176,46 +176,46 @@ typedef enum                    // TODO: Rework
     // combined for convenience
     kSetAndGetAble = 0x07,      ///< both set and get-able
     kGetableSingleAndAll = 0x03 ///< both single and all
-} CIPAttributeFlag;
+};
 
-typedef enum
+enum IoConnectionEvent
 {
     kIoConnectionEventOpened,
     kIoConnectionEventTimedOut,
     kIoConnectionEventClosed
-} IoConnectionEvent;
+};
 
 /** @brief CIP Byte Array
  *
  */
-typedef struct
+struct CipByteArray
 {
     EipUint16   length;     ///< Length of the Byte Array
     EipByte*    data;       ///< Pointer to the data
-} CipByteArray;
+};
 
 /** @brief CIP Short String
  *
  */
-typedef struct
+struct CipShortString
 {
     EipUint8    length;     ///< Length of the String (8 bit value)
     EipByte*    string;     ///< Pointer to the string data
-} CipShortString;
+};
 
 /** @brief CIP String
  *
  */
-typedef struct
+struct CipString
 {
     EipUint16   length;     ///< Length of the String (16 bit value)
     EipByte*    string;     ///< Pointer to the string data
-} CipString;
+};
 
 /** @brief Struct for padded EPATHs
  *
  */
-typedef struct
+struct CipEpath
 {
     EipUint8    path_size;          ///< Size of the Path in 16-bit words
     // TODO: Fix, should be UINT (EIP_UINT16)
@@ -223,12 +223,12 @@ typedef struct
     EipUint16   class_id;           ///< Class ID of the linked object
     EipUint16   instance_number;    ///< Requested Instance Number of the linked object
     EipUint16   attribute_number;   ///< Requested Attribute Number of the linked object
-} CipEpath;
+};
 
 /** @brief CIP Connection Path
  *
  */
-typedef struct
+struct CipConnectionPath
 {
     EipUint8    path_size;          ///< Size of the Path in 16-bit words
     // TODO: Fix, should be UINT (EIP_UINT16)
@@ -237,12 +237,12 @@ typedef struct
     EipUint32   connection_point[3];// TODO:  Why array length 3?
     EipUint8    data_segment;
     EipUint8*   segment_data;
-} CipConnectionPath;
+};
 
 /** @brief Struct representing the key data format of the electronic key segment
  *
  */
-typedef struct
+struct CipKeyData
 {
     CipUint     vendor_id;          ///< Vendor ID
     CipUint     device_type;        ///< Device Type
@@ -250,43 +250,43 @@ typedef struct
     CipByte     major_revision;     /**< Major Revision and Compatibility (Bit 0-6 = Major
                                      *  Revision) Bit 7 = Compatibility */
     CipUsint    minor_revision;     ///< Minor Revision
-} CipKeyData;
+};
 
-typedef struct
+struct CipRevision
 {
     EipUint8    major_revision;
     EipUint8    minor_revision;
-} CipRevision;
+};
 
 /** @brief CIP Electronic Key Segment struct
  *
  */
-typedef struct
+struct CipElectronicKey
 {
     CipUsint    segment_type;  ///< Specifies the Segment Type
     CipUsint    key_format;    /**< Key Format 0-3 reserved, 4 = see Key Format Table,
                                 *  5-255 = Reserved */
     CipKeyData  key_data;       /**< Depends on key format used, usually Key Format 4 as
                                  *  specified in CIP Specification, Volume 1*/
-} CipElectronicKey;
+};
 
 /** @brief CIP Message Router Request
  *
  */
-typedef struct
+struct CipMessageRouterRequest
 {
     CipUsint    service;
     CipEpath    request_path;
     EipInt16    data_length;
     CipOctet*   data;
-} CipMessageRouterRequest;
+};
 
 #define MAX_SIZE_OF_ADD_STATUS 2    // for now we support extended status codes up to 2 16bit values there is mostly only one 16bit value used
 
 /** @brief CIP Message Router Response
  *
  */
-typedef struct
+struct CipMessageRouterResponse
 {
     CipUsint reply_service;                                 /**< Reply service code, the requested service code +
                                                              *  0x80 */
@@ -301,18 +301,31 @@ typedef struct
     EipInt16    data_length;                                   // TODO: Check if this is correct
     CipOctet*   data;                                         /**< Array of octet; Response data per object definition from
                                                              *  request */
-} CipMessageRouterResponse;
+};
 
 
-
-struct CipAttribute
+/**
+ * Class CipAttribute
+ * holds info for a CIP attribute which may be contained by a #CipInstance
+ */
+class CipAttribute
 {
-    CipAttribute( EipUint16 aAttributeId = 0, EipUint8 aType = 0, EipUint8 aFlags = 0, void* aData = 0 ) :
+public:
+    CipAttribute(
+            EipUint16 aAttributeId = 0,
+            EipUint8 aType = 0,
+            EipUint8 aFlags = 0,
+            void* aData = 0,
+            bool IOwnData = false
+            ) :
         attribute_id( aAttributeId ),
         type( aType ),
         attribute_flags( aFlags ),
-        data( aData )
+        data( aData ),
+        own_data( IOwnData )
     {}
+
+    virtual ~CipAttribute();
 
     EipUint16   attribute_id;
     EipUint8    type;
@@ -323,35 +336,58 @@ struct CipAttribute
                                                 all other values reserved
                                          */
     void*       data;
+
+    bool        own_data;               // Do I own data?
+                                        // If so, I must CipFree() it in destructor.
 } ;
 
-// type definition of CIP service structure
-struct CipClass;
 
-struct CipInstance
+class CipClass;
+
+/**
+ * Class CipInstance
+ * holds CIP intance info and instances may be contained within a #CipClass.
+ */
+class CipInstance
 {
-    CipInstance() :
-        instance_id( 0 ),
-        cip_class( 0 )
-    {}
-
-    CipInstance( EipUint32 id, CipClass* aClazz );   // implemented in cipcommon.c
-
-    ~CipInstance();
-
-    void InsertAttribute( EipUint16 attribute_id,
-        EipUint8 cip_type, void* data, EipByte cip_flags );
-
-
-    EipUint32           instance_id;    ///< this instance's number (unique within the class)
-
+public:
     typedef std::vector<CipAttribute*>      CipAttributes;
 
-    CipAttributes       attributes;         ///< pointer array to attributes which are unique to this instance
-    CipClass*           cip_class;          ///< class the instance belongs to
+    CipInstance( EipUint32 aInstanceId, CipClass* aClass ) :
+        instance_id( aInstanceId ),
+        cip_class( aClass )
+    {
+    }
+
+    virtual ~CipInstance();
+
+    CipAttribute* AttributeInsert( EipUint16 attribute_id,
+        EipUint8 cip_type,
+        void* data,
+        EipByte cip_flags,
+        bool attr_owns_data = false
+        );
+
+    /**
+     * Function Attribute
+     * returns a CipAttribute or NULL if not found.
+     */
+    CipAttribute* Attribute( EipUint16 attribute_id ) const;
+
+    const CipAttributes& Attributes() const
+    {
+        return attributes;
+    }
+
+    EipUint32           instance_id;    ///< this instance's number (unique within the class)
+    CipClass*           cip_class;      ///< class the instance belongs to
+
+protected:
+    CipAttributes       attributes;     ///< sorted pointer array to CipAttributes, unique to this instance
 
 private:
-    CipInstance( CipInstance& );            // private because not implemented
+
+    CipInstance( CipInstance& );        // private because not implemented
 };
 
 
@@ -374,9 +410,13 @@ typedef EipStatus (* CipServiceFunction)( CipInstance* instance,
         CipMessageRouterResponse* response );
 
 
-//* @brief Service descriptor.
-struct CipService
+/**
+ * Class CipService
+ * holds info for a CIP service and services may be contained within a CipClass.
+ */
+class CipService
 {
+public:
     CipService( const char* aServiceName = "", int aServiceId = 0,
             CipServiceFunction aServiceFunction = 0 ) :
         service_name( aServiceName ),
@@ -399,6 +439,10 @@ struct CipService
 class CipClass : public CipInstance
 {
 public:
+
+    typedef std::vector<CipInstance*>      CipInstances;
+    typedef std::vector<CipService*>       CipServices;
+
     CipClass(
         const char* aClassName,
         EipUint32   aClassId,
@@ -413,8 +457,30 @@ public:
 
     ~CipClass();
 
-    void InsertService( EipUint8 service_id,
+    bool InsertService( EipUint8 service_id,
         CipServiceFunction service_function, const char* service_name );
+
+    CipService* Service( EipUint8 service_id ) const;
+
+    const CipServices& Services() const
+    {
+        return services;
+    }
+
+
+    /**
+     * Function InstanceInsert
+     * inserts a new instance into this class if the @a instance_id is unique.
+     * @return CipInstance* - the new instance or NULL if failure.
+     */
+    CipInstance* InstanceInsert( EipUint32 instance_id );
+
+    CipInstance* Instance( EipUint32 instance_id ) const;
+
+    const CipInstances& Instances() const
+    {
+        return instances;
+    }
 
 
     // the rest of these are specific to the Class class only.
@@ -427,12 +493,6 @@ public:
                                              *  consecutive)*/
     EipUint32   get_attribute_all_mask;     /**< mask indicating which attributes are
                                               *  returned by getAttributeAll*/
-
-    typedef std::vector<CipInstance*>      CipInstances;
-    typedef std::vector<CipService*>       CipServices;
-
-    CipInstances    instances;              ///< collection of instances
-    CipServices     services;               ///< collection of services
 
 
 protected:
@@ -474,6 +534,9 @@ protected:
         instances.push_back( aPublicClass );
     }
 
+    CipInstances    instances;              ///< collection of instances
+    CipServices     services;               ///< collection of services
+
 private:
     CipClass( CipClass& );                  // private because not implemented
 };
@@ -482,7 +545,7 @@ private:
 /**
  * @brief Struct for saving TCP/IP interface information
  */
-typedef struct
+struct CipTcpIpNetworkInterfaceConfiguration
 {
     CipUdint ip_address;
     CipUdint network_mask;
@@ -490,16 +553,16 @@ typedef struct
     CipUdint name_server;
     CipUdint name_server_2;
     CipString domain_name;
-} CipTcpIpNetworkInterfaceConfiguration;
+} ;
 
-typedef struct
+struct CipRoutePath
 {
     EipUint8    path_size;
     EipUint32   port; // support up to 32 bit path
     EipUint32   address;
-} CipRoutePath;
+} ;
 
-typedef struct
+struct CipUnconnectedSendParameter
 {
     EipByte         priority;
     EipUint8        timeout_ticks;
@@ -511,7 +574,7 @@ typedef struct
     EipUint8        reserved;
     CipRoutePath    route_path;
     void*           data;
-} CipUnconnectedSendParameter;
+};
 
 /* these are used for creating the getAttributeAll masks
  *  TODO there might be a way simplifying this using __VARARGS__ in #define */

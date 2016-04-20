@@ -659,7 +659,7 @@ EipStatus AssembleForwardOpenResponse( ConnectionObject* co,
 
     AddNullAddressItem( cpfd );
 
-    response->reply_service  = (0x80 | kForwardOpen);
+    response->reply_service  = 0x80 | kForwardOpen;
     response->general_status = general_status;
 
     if( kCipErrorSuccess == general_status )
@@ -730,10 +730,8 @@ EipStatus AssembleForwardOpenResponse( ConnectionObject* co,
         AddDintToMessage( co->t_to_o_requested_packet_interval, &message );
     }
 
-    *message = 0;   // remaining path size - for routing devices relevant
-    message++;
-    *message = 0;   // reserved
-    message++;
+    *message++ = 0;   // remaining path size - for routing devices relevant
+    *message++ = 0;   // reserved
 
     return kEipStatusOkSend; // send reply
 }
