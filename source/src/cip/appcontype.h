@@ -15,7 +15,7 @@ void InitializeIoConnectionData(void);
  *
  *  If a suitable connection is found the connection data is transfered the
  *  application connection type is set (i.e., EConnType).
- *  @param connection_object connection data to be used
+ *  @param cip_conn connection data to be used
  *  @param extended_error if an error occurred this value has the according
  *     error code for the response
  *  @return
@@ -23,8 +23,8 @@ void InitializeIoConnectionData(void);
  *          data given in pa_pstConnData.
  *        - on error: NULL
  */
-ConnectionObject *GetIoConnectionForConnectionData(
-    ConnectionObject *connection_object, EipUint16 *extended_error);
+CipConn *GetIoConnectionForConnectionData(
+    CipConn *cip_conn, EipUint16 *extended_error);
 
 /** @brief Check if there exists already an exclusive owner or listen only connection
  *         which produces the input assembly.
@@ -32,7 +32,7 @@ ConnectionObject *GetIoConnectionForConnectionData(
  *  @param input_point the Input point to be produced
  *  @return if a connection could be found a pointer to this connection if not NULL
  */
-ConnectionObject *GetExistingProducerMulticastConnection(EipUint32 input_point);
+CipConn *GetExistingProducerMulticastConnection(EipUint32 input_point);
 
 /** @brief check if there exists an producing multicast exclusive owner or
  * listen only connection that should produce the same input but is not in charge
@@ -42,7 +42,7 @@ ConnectionObject *GetExistingProducerMulticastConnection(EipUint32 input_point);
  * @return if a connection could be found the pointer to this connection
  *      otherwise NULL.
  */
-ConnectionObject *GetNextNonControlMasterConnection(EipUint32 input_point);
+CipConn *GetNextNonControlMasterConnection(EipUint32 input_point);
 
 /** @brief Close all connection producing the same input and have the same type
  * (i.e., listen only or input only).

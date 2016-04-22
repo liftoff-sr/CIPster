@@ -24,16 +24,17 @@
 #include "cpf.h"
 #include "appcontype.h"
 
-/// Binary search function template, with templated compare function
-template< typename T, typename IterT, typename compare >
-IterT vec_search( IterT begin, IterT end, T target, compare comp )
+/// Binary search function template, dedicated for classes with Id() member func
+template< typename T, typename IterT >
+IterT vec_search( IterT begin, IterT end, T target )
 {
     IterT initial_end = end;
 
     while( begin < end )
     {
-        IterT middle = begin + (end - begin - 1)/2;
-        int r = comp( target, *middle );
+        IterT   middle = begin + (end - begin - 1)/2;
+        int     r = target - (*middle)->Id();
+
         if( r < 0 )
             end = middle;
         else if( r > 0 )
@@ -320,7 +321,7 @@ CipService* CipClass::Service( EipUint8 service_id ) const
     CipClass::CipServices::const_iterator  it;
 
     // binary search thru vector of pointers looking for attribute_id
-    it = vec_search( services.begin(), services.end(), service_id, serv_comp );
+    it = vec_search( services.begin(), services.end(), service_id );
 
     if( it != services.end() )
         return *it;
@@ -331,40 +332,56 @@ CipService* CipClass::Service( EipUint8 service_id ) const
 }
 
 
-CipInstance* CipClass::InstanceInsert( EipUint32 instance_id )
+bool CipClass::InstancesInsert( CipInstance** aInstances, int aCount )
 {
-    CipClass::CipInstances::iterator it;
+    bool ret = true;
 
-    // Keep sorted by id
-    for( it = instances.begin(); it != instances.end();  ++it )
+    for( int i = 0; i < aCount;  ++i )
     {
-        if( instance_id < (*it)->instance_id )
-            break;
+        CipInstances::iterator it;
 
-        else if( instance_id == (*it)->instance_id )
+        CipInstance* inst = aInstances[i];
+
+        // Keep sorted by id
+        for( it = instances.begin();  it != instances.end();  ++it )
         {
-            OPENER_TRACE_ERR( "class '%s' already has instance %d\n",
-                class_name.c_str(), instance_id
-                );
+            if( inst->Id() < (*it)->Id() )
+                break;
 
-            return NULL;
+            else if( inst->Id() == (*it)->Id() )
+            {
+                OPENER_TRACE_ERR( "class '%s' already has instance %d\n",
+                    class_name.c_str(), inst->Id()
+                    );
+
+                ret = false;
+                continue;
+            }
         }
+
+        if( inst->Id() > highest_inst_id )
+            highest_inst_id = inst->Id();
+
+        instances.insert( it, inst );
+
+        aInstances[i] = 0;
     }
 
-    if( instance_id > highest_inst_id )
-        highest_inst_id = instance_id;
-
-    CipInstance* instance = new CipInstance( instance_id, this );
-
-    instances.insert( it, instance );
-
-    return instance;
+    return ret;
 }
 
 
-static int inst_comp( EipUint32 instance_id, CipInstance* instance )
+CipInstance* CipClass::InstanceInsert( EipUint32 instance_id )
 {
-    return instance_id - instance->instance_id;
+    CipInstance* instance = new CipInstance( instance_id, this );
+
+    if( !InstancesInsert( &instance, 1 ) )
+    {
+        delete instance;
+        instance = NULL;        // return NULL on failure
+    }
+
+    return instance;
 }
 
 
@@ -376,7 +393,7 @@ CipInstance* CipClass::Instance( EipUint32 instance_id ) const
     CipInstances::const_iterator  it;
 
     // a binary search thru the vector of pointers looking for attribute_id
-    it = vec_search( instances.begin(), instances.end(), instance_id, inst_comp );
+    it = vec_search( instances.begin(), instances.end(), instance_id );
 
     if( it != instances.end() )
         return *it;
@@ -466,35 +483,53 @@ CipAttribute::~CipAttribute()
 }
 
 
+bool CipInstance::AttributesInsert( CipAttribute** aAttributes, int aCount )
+{
+    bool ret = true;
+
+    for( int i = 0; i < aCount;  ++i )
+    {
+        CipAttribute* a = aAttributes[i];
+
+        CipInstance::CipAttributes::iterator it;
+
+        // Keep sorted by id
+        for( it = attributes.begin(); it != attributes.end();  ++it )
+        {
+            if( a->Id() < (*it)->Id() )
+                break;
+
+            else if( a->Id() == (*it)->Id() )
+            {
+                OPENER_TRACE_ERR( "class '%s' instance %d already has attribute %d\n",
+                    cip_class ? cip_class->class_name.c_str() : "meta-something",
+                    instance_id,
+                    a->Id()
+                    );
+
+                ret = false;
+                continue;
+            }
+        }
+
+        // remember the max attribute number that was inserted
+        if( a->Id() > cip_class->highest_attr_id )
+        {
+            cip_class->highest_attr_id = a->Id();
+        }
+
+        attributes.insert( it, a );
+
+        aAttributes[i] = 0;
+    }
+
+    return ret;
+}
+
+
 CipAttribute* CipInstance::AttributeInsert( EipUint16 attribute_id,
         EipUint8 cip_type, void* data, EipByte cip_flags, bool attr_owns_data )
 {
-    CipInstance::CipAttributes::iterator it;
-
-    // Keep sorted by id
-    for( it = attributes.begin(); it != attributes.end();  ++it )
-    {
-        if( attribute_id < (*it)->attribute_id )
-            break;
-
-        else if( attribute_id == (*it)->attribute_id )
-        {
-            OPENER_TRACE_ERR( "class '%s' instance %d already has attribute %d\n",
-                cip_class ? cip_class->class_name.c_str() : "meta-something",
-                instance_id,
-                attribute_id
-                );
-
-            return NULL;
-        }
-    }
-
-    // remember the max attribute number that was defined
-    if( attribute_id > cip_class->highest_attr_id )
-    {
-        cip_class->highest_attr_id = attribute_id;
-    }
-
     CipAttribute* attribute = new CipAttribute(
                     attribute_id,
                     cip_type,
@@ -503,7 +538,11 @@ CipAttribute* CipInstance::AttributeInsert( EipUint16 attribute_id,
                     attr_owns_data
                     );
 
-    attributes.insert( it, attribute );
+    if( !AttributesInsert( &attribute, 1 ) )
+    {
+        delete attribute;
+        attribute = NULL;   // return NULL on failure
+    }
 
     return attribute;
 }
@@ -516,30 +555,52 @@ bool InsertAttribute( CipInstance* instance, EipUint16 attribute_id,
 }
 
 
+bool CipClass::ServicesInsert( CipService** aServices, int aCount )
+{
+    bool ret = true;
+
+    for( int i = 0; i < aCount;  ++i )
+    {
+        CipService* s = aServices[i];
+
+        CipServices::iterator it;
+
+        // Keep sorted by id
+        for( it = services.begin();  it != services.end();  ++it )
+        {
+            if( s->Id() < (*it)->Id() )
+                break;
+
+            else if( s->Id() == (*it)->Id() )
+            {
+                OPENER_TRACE_ERR( "class '%s' already has service %d\n",
+                    class_name.c_str(), service_id
+                    );
+
+                ret = false;
+                continue;
+            }
+        }
+
+        services.insert( it, s );
+
+        aServices[i] = 0;
+    }
+
+    return ret;
+}
+
+
 CipService* CipClass::ServiceInsert( EipUint8 service_id,
         CipServiceFunction service_function, const char* service_name )
 {
-    CipClass::CipServices::iterator it;
-
-    // Keep sorted by id
-    for( it = services.begin();  it != services.end();  ++it )
-    {
-        if( service_id < (*it)->service_id )
-            break;
-
-        else if( service_id == (*it)->service_id )
-        {
-            OPENER_TRACE_ERR( "class '%s' already has service %d\n",
-                class_name.c_str(), service_id
-                );
-
-            return NULL;
-        }
-    }
-
     CipService* service = new CipService( service_name, service_id, service_function );
 
-    services.insert( it, service );
+    if( !ServicesInsert( &service, 1 ) )
+    {
+        delete service;
+        service = NULL;     // return NULL on failure
+    }
 
     return service;
 }
@@ -552,18 +613,12 @@ CipService* InsertService( CipClass* clazz, EipUint8 service_id,
 }
 
 
-static int attr_comp( EipUint16 id, CipAttribute* attr )
-{
-    return id - attr->attribute_id;
-}
-
-
 CipAttribute* CipInstance::Attribute( EipUint16 attribute_id ) const
 {
     CipInstance::CipAttributes::const_iterator  it;
 
     // a binary search thru the vector of pointers looking for attribute_id
-    it = vec_search( attributes.begin(), attributes.end(), attribute_id, attr_comp );
+    it = vec_search( attributes.begin(), attributes.end(), attribute_id );
 
     if( it != attributes.end() )
         return *it;

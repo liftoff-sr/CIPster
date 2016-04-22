@@ -20,12 +20,13 @@ CipCommonPacketFormatData g_common_packet_format_data_item;    //*< CPF global d
 int NotifyCommonPacketFormat( EncapsulationData* receive_data,
         EipUint8* reply_buffer )
 {
-    int return_value = kEipStatusError;
+    int return_value = CreateCommonPacketFormatStructure(
+          receive_data->buf_pos,
+          receive_data->data_length,
+          &g_common_packet_format_data_item
+          );
 
-    if( ( return_value = CreateCommonPacketFormatStructure(
-                  receive_data->buf_pos,
-                  receive_data->data_length, &g_common_packet_format_data_item ) )
-        == kEipStatusError )
+    if( return_value == kEipStatusError )
     {
         OPENER_TRACE_ERR( "notifyCPF: error from createCPFstructure\n" );
     }
@@ -33,8 +34,10 @@ int NotifyCommonPacketFormat( EncapsulationData* receive_data,
     {
         return_value = kEipStatusOk; // In cases of errors we normally need to send an error response
 
+        // Check if NullAddressItem received, otherwise it is no unconnected
+        // message and should not be here
         if( g_common_packet_format_data_item.address_item.type_id
-            == kCipItemIdNullAddress ) // check if NullAddressItem received, otherwise it is no unconnected message and should not be here
+            == kCipItemIdNullAddress )
         {
             // found null address item
             if( g_common_packet_format_data_item.data_item.type_id
@@ -93,11 +96,11 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
             == kCipItemIdConnectionAddress )
         {
             // ConnectedAddressItem item
-            ConnectionObject* conn = GetConnectedObject(
+            CipConn* conn = GetConnectedObject(
                     g_common_packet_format_data_item.address_item.data
                     .connection_identifier );
 
-            if( NULL != conn )
+            if( conn )
             {
                 // reset the watchdog timer
                 conn->inactivity_watchdog_timer = (conn->o_to_t_requested_packet_interval /1000) <<
@@ -269,8 +272,8 @@ EipStatus CreateCommonPacketFormatStructure( EipUint8* data, int data_length,
 int EncodeNullAddressItem( EipUint8** message, int size )
 {
     // null address item -> address length set to 0
-    size    += AddIntToMessage( kCipItemIdNullAddress, message );
-    size    += AddIntToMessage( 0, message );
+    size  += AddIntToMessage( kCipItemIdNullAddress, message );
+    size  += AddIntToMessage( 0, message );
     return size;
 }
 
@@ -302,9 +305,9 @@ int EncodeSequencedAddressItem( EipUint8** message,
         CipCommonPacketFormatData* cpfd, int size )
 {
     // sequenced address item -> address length set to 8 and copy ConnectionIdentifier and SequenceNumber
-    size    += AddIntToMessage( kCipItemIdSequencedAddressItem, message );
-    size    += AddIntToMessage( 8, message );
-    size    += AddDintToMessage( cpfd->address_item.data.connection_identifier, message );
+    size += AddIntToMessage( kCipItemIdSequencedAddressItem, message );
+    size += AddIntToMessage( 8, message );
+    size += AddDintToMessage( cpfd->address_item.data.connection_identifier, message );
     size += AddDintToMessage( cpfd->address_item.data.sequence_number, message );
     return size;
 }
@@ -641,8 +644,7 @@ int AssembleLinearMessage( CipMessageRouterResponse* response,
 }
 
 
-int AssembleIOMessage( CipCommonPacketFormatData* cpfd,
-        EipUint8* message )
+int AssembleIOMessage( CipCommonPacketFormatData* cpfd,  EipUint8* message )
 {
-    return AssembleLinearMessage( 0, cpfd, &g_message_data_reply_buffer[0] );
+    return AssembleLinearMessage( 0, cpfd, g_message_data_reply_buffer );
 }

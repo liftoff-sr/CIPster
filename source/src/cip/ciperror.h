@@ -6,7 +6,7 @@
 #ifndef OPENER_CIPERROR_H_
 #define OPENER_CIPERROR_H_
 
-typedef enum
+enum CipError
 {
     kCipErrorSuccess = 0x00,                                    ///< Service was successfully performed by the object specified.
     kCipErrorConnectionFailure = 0x01,                          ///< A connection related service failed along the connection path.
@@ -51,5 +51,5 @@ typedef enum
     kCipErrorMemberNotSetable   = 0x29,                         ///< A request to modify a non-modifiable member was received
     kCipErrorGroup2OnlyServerGeneralFailure = 0x2A              ///< This error code may only be reported by DeviceNet group 2 only servers with 4K or less code space and only in place of Service not supported, Attribute not supported and Attribute not setable.
 //2B - CF Reserved by CIP for future extensions D0 - FF Reserved for Object Class and service errors
-} CipError;
+};
 #endif // OPENER_CIPERROR_H_

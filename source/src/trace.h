@@ -8,6 +8,7 @@
 
 #include <opener_user_conf.h>
 
+
 /** @file trace.h
  * @brief Tracing infrastructure for OpENer
  */
@@ -17,16 +18,17 @@
 /** @def OPENER_TRACE_LEVEL_ERROR Enable tracing of error messages. This is the
  *  default if no trace level is given.
  */
-#define OPENER_TRACE_LEVEL_ERROR 0x01
+#define OPENER_TRACE_LEVEL_ERROR        0x01
 
 //* @def OPENER_TRACE_LEVEL_WARNING Enable tracing of warning messages
-#define OPENER_TRACE_LEVEL_WARNING 0x02
+#define OPENER_TRACE_LEVEL_WARNING      0x02
 
 //* @def OPENER_TRACE_LEVEL_WARNING Enable tracing of state messages
-#define OPENER_TRACE_LEVEL_STATE 0x04
+#define OPENER_TRACE_LEVEL_STATE        0x04
 
 //* @def OPENER_TRACE_LEVEL_INFO Enable tracing of info messages
-#define OPENER_TRACE_LEVEL_INFO 0x08
+#define OPENER_TRACE_LEVEL_INFO         0x08
+
 
 #ifndef OPENER_TRACE_LEVEL
 #ifdef WIN32

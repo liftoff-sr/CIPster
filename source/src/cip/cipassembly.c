@@ -23,10 +23,8 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
 
 CipClass* CreateAssemblyClass()
 {
-    CipClass* assembly_class;
-
     // create the CIP Assembly object with zero instances
-    assembly_class = CreateCipClass( kCipAssemblyClassCode,
+    CipClass* clazz = CreateCipClass( kCipAssemblyClassCode,
             0,           // 0 as the assembly object should not have a get_attribute_all service
             0,           // 0 as the assembly object should not have a get_attribute_all service
             0,           // # instances
@@ -34,13 +32,12 @@ CipClass* CreateAssemblyClass()
             2            // Revision, according to the CIP spec currently this has to be 2
             );
 
-    if( NULL != assembly_class )
+    if( !clazz )
     {
-        InsertService( assembly_class, kSetAttributeSingle,
-                &SetAssemblyAttributeSingle, "SetAssemblyAttributeSingle" );
+        clazz->ServiceInsert( kSetAttributeSingle, &SetAssemblyAttributeSingle, "SetAssemblyAttributeSingle" );
     }
 
-    return assembly_class;
+    return clazz;
 }
 
 
@@ -122,11 +119,14 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipUint8* router_request_data;
-    CipAttribute* attribute;
+    EipUint8*       router_request_data;
+    CipAttribute*   attribute;
 
-    OPENER_TRACE_INFO( " setAttribute %d\n",
-            request->request_path.attribute_number );
+    OPENER_TRACE_INFO( "%s: setAttribute %d on assembly instance %d\n",
+            __func__,
+            request->request_path.attribute_number,
+            instance->instance_id
+            );
 
     router_request_data = request->data;
 
@@ -135,12 +135,13 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
     response->general_status = kCipErrorAttributeNotSupported;
     response->size_of_additional_status = 0;
 
-    attribute = GetCipAttribute( instance, request->request_path.attribute_number );
+    attribute = instance->Attribute( request->request_path.attribute_number );
 
-    if( (attribute != NULL)
-        && (3 == request->request_path.attribute_number) )
+    if( attribute  &&  3 == request->request_path.attribute_number )
     {
-        if( attribute->data != NULL )
+        OPENER_TRACE_INFO( "%s: attr3\n" );
+
+        if( attribute->data )
         {
             CipByteArray* data = (CipByteArray*) attribute->data;
 
@@ -198,8 +199,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
         }
     }
 
-    if( (attribute != NULL)
-        && (4 == request->request_path.attribute_number) )
+    else if( attribute && 4 == request->request_path.attribute_number )
     {
         response->general_status = kCipErrorAttributeNotSetable;
     }

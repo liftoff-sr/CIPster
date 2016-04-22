@@ -13,7 +13,7 @@
  * I/O Connection Object State Transition Diagram
  * ----------------------------------------------
  * @dot
- *   digraph IOConnectionObjectStateTransition {
+ *   digraph IOCipConnStateTransition {
  *     A[label="Any State"]
  *     N[label="Non-existent"]
  *     C[label="Configuring"]
@@ -46,32 +46,32 @@
 /** @brief Setup all data in order to establish an IO connection
  *
  * This function can be called after all data has been parsed from the forward open request
- * @param connection_object pointer to the connection object structure holding the parsed data from the forward open request
+ * @param cip_conn pointer to the connection object structure holding the parsed data from the forward open request
  * @param extended_error the extended error code in case an error happened
  * @return general status on the establishment
  *    - EIP_OK ... on success
  *    - On an error the general status code to be put into the response
  */
-int EstablishIoConnction( ConnectionObject* connection_object,
+int EstablishIoConnction( CipConn* cip_conn,
         EipUint16* extended_error );
 
 /** @brief Take the data given in the connection object structure and open the necessary communication channels
  *
  * This function will use the g_stCPFDataItem!
- * @param connection_object pointer to the connection object data
+ * @param cip_conn pointer to the connection object data
  * @return general status on the open process
  *    - EIP_OK ... on success
  *    - On an error the general status code to be put into the response
  */
-CipError OpenCommunicationChannels( ConnectionObject* connection_object );
+CipError OpenCommunicationChannels( CipConn* cip_conn );
 
 /** @brief close the communication channels of the given connection and remove it
  * from the active connections list.
  *
- * @param connection_object pointer to the connection object data
+ * @param cip_conn pointer to the connection object data
  */
 void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList(
-        ConnectionObject* connection_object );
+        CipConn* cip_conn );
 
 extern EipUint8* g_config_data_buffer;
 extern unsigned g_config_data_length;

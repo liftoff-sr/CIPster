@@ -110,6 +110,8 @@ enum CipDataType
     kCipTime = 0xDB,        ///< Duration in milli-seconds; range of DINT
     kCipEpath = 0xDC,       ///< CIP path segments
     kCipEngUnit = 0xDD,     ///< Engineering Units
+    kCipStringI = 0xDE,     ///< International Character String
+
     // definition of some CIP structs
     // need to be validated in IEC 61131-3 subclause 2.3.3
     // TODO: Check these codes
@@ -327,6 +329,8 @@ public:
 
     virtual ~CipAttribute();
 
+    EipUint16   Id() const { return attribute_id; }
+
     EipUint16   attribute_id;
     EipUint8    type;
     EipUint8    attribute_flags;         /**<   0 => getable_all,
@@ -335,7 +339,7 @@ public:
                                                 3 => get and setable;
                                                 all other values reserved
                                          */
-    void*       data;
+    void*       data;                   // no ownership of data unless own_data true.
 
     bool        own_data;               // Do I own data?
                                         // If so, I must CipFree() it in destructor.
@@ -361,11 +365,30 @@ public:
 
     virtual ~CipInstance();
 
+    EipUint32   Id() const { return instance_id; }
+
+    /**
+     * Function AttributesInsert
+     * inserts attributes and returns true if succes, else false.
+     *
+     * @param aAttribute is an array of CipAttribute pointers, and any CipAttributes
+     *  inserted successfully are subsequently owned by this instance and their
+     *  pointers are set to NULL in the array.  This allows caller to determine
+     *  which if any were unable to be inserted by their non-null-ness.
+     *
+     * @param aCount is the number of CipAttributes in the array.
+     *
+     * @return bool - true if all were inserted, false if any failed and caller's array
+     *   will have non-null pointers for those still owned by caller and
+     *   unsuccessfully inserted.
+     */
+    bool AttributesInsert( CipAttribute** aAttributes, int aCount );
+
     CipAttribute* AttributeInsert( EipUint16 attribute_id,
-        EipUint8 cip_type,
-        void* data,
-        EipByte cip_flags,
-        bool attr_owns_data = false
+        EipUint8    cip_type,
+        void*       data,
+        EipByte     cip_flags,
+        bool        attr_owns_data = false
         );
 
     /**
@@ -386,8 +409,8 @@ protected:
     CipAttributes       attributes;     ///< sorted pointer array to CipAttributes, unique to this instance
 
 private:
-
-    CipInstance( CipInstance& );        // private because not implemented
+    CipInstance( CipInstance& );                    // private because not implemented
+    CipInstance& operator=( const CipInstance& );   // private because not implemented
 };
 
 
@@ -425,6 +448,10 @@ public:
     {
     }
 
+    ~CipService() {}
+
+    EipUint8  Id() const { return service_id; }
+
     std::string service_name;               ///< name of the service
     EipUint8    service_id;                 ///< service number
 
@@ -453,16 +480,51 @@ public:
 
     ~CipClass();
 
+    /**
+     * Function ServicesInsert
+     * inserts services and returns true if succes, else false.
+     *
+     * @param aServices is an array of CipService pointers, and any CipServices
+     *  inserted successfully are subsequently owned by this container and their
+     *  pointers are set to NULL in the array.  This allows caller to determine
+     *  which if any were unable to be inserted by their non-null-ness.
+     *
+     * @param aCount is the number of CipServices in the array.
+     *
+     * @return bool - true if all were inserted, false if any failed and caller's array
+     *   will have non-null pointers for those still owned by caller and
+     *   unsuccessfully inserted.
+     */
+    bool ServicesInsert( CipService** aServices, int aCount );
+
     CipService* ServiceInsert( EipUint8 service_id,
         CipServiceFunction service_function, const char* service_name );
 
+    /// Get an existing CipService or return NULL if not found.
     CipService* Service( EipUint8 service_id ) const;
 
+    /// Return a read only collection of services
     const CipServices& Services() const
     {
         return services;
     }
 
+    /**
+     * Function ServicesInsert
+     * inserts services and returns true if succes, else false.
+     *
+     * @param aInstances is an array of CipInstance pointers, and any CipInstances
+     *  inserted successfully are subsequently owned by this container and their
+     *  pointers are set to NULL in the array.  This allows caller to determine
+     *  which if any were unable to be inserted by their non-null-ness.
+     *
+     * @param aCount is the array size.
+     *
+     * @return bool - true if all were inserted, false if any failed and caller's array
+     *   will have non-null pointers for those still owned by caller and
+     *   unsuccessfully inserted.
+     */
+    bool InstancesInsert( CipInstance** aInstances, int aCount );
 
     /**
      * Function InstanceInsert
@@ -473,6 +535,7 @@ public:
 
     CipInstance* Instance( EipUint32 instance_id ) const;
 
+    /// Return a read only collection of CipInstances.
     const CipInstances& Instances() const
     {
         return instances;
@@ -509,7 +572,7 @@ protected:
     */
 
     CipClass(
-            const char* aClassName,             ///< without "meta-" prefix
+            const char* aClassName,         ///< without "meta-" prefix
             EipUint32   a_get_all_class_attributes_mask,
             CipClass*   aPublicClass
             );
@@ -523,16 +586,17 @@ private:
 
 
 /**
- * @brief Struct for saving TCP/IP interface information
+ * Struct CipTcpIpNetworkInterfaceConfiguration
+ * if for holding TCP/IP interface information
  */
 struct CipTcpIpNetworkInterfaceConfiguration
 {
-    CipUdint ip_address;
-    CipUdint network_mask;
-    CipUdint gateway;
-    CipUdint name_server;
-    CipUdint name_server_2;
-    CipString domain_name;
+    CipUdint    ip_address;
+    CipUdint    network_mask;
+    CipUdint    gateway;
+    CipUdint    name_server;
+    CipUdint    name_server_2;
+    CipString   domain_name;
 };
 
 struct CipRoutePath

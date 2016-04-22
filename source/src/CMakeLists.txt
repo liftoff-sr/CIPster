@@ -2,7 +2,7 @@
 opener_common_includes()
 opener_platform_support("INCLUDES")
 
-add_definitions( -fPIC )
+add_definitions( -fPIC )        # The static library might eventually be linked into a DSO
 
 set( CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined" )
 
@@ -30,18 +30,25 @@ set( UTILS_SRCS
     utils/xorshiftrandom.c
     )
 
-if( true )
-    # compile all sources with the C++ compiler:
-    set_source_files_properties( ${CIP_SRCS} ${ENCAP_SRCS} ${UTILS_SRCS}
-        PROPERTIES
-            LANGUAGE CXX
-        )
 
-    add_definitions( -D__STDC_FORMAT_MACROS )       # <inttypes.h>'s PRIX32
-    add_definitions( -std=c++0x )
-endif()
+set( OBJECTS_SRCS )
 
 add_subdirectory( cip_objects )
+
+
+# compile all sources with the C++ compiler:
+set_source_files_properties(
+    ${CIP_SRCS}
+    ${ENCAP_SRCS}
+    ${UTILS_SRCS}
+    ${OBJECTS_SRCS}
+
+        PROPERTIES
+            LANGUAGE CXX
+    )
+
+add_definitions( -D__STDC_FORMAT_MACROS )       # <inttypes.h>'s PRIX32
+add_definitions( -std=c++0x )
 
 
 opener_common_includes()
@@ -49,13 +56,15 @@ opener_common_includes()
 opener_platform_support( "INCLUDES" )
 
 
-message( "CIP_SRC:${CIP_SRC}" )
+message( "OBJECTS_SRC:${OBJECTS_SRC}" )
+
 
 add_library( eip STATIC
     ${OpENer_ADD_CIP_OBJECTS}
     ${CIP_SRCS}
     ${ENCAP_SRCS}
     ${UTILS_SRCS}
+    ${OBJECTS_SRCS}
     )
 
 message( "CMAKE_INSTALL_PREFIX:${CMAKE_INSTALL_PREFIX}" )

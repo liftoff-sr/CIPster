@@ -8,24 +8,24 @@
 
 #include "cipclass3connection.h"
 
-ConnectionObject* GetFreeExplicitConnection( void );
+CipConn* GetFreeExplicitConnection( void );
 
 // *** Global variables ***
 
 /// @brief Array of the available explicit connections
-ConnectionObject g_explicit_connections[OPENER_CIP_NUM_EXPLICIT_CONNS];
+CipConn g_explicit_connections[OPENER_CIP_NUM_EXPLICIT_CONNS];
 
 // *** Implementation ***
-int EstablishClass3Connection( ConnectionObject* connection_object,
+int EstablishClass3Connection( CipConn* cip_conn,
         EipUint16* extended_error )
 {
     int eip_status = kEipStatusOk;
     EipUint32 produced_connection_id_buffer;
 
     // TODO add check for transport type trigger
-    // if (0x03 == (g_stDummyConnectionObject.TransportTypeClassTrigger & 0x03))
+    // if (0x03 == (g_stDummyCipConn.TransportTypeClassTrigger & 0x03))
 
-    ConnectionObject* explicit_connection = GetFreeExplicitConnection();
+    CipConn* explicit_connection = GetFreeExplicitConnection();
 
     if( NULL == explicit_connection )
     {
@@ -35,7 +35,7 @@ int EstablishClass3Connection( ConnectionObject* connection_object,
     }
     else
     {
-        CopyConnectionData( explicit_connection, connection_object );
+        CopyConnectionData( explicit_connection, cip_conn );
 
         produced_connection_id_buffer = explicit_connection->produced_connection_id;
         GeneralConnectionConfiguration( explicit_connection );
@@ -57,7 +57,7 @@ int EstablishClass3Connection( ConnectionObject* connection_object,
 }
 
 
-ConnectionObject* GetFreeExplicitConnection( void )
+CipConn* GetFreeExplicitConnection( void )
 {
     int i;
 
@@ -74,5 +74,5 @@ ConnectionObject* GetFreeExplicitConnection( void )
 void InitializeClass3ConnectionData( void )
 {
     memset( g_explicit_connections, 0,
-            OPENER_CIP_NUM_EXPLICIT_CONNS * sizeof(ConnectionObject) );
+            OPENER_CIP_NUM_EXPLICIT_CONNS * sizeof(CipConn) );
 }

@@ -27,6 +27,10 @@ set( OpENer_VERSION_MINOR 2 )
 
 set( USER_INCLUDE_DIR "" CACHE PATH "Location of user specific include file (opener_user_conf.h)" )
 
+if( USER_INCLUDE_DIR STREQUAL "" )
+    message( WARNING "Please set variable USER_INCLUDE_DIR to a directory containing a file named opener_user_conf.h" )
+endif()
+
 include_directories( ${USER_INCLUDE_DIR} )
 
 set( OpENer_BUILDSUPPORT_DIR ${PROJECT_SOURCE_DIR}/buildsupport )

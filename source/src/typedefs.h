@@ -86,23 +86,23 @@ static const int kEipInvalidSocket = -1;
 /** @brief EIP stack status enum
  *
  */
-typedef enum
+enum EipStatus
 {
     kEipStatusOk = 0,           ///< Stack is ok
     kEipStatusOkSend    = 1,    ///< Stack is ok, after send
     kEipStatusError     = -1    ///< Stack is in error
-} EipStatus;
+};
 
 /** @brief Communication direction of an UDP socket; consuming is receiver,
  * producing is sender
  *
  * These are used as array indexes, watch out if changing these values
  */
-typedef enum
+enum UdpCommuncationDirection
 {
     kUdpCommuncationDirectionConsuming  = 0,    ///< Consuming direction; receiver
     kUdpCommuncationDirectionProducing  = 1     ///< Producing direction; sender
-} UdpCommuncationDirection;
+};
 
 #ifndef __cplusplus
  #include <stdbool.h>

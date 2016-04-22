@@ -16,14 +16,14 @@
  * - Point-to-point connections (unicast)
  * - Multicast connection
  */
-typedef enum
+enum RoutingType
 {
     kRoutingTypePointToPointConnection = 0x4000,
     kRoutingTypeMulticastConnection = 0x2000
-} RoutingType;
+};
 
 //* @brief Connection Manager Error codes
-typedef enum
+enum ConnectionManagerStatusCode
 {
     kConnectionManagerStatusCodeSuccess = 0x00,
     kConnectionManagerStatusCodeErrorConnectionInUse = 0x0100,
@@ -46,15 +46,15 @@ typedef enum
     kConnectionManagerStatusCodeErrorParameterErrorInUnconnectedSendService = 0x0205,
     kConnectionManagerStatusCodeErrorInvalidSegmentTypeInPath   = 0x0315,
     kConnectionManagerStatusCodeTargetObjectOutOfConnections    = 0x011A
-} ConnectionManagerStatusCode;
+};
 
-typedef enum
+enum ConnectionTriggerType
 {
     kConnectionTriggerTypeProductionTriggerMask = 0x70,
     kConnectionTriggerTypeCyclicConnection = 0x0,
     kConnectionTriggerTypeChangeOfStateTriggeredConnection = 0x10,
     kConnectionTriggerTypeApplicationTriggeredConnection = 0x20
-} ConnectionTriggerType;
+};
 
 /** @brief macros for comparing sequence numbers according to CIP spec vol
  * 2 3-4.2 for int type variables
@@ -76,7 +76,7 @@ typedef enum
 #define SEQ_GEQ16( a, b )   ( (short) ( (a) - (b) ) >= 0 )
 
 //* @brief States of a connection
-typedef enum
+enum ConnectionState
 {
     kConnectionStateNonExistent = 0,
     kConnectionStateConfiguring = 1,
@@ -85,54 +85,57 @@ typedef enum
     kConnectionStateTimedOut = 4,
     kConnectionStateDeferredDelete = 5,    ///< only used in DeviceNet
     kConnectionStateClosing
-} ConnectionState;
+};
 
 //* @brief instance_type attributes
-typedef enum
+enum ConnectionType
 {
     kConnectionTypeExplicit = 0,
     kConnectionTypeIoExclusiveOwner = 0x01,
     kConnectionTypeIoInputOnly  = 0x11,
     kConnectionTypeIoListenOnly = 0x21
-} ConnectionType;
+};
 
 //* @brief Possible values for the watch dog time out action of a connection
-typedef enum
+enum WatchdogTimeoutAction
 {
     kWatchdogTimeoutActionTransitionToTimedOut = 0, ///< , invalid for explicit message connections
     kWatchdogTimeoutActionAutoDelete    = 1,        /**< Default for explicit message connections,
                                                      *  default for I/O connections on EIP */
     kWatchdogTimeoutActionAutoReset     = 2,        ///< Invalid for explicit message connections
     kWatchdogTimeoutActionDeferredDelete = 3        ///< Only valid for DeviceNet, invalid for I/O connections
-} WatchdogTimeoutAction;
+};
 
-typedef struct
+struct LinkConsumer
 {
     ConnectionState state;
     EipUint16 connection_id;
 
 /*TODO think if this is needed anymore
  *  TCMReceiveDataFunc m_ptfuncReceiveData; */
-} LinkConsumer;
+};
 
-typedef struct
+struct LinkProducer
 {
     ConnectionState state;
     EipUint16 connection_id;
-} LinkProducer;
+};
 
-typedef struct
+struct LinkObject
 {
     LinkConsumer    consumer;
     LinkProducer    producer;
-} LinkObject;
+};
 
-/** The data needed for handling connections. This data is strongly related to
+
+/**
+ * Class CipConn
+ * holds the data needed for handling connections. This data is strongly related to
  * the connection object defined in the CIP-specification. However the full
  * functionality of the connection object is not implemented. Therefore this
  * data can not be accessed with CIP means.
  */
-typedef struct connection_object
+struct CipConn
 {
     ConnectionState state;
     ConnectionType  instance_type;
@@ -141,7 +144,7 @@ typedef struct connection_object
      *  EipUint16 DeviceNetProductedConnectionID;
      *  EipUint16 DeviceNetConsumedConnectionID;
      */
-    EipByte device_net_initial_comm_characteristcs;
+    EipByte     device_net_initial_comm_characteristcs;
     EipUint16   produced_connection_size;
     EipUint16   consumed_connection_size;
     EipUint16   expected_packet_rate;
@@ -161,8 +164,8 @@ typedef struct connection_object
      *  UINT16 ProductionInhibitTime;
      */
     // non CIP Attributes, only relevant for opened connections
-    EipByte priority_timetick;
-    EipUint8 timeout_ticks;
+    EipByte     priority_timetick;
+    EipUint8    timeout_ticks;
     EipUint16   connection_serial_number;
     EipUint16   originator_vendor_id;
     EipUint32   originator_serial_number;
@@ -173,9 +176,11 @@ typedef struct connection_object
     EipUint16   t_to_o_network_connection_parameter;
     EipByte     transport_type_class_trigger;
     EipUint8    connection_path_size;
-    CipElectronicKey electronic_key;
-    CipConnectionPath connection_path; // padded EPATH
-    LinkObject link_object;
+
+    CipElectronicKey    electronic_key;
+    CipConnectionPath   connection_path; // padded EPATH
+
+    LinkObject  link_object;
 
     CipInstance* consuming_instance;
 
@@ -219,6 +224,7 @@ typedef struct connection_object
                                              *  established the connection. needed
                                              *  for scanning if the right packet is
                                              *  arriving */
+
     int socket[2];                          // socket handles, indexed by kConsuming or kProducing
 
     // pointers to connection handling functions
@@ -228,12 +234,12 @@ typedef struct connection_object
     ConnectionReceiveDataFunction connection_receive_data_function;
 
     // pointers to be used in the active connection list
-    struct connection_object*   next_connection_object;
-    struct connection_object*   first_connection_object;
+    CipConn*    next_cip_conn;
+    CipConn*    first_cip_conn;
 
     EipUint16   correct_originator_to_target_size;
     EipUint16   correct_target_to_originator_size;
-} ConnectionObject;
+};
 
 //* @brief Connection Manager class code
 static const int g_kCipConnectionManagerClassCode = 0x06;
@@ -250,7 +256,7 @@ EipStatus ConnectionManagerInit( EipUint16 unique_connection_id );
  *   @return pointer to connected Object
  *           0 .. connection not present in device
  */
-ConnectionObject* GetConnectedObject( EipUint32 connection_id );
+CipConn* GetConnectedObject( EipUint32 connection_id );
 
 /**  Get a connection object for a given output assembly.
  *
@@ -259,20 +265,20 @@ ConnectionObject* GetConnectedObject( EipUint32 connection_id );
  *   @return pointer to connected Object
  *           0 .. connection not present in device
  */
-ConnectionObject* GetConnectedOutputAssembly( EipUint32 output_assembly_id );
+CipConn* GetConnectedOutputAssembly( EipUint32 output_assembly_id );
 
 /** Copy the given connection data from pa_pstSrc to pa_pstDst
  */
-void CopyConnectionData( ConnectionObject* destination, ConnectionObject* source );
+void CopyConnectionData( CipConn* destination, CipConn* source );
 
 /** @brief Close the given connection
  *
  * This function will take the data form the connection and correctly closes the
  * connection (e.g., open sockets)
- * @param connection_object pointer to the connection object structure to be
+ * @param cip_conn pointer to the connection object structure to be
  * closed
  */
-void CloseConnection( ConnectionObject* connection_object );
+void CloseConnection( CipConn* cip_conn );
 
 // TODO: Missing documentation
 EipBool8 IsConnectedOutputAssembly( EipUint32 instance_number );
@@ -280,10 +286,10 @@ EipBool8 IsConnectedOutputAssembly( EipUint32 instance_number );
 /** @brief Generate the ConnectionIDs and set the general configuration
  * parameter in the given connection object.
  *
- * @param connection_object pointer to the connection object that should be set
+ * @param cip_conn pointer to the connection object that should be set
  * up.
  */
-void GeneralConnectionConfiguration( ConnectionObject* connection_object );
+void GeneralConnectionConfiguration( CipConn* cip_conn );
 
 /** @brief Insert the given connection object to the list of currently active
  *  and managed connections.
@@ -292,11 +298,11 @@ void GeneralConnectionConfiguration( ConnectionObject* connection_object );
  * will perform the supervision and handle the timing (e.g., timeout,
  * production inhibit, etc).
  *
- * @param connection_object pointer to the connection object to be added.
+ * @param cip_conn pointer to the connection object to be added.
  */
-void AddNewActiveConnection( ConnectionObject* connection_object );
+void AddNewActiveConnection( CipConn* cip_conn );
 
 // TODO: Missing documentation
-void RemoveFromActiveConnections( ConnectionObject* connection_object );
+void RemoveFromActiveConnections( CipConn* cip_conn );
 
 #endif // OPENER_CIPCONNECTIONMANAGER_H_

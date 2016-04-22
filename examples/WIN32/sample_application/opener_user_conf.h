@@ -38,7 +38,7 @@ typedef unsigned short in_port_t;
  *  the connection manager object as well as to the assembly object are supported
  *  in any case.
  */
-#define OPENER_CIP_NUM_APPLICATION_SPECIFIC_CONNECTABLE_OBJECTS 1
+#define OPENER_CIP_NUM_APPLICATION_SPECIFIC_CONNECTABLE_OBJECTS     10
 
 /** @brief Define the number of supported explicit connections.
  *  According to ODVA's PUB 70 this number should be greater than 6.
