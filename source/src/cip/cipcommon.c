@@ -165,7 +165,7 @@ CipInstance::~CipInstance()
 {
     if( cip_class )         // if not nested in a meta-class
     {
-        if( instance_id )   // or nested in a public class
+        if( instance_id )   // and not nested in a public class, then I am an instance.
         {
             OPENER_TRACE_INFO( "deleting instance %d of class '%s'\n",
                 instance_id, cip_class->class_name.c_str() );
@@ -392,7 +392,7 @@ CipInstance* CipClass::Instance( EipUint32 instance_id ) const
 
     CipInstances::const_iterator  it;
 
-    // a binary search thru the vector of pointers looking for attribute_id
+    // binary search thru the vector of pointers looking for id
     it = vec_search( instances.begin(), instances.end(), instance_id );
 
     if( it != instances.end() )
@@ -405,12 +405,12 @@ CipInstance* CipClass::Instance( EipUint32 instance_id ) const
 }
 
 
-bool AddCipInstances( CipClass* cip_class, int number_of_instances )
+bool AddCipInstances( CipClass* aClass, int aInstanceCount )
 {
-    OPENER_TRACE_INFO( "adding %d instances to class '%s'\n", number_of_instances,
-            cip_class->class_name.c_str() );
+    OPENER_TRACE_INFO( "adding %d instances to class '%s'\n", aInstanceCount,
+            aClass->class_name.c_str() );
 
-    const CipClass::CipInstances& instances = cip_class->Instances();
+    const CipClass::CipInstances& instances = aClass->Instances();
 
     // Assume no instances have been inserted which have a higher instance_id
     // than their respective index into the collection.  (Not always true, can fail.)
@@ -419,12 +419,12 @@ bool AddCipInstances( CipClass* cip_class, int number_of_instances )
                             + 1;  // the first instance is number 1
 
     // create the new instances
-    for( int i = 0; i < number_of_instances;  ++i, ++instance_number )
+    for( int i = 0; i < aInstanceCount;  ++i, ++instance_number )
     {
-        if( !cip_class->InstanceInsert( instance_number ) )
+        if( !aClass->InstanceInsert( instance_number ) )
         {
             OPENER_TRACE_ERR( "class '%s' collision on instance_id: %d\n",
-                cip_class->class_name.c_str(), instance_number );
+                aClass->class_name.c_str(), instance_number );
 
             return false;
         }
@@ -442,7 +442,7 @@ CipInstance* AddCIPInstance( CipClass* clazz, EipUint32 instance_id )
 CipClass* CreateCipClass( EipUint32 class_id,
         EipUint32 class_attributes_get_attribute_all_mask,
         EipUint32 instance_attributes_get_attributes_all_mask,
-        int number_of_instances,
+        int aInstanceCount,
         const char* class_name,
         EipUint16 class_revision )
 {
@@ -459,9 +459,9 @@ CipClass* CreateCipClass( EipUint32 class_id,
             class_revision
             );
 
-    if( number_of_instances > 0 )
+    if( aInstanceCount > 0 )
     {
-        AddCipInstances( clazz, number_of_instances );
+        AddCipInstances( clazz, aInstanceCount );
     }
 
     if( RegisterCipClass( clazz ) == kEipStatusError )
@@ -574,7 +574,7 @@ bool CipClass::ServicesInsert( CipService** aServices, int aCount )
             else if( s->Id() == (*it)->Id() )
             {
                 OPENER_TRACE_ERR( "class '%s' already has service %d\n",
-                    class_name.c_str(), service_id
+                    class_name.c_str(), s->Id()
                     );
 
                 ret = false;
