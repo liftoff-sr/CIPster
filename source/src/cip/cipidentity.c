@@ -85,9 +85,9 @@ void SetDeviceStatus( EipUint16 status )
  * @param response
  * @returns Currently always kEipOkSend is returned
  */
-static EipStatus Reset( CipInstance* instance,              // pointer to instance
-        CipMessageRouterRequest* request,    // pointer to message router request
-        CipMessageRouterResponse* response ) // pointer to message router response
+static EipStatus Reset( CipInstance* instance,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response )
 {
     EipStatus eip_status;
 
@@ -159,7 +159,8 @@ EipStatus CipIdentityInit()
             MASK7( 1, 2, 3, 4, 5, 6, 7 ),           // instance getAttributeAll mask	CIP spec 5-2.3.2
             1,                                      // # of instances
             "identity",                             // class name (for debug)
-            1 );                                    // class revision
+            1                                       // class revision
+            );
 
     if( !clazz )
         return kEipStatusError;

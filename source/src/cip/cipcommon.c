@@ -279,9 +279,10 @@ CipClass::CipClass(
 
 CipClass::~CipClass()
 {
-    // cip_class is NULL for a meta-class, which BTW does not own its one
-    // public class instance
-    if( cip_class )
+    OPENER_TRACE_INFO( "deleting class '%s'\n", class_name.c_str() );
+
+    // a meta-class does not own its one public class instance
+    if( !IsMetaClass() )
     {
         // delete all the instances of this class
         while( instances.size() )
@@ -301,12 +302,17 @@ CipClass::~CipClass()
 
     while( services.size() )
     {
+#if 1
+        if( class_name == "TCP/IP interface" )
+        {
+            ShowServices();
+        }
+#endif
+
         delete *services.begin();
 
         services.erase( services.begin() );
     }
-
-    OPENER_TRACE_INFO( "deleting class '%s'\n", class_name.c_str() );
 }
 
 
@@ -375,7 +381,9 @@ CipInstance* CipClass::InstanceInsert( EipUint32 instance_id )
 {
     CipInstance* instance = new CipInstance( instance_id, this );
 
-    if( !InstancesInsert( &instance, 1 ) )
+    CipInstance* array[1]{ instance };  // this gets zeroed in called func
+
+    if( !InstancesInsert( array, 1 ) )
     {
         delete instance;
         instance = NULL;        // return NULL on failure
@@ -501,24 +509,26 @@ bool CipInstance::AttributesInsert( CipAttribute** aAttributes, int aCount )
 
             else if( a->Id() == (*it)->Id() )
             {
-                OPENER_TRACE_ERR( "class '%s' instance %d already has attribute %d\n",
+                OPENER_TRACE_ERR( "class '%s' instance %d already has attribute %d, ovveriding\n",
                     cip_class ? cip_class->class_name.c_str() : "meta-something",
                     instance_id,
                     a->Id()
                     );
 
-                ret = false;
-                continue;
+                // Re-use this slot given by position 'it'.
+                delete *it;
+                attributes.erase( it );    // will re-insert at this position below
+                break;
             }
         }
+
+        attributes.insert( it, a );
 
         // remember the max attribute number that was inserted
         if( a->Id() > cip_class->highest_attr_id )
         {
             cip_class->highest_attr_id = a->Id();
         }
-
-        attributes.insert( it, a );
 
         aAttributes[i] = 0;
     }
@@ -538,7 +548,9 @@ CipAttribute* CipInstance::AttributeInsert( EipUint16 attribute_id,
                     attr_owns_data
                     );
 
-    if( !AttributesInsert( &attribute, 1 ) )
+    CipAttribute* array[1]{ attribute };  // this gets zeroed in called func
+
+    if( !AttributesInsert( array, 1 ) )
     {
         delete attribute;
         attribute = NULL;   // return NULL on failure
@@ -573,12 +585,14 @@ bool CipClass::ServicesInsert( CipService** aServices, int aCount )
 
             else if( s->Id() == (*it)->Id() )
             {
-                OPENER_TRACE_ERR( "class '%s' already has service %d\n",
+                OPENER_TRACE_ERR( "class '%s' already has service %d, overriding.\n",
                     class_name.c_str(), s->Id()
                     );
 
-                ret = false;
-                continue;
+                // re-use this slot given by position 'it'.
+                delete *it;             // delete existing CipService
+                services.erase( it );   // will re-gap service st::vector with following insert()
+                break;
             }
         }
 
@@ -596,7 +610,9 @@ CipService* CipClass::ServiceInsert( EipUint8 service_id,
 {
     CipService* service = new CipService( service_name, service_id, service_function );
 
-    if( !ServicesInsert( &service, 1 ) )
+    CipService* array[1]{ service };  // this gets zeroed in called func
+
+    if( !ServicesInsert( array, 1 ) )
     {
         delete service;
         service = NULL;     // return NULL on failure

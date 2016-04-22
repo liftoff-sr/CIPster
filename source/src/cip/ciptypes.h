@@ -408,6 +408,16 @@ public:
 protected:
     CipAttributes       attributes;     ///< sorted pointer array to CipAttributes, unique to this instance
 
+    void ShowAttributes()
+    {
+        for( CipAttributes::const_iterator it = attributes.begin();
+            it != attributes.end();  ++it )
+        {
+            OPENER_TRACE_INFO( "id:%d\n",
+                (*it)->Id() );
+        }
+    }
+
 private:
     CipInstance( CipInstance& );                    // private because not implemented
     CipInstance& operator=( const CipInstance& );   // private because not implemented
@@ -448,7 +458,7 @@ public:
     {
     }
 
-    ~CipService() {}
+    virtual ~CipService() {}
 
     EipUint8  Id() const { return service_id; }
 
@@ -479,6 +489,10 @@ public:
         );
 
     ~CipClass();
+
+    /// Return true if this is a meta-class, false if public.
+    bool IsMetaClass() const    { return !cip_class; }
+
 
     /**
      * Function ServicesInsert
@@ -579,6 +593,26 @@ protected:
 
     CipInstances    instances;              ///< collection of instances
     CipServices     services;               ///< collection of services
+
+    void ShowServices()
+    {
+        for( CipServices::const_iterator it = services.begin();
+            it != services.end();  ++it )
+        {
+            OPENER_TRACE_INFO( "id:%d %s\n",
+                (*it)->Id(),
+                (*it)->service_name.c_str() );
+        }
+    }
+
+    void ShowInstances()
+    {
+        for( CipInstances::const_iterator it = instances.begin();
+            it != instances.end();  ++it )
+        {
+            OPENER_TRACE_INFO( "id:%d\n", (*it)->Id() );
+        }
+    }
 
 private:
     CipClass( CipClass& );                  // private because not implemented
