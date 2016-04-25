@@ -30,34 +30,41 @@ void ConfigureMacAddress( const EipUint8* mac_address )
 }
 
 
+static CipInstance* createEthernetLinkInstance()
+{
+    CipClass*   clazz = GetCipClass( CIP_ETHERNETLINK_CLASS_CODE );
+
+    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
+
+    i->AttributeInsert( 1, kCipUdint,  &g_ethernet_link.interface_speed, kGetableSingleAndAll );
+    i->AttributeInsert( 2, kCipDword,  &g_ethernet_link.interface_flags, kGetableSingleAndAll );
+    i->AttributeInsert( 3, kCip6Usint, &g_ethernet_link.physical_address, kGetableSingleAndAll );
+
+    return i;
+}
+
+
 EipStatus CipEthernetLinkInit()
 {
-    // set attributes to initial values
-    g_ethernet_link.interface_speed = 100;
-
-    // successful speed and duplex neg, full duplex active link,
-    // TODO in future it should be checked if link is active
-    g_ethernet_link.interface_flags = 0xF;
-
-    CipClass* clazz = CreateCipClass( CIP_ETHERNETLINK_CLASS_CODE,
-          0xffffffff,               // class getAttributeAll mask
-          0xffffffff,               // instance getAttributeAll mask
-          1,                        // # instances
-          "Ethernet Link",
-          1                         // version
-          );
-
-    if( clazz )
+    if( !GetCipClass( CIP_ETHERNETLINK_CLASS_CODE ) )
     {
-        CipInstance* i = clazz->Instance( 1 );
+        // set attributes to initial values
+        g_ethernet_link.interface_speed = 100;
 
-        i->AttributeInsert( 1, kCipUdint,  &g_ethernet_link.interface_speed, kGetableSingleAndAll );
-        i->AttributeInsert( 2, kCipDword,  &g_ethernet_link.interface_flags, kGetableSingleAndAll );
-        i->AttributeInsert( 3, kCip6Usint, &g_ethernet_link.physical_address, kGetableSingleAndAll );
-    }
-    else
-    {
-        return kEipStatusError;
+        // successful speed and duplex neg, full duplex active link,
+        // TODO in future it should be checked if link is active
+        g_ethernet_link.interface_flags = 0xF;
+
+        CipClass* clazz = new CipClass( CIP_ETHERNETLINK_CLASS_CODE,
+              "Ethernet Link",
+              0xffffffff,               // class getAttributeAll mask
+              0xffffffff,               // instance getAttributeAll mask
+              1                         // version
+              );
+
+        RegisterCipClass( clazz );
+
+        clazz->InstanceInsert( createEthernetLinkInstance() );
     }
 
     return kEipStatusOk;

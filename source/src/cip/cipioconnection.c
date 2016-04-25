@@ -153,8 +153,7 @@ int EstablishIoConnction( CipConn* conn,
 
         if( originator_to_target_connection_type != 0 ) //setup consumer side
         {
-            instance = GetCipInstance(
-                             assembly_class,
+            instance = assembly_class->Instance(
                              io_conn->connection_path.connection_point[0] );
 
             // consuming Connection Point is present
@@ -217,8 +216,7 @@ int EstablishIoConnction( CipConn* conn,
 
         if( target_to_originator_connection_type != 0 ) //setup producer side
         {
-            instance = GetCipInstance(
-                                 assembly_class,
+            instance = assembly_class->Instance(
                                  io_conn->connection_path.connection_point[
                                  producing_index] );
             if( instance )
@@ -582,8 +580,7 @@ EipUint16 HandleConfigData( CipClass* assembly_class,
         CipConn* conn )
 {
     EipUint16 connection_manager_status = 0;
-    CipInstance* config_instance = GetCipInstance(
-            assembly_class, conn->connection_path.connection_point[2] );
+    CipInstance* config_instance = assembly_class->Instance( conn->connection_path.connection_point[2] );
 
     if( 0 != g_config_data_length )
     {

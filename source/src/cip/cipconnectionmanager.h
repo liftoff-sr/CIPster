@@ -242,7 +242,7 @@ struct CipConn
 };
 
 //* @brief Connection Manager class code
-static const int g_kCipConnectionManagerClassCode = 0x06;
+static const int kCipConnectionManagerClassCode = 0x06;
 
 // public functions
 

@@ -29,7 +29,7 @@ extern EipUint16    device_type_;
 extern EipUint16    product_code_;
 extern CipRevision  revision_;
 
-#define CIP_CONN_TYPE_MASK 0x6000           //*< Bit mask filter on bit 13 & 14
+#define CIP_CONN_TYPE_MASK      0x6000     //*< Bit mask filter on bit 13 & 14
 
 bool table_init = true;
 
@@ -175,30 +175,32 @@ EipUint32 GetConnectionId()
 
 EipStatus ConnectionManagerInit( EipUint16 unique_connection_id )
 {
-    InitializeConnectionManagerData();
+    if( !GetCipClass( kCipConnectionManagerClassCode ) )
+    {
+        CipClass* clazz = new CipClass( kCipConnectionManagerClassCode,
+                "connection manager",       // class name
+                0xC6,                       // class getAttributeAll mask
+                0xffffffff,                 // instance getAttributeAll mask
+                1                           // revision
+                );
 
-    CipClass* connection_manager = CreateCipClass(
-            g_kCipConnectionManagerClassCode,   // class ID
-            0xC6,                               // class getAttributeAll mask
-            0xffffffff,                         // instance getAttributeAll mask
-            1,                                  // no. instances
-            "connection manager",               // class name
-            1                                   // revision
-            );
+        RegisterCipClass( clazz );
 
-    if( !connection_manager )
-        return kEipStatusError;
+        // add one instance
+        clazz->InstanceInsert(  new CipInstance( 1 ) );
 
-    InsertService( connection_manager, kForwardOpen, &ForwardOpen, "ForwardOpen" );
+        clazz->ServiceInsert( kForwardOpen, &ForwardOpen, "ForwardOpen" );
 
-    InsertService( connection_manager, kForwardClose, &ForwardClose, "ForwardClose" );
+        clazz->ServiceInsert( kForwardClose, &ForwardClose, "ForwardClose" );
 
-    InsertService( connection_manager, kGetConnectionOwner, &GetConnectionOwner, "GetConnectionOwner" );
+        clazz->ServiceInsert( kGetConnectionOwner, &GetConnectionOwner, "GetConnectionOwner" );
 
-    g_incarnation_id = ( (EipUint32) unique_connection_id ) << 16;
+        g_incarnation_id = ( (EipUint32) unique_connection_id ) << 16;
 
-    AddConnectableObject( kCipMessageRouterClassCode, EstablishClass3Connection );
-    AddConnectableObject( kCipAssemblyClassCode, EstablishIoConnction );
+        InitializeConnectionManagerData();
+        AddConnectableObject( kCipMessageRouterClassCode, EstablishClass3Connection );
+        AddConnectableObject( kCipAssemblyClassCode, EstablishIoConnction );
+    }
 
     return kEipStatusOk;
 }
@@ -1104,7 +1106,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
             OPENER_TRACE_INFO( "Configuration instance id %" PRId32 "\n",
                     conn->connection_path.connection_point[2] );
 
-            if( NULL == GetCipInstance( clazz, conn->connection_path.connection_point[2] ) )
+            if( NULL == clazz->Instance( conn->connection_path.connection_point[2] ) )
             {
                 //according to the test tool we should respond with this extended error code
                 *extended_error =
@@ -1196,7 +1198,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
                             "connection point %u\n",
                             (unsigned) conn->connection_path.connection_point[i] );
 
-                    if( 0 == GetCipInstance( clazz, conn->connection_path.connection_point[i] ) )
+                    if( 0 == clazz->Instance( conn->connection_path.connection_point[i] ) )
                     {
                         *extended_error =
                             kConnectionManagerStatusCodeInconsistentApplicationPathCombo;

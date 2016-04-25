@@ -107,32 +107,40 @@ CipClass* GetCipClass( EipUint32 class_id )
 CipError CreateMessageRouterRequestStructure( EipUint8* data, EipInt16 data_length,
         CipMessageRouterRequest* request );
 
-EipStatus CipMessageRouterInit()
+static CipInstance* createCipMessageRouterInstance()
 {
-    CipClass* clazz = CreateCipClass( kCipMessageRouterClassCode,   // class ID
-            0xffffffff,                                             // class getAttributeAll mask
-            0xffffffff,                                             // instance getAttributeAll mask
-            1,                                                      // # of instances
-            "message router",                                       // class name
-            1 );                                                    // revision
+    CipClass* clazz = GetCipClass( kCipMessageRouterClassCode );
 
-    if( !clazz )
-        return kEipStatusError;
+    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
-    // reserved for future use -> set to zero
-    g_response.reserved = 0;
-
-    // set reply buffer, using a fixed buffer (about 100 bytes)
-    g_response.data = g_message_data_reply_buffer;
-
-    return kEipStatusOk;
+    return i;
 }
 
 
-CipInstance* GetCipInstance( CipClass* cip_class, EipUint32 instance_id )
+EipStatus CipMessageRouterInit()
 {
-    // if the instance number is zero, return the class object itself
-    return cip_class->Instance( instance_id );
+    // may not already be registered.
+    if( !GetCipClass( kCipMessageRouterClassCode ) )
+    {
+        CipClass* clazz = new CipClass( kCipMessageRouterClassCode,
+                "message router",  // class name
+                0xffffffff,        // class getAttributeAll mask
+                0xffffffff,        // instance getAttributeAll mask
+                1                  // revision
+                );
+
+        RegisterCipClass( clazz );
+
+        clazz->InstanceInsert( createCipMessageRouterInstance() );
+
+        // reserved for future use -> set to zero
+        g_response.reserved = 0;
+
+        // set reply buffer, using a fixed buffer (about 100 bytes)
+        g_response.data = g_message_data_reply_buffer;
+    }
+
+    return kEipStatusOk;
 }
 
 

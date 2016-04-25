@@ -79,7 +79,7 @@ void CipStackInit( EipUint16 unique_connection_id )
     OPENER_ASSERT( kEipStatusOk == eip_status );
 
 #if 0    // do this in caller after return from this function.
-    // the application has to be initialized at last
+    // the application has to be initialized last
     eip_status = ApplicationInitialization();
     OPENER_ASSERT( kEipStatusOk == eip_status );
 #endif
@@ -95,11 +95,6 @@ void ShutdownCipStack()
 
     // Than free the sockets of currently active encapsulation sessions
     EncapsulationShutDown();
-
-    /*
-    // clean the data needed for the assembly object's attribute 3
-    ShutdownAssemblies();
-    */
 
     ShutdownTcpIpInterface();
 
@@ -163,12 +158,12 @@ EipStatus NotifyClass( CipClass* cip_class,
 
 CipInstance::~CipInstance()
 {
-    if( cip_class )         // if not nested in a meta-class
+    if( owning_class )      // if not nested in a meta-class
     {
         if( instance_id )   // and not nested in a public class, then I am an instance.
         {
             OPENER_TRACE_INFO( "deleting instance %d of class '%s'\n",
-                instance_id, cip_class->class_name.c_str() );
+                instance_id, owning_class->class_name.c_str() );
         }
     }
 
@@ -179,20 +174,13 @@ CipInstance::~CipInstance()
 
 
 CipClass::CipClass(
-        const char* aClassName,
         EipUint32   aClassId,
+        const char* aClassName,
         EipUint32   a_get_all_class_attributes_mask,
         EipUint32   a_get_all_instance_attributes_mask,
         EipUint16   aRevision
         ) :
-    CipInstance(
-        0,                  // instance_id of public class is always 0
-        new CipClass(       // class of public class is this meta-class
-                aClassName,
-                a_get_all_class_attributes_mask,
-                this
-            )
-        ),
+    CipInstance( 0 ),       // instance_id of public class is always 0
     class_id( aClassId ),
     class_name( aClassName ),
     revision( aRevision ),
@@ -202,7 +190,18 @@ CipClass::CipClass(
 {
     // The public class holds services for the instances, and attributes for itself.
 
-    CipClass* meta_class = cip_class;   // class of this class is meta-class
+    // class of "this" public class is meta_class.
+    CipClass* meta_class = new CipClass(
+                aClassName,
+                a_get_all_class_attributes_mask
+                );
+
+    // The meta class has no attributes, but holds services for the public class.
+
+    // The meta class has only one instance and it is the public class and it
+    // is not owned by the meta-class (will not delete it during destruction).
+    // But in fact the public class owns the meta-class.
+    meta_class->InstanceInsert( this );     // sets this->cip_class also.
 
     // create the standard class attributes
 
@@ -231,7 +230,6 @@ CipClass::CipClass(
 
     if( a_get_all_instance_attributes_mask )
     {
-        // bind instance services to the class
         ServiceInsert( kGetAttributeAll, &GetAttributeAll, "GetAttributeAll" );
     }
 }
@@ -241,10 +239,9 @@ CipClass::CipClass(
         // meta-class constructor
 
         const char* aClassName,             ///< without "meta-" prefix
-        EipUint32   a_get_all_class_attributes_mask,
-        CipClass*   aPublicClass
+        EipUint32   a_get_all_class_attributes_mask
         ) :
-    CipInstance( 0xffffffff, NULL ),        // instance_id and NULL class
+    CipInstance( 0xffffffff ),        // instance_id and NULL class
     class_id( 0xffffffff ),
     class_name( std::string( "meta-" ) + aClassName ),
     revision( 0 ),
@@ -259,13 +256,6 @@ CipClass::CipClass(
         subclass of the instance struct, and contains a pointer to a
         metaclass. CIP never explicitly addresses a metaclass.
     */
-
-    // The meta class has no attributes, but holds services for the public class.
-
-    // The meta class has only one instance and it is the public class and it
-    // is not owned by the meta-class (will not delete it during destruction).
-    // But in fact the public class owns the meta-class.
-    instances.push_back( aPublicClass );
 
     ServiceInsert( kGetAttributeSingle, &GetAttributeSingle, "GetAttributeSingle" );
 
@@ -294,10 +284,11 @@ CipClass::~CipClass()
             instances.erase( instances.begin() );
         }
 
-        // delete the meta-class, which invokes a small bit of recursion
+        // The public class owns the meta-class.
+        // Delete the meta-class, which invokes a small bit of recursion
         // back into this function, but on the nested call cip_class will
         // be NULL for the meta-class.
-        delete cip_class;
+        delete owning_class;
     }
 
     while( services.size() )
@@ -324,7 +315,7 @@ static int serv_comp( EipUint8 id, CipService* service )
 
 CipService* CipClass::Service( EipUint8 service_id ) const
 {
-    CipClass::CipServices::const_iterator  it;
+    CipServices::const_iterator  it;
 
     // binary search thru vector of pointers looking for attribute_id
     it = vec_search( services.begin(), services.end(), service_id );
@@ -338,52 +329,52 @@ CipService* CipClass::Service( EipUint8 service_id ) const
 }
 
 
-bool CipClass::InstancesInsert( CipInstance** aInstances, int aCount )
+bool CipClass::InstanceInsert( CipInstance* aInstance )
 {
-    bool ret = true;
-
-    for( int i = 0; i < aCount;  ++i )
+    if( aInstance->owning_class )
     {
-        CipInstances::iterator it;
-
-        CipInstance* inst = aInstances[i];
-
-        // Keep sorted by id
-        for( it = instances.begin();  it != instances.end();  ++it )
-        {
-            if( inst->Id() < (*it)->Id() )
-                break;
-
-            else if( inst->Id() == (*it)->Id() )
-            {
-                OPENER_TRACE_ERR( "class '%s' already has instance %d\n",
-                    class_name.c_str(), inst->Id()
-                    );
-
-                ret = false;
-                continue;
-            }
-        }
-
-        if( inst->Id() > highest_inst_id )
-            highest_inst_id = inst->Id();
-
-        instances.insert( it, inst );
-
-        aInstances[i] = 0;
+        OPENER_TRACE_ERR( "%s: aInstance id:%d is already owned\n", __func__, aInstance->Id() );
+        return false;
     }
 
-    return ret;
+    CipInstances::iterator it;
+
+    // Keep sorted by id
+    for( it = instances.begin();  it != instances.end();  ++it )
+    {
+        if( aInstance->Id() < (*it)->Id() )
+            break;
+
+        else if( aInstance->Id() == (*it)->Id() )
+        {
+            OPENER_TRACE_ERR( "class '%s' already has instance %d\n",
+                class_name.c_str(), aInstance->Id()
+                );
+
+            return false;
+        }
+    }
+
+    if( aInstance->Id() > highest_inst_id )
+        highest_inst_id = aInstance->Id();
+
+    instances.insert( it, aInstance );
+
+    // it's official, instance is a member of this class as of now.
+    aInstance->owning_class = this;
+
+    if( aInstance->highest_inst_attr_id > highest_attr_id )
+        owning_class->highest_attr_id = aInstance->highest_inst_attr_id;
+
+    return true;
 }
 
 
 CipInstance* CipClass::InstanceInsert( EipUint32 instance_id )
 {
-    CipInstance* instance = new CipInstance( instance_id, this );
+    CipInstance* instance = new CipInstance( instance_id );
 
-    CipInstance* array[1]{ instance };  // this gets zeroed in called func
-
-    if( !InstancesInsert( array, 1 ) )
+    if( !InstanceInsert( instance ) )
     {
         delete instance;
         instance = NULL;        // return NULL on failure
@@ -413,74 +404,6 @@ CipInstance* CipClass::Instance( EipUint32 instance_id ) const
 }
 
 
-bool AddCipInstances( CipClass* aClass, int aInstanceCount )
-{
-    OPENER_TRACE_INFO( "adding %d instances to class '%s'\n", aInstanceCount,
-            aClass->class_name.c_str() );
-
-    const CipClass::CipInstances& instances = aClass->Instances();
-
-    // Assume no instances have been inserted which have a higher instance_id
-    // than their respective index into the collection.  (Not always true, can fail.)
-
-    int instance_number = instances.size()
-                            + 1;  // the first instance is number 1
-
-    // create the new instances
-    for( int i = 0; i < aInstanceCount;  ++i, ++instance_number )
-    {
-        if( !aClass->InstanceInsert( instance_number ) )
-        {
-            OPENER_TRACE_ERR( "class '%s' collision on instance_id: %d\n",
-                aClass->class_name.c_str(), instance_number );
-
-            return false;
-        }
-    }
-    return true;
-}
-
-
-CipInstance* AddCIPInstance( CipClass* clazz, EipUint32 instance_id )
-{
-    return clazz->InstanceInsert( instance_id );
-}
-
-
-CipClass* CreateCipClass( EipUint32 class_id,
-        EipUint32 class_attributes_get_attribute_all_mask,
-        EipUint32 instance_attributes_get_attributes_all_mask,
-        int aInstanceCount,
-        const char* class_name,
-        EipUint16 class_revision )
-{
-    OPENER_TRACE_INFO( "creating class '%s' with id: 0x%08x\n", class_name,
-            class_id );
-
-    OPENER_ASSERT( !GetCipClass( class_id ) );   // should never try to redefine a class
-
-    CipClass* clazz = new CipClass(
-            class_name,
-            class_id,
-            class_attributes_get_attribute_all_mask,
-            instance_attributes_get_attributes_all_mask,
-            class_revision
-            );
-
-    if( aInstanceCount > 0 )
-    {
-        AddCipInstances( clazz, aInstanceCount );
-    }
-
-    if( RegisterCipClass( clazz ) == kEipStatusError )
-    {
-        return 0;       // TODO handle return value and clean up if necessary
-    }
-
-    return clazz;
-}
-
-
 CipAttribute::~CipAttribute()
 {
     if( own_data && data )
@@ -491,49 +414,48 @@ CipAttribute::~CipAttribute()
 }
 
 
-bool CipInstance::AttributesInsert( CipAttribute** aAttributes, int aCount )
+bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 {
-    bool ret = true;
+    CipAttributes::iterator it;
 
-    for( int i = 0; i < aCount;  ++i )
+    // Keep sorted by id
+    for( it = attributes.begin(); it != attributes.end();  ++it )
     {
-        CipAttribute* a = aAttributes[i];
+        if( aAttribute->Id() < (*it)->Id() )
+            break;
 
-        CipInstance::CipAttributes::iterator it;
-
-        // Keep sorted by id
-        for( it = attributes.begin(); it != attributes.end();  ++it )
+        else if( aAttribute->Id() == (*it)->Id() )
         {
-            if( a->Id() < (*it)->Id() )
-                break;
+            OPENER_TRACE_ERR( "class '%s' instance %d already has attribute %d, ovveriding\n",
+                owning_class ? owning_class->class_name.c_str() : "meta-something",
+                instance_id,
+                aAttribute->Id()
+                );
 
-            else if( a->Id() == (*it)->Id() )
-            {
-                OPENER_TRACE_ERR( "class '%s' instance %d already has attribute %d, ovveriding\n",
-                    cip_class ? cip_class->class_name.c_str() : "meta-something",
-                    instance_id,
-                    a->Id()
-                    );
-
-                // Re-use this slot given by position 'it'.
-                delete *it;
-                attributes.erase( it );    // will re-insert at this position below
-                break;
-            }
+            // Re-use this slot given by position 'it'.
+            delete *it;
+            attributes.erase( it );    // will re-insert at this position below
+            break;
         }
-
-        attributes.insert( it, a );
-
-        // remember the max attribute number that was inserted
-        if( a->Id() > cip_class->highest_attr_id )
-        {
-            cip_class->highest_attr_id = a->Id();
-        }
-
-        aAttributes[i] = 0;
     }
 
-    return ret;
+    attributes.insert( it, aAttribute );
+
+    aAttribute->owning_instance = this;
+
+    // remember the max attribute number that was inserted
+    if( aAttribute->Id() > highest_inst_attr_id )
+    {
+        highest_inst_attr_id = aAttribute->Id();
+    }
+
+    if( owning_class )
+    {
+        if( highest_inst_attr_id > owning_class->highest_attr_id )
+            owning_class->highest_attr_id = highest_inst_attr_id;
+    }
+
+    return true;
 }
 
 
@@ -548,9 +470,7 @@ CipAttribute* CipInstance::AttributeInsert( EipUint16 attribute_id,
                     attr_owns_data
                     );
 
-    CipAttribute* array[1]{ attribute };  // this gets zeroed in called func
-
-    if( !AttributesInsert( array, 1 ) )
+    if( !AttributeInsert( attribute ) )
     {
         delete attribute;
         attribute = NULL;   // return NULL on failure
@@ -567,41 +487,32 @@ bool InsertAttribute( CipInstance* instance, EipUint16 attribute_id,
 }
 
 
-bool CipClass::ServicesInsert( CipService** aServices, int aCount )
+bool CipClass::ServiceInsert( CipService* aService )
 {
-    bool ret = true;
+    CipServices::iterator it;
 
-    for( int i = 0; i < aCount;  ++i )
+    // Keep sorted by id
+    for( it = services.begin();  it != services.end();  ++it )
     {
-        CipService* s = aServices[i];
+        if( aService->Id() < (*it)->Id() )
+            break;
 
-        CipServices::iterator it;
-
-        // Keep sorted by id
-        for( it = services.begin();  it != services.end();  ++it )
+        else if( aService->Id() == (*it)->Id() )
         {
-            if( s->Id() < (*it)->Id() )
-                break;
+            OPENER_TRACE_ERR( "class '%s' already has service %d, overriding.\n",
+                class_name.c_str(), aService->Id()
+                );
 
-            else if( s->Id() == (*it)->Id() )
-            {
-                OPENER_TRACE_ERR( "class '%s' already has service %d, overriding.\n",
-                    class_name.c_str(), s->Id()
-                    );
-
-                // re-use this slot given by position 'it'.
-                delete *it;             // delete existing CipService
-                services.erase( it );   // will re-gap service st::vector with following insert()
-                break;
-            }
+            // re-use this slot given by position 'it'.
+            delete *it;             // delete existing CipService
+            services.erase( it );   // will re-gap service st::vector with following insert()
+            break;
         }
-
-        services.insert( it, s );
-
-        aServices[i] = 0;
     }
 
-    return ret;
+    services.insert( it, aService );
+
+    return true;
 }
 
 
@@ -610,9 +521,7 @@ CipService* CipClass::ServiceInsert( EipUint8 service_id,
 {
     CipService* service = new CipService( service_name, service_id, service_function );
 
-    CipService* array[1]{ service };  // this gets zeroed in called func
-
-    if( !ServicesInsert( array, 1 ) )
+    if( !ServiceInsert( service ) )
     {
         delete service;
         service = NULL;     // return NULL on failure
@@ -631,7 +540,7 @@ CipService* InsertService( CipClass* clazz, EipUint8 service_id,
 
 CipAttribute* CipInstance::Attribute( EipUint16 attribute_id ) const
 {
-    CipInstance::CipAttributes::const_iterator  it;
+    CipAttributes::const_iterator  it;
 
     // a binary search thru the vector of pointers looking for attribute_id
     it = vec_search( attributes.begin(), attributes.end(), attribute_id );
@@ -696,12 +605,14 @@ EipStatus GetAttributeSingle( CipInstance* instance,
              */
 
             if( attribute->type == kCipByteArray
-                && instance->cip_class->class_id == kCipAssemblyClassCode )
+                && instance->owning_class->class_id == kCipAssemblyClassCode )
             {
                 OPENER_ASSERT( attribute->data );
 
-                // we are getting a byte array of a assembly object, kick out to the app callback
                 OPENER_TRACE_INFO( " -> getAttributeSingle CIP_BYTE_ARRAY\r\n" );
+
+                // client asked for attribute which is a byte array of an assembly instance,
+                // give app a chance to update data before we send it.
                 BeforeAssemblyDataSend( instance );
             }
 
@@ -745,7 +656,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipSint:
     case kCipUsint:
     case kCipByte:
-        **message = *(EipUint8*) (data);
+        **message = *(EipUint8*) data;
         ++(*message);
         counter = 1;
         break;
@@ -753,7 +664,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipInt:
     case kCipUint:
     case kCipWord:
-        AddIntToMessage( *(EipUint16*) (data), message );
+        AddIntToMessage( *(EipUint16*) data, message );
         counter = 2;
         break;
 
@@ -761,7 +672,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipUdint:
     case kCipDword:
     case kCipReal:
-        AddDintToMessage( *(EipUint32*) (data), message );
+        AddDintToMessage( *(EipUint32*) data, message );
         counter = 4;
         break;
 
@@ -770,7 +681,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipUlint:
     case kCipLword:
     case kCipLreal:
-        AddLintToMessage( *(EipUint64*) (data), message );
+        AddLintToMessage( *(EipUint64*) data, message );
         counter = 8;
         break;
 #endif
@@ -785,7 +696,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         {
             CipString* string = (CipString*) data;
 
-            AddIntToMessage( *(EipUint16*) &(string->length), message );
+            AddIntToMessage( *(EipUint16*) &string->length, message );
             memcpy( *message, string->string, string->length );
             *message += string->length;
 
@@ -880,9 +791,8 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
 
     case kCipByteArray:
         {
-            CipByteArray* cip_byte_array;
             OPENER_TRACE_INFO( " -> get attribute byte array\r\n" );
-            cip_byte_array = (CipByteArray*) data;
+            CipByteArray* cip_byte_array = (CipByteArray*) data;
             memcpy( *message, cip_byte_array->data, cip_byte_array->length );
             *message += cip_byte_array->length;
             counter = cip_byte_array->length;
@@ -1003,7 +913,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
         OPENER_TRACE_INFO( "GetAttributeAll: instance number 2\n" );
     }
 
-    CipService* service = instance->cip_class->Service( kGetAttributeSingle );
+    CipService* service = instance->owning_class->Service( kGetAttributeSingle );
 
     if( service )
     {
@@ -1024,7 +934,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
                 int attrNum = attributes[j]->attribute_id;
 
                 // only return attributes that are flagged as being part of GetAttributeAll
-                if( attrNum < 32 && (instance->cip_class->get_attribute_all_mask & (1 << attrNum) ) )
+                if( attrNum < 32 && (instance->owning_class->get_attribute_all_mask & (1 << attrNum) ) )
                 {
                     request->request_path.attribute_number = attrNum;
 

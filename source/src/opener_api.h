@@ -100,15 +100,29 @@ void ShutdownCipStack();
  */
 CipClass* GetCipClass( EipUint32 class_id );
 
+
+/** @ingroup CIP_API
+ * @brief Register a CipClass into the CIP class registry.  This may only be
+ *  done once for each unique class_id.
+ *
+ * @param aClass which CIP class to register.
+ */
+EipStatus RegisterCipClass( CipClass* aClass );
+
+
 /** @ingroup CIP_API
  * @brief Get a pointer to an instance
  *
- * @param cip_object pointer to the object the instance belongs to
+ * @param cip_class pointer to the object the instance belongs to
  * @param instance_number number of the instance to retrieve
  * @return pointer to CIP Instance
  *          0 if instance is not in the object
  */
-CipInstance* GetCipInstance( CipClass* cip_object, EipUint32 instance_number );
+inline CipInstance* GetCipInstance( CipClass* cip_class, EipUint32 instance_number )
+{
+    return cip_class->Instance( instance_number );
+}
+
 
 /** @ingroup CIP_API
  * @brief Get a pointer to an instance's attribute
@@ -151,38 +165,6 @@ CipClass* CreateCipClass( EipUint32 class_id,
         const char* class_name,
         EipUint16 class_revision );
 
-/** @ingroup CIP_API
- * @brief Add a number of CIP instances to a given CIP class
- *
- * The required number of instances are created in a block, but are attached to
- * the class as a linked list.
- * The instances are numbered sequentially -- i.e. the first node in the chain
- * is instance 1, the second is 2, and so on.
- * You can add new instances at any time (you do not have to create all the
- * instances of a class at the same time) deleting instances once they have
- * been created is not supported out-of-order instance numbers are not
- * supported running out of memory while creating new instances causes an
- * assert.
- *
- * @param cip_object_to_add_instances CIP object the instances should be added
- * @param number_of_instances number of instances to be generated.
- * @return bool - true if all were added, else false.  Can fail if a collision on
- *   instance_id happens.
- */
-bool AddCipInstances( CipClass* cip_object_to_add_instances, int number_of_instances );
-
-/** @ingroup CIP_API
- * @brief Create one instance of a given class with a certain instance number
- *
- * This function can be used for creating out of order instance numbers
- * @param pa_pstCIPClass the class the instance should be created for
- * @param pa_nInstanceId the instance id of the created instance
- * @return pointer to the created instance, if an instance with the given id
- *         already exists the existing is returned an no new instance is created
- *
- */
-CipInstance* AddCIPInstance( CipClass* cip_class_to_add_instance,
-        EipUint32 pa_nInstanceId );
 
 /** @ingroup CIP_API
  * @brief Insert an attribute in an instance of a CIP class

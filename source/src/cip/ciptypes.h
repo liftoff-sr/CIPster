@@ -156,7 +156,6 @@ enum CIPServiceCode
     kInsertMember = 0x1A,
     kRemoveMember = 0x1B,
     kGroupSync = 0x1C,
-
     // End CIP common services
 
     // Start CIP object-specific services
@@ -164,8 +163,7 @@ enum CIPServiceCode
     kForwardClose = 0x4E,
     kUnconnectedSend = 0x52,
     kGetConnectionOwner = 0x5A
-
-// End CIP object-specific services
+    // End CIP object-specific services
 };
 
 //* @brief Definition of Get and Set Flags for CIP Attributes
@@ -305,6 +303,29 @@ struct CipMessageRouterResponse
                                                              *  request */
 };
 
+class CipInstance;
+class CipAttribute;
+class CipClass;
+
+
+/** @ingroup CIP_API
+ *  @typedef  EIP_STATUS (*AttributeFunc)( CipAttribute *,
+ *    CipMessageRouterRequest*, CipMessageRouterResponse*)
+ *
+ *  @brief Signature definition for the implementation of CIP services.
+ *
+ *  CIP services have to follow this signature in order to be handled correctly
+ * by the stack.
+ *  @param aAttribute which was referenced in the service request
+ *  @param aRequest request data
+ *  @param aResponse storage for the response data, including a buffer for
+ *      extended data
+ *  @return EIP_OK_SEND if service could be executed successfully and a response
+ * should be sent
+ */
+typedef EipStatus (* AttributeFunc)( CipAttribute* aAttribute,
+        CipMessageRouterRequest* aRequest,
+        CipMessageRouterResponse* aResponse );
 
 /**
  * Class CipAttribute
@@ -312,6 +333,8 @@ struct CipMessageRouterResponse
  */
 class CipAttribute
 {
+    friend class CipInstance;
+
 public:
     CipAttribute(
             EipUint16 aAttributeId = 0,
@@ -324,7 +347,8 @@ public:
         type( aType ),
         attribute_flags( aFlags ),
         data( aData ),
-        own_data( IOwnData )
+        own_data( IOwnData ),
+        owning_instance( 0 )
     {}
 
     virtual ~CipAttribute();
@@ -339,14 +363,20 @@ public:
                                                 3 => get and setable;
                                                 all other values reserved
                                          */
+
     void*       data;                   // no ownership of data unless own_data true.
 
     bool        own_data;               // Do I own data?
                                         // If so, I must CipFree() it in destructor.
+
+protected:
+    CipInstance*    owning_instance;
+
+    EipStatus   GetAttribute( CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+    EipStatus   GetHighestId( CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+
 } ;
 
-
-class CipClass;
 
 /**
  * Class CipInstance
@@ -357,9 +387,10 @@ class CipInstance
 public:
     typedef std::vector<CipAttribute*>      CipAttributes;
 
-    CipInstance( EipUint32 aInstanceId, CipClass* aClass ) :
+    CipInstance( EipUint32 aInstanceId ) :
         instance_id( aInstanceId ),
-        cip_class( aClass )
+        owning_class( 0 ),           // NULL (not owned) until I am inserted into a CipClass
+        highest_inst_attr_id( 0 )
     {
     }
 
@@ -368,21 +399,17 @@ public:
     EipUint32   Id() const { return instance_id; }
 
     /**
-     * Function AttributesInsert
-     * inserts attributes and returns true if succes, else false.
+     * Function AttributeInsert
+     * inserts an attribute and returns true if succes, else false.
      *
-     * @param aAttribute is an array of CipAttribute pointers, and any CipAttributes
-     *  inserted successfully are subsequently owned by this instance and their
-     *  pointers are set to NULL in the array.  This allows caller to determine
-     *  which if any were unable to be inserted by their non-null-ness.
+     * @param aAttribute is the one to insert, and may not already be a member
+     *  of another instance.
      *
-     * @param aCount is the number of CipAttributes in the array.
-     *
-     * @return bool - true if all were inserted, false if any failed and caller's array
-     *   will have non-null pointers for those still owned by caller and
-     *   unsuccessfully inserted.
+     * @return bool - true if success, else false if failed.  Currently attributes
+     *  may be overrridden, so any existing CipAttribute in this instance with the
+     *  same attribute_id will be delete in favour of this one.
      */
-    bool AttributesInsert( CipAttribute** aAttributes, int aCount );
+    bool AttributeInsert( CipAttribute* aAttributes );
 
     CipAttribute* AttributeInsert( EipUint16 attribute_id,
         EipUint8    cip_type,
@@ -402,8 +429,10 @@ public:
         return attributes;
     }
 
-    EipUint32           instance_id;    ///< this instance's number (unique within the class)
-    CipClass*           cip_class;      ///< class the instance belongs to
+    EipUint32       instance_id;    ///< this instance's number (unique within the class)
+    CipClass*       owning_class;   ///< class the instance belongs to or NULL if none.
+
+    EipUint16       highest_inst_attr_id;    ///< highest attribute_id for this instance
 
 protected:
     CipAttributes       attributes;     ///< sorted pointer array to CipAttributes, unique to this instance
@@ -480,9 +509,28 @@ public:
     typedef std::vector<CipInstance*>      CipInstances;
     typedef std::vector<CipService*>       CipServices;
 
+    /**
+     * Constructor CipClass
+     * is a base CIP Class and contains services and class (not instance) attributes.
+     * The class attributes are held in the CipInstance from which this C++ class
+     * is derived.
+     *
+     * @param aClassId ID of the class
+     * @param aClassName name of class
+     *
+     * @param a_get_attribute_all_mask mask of which attribute Ids are included in the
+     *  class getAttributeAll. If the mask is 0 the getAttributeAll service will not
+     *  be added as class service.
+     *
+     * @param a_instance_attributes_get_attributes_all_mask  mask of which attributes
+     *  are included in the instance getAttributeAll. If the mask is 0 the getAttributeAll
+     *  service will not be added as class service.
+     *
+     * @param aRevision class revision
+     */
     CipClass(
-        const char* aClassName,
         EipUint32   aClassId,
+        const char* aClassName,
         EipUint32   a_get_all_class_attributes_mask,
         EipUint32   a_get_all_instance_attributes_mask,
         EipUint16   aRevision = 1
@@ -491,25 +539,19 @@ public:
     ~CipClass();
 
     /// Return true if this is a meta-class, false if public.
-    bool IsMetaClass() const    { return !cip_class; }
-
+    bool IsMetaClass() const    { return !owning_class; }
 
     /**
-     * Function ServicesInsert
-     * inserts services and returns true if succes, else false.
+     * Function ServiceInsert
+     * inserts a service and returns true if succes, else false.
      *
-     * @param aServices is an array of CipService pointers, and any CipServices
-     *  inserted successfully are subsequently owned by this container and their
-     *  pointers are set to NULL in the array.  This allows caller to determine
-     *  which if any were unable to be inserted by their non-null-ness.
+     * @param aService is to be inserted and must not already be part of a CipClass.
      *
-     * @param aCount is the number of CipServices in the array.
-     *
-     * @return bool - true if all were inserted, false if any failed and caller's array
-     *   will have non-null pointers for those still owned by caller and
-     *   unsuccessfully inserted.
+     * @return bool - true on success, else false.  Since services may be overridden,
+     *  currently this will not fail if the service_id already exists.  It will merely
+     *  delete the existing one with the same service_id.
      */
-    bool ServicesInsert( CipService** aServices, int aCount );
+    bool ServiceInsert( CipService* aService );
 
     CipService* ServiceInsert( EipUint8 service_id,
         CipServiceFunction service_function, const char* service_name );
@@ -524,21 +566,18 @@ public:
     }
 
     /**
-     * Function ServicesInsert
-     * inserts services and returns true if succes, else false.
+     * Function InstanceInsert
+     * inserts an instance and returns true if succes, else false.
      *
-     * @param aInstances is an array of CipInstance pointers, and any CipInstances
-     *  inserted successfully are subsequently owned by this container and their
-     *  pointers are set to NULL in the array.  This allows caller to determine
-     *  which if any were unable to be inserted by their non-null-ness.
+     * @param aInstance is a new instance, and since the normal CipInstance
+     *  constructor marks any new instance as not yet belonging to a class, this
+     *  instance may not belong to any class at the time this call is made.
      *
-     * @param aCount is the array size.
-     *
-     * @return bool - true if all were inserted, false if any failed and caller's array
-     *   will have non-null pointers for those still owned by caller and
-     *   unsuccessfully inserted.
+     * @return bool - true on succes, else false.  Failure happens when the instance
+     *  was marked as already being in another class, or if the instance_id was
+     *  not unique.
      */
-    bool InstancesInsert( CipInstance** aInstances, int aCount );
+    bool InstanceInsert( CipInstance* aInstances );
 
     /**
      * Function InstanceInsert
@@ -587,8 +626,7 @@ protected:
 
     CipClass(
             const char* aClassName,         ///< without "meta-" prefix
-            EipUint32   a_get_all_class_attributes_mask,
-            CipClass*   aPublicClass
+            EipUint32   a_get_all_class_attributes_mask
             );
 
     CipInstances    instances;              ///< collection of instances

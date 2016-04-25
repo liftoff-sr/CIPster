@@ -148,24 +148,11 @@ static EipStatus Reset( CipInstance* instance,
 }
 
 
-/** @brief CIP Identity object constructor
- *
- * @returns EIP_ERROR if the class could not be created, otherwise EIP_OK
- */
-EipStatus CipIdentityInit()
+static CipInstance* createIdentityInstance()
 {
-    CipClass* clazz = CreateCipClass( kIdentityClassCode,
-            MASK4( 1, 2, 6, 7 ),                    // class getAttributeAll mask		CIP spec 5-2.3.2
-            MASK7( 1, 2, 3, 4, 5, 6, 7 ),           // instance getAttributeAll mask	CIP spec 5-2.3.2
-            1,                                      // # of instances
-            "identity",                             // class name (for debug)
-            1                                       // class revision
-            );
+    CipClass* clazz = GetCipClass( kIdentityClassCode );
 
-    if( !clazz )
-        return kEipStatusError;
-
-    CipInstance* i = clazz->Instance( 1 );
+    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
     i->AttributeInsert( 1, kCipUint, &vendor_id_, kGetableSingleAndAll );
     i->AttributeInsert( 2, kCipUint, &device_type_, kGetableSingleAndAll );
@@ -177,7 +164,32 @@ EipStatus CipIdentityInit()
 
     i->AttributeInsert( 7, kCipShortString, &product_name_, kGetableSingleAndAll );
 
-    clazz->ServiceInsert( kReset, &Reset, "Reset" );
+    return i;
+}
+
+
+/** @brief CIP Identity object constructor
+ *
+ * @returns EIP_ERROR if the class could not be created, otherwise EIP_OK
+ */
+EipStatus CipIdentityInit()
+{
+    if( !GetCipClass( kIdentityClassCode ) )
+    {
+        CipClass* clazz = new CipClass( kIdentityClassCode,
+                "identity",                     // class name
+                MASK4( 1, 2, 6, 7 ),            // class getAttributeAll mask		CIP spec 5-2.3.2
+                MASK7( 1, 2, 3, 4, 5, 6, 7 ),   // instance getAttributeAll mask	CIP spec 5-2.3.2
+                1                               // class revision
+                );
+
+        RegisterCipClass( clazz );
+
+        clazz->ServiceInsert( kReset, &Reset, "Reset" );
+
+        clazz->InstanceInsert( createIdentityInstance() );
+    }
 
     return kEipStatusOk;
 }
+

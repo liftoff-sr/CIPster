@@ -8,7 +8,7 @@
 
 #include "cipclass3connection.h"
 
-CipConn* GetFreeExplicitConnection( void );
+CipConn* GetFreeExplicitConnection();
 
 // *** Global variables ***
 
@@ -59,9 +59,7 @@ int EstablishClass3Connection( CipConn* cip_conn,
 
 CipConn* GetFreeExplicitConnection( void )
 {
-    int i;
-
-    for( i = 0; i < OPENER_CIP_NUM_EXPLICIT_CONNS; i++ )
+    for( int i = 0; i < OPENER_CIP_NUM_EXPLICIT_CONNS; i++ )
     {
         if( g_explicit_connections[i].state == kConnectionStateNonExistent )
             return &(g_explicit_connections[i]);
@@ -71,8 +69,7 @@ CipConn* GetFreeExplicitConnection( void )
 }
 
 
-void InitializeClass3ConnectionData( void )
+void InitializeClass3ConnectionData()
 {
-    memset( g_explicit_connections, 0,
-            OPENER_CIP_NUM_EXPLICIT_CONNS * sizeof(CipConn) );
+    memset( g_explicit_connections, 0, sizeof g_explicit_connections );
 }

@@ -21,48 +21,36 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response );
 
-CipClass* CreateAssemblyClass()
-{
-    // create the CIP Assembly object with zero instances
-    CipClass* clazz = CreateCipClass( kCipAssemblyClassCode,
-            0,           // 0 as the assembly object should not have a get_attribute_all service
-            0,           // 0 as the assembly object should not have a get_attribute_all service
-            0,           // # instances
-            "assembly",  // name
-            2            // Revision, according to the CIP spec currently this has to be 2
-            );
-
-    if( !clazz )
-    {
-        clazz->ServiceInsert( kSetAttributeSingle, &SetAssemblyAttributeSingle, "SetAssemblyAttributeSingle" );
-    }
-
-    return clazz;
-}
-
 
 EipStatus CipAssemblyInitialize()
 {
-    // create the CIP Assembly class
-    return CreateAssemblyClass() ? kEipStatusOk : kEipStatusError;
+    // may only register once.
+    if( !GetCipClass( kCipAssemblyClassCode ) )
+    {
+        CipClass* clazz = new CipClass( kCipAssemblyClassCode,
+                "assembly",  // aClassName
+                0,           // assembly object should not have a get_attribute_all service
+                0,           // assembly object should not have a get_attribute_all service
+                2            // aRevision, according to the CIP spec currently this has to be 2
+                );
+
+        RegisterCipClass( clazz );
+
+        clazz->ServiceInsert( kSetAttributeSingle, &SetAssemblyAttributeSingle, "SetAssemblyAttributeSingle" );
+    }
+
+    return kEipStatusOk;
 }
 
 
 CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
         EipUint16 data_length )
 {
-    CipClass* assembly_class = GetCipClass( kCipAssemblyClassCode );
+    CipClass* clazz = GetCipClass( kCipAssemblyClassCode );
 
-    if( !assembly_class )
-    {
-        assembly_class = CreateAssemblyClass();
-        if( !assembly_class )
-        {
-            return NULL;
-        }
-    }
+    OPENER_ASSERT( clazz );     // Stack startup should call CipAssemblyInitialize()
 
-    CipInstance* instance = AddCIPInstance( assembly_class, instance_id );
+    OPENER_TRACE_INFO( "%s: creating assembly instance_id %d\n", __func__, instance_id );
 
     CipByteArray* byte_array = (CipByteArray*) CipCalloc( 1, sizeof(CipByteArray) );
     if( !byte_array )
@@ -73,10 +61,17 @@ CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
     byte_array->length = data_length;
     byte_array->data   = data;
 
+    CipInstance* instance = new CipInstance( instance_id );
+
+    // add true so ~CipAttribute() deletes the byte_array.
     instance->AttributeInsert( 3, kCipByteArray, byte_array, kSetAndGetAble, true );
 
     // Attribute 4 Number of bytes in Attribute 3
     instance->AttributeInsert( 4, kCipUint, &byte_array->length, kGetableSingle );
+
+    // This is a public function, we don't expect caller to insert instance
+    // into the class, do it here.
+    clazz->InstanceInsert( instance );
 
     return instance;
 }
@@ -86,7 +81,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
         EipUint8* data,
         EipUint16 data_length )
 {
-    OPENER_ASSERT( instance->cip_class->class_id == kCipAssemblyClassCode );
+    OPENER_ASSERT( instance->owning_class->Id() == kCipAssemblyClassCode );
 
     // empty path (path size = 0) need to be checked and taken care of in future
 
@@ -119,23 +114,20 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipUint8*       router_request_data;
-    CipAttribute*   attribute;
-
     OPENER_TRACE_INFO( "%s: setAttribute %d on assembly instance %d\n",
             __func__,
             request->request_path.attribute_number,
             instance->instance_id
             );
 
-    router_request_data = request->data;
+    EipUint8* router_request_data = request->data;
 
     response->data_length = 0;
     response->reply_service = 0x80 | request->service;
     response->general_status = kCipErrorAttributeNotSupported;
     response->size_of_additional_status = 0;
 
-    attribute = instance->Attribute( request->request_path.attribute_number );
+    CipAttribute*  attribute = instance->Attribute( request->request_path.attribute_number );
 
     if( attribute  &&  3 == request->request_path.attribute_number )
     {
@@ -143,7 +135,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
 
         if( attribute->data )
         {
-            CipByteArray* data = (CipByteArray*) attribute->data;
+            CipByteArray* byte_array = (CipByteArray*) attribute->data;
 
             // TODO: check for ATTRIBUTE_SET/GETABLE MASK
             if( IsConnectedOutputAssembly( instance->instance_id ) )
@@ -154,7 +146,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
             }
             else
             {
-                if( request->data_length < data->length )
+                if( request->data_length < byte_array->length )
                 {
                     OPENER_TRACE_INFO(
                             "Assembly setAssemblyAttributeSingle: not enough data received.\r\n" );
@@ -162,7 +154,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
                 }
                 else
                 {
-                    if( request->data_length > data->length )
+                    if( request->data_length > byte_array->length )
                     {
                         OPENER_TRACE_INFO(
                                 "Assembly setAssemblyAttributeSingle: too much data received.\r\n" );
@@ -170,7 +162,7 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
                     }
                     else
                     {
-                        memcpy( data->data, router_request_data, data->length );
+                        memcpy( byte_array->data, router_request_data, byte_array->length );
 
                         if( AfterAssemblyDataReceived( instance ) != kEipStatusOk )
                         {

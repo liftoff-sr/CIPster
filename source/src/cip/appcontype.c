@@ -11,29 +11,29 @@
 /// @brief External globals needed from connectionmanager.c
 extern CipConn* g_active_connection_list;
 
-typedef struct
+struct ExclusiveOwnerConnection
 {
     unsigned output_assembly;           ///< the O-to-T point for the connection
     unsigned input_assembly;            ///< the T-to-O point for the connection
     unsigned config_assembly;           ///< the config point for the connection
     CipConn connection_data;   ///< the connection data, only one connection is allowed per O-to-T point
-} ExclusiveOwnerConnection;
+};
 
-typedef struct
+struct InputOnlyConnection
 {
     unsigned output_assembly;           ///< the O-to-T point for the connection
     unsigned input_assembly;            ///< the T-to-O point for the connection
     unsigned config_assembly;           ///< the config point for the connection
     CipConn connection_data[OPENER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH]; ///< the connection data
-} InputOnlyConnection;
+};
 
-typedef struct
+struct ListenOnlyConnection
 {
     unsigned output_assembly;           ///< the O-to-T point for the connection
     unsigned input_assembly;            ///< the T-to-O point for the connection
     unsigned config_assembly;           ///< the config point for the connection
     CipConn connection_data[OPENER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH];    ///< the connection data
-} ListenOnlyConnection;
+};
 
 ExclusiveOwnerConnection g_exlusive_owner_connections[OPENER_CIP_NUM_EXLUSIVE_OWNER_CONNS];
 
@@ -189,8 +189,7 @@ CipConn* GetExclusiveOwnerConnection( CipConn* cip_conn,
 }
 
 
-CipConn* GetInputOnlyConnection( CipConn* cip_conn,
-        EipUint16* extended_error )
+CipConn* GetInputOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
 {
     CipConn* input_only_connection = NULL;
 
@@ -234,8 +233,7 @@ CipConn* GetInputOnlyConnection( CipConn* cip_conn,
 }
 
 
-CipConn* GetListenOnlyConnection( CipConn* cip_conn,
-        EipUint16* extended_error )
+CipConn* GetListenOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
 {
     CipConn* listen_only_connection = NULL;
 
@@ -428,12 +426,9 @@ EipBool8 ConnectionWithSameConfigPointExists( EipUint32 config_point )
 
 void InitializeIoConnectionData()
 {
-    memset( g_exlusive_owner_connections, 0,
-            OPENER_CIP_NUM_EXLUSIVE_OWNER_CONNS * sizeof(ExclusiveOwnerConnection) );
+    memset( g_exlusive_owner_connections, 0, sizeof g_exlusive_owner_connections );
 
-    memset( g_input_only_connections, 0,
-            OPENER_CIP_NUM_INPUT_ONLY_CONNS * sizeof(InputOnlyConnection) );
+    memset( g_input_only_connections, 0, sizeof g_input_only_connections );
 
-    memset( g_listen_only_connections, 0,
-            OPENER_CIP_NUM_LISTEN_ONLY_CONNS * sizeof(ListenOnlyConnection) );
+    memset( g_listen_only_connections, 0, sizeof g_listen_only_connections );
 }

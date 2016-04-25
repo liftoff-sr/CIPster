@@ -173,22 +173,11 @@ EipStatus SetAttributeSingleTcp( CipInstance* instance,
 }
 
 
-EipStatus CipTcpIpInterfaceInit()
+static CipInstance* createTcpIpInterfaceInstance()
 {
-    CipClass* clazz = CreateCipClass( kCipTcpIpInterfaceClassCode,
-          0xffffffff,            // class getAttributeAll mask
-          0xffffffff,            // instance getAttributeAll mask
-          1,                     // # instances
-          "TCP/IP interface",
-          3
-          );
+    CipClass* clazz = GetCipClass( kCipTcpIpInterfaceClassCode );
 
-    if( !clazz )
-        return kEipStatusError;
-
-    // bind attributes to the instance #1 that was created above
-
-    CipInstance* i = clazz->Instance( 1 );
+    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
     i->AttributeInsert( 1, kCipDword, (void*) &tcp_status_, kGetableSingleAndAll );
     i->AttributeInsert( 2, kCipDword, (void*) &configuration_capability_, kGetableSingleAndAll );
@@ -205,11 +194,32 @@ EipStatus CipTcpIpInterfaceInit()
 
     i->AttributeInsert( 9, kCipAny, (void*) &g_multicast_configuration, kGetableSingleAndAll );
 
-    clazz->ServiceInsert( kGetAttributeSingle, &GetAttributeSingleTcpIpInterface, "GetAttributeSingleTCPIPInterface" );
+    return i;
+}
 
-    clazz->ServiceInsert( kGetAttributeAll, &GetAttributeAllTcpIpInterface, "GetAttributeAllTCPIPInterface" );
 
-    clazz->ServiceInsert( kSetAttributeSingle, &SetAttributeSingleTcp, "SetAttributeSingle" );
+EipStatus CipTcpIpInterfaceInit()
+{
+    if( !GetCipClass( kCipTcpIpInterfaceClassCode ) )
+    {
+
+        CipClass* clazz = new CipClass( kCipTcpIpInterfaceClassCode,
+              "TCP/IP interface",
+              0xffffffff,               // class getAttributeAll mask
+              0xffffffff,               // instance getAttributeAll mask
+              3                         // version
+              );
+
+        RegisterCipClass( clazz );
+
+        clazz->ServiceInsert( kGetAttributeSingle, &GetAttributeSingleTcpIpInterface, "GetAttributeSingleTCPIPInterface" );
+
+        clazz->ServiceInsert( kGetAttributeAll, &GetAttributeAllTcpIpInterface, "GetAttributeAllTCPIPInterface" );
+
+        clazz->ServiceInsert( kSetAttributeSingle, &SetAttributeSingleTcp, "SetAttributeSingle" );
+
+        clazz->InstanceInsert( createTcpIpInterfaceInstance() );
+    }
 
     return kEipStatusOk;
 }
@@ -283,23 +293,25 @@ EipStatus GetAttributeAllTcpIpInterface( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipUint8* start = response->data;       // snapshot initial
+    EipUint8*   start = response->data;       // snapshot initial
+    EipUint8    get_mask = instance->owning_class->get_attribute_all_mask;
 
     const CipInstance::CipAttributes& attributes = instance->Attributes();
-    for( unsigned j = 0; j < attributes.size();  ++j )
-    {
-        CipAttribute* attribute = attributes[j];
 
-        int attribute_id = attribute->attribute_id;
+    for( CipInstance::CipAttributes::const_iterator it = attributes.begin();
+            it != attributes.end(); ++it )
+    {
+        int attribute_id = (*it)->Id();
 
         // only return attributes that are flagged as being part of GetAttributeAll
-        if( attribute_id < 32
-            && (instance->cip_class->get_attribute_all_mask & 1 << attribute_id) )
+        if( attribute_id < 32 && (get_mask & (1 << attribute_id)) )
         {
             request->request_path.attribute_number = attribute_id;
 
-            if( 8 == attribute_id ) // insert 6 zeros for the required empty safety network number according to Table 5-3.10
+            if( 8 == attribute_id )
             {
+                // insert 6 zeros for the required empty safety network number
+                // according to Table 5-3.10
                 memset( response->data, 0, 6 );
                 response->data += 6;
             }
@@ -313,8 +325,6 @@ EipStatus GetAttributeAllTcpIpInterface( CipInstance* instance,
 
             response->data += response->data_length;
         }
-
-        attribute++;
     }
 
     response->data_length = response->data - start;
