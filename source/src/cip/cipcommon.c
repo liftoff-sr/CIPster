@@ -155,6 +155,114 @@ EipStatus NotifyClass( CipClass* cip_class,
     return kEipStatusOkSend;
 }
 
+//-----<CipAttrube>-------------------------------------------------------
+
+CipAttribute::CipAttribute(
+        EipUint16   aAttributeId,
+        EipUint8    aType,
+        EipUint8    aFlags,
+
+        // assign your getter and setter per attribute, either may be NULL
+        AttributeFunc aGetter,
+        AttributeFunc aSetter,
+
+        void*   aData
+        ) :
+    attribute_id( aAttributeId ),
+    type( aType ),
+    attribute_flags( aFlags ),
+    data( aData ),
+    owning_instance( 0 ),
+    getter( aGetter ),
+    setter( aSetter )
+{
+}
+
+
+CipAttribute::~CipAttribute()
+{
+}
+
+
+EipStatus GetAttrData( CipAttribute* attr,
+        CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+{
+    EipByte* message = response->data;
+
+    response->data_length = EncodeData( attr->type, attr->data, &message );
+
+    response->general_status = kCipErrorSuccess;
+
+    return kEipStatusOkSend;
+}
+
+
+EipStatus GetInstanceCount( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+{
+    CipClass* clazz = dynamic_cast<CipClass*>( attr->Instance() );
+
+    // This func must be invoked only on a class attribute,
+    // because on an instance attribute clazz will be NULL since
+    // instance is not a CipClass and dynamic_cast<> returns NULL.
+    if( clazz )
+    {
+        EipUint16 instance_count = clazz->Instances().size();
+
+        EipByte* message = response->data;
+
+        response->data_length = EncodeData( attr->type, &instance_count, &message );
+
+        response->general_status = kCipErrorSuccess;
+
+        return kEipStatusOkSend;
+    }
+    return kEipStatusError;
+}
+
+
+EipStatus SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+{
+    response->size_of_additional_status = 0;
+    response->reply_service = 0x80 | request->service;
+
+#if 1
+    EipByte* message = request->data;
+
+    int out_count = DecodeData( attr->type, attr->data, &message );
+
+    if( out_count >= 0 )
+    {
+        request->data_length -= out_count;
+        request->data += out_count;
+
+        response->general_status = kCipErrorSuccess;
+        response->data_length = 0;
+
+        return kEipStatusOkSend;
+    }
+    else
+        return kEipStatusError;
+
+#else
+
+    response->general_status = kCipErrorAttributeNotSetable;
+
+    response->data_length = 0;
+    return kEipStatusOkSend;
+
+#endif
+}
+
+
+//-----<CipInstance>------------------------------------------------------
+
+CipInstance::CipInstance( EipUint32 aInstanceId ) :
+    instance_id( aInstanceId ),
+    owning_class( 0 ),           // NULL (not owned) until I am inserted into a CipClass
+    highest_inst_attr_id( 0 )
+{
+}
+
 
 CipInstance::~CipInstance()
 {
@@ -172,6 +280,8 @@ CipInstance::~CipInstance()
     attributes.clear();
 }
 
+
+//-----<CipClass>--------------------------------------------------------------
 
 CipClass::CipClass(
         EipUint32   aClassId,
@@ -205,33 +315,35 @@ CipClass::CipClass(
 
     // create the standard class attributes
 
-    AttributeInsert( 1, kCipUint, (void*) &revision, kGetableSingleAndAll );
+    AttributeInsert( 1, kCipUint, kGetableSingleAndAll, (void*) &revision );
 
-    // largest instance number
-    AttributeInsert( 2, kCipUint, (void*) &highest_inst_id, kGetableSingleAndAll );
+    // largest instance id
+    AttributeInsert( 2, kCipUint, kGetableSingleAndAll, (void*) &highest_inst_id );
 
     // number of instances currently existing, dynamically determined elsewhere
-    AttributeInsert( 3, kCipUint, NULL, kGetableSingleAndAll );
+    AttributeInsert( 3, kCipUint, kGetableSingleAndAll, GetInstanceCount, NULL );
 
     // optional attribute list - default = 0
-    AttributeInsert( 4, kCipUint, (void*) &kCipUintZero, kGetableAll );
+    AttributeInsert( 4, kCipUint, kGetableAll, (void*) &kCipUintZero );
 
     // optional service list - default = 0
-    AttributeInsert( 5, kCipUint, (void*) &kCipUintZero, kGetableAll );
+    AttributeInsert( 5, kCipUint, kGetableAll, (void*) &kCipUintZero );
 
     // max class attribute number
-    AttributeInsert( 6, kCipUint, (void*) &meta_class->highest_attr_id, kGetableSingleAndAll );
+    AttributeInsert( 6, kCipUint, kGetableSingleAndAll, (void*) &meta_class->highest_attr_id );
 
     // max instance attribute number
-    AttributeInsert( 7, kCipUint, (void*) &highest_attr_id, kGetableSingleAndAll );
+    AttributeInsert( 7, kCipUint, kGetableSingleAndAll, (void*) &highest_attr_id );
 
     // create the standard instance services
-    ServiceInsert( kGetAttributeSingle, &GetAttributeSingle, "GetAttributeSingle" );
+    ServiceInsert( kGetAttributeSingle, GetAttributeSingle, "GetAttributeSingle" );
 
     if( a_get_all_instance_attributes_mask )
     {
-        ServiceInsert( kGetAttributeAll, &GetAttributeAll, "GetAttributeAll" );
+        ServiceInsert( kGetAttributeAll, GetAttributeAll, "GetAttributeAll" );
     }
+
+    ServiceInsert( kSetAttributeSingle, SetAttributeSingle, "SetAttributeSingle" );
 }
 
 
@@ -257,12 +369,12 @@ CipClass::CipClass(
         metaclass. CIP never explicitly addresses a metaclass.
     */
 
-    ServiceInsert( kGetAttributeSingle, &GetAttributeSingle, "GetAttributeSingle" );
+    ServiceInsert( kGetAttributeSingle, GetAttributeSingle, "GetAttributeSingle" );
 
     // create the standard class services
     if( a_get_all_class_attributes_mask )
     {
-        ServiceInsert( kGetAttributeAll, &GetAttributeAll, "GetAttributeAll" );
+        ServiceInsert( kGetAttributeAll, GetAttributeAll, "GetAttributeAll" );
     }
 }
 
@@ -293,7 +405,7 @@ CipClass::~CipClass()
 
     while( services.size() )
     {
-#if 1
+#if 0
         if( class_name == "TCP/IP interface" )
         {
             ShowServices();
@@ -304,12 +416,6 @@ CipClass::~CipClass()
 
         services.erase( services.begin() );
     }
-}
-
-
-static int serv_comp( EipUint8 id, CipService* service )
-{
-    return id - service->service_id;
 }
 
 
@@ -404,19 +510,11 @@ CipInstance* CipClass::Instance( EipUint32 instance_id ) const
 }
 
 
-CipAttribute::~CipAttribute()
-{
-    if( own_data && data )
-    {
-        CipFree( data );
-        data = NULL;
-    }
-}
-
-
 bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 {
     CipAttributes::iterator it;
+
+    OPENER_ASSERT( !aAttribute->owning_instance );  // only un-owned attributes may be inserted
 
     // Keep sorted by id
     for( it = attributes.begin(); it != attributes.end();  ++it )
@@ -441,7 +539,7 @@ bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 
     attributes.insert( it, aAttribute );
 
-    aAttribute->owning_instance = this;
+    aAttribute->owning_instance = this; // until now there was no owner of this attribute.
 
     // remember the max attribute number that was inserted
     if( aAttribute->Id() > highest_inst_attr_id )
@@ -459,15 +557,22 @@ bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 }
 
 
-CipAttribute* CipInstance::AttributeInsert( EipUint16 attribute_id,
-        EipUint8 cip_type, void* data, EipByte cip_flags, bool attr_owns_data )
+CipAttribute* CipInstance::AttributeInsert(
+        EipUint16       attribute_id,
+        EipUint8        cip_type,
+        EipByte         cip_flags,
+        AttributeFunc   aGetter,
+        AttributeFunc   aSetter,
+        void* data
+        )
 {
     CipAttribute* attribute = new CipAttribute(
                     attribute_id,
                     cip_type,
                     cip_flags,
-                    data,
-                    attr_owns_data
+                    aGetter,
+                    aSetter,
+                    data
                     );
 
     if( !AttributeInsert( attribute ) )
@@ -480,10 +585,29 @@ CipAttribute* CipInstance::AttributeInsert( EipUint16 attribute_id,
 }
 
 
-bool InsertAttribute( CipInstance* instance, EipUint16 attribute_id,
-        EipUint8 cip_type, void* data, EipByte cip_flags )
+CipAttribute* CipInstance::AttributeInsert(
+        EipUint16       attribute_id,
+        EipUint8        cip_type,
+        EipByte         cip_flags,
+        void* data
+        )
 {
-    return instance->AttributeInsert( attribute_id, cip_type, data, cip_flags );
+    CipAttribute* attribute = new CipAttribute(
+                    attribute_id,
+                    cip_type,
+                    cip_flags,
+                    NULL,
+                    NULL,
+                    data
+                    );
+
+    if( !AttributeInsert( attribute ) )
+    {
+        delete attribute;
+        attribute = NULL;   // return NULL on failure
+    }
+
+    return attribute;
 }
 
 
@@ -531,13 +655,6 @@ CipService* CipClass::ServiceInsert( EipUint8 service_id,
 }
 
 
-CipService* InsertService( CipClass* clazz, EipUint8 service_id,
-        CipServiceFunction service_function, const char* service_name )
-{
-    return clazz->ServiceInsert( service_id, service_function, service_name );
-}
-
-
 CipAttribute* CipInstance::Attribute( EipUint16 attribute_id ) const
 {
     CipAttributes::const_iterator  it;
@@ -569,8 +686,6 @@ EipStatus GetAttributeSingle( CipInstance* instance,
     // Mask for filtering get-ability
     EipByte get_mask;
 
-    CipAttribute* attribute = instance->Attribute( request->request_path.attribute_number );
-
     EipByte* message = response->data;
 
     response->data_length = 0;
@@ -590,6 +705,8 @@ EipStatus GetAttributeSingle( CipInstance* instance,
         get_mask = kGetableSingle;
     }
 
+    CipAttribute* attribute = instance->Attribute( request->request_path.attribute_number );
+
     if( attribute )
     {
         if( attribute->attribute_flags & get_mask )
@@ -599,6 +716,7 @@ EipStatus GetAttributeSingle( CipInstance* instance,
 
             // create a reply message containing the data
 
+#if 0
             /* TODO think if it is better to put this code in an own
              * getAssemblyAttributeSingle functions which will call get attribute
              * single.
@@ -638,7 +756,42 @@ EipStatus GetAttributeSingle( CipInstance* instance,
                     response->general_status = kCipErrorSuccess;
                 }
             }
+#else
+            attribute->Get( request, response );
+#endif
         }
+    }
+
+    return kEipStatusOkSend;
+}
+
+
+EipStatus SetAttributeSingle( CipInstance* instance,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response )
+{
+    response->size_of_additional_status = 0;
+    response->data_length = 0;
+    response->reply_service = 0x80 | request->service;
+
+    CipAttribute* attribute = instance->Attribute( request->request_path.attribute_number );
+
+    if( attribute )
+    {
+        if( attribute->attribute_flags & kSetable )
+        {
+            OPENER_TRACE_INFO( "%s: attribute_id:%d calling Set()\n",
+                __func__, attribute->attribute_id );
+            return attribute->Set( request, response );
+        }
+
+        // it is an attribute we have, however this attribute is not setable
+        response->general_status = kCipErrorAttributeNotSetable;
+    }
+    else
+    {
+        // we don't have this attribute
+        response->general_status = kCipErrorAttributeNotSupported;
     }
 
     return kEipStatusOkSend;
@@ -862,6 +1015,19 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
         break;
 #endif
 
+#if 0
+    // has no notion of buffer overrun or memory ownership
+    case kCipByteArray:
+        {
+            OPENER_TRACE_INFO( " -> get attribute byte array\r\n" );
+            CipByteArray* byte_array = (CipByteArray*) data;
+            byte_array->length = GetIntFromMessage( message );
+            memcpy( byte_array->data, *message, cip_byte_array->length );
+            number_of_decoded_bytes = byte_array->length + 2;   // 2 byte length field
+        }
+        break;
+#endif
+
     case kCipString:
         {
             CipString* string = (CipString*) data;
@@ -906,12 +1072,14 @@ EipStatus GetAttributeAll( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipUint8* reply = response->data;
+    EipUint8* start = response->data;
 
+    /*
     if( instance->instance_id == 2 )
     {
         OPENER_TRACE_INFO( "GetAttributeAll: instance number 2\n" );
     }
+    */
 
     CipService* service = instance->owning_class->Service( kGetAttributeSingle );
 
@@ -921,7 +1089,8 @@ EipStatus GetAttributeAll( CipInstance* instance,
 
         if( !attributes.size() )
         {
-            response->data_length = 0;          // there are no attributes to be sent back
+            // there are no attributes to be sent back
+            response->data_length = 0;
             response->reply_service = 0x80 | request->service;
 
             response->general_status = kCipErrorServiceNotSupported;
@@ -929,19 +1098,23 @@ EipStatus GetAttributeAll( CipInstance* instance,
         }
         else
         {
-            for( unsigned j = 0; j < attributes.size();  ++j ) // for each instance attribute of this class
+            EipUint32 get_mask = instance->owning_class->get_attribute_all_mask;
+
+            for( CipInstance::CipAttributes::const_iterator it = attributes.begin();
+                    it != attributes.end(); ++it )
             {
-                int attrNum = attributes[j]->attribute_id;
+                int attribute_id = (*it)->Id();
 
                 // only return attributes that are flagged as being part of GetAttributeAll
-                if( attrNum < 32 && (instance->owning_class->get_attribute_all_mask & (1 << attrNum) ) )
+                if( attribute_id < 32 && (get_mask & (1 << attribute_id)) )
                 {
-                    request->request_path.attribute_number = attrNum;
+                    request->request_path.attribute_number = attribute_id;
 
-                    if( kEipStatusOkSend != service->service_function(
-                            instance, request, response ) )
+                    EipStatus result = service->service_function( instance, request, response );
+
+                    if( result != kEipStatusOkSend )
                     {
-                        response->data = reply;
+                        response->data = start;
                         return kEipStatusError;
                     }
 
@@ -949,8 +1122,8 @@ EipStatus GetAttributeAll( CipInstance* instance,
                 }
             }
 
-            response->data_length = response->data - reply;
-            response->data = reply;
+            response->data_length = response->data - start;
+            response->data = start;
         }
 
         return kEipStatusOkSend;

@@ -95,7 +95,7 @@ static EipStatus Reset( CipInstance* instance,
 
     eip_status = kEipStatusOkSend;
 
-    response->reply_service = (0x80 | request->service);
+    response->reply_service = 0x80 | request->service;
     response->size_of_additional_status = 0;
     response->general_status = kCipErrorSuccess;
 
@@ -154,15 +154,15 @@ static CipInstance* createIdentityInstance()
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
-    i->AttributeInsert( 1, kCipUint, &vendor_id_, kGetableSingleAndAll );
-    i->AttributeInsert( 2, kCipUint, &device_type_, kGetableSingleAndAll );
-    i->AttributeInsert( 3, kCipUint, &product_code_, kGetableSingleAndAll );
-    i->AttributeInsert( 4, kCipUsintUsint, &revision_, kGetableSingleAndAll );
+    i->AttributeInsert( 1, kCipUint, kGetableSingleAndAll, GetAttrData, NULL, &vendor_id_ );
+    i->AttributeInsert( 2, kCipUint, kGetableSingleAndAll, GetAttrData, NULL, &device_type_ );
+    i->AttributeInsert( 3, kCipUint, kGetableSingleAndAll, GetAttrData, NULL, &product_code_ );
+    i->AttributeInsert( 4, kCipUsintUsint, kGetableSingleAndAll, GetAttrData, NULL, &revision_ );
 
-    i->AttributeInsert( 5, kCipWord, &status_, kGetableSingleAndAll );
-    i->AttributeInsert( 6, kCipUdint, &serial_number_, kGetableSingleAndAll );
+    i->AttributeInsert( 5, kCipWord, kGetableSingleAndAll, GetAttrData, NULL, &status_ );
+    i->AttributeInsert( 6, kCipUdint, kGetableSingleAndAll, GetAttrData, NULL, &serial_number_ );
 
-    i->AttributeInsert( 7, kCipShortString, &product_name_, kGetableSingleAndAll );
+    i->AttributeInsert( 7, kCipShortString, kGetableSingleAndAll, GetAttrData, NULL, &product_name_ );
 
     return i;
 }

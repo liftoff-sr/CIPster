@@ -1,5 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
+ * Conversion to C++ is Copyright (C) 2016, SoftPLC Corportion.
  * All rights reserved.
  *
  ******************************************************************************/
@@ -23,20 +24,20 @@ CipDword configuration_control_ = 0;                //*< #3  This is a TCP/IP ob
 
 CipEpath physical_link_object_ =                    //*< #4
 {
-    2,                                              //*< EIP_UINT16 (UINT) PathSize in 16 Bit chunks
-    CIP_ETHERNETLINK_CLASS_CODE,                    //*< EIP_UINT16 ClassID
-    1,                                              //*< EIP_UINT16 InstanceNr
-    0                                               //*< EIP_UINT16 AttributNr (not used as this is the EPATH the EthernetLink object)
+    2,                               //*< EIP_UINT16 (UINT) PathSize in 16 Bit chunks
+    CIP_ETHERNETLINK_CLASS_CODE,     //*< EIP_UINT16 ClassID
+    1,                               //*< EIP_UINT16 InstanceNr
+    0                                //*< EIP_UINT16 AttributNr (not used as this is the EPATH the EthernetLink object)
 };
 
 CipTcpIpNetworkInterfaceConfiguration interface_configuration_ =    //*< #5 IP, network mask, gateway, name server 1 & 2, domain name
 {
-    0,                                                              // default IP address
-    0,                                                              // NetworkMask
-    0,                                                              // Gateway
-    0,                                                              // NameServer
-    0,                                                              // NameServer2
-    {                                                               // DomainName
+    0,                               // default IP address
+    0,                               // NetworkMask
+    0,                               // Gateway
+    0,                               // NameServer
+    0,                               // NameServer2
+    {                                // DomainName
         0, NULL,
     }
 };
@@ -64,237 +65,68 @@ MulticastAddressConfiguration g_multicast_configuration =
 };
 
 //************* Functions ***************************************
-EipStatus GetAttributeSingleTcpIpInterface( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response );
-
-EipStatus GetAttributeAllTcpIpInterface( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response );
-
-EipStatus ConfigureNetworkInterface( const char* ip_address,
-        const char* subnet_mask,
-        const char* gateway )
-{
-    interface_configuration_.ip_address = inet_addr( ip_address );
-    interface_configuration_.network_mask = inet_addr( subnet_mask );
-    interface_configuration_.gateway = inet_addr( gateway );
-
-    // calculate the CIP multicast address. The multicast address is calculated, not input
-    EipUint32 host_id = ntohl( interface_configuration_.ip_address )
-                        & ~ntohl( interface_configuration_.network_mask ); // see CIP spec 3-5.3 for multicast address algorithm
-    host_id -= 1;
-    host_id &= 0x3ff;
-
-    g_multicast_configuration.starting_multicast_address = htonl(
-            ntohl( inet_addr( "239.192.1.0" ) ) + (host_id << 5) );
-
-    return kEipStatusOk;
-}
 
 
-void ConfigureDomainName( const char* domain_name )
-{
-    if( NULL != interface_configuration_.domain_name.string )
-    {
-        /* if the string is already set to a value we have to free the resources
-         * before we can set the new value in order to avoid memory leaks.
-         */
-        CipFree( interface_configuration_.domain_name.string );
-    }
-
-    interface_configuration_.domain_name.length = strlen( domain_name );
-
-    if( interface_configuration_.domain_name.length )
-    {
-        interface_configuration_.domain_name.string = (EipByte*) CipCalloc(
-                interface_configuration_.domain_name.length + 1, sizeof(EipInt8) );
-        strcpy( (char*) interface_configuration_.domain_name.string, domain_name );
-    }
-    else
-    {
-        interface_configuration_.domain_name.string = NULL;
-    }
-}
-
-
-void ConfigureHostName( const char* hostname )
-{
-    if( NULL != hostname_.string )
-    {
-        /* if the string is already set to a value we have to free the resources
-         * before we can set the new value in order to avoid memory leaks.
-         */
-        CipFree( hostname_.string );
-    }
-
-    hostname_.length = strlen( hostname );
-
-    if( hostname_.length )
-    {
-        hostname_.string = (EipByte*) CipCalloc( hostname_.length + 1,
-                sizeof(EipByte) );
-        strcpy( (char*) hostname_.string, hostname );
-    }
-    else
-    {
-        hostname_.string = NULL;
-    }
-}
-
-
-EipStatus SetAttributeSingleTcp( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response )
-{
-    CipAttribute* attribute = GetCipAttribute(
-            instance, request->request_path.attribute_number );
-
-    (void) instance; //Suppress compiler warning
-
-    if( 0 != attribute )
-    {
-        // it is an attribute we currently support, however no attribute is setable
-        // TODO: if you like to have a device that can be configured via this CIP object add your code here
-        // TODO: check for flags associated with attributes
-        response->general_status = kCipErrorAttributeNotSetable;
-    }
-    else
-    {
-        // we don't have this attribute
-        response->general_status = kCipErrorAttributeNotSupported;
-    }
-
-    response->size_of_additional_status = 0;
-    response->data_length = 0;
-    response->reply_service = (0x80
-                                              | request->service);
-    return kEipStatusOkSend;
-}
-
-
-static CipInstance* createTcpIpInterfaceInstance()
-{
-    CipClass* clazz = GetCipClass( kCipTcpIpInterfaceClassCode );
-
-    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
-
-    i->AttributeInsert( 1, kCipDword, (void*) &tcp_status_, kGetableSingleAndAll );
-    i->AttributeInsert( 2, kCipDword, (void*) &configuration_capability_, kGetableSingleAndAll );
-
-    i->AttributeInsert( 3, kCipDword, (void*) &configuration_control_, kGetableSingleAndAll );
-
-    i->AttributeInsert( 4, kCipEpath, &physical_link_object_, kGetableSingleAndAll );
-
-    i->AttributeInsert( 5, kCipUdintUdintUdintUdintUdintString, &interface_configuration_, kGetableSingleAndAll );
-
-    i->AttributeInsert( 6, kCipString, (void*) &hostname_, kGetableSingleAndAll );
-
-    i->AttributeInsert( 8, kCipUsint, (void*) &g_time_to_live_value, kGetableSingleAndAll );
-
-    i->AttributeInsert( 9, kCipAny, (void*) &g_multicast_configuration, kGetableSingleAndAll );
-
-    return i;
-}
-
-
-EipStatus CipTcpIpInterfaceInit()
-{
-    if( !GetCipClass( kCipTcpIpInterfaceClassCode ) )
-    {
-
-        CipClass* clazz = new CipClass( kCipTcpIpInterfaceClassCode,
-              "TCP/IP interface",
-              0xffffffff,               // class getAttributeAll mask
-              0xffffffff,               // instance getAttributeAll mask
-              3                         // version
-              );
-
-        RegisterCipClass( clazz );
-
-        clazz->ServiceInsert( kGetAttributeSingle, &GetAttributeSingleTcpIpInterface, "GetAttributeSingleTCPIPInterface" );
-
-        clazz->ServiceInsert( kGetAttributeAll, &GetAttributeAllTcpIpInterface, "GetAttributeAllTCPIPInterface" );
-
-        clazz->ServiceInsert( kSetAttributeSingle, &SetAttributeSingleTcp, "SetAttributeSingle" );
-
-        clazz->InstanceInsert( createTcpIpInterfaceInstance() );
-    }
-
-    return kEipStatusOk;
-}
-
-
-void ShutdownTcpIpInterface( void )
-{
-    //Only free the resources if they are initialized
-    if( NULL != hostname_.string )
-    {
-        CipFree( hostname_.string );
-        hostname_.string = NULL;
-    }
-
-    if( NULL != interface_configuration_.domain_name.string )
-    {
-        CipFree( interface_configuration_.domain_name.string );
-        interface_configuration_.domain_name.string = NULL;
-    }
-}
-
-
-EipStatus GetAttributeSingleTcpIpInterface( CipInstance* instance,
+// Attribute 9 can not be easily handled with the default mechanism
+// therefore we will do here.
+static EipStatus get_multicast_config( CipAttribute* attribute,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
     EipStatus status = kEipStatusOkSend;
     EipByte* message = response->data;
 
-    if( 9 == request->request_path.attribute_number )
-    {
-        /*  attribute 9 can not be easily handled with the default mechanism
-         *   therefore we will do it by hand
-         */
-        response->data_length = 0;
-        response->reply_service = 0x80 | request->service;
+    response->data_length = 0;
+    response->reply_service = 0x80 | request->service;
 
-        response->general_status = kCipErrorSuccess;
-        response->size_of_additional_status = 0;
+    response->general_status = kCipErrorSuccess;
+    response->size_of_additional_status = 0;
 
-        response->data_length += EncodeData(
-                kCipUsint, &(g_multicast_configuration.alloc_control), &message );
+    response->data_length += EncodeData(
+            kCipUsint, &g_multicast_configuration.alloc_control, &message );
 
-        response->data_length += EncodeData(
-                kCipUsint, &(g_multicast_configuration.reserved_shall_be_zero),
-                &message );
+    response->data_length += EncodeData(
+            kCipUsint, &g_multicast_configuration.reserved_shall_be_zero,
+            &message );
 
-        response->data_length += EncodeData(
-                kCipUint,
-                &(g_multicast_configuration.number_of_allocated_multicast_addresses),
-                &message );
+    response->data_length += EncodeData(
+            kCipUint,
+            &g_multicast_configuration.number_of_allocated_multicast_addresses,
+            &message );
 
-        EipUint32 multicast_address = ntohl(
-                g_multicast_configuration.starting_multicast_address );
+    EipUint32 multicast_address = ntohl(
+            g_multicast_configuration.starting_multicast_address );
 
-        response->data_length += EncodeData( kCipUdint,
-                &multicast_address,
-                &message );
-    }
-    else
-    {
-        status = GetAttributeSingle( instance, request, response );
-        OPENER_TRACE_INFO( "%s: status:%d\n", __func__, status );
-    }
+    response->data_length += EncodeData( kCipUdint,
+            &multicast_address,
+            &message );
 
     return status;
 }
 
 
+static EipStatus get_attr_7( CipAttribute* attribute,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response )
+{
+    // insert 6 zeros for the required empty safety network number
+    // according to Table 5-4.15
+    memset( response->data, 0, 6 );
+    response->data_length += 6;
+
+    response->general_status = kCipErrorSuccess;
+
+    return kEipStatusOkSend;
+}
+
+
+#if 0
 EipStatus GetAttributeAllTcpIpInterface( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
     EipUint8*   start = response->data;       // snapshot initial
-    EipUint8    get_mask = instance->owning_class->get_attribute_all_mask;
+    EipUint32   get_mask = instance->owning_class->get_attribute_all_mask;
 
     const CipInstance::CipAttributes& attributes = instance->Attributes();
 
@@ -331,4 +163,144 @@ EipStatus GetAttributeAllTcpIpInterface( CipInstance* instance,
     response->data = start;
 
     return kEipStatusOkSend;
+}
+#endif
+
+
+EipStatus ConfigureNetworkInterface( const char* ip_address,
+        const char* subnet_mask,
+        const char* gateway )
+{
+    interface_configuration_.ip_address = inet_addr( ip_address );
+    interface_configuration_.network_mask = inet_addr( subnet_mask );
+    interface_configuration_.gateway = inet_addr( gateway );
+
+    // calculate the CIP multicast address. The multicast address is calculated, not input
+    EipUint32 host_id = ntohl( interface_configuration_.ip_address )
+                        & ~ntohl( interface_configuration_.network_mask ); // see CIP spec 3-5.3 for multicast address algorithm
+    host_id -= 1;
+    host_id &= 0x3ff;
+
+    g_multicast_configuration.starting_multicast_address = htonl(
+            ntohl( inet_addr( "239.192.1.0" ) ) + (host_id << 5) );
+
+    return kEipStatusOk;
+}
+
+
+void ConfigureDomainName( const char* domain_name )
+{
+    if( interface_configuration_.domain_name.string )
+    {
+        /* if the string is already set to a value we have to free the resources
+         * before we can set the new value in order to avoid memory leaks.
+         */
+        CipFree( interface_configuration_.domain_name.string );
+    }
+
+    interface_configuration_.domain_name.length = strlen( domain_name );
+
+    if( interface_configuration_.domain_name.length )
+    {
+        interface_configuration_.domain_name.string = (EipByte*) CipCalloc(
+                interface_configuration_.domain_name.length + 1, sizeof(EipInt8) );
+
+        strcpy( (char*) interface_configuration_.domain_name.string, domain_name );
+    }
+    else
+    {
+        interface_configuration_.domain_name.string = NULL;
+    }
+}
+
+
+void ConfigureHostName( const char* hostname )
+{
+    if( hostname_.string )
+    {
+        /* if the string is already set to a value we have to free the resources
+         * before we can set the new value in order to avoid memory leaks.
+         */
+        CipFree( hostname_.string );
+    }
+
+    hostname_.length = strlen( hostname );
+
+    if( hostname_.length )
+    {
+        hostname_.string = (EipByte*) CipCalloc( hostname_.length + 1,
+                sizeof(EipByte) );
+
+        strcpy( (char*) hostname_.string, hostname );
+    }
+    else
+    {
+        hostname_.string = NULL;
+    }
+}
+
+
+static CipInstance* createTcpIpInterfaceInstance()
+{
+    CipClass* clazz = GetCipClass( kCipTcpIpInterfaceClassCode );
+
+    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
+
+    i->AttributeInsert( 1, kCipDword, kGetableSingleAndAll, &tcp_status_ );
+    i->AttributeInsert( 2, kCipDword, kGetableSingleAndAll, &configuration_capability_ );
+
+    i->AttributeInsert( 3, kCipDword, kGetableSingleAndAll, &configuration_control_ );
+
+    i->AttributeInsert( 4, kCipEpath, kGetableSingleAndAll, &physical_link_object_ );
+
+    i->AttributeInsert( 5, kCipUdintUdintUdintUdintUdintString, kGetableSingleAndAll, &interface_configuration_ );
+
+    i->AttributeInsert( 6, kCipString, kGetableSingleAndAll, &hostname_ );
+
+    i->AttributeInsert( 7, kCipAny, kGetableSingleAndAll, get_attr_7, NULL );
+
+    // This is settable also, but volatile after setting.  To make it NV, supply
+    // a setter which calls SetAttrData() and then writes it to NV memory.
+    i->AttributeInsert( 8, kCipUsint, kSetAndGetAble, &g_time_to_live_value );
+
+    i->AttributeInsert( 9, kCipAny, kGetableSingleAndAll, get_multicast_config, NULL, &g_multicast_configuration );
+
+    return i;
+}
+
+
+EipStatus CipTcpIpInterfaceInit()
+{
+    if( !GetCipClass( kCipTcpIpInterfaceClassCode ) )
+    {
+        CipClass* clazz = new CipClass( kCipTcpIpInterfaceClassCode,
+              "TCP/IP interface",
+              0xffffffff,               // class getAttributeAll mask
+              0xffffffff,               // instance getAttributeAll mask
+              4                         // version
+              );
+
+        RegisterCipClass( clazz );
+
+        clazz->InstanceInsert( createTcpIpInterfaceInstance() );
+    }
+
+    return kEipStatusOk;
+}
+
+
+void ShutdownTcpIpInterface()
+{
+    //Only free the resources if they are initialized
+    if( hostname_.string )
+    {
+        CipFree( hostname_.string );
+        hostname_.string = NULL;
+    }
+
+    if( interface_configuration_.domain_name.string )
+    {
+        CipFree( interface_configuration_.domain_name.string );
+        interface_configuration_.domain_name.string = NULL;
+    }
 }

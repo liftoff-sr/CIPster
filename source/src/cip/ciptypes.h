@@ -178,6 +178,8 @@ enum CIPAttributeFlag           // TODO: Rework
     kGetableSingleAndAll = 0x03 ///< both single and all
 };
 
+
+
 enum IoConnectionEvent
 {
     kIoConnectionEventOpened,
@@ -185,14 +187,36 @@ enum IoConnectionEvent
     kIoConnectionEventClosed
 };
 
+
+#if 0
+typedef std::basic_string<EipByte>    ByteArrayBase;
+
 /** @brief CIP Byte Array
  *
  */
+class CipByteArray : public ByteArrayBase
+{
+    CipByteArray( EipUint16 aLength = 0, EipByte* aData = 0 ) :
+        ByteArrayBase( aData, aLength )
+    {
+    }
+
+    EipUint16       Length() const  { return size(); }
+    const EipByte*  Data() const    { return data(); }
+
+    // inherit all member funcs of ByteArrayBase.
+};
+
+#else
+
 struct CipByteArray
 {
     EipUint16   length;     ///< Length of the Byte Array
     EipByte*    data;       ///< Pointer to the data
 };
+
+#endif
+
 
 /** @brief CIP Short String
  *
@@ -203,6 +227,7 @@ struct CipShortString
     EipByte*    string;     ///< Pointer to the string data
 };
 
+
 /** @brief CIP String
  *
  */
@@ -211,6 +236,7 @@ struct CipString
     EipUint16   length;     ///< Length of the String (16 bit value)
     EipByte*    string;     ///< Pointer to the string data
 };
+
 
 /** @brief Struct for padded EPATHs
  *
@@ -251,6 +277,7 @@ struct CipKeyData
                                      *  Revision) Bit 7 = Compatibility */
     CipUsint    minor_revision;     ///< Minor Revision
 };
+
 
 struct CipRevision
 {
@@ -309,23 +336,32 @@ class CipClass;
 
 
 /** @ingroup CIP_API
- *  @typedef  EIP_STATUS (*AttributeFunc)( CipAttribute *,
+ * @typedef  EIP_STATUS (*AttributeFunc)( CipAttribute *,
  *    CipMessageRouterRequest*, CipMessageRouterResponse*)
  *
- *  @brief Signature definition for the implementation of CIP services.
+ * @brief Signature definition for the implementation of CIP services.
  *
- *  CIP services have to follow this signature in order to be handled correctly
- * by the stack.
- *  @param aAttribute which was referenced in the service request
- *  @param aRequest request data
- *  @param aResponse storage for the response data, including a buffer for
+ * @param aAttribute
+ * @param aRequest request data
+ * @param aResponse storage for the response data, including a buffer for
  *      extended data
- *  @return EIP_OK_SEND if service could be executed successfully and a response
- * should be sent
+ * @return EIP_OK_SEND if service could be executed successfully and a response
+ *  should be sent
  */
-typedef EipStatus (* AttributeFunc)( CipAttribute* aAttribute,
-        CipMessageRouterRequest* aRequest,
-        CipMessageRouterResponse* aResponse );
+typedef EipStatus (*AttributeFunc)( CipAttribute* aAttribute,
+            CipMessageRouterRequest* aRequest,
+            CipMessageRouterResponse* aResponse );
+
+// some standard getter functions, and you may add your own elsewhere also:
+EipStatus   GetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+EipStatus   GetAttrAssemblyData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+EipStatus   GetInstanceCount( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+EipStatus   GetAttrHighestId( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+
+// some standard setter functions, and you may add your own elsewhere also:
+EipStatus   SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+EipStatus   SetAttrAssemblyData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+
 
 /**
  * Class CipAttribute
@@ -337,19 +373,16 @@ class CipAttribute
 
 public:
     CipAttribute(
-            EipUint16 aAttributeId = 0,
-            EipUint8 aType = 0,
-            EipUint8 aFlags = 0,
-            void* aData = 0,
-            bool IOwnData = false
-            ) :
-        attribute_id( aAttributeId ),
-        type( aType ),
-        attribute_flags( aFlags ),
-        data( aData ),
-        own_data( IOwnData ),
-        owning_instance( 0 )
-    {}
+            EipUint16   aAttributeId,
+            EipUint8    aType,
+            EipUint8    aFlags,
+
+            // assign your getter and setter per attribute, either may be NULL
+            AttributeFunc aGetter,
+            AttributeFunc aSetter,
+
+            void*   aData
+            );
 
     virtual ~CipAttribute();
 
@@ -364,18 +397,52 @@ public:
                                                 all other values reserved
                                          */
 
-    void*       data;                   // no ownership of data unless own_data true.
+    void*       data;                   // no ownership of data
 
-    bool        own_data;               // Do I own data?
-                                        // If so, I must CipFree() it in destructor.
+    CipInstance* Instance() const   { return owning_instance; }
+
+    /**
+     * Function Get
+     * is an abstract function that calls the getter that was passed in to the constructor
+     * or a standard fallback behaviour.
+     */
+    EipStatus Get( CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+    {
+        if( getter )    // getter could be null, otherwise was established in attribute constructor
+            return getter( this, request, response );   // this is an override of standard GetAttrData()
+        else
+            return GetAttrData( this, request, response );
+    }
+
+    /**
+     * Function Set
+     * is an abstract function that calls the setter that was passed into the constructor
+     * or a standard fallback behaviour.
+     */
+    EipStatus Set( CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+    {
+        if( setter )    // setter could be null, otherwise was established in attribute constructor
+            return setter( this, request, response );   // an override of standard SetAttrData()
+        else
+            return SetAttrData( this, request, response );
+    }
 
 protected:
+
     CipInstance*    owning_instance;
 
-    EipStatus   GetAttribute( CipMessageRouterRequest* request, CipMessageRouterResponse* response );
-    EipStatus   GetHighestId( CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+    /**
+     * Function Pointer getter
+     * is fixed during construction to one of the getter functions.
+     */
+    const AttributeFunc   getter;
 
-} ;
+    /**
+     * Function Pointer setter
+     * is fixed during construction to one of the setter functions.
+     */
+    const AttributeFunc   setter;
+};
 
 
 /**
@@ -387,12 +454,7 @@ class CipInstance
 public:
     typedef std::vector<CipAttribute*>      CipAttributes;
 
-    CipInstance( EipUint32 aInstanceId ) :
-        instance_id( aInstanceId ),
-        owning_class( 0 ),           // NULL (not owned) until I am inserted into a CipClass
-        highest_inst_attr_id( 0 )
-    {
-    }
+    CipInstance( EipUint32 aInstanceId );
 
     virtual ~CipInstance();
 
@@ -407,15 +469,22 @@ public:
      *
      * @return bool - true if success, else false if failed.  Currently attributes
      *  may be overrridden, so any existing CipAttribute in this instance with the
-     *  same attribute_id will be delete in favour of this one.
+     *  same attribute_id will be deleted in favour of this one.
      */
     bool AttributeInsert( CipAttribute* aAttributes );
 
     CipAttribute* AttributeInsert( EipUint16 attribute_id,
-        EipUint8    cip_type,
-        void*       data,
-        EipByte     cip_flags,
-        bool        attr_owns_data = false
+        EipUint8        cip_type,
+        EipByte         cip_flags,
+        void*           data
+        );
+
+    CipAttribute* AttributeInsert( EipUint16 attribute_id,
+        EipUint8        cip_type,
+        EipByte         cip_flags,
+        AttributeFunc   aGetter,
+        AttributeFunc   aSetter,
+        void*           data = NULL
         );
 
     /**

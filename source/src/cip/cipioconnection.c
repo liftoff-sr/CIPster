@@ -608,8 +608,7 @@ EipUint16 HandleConfigData( CipClass* assembly_class,
         }
         else
         {
-            /* put the data on the configuration assembly object with the current
-             *  design this can be done rather efficiently */
+            // put the data into the configuration assembly object
             if( kEipStatusOk
                 != NotifyAssemblyConnectedDataReceived( config_instance,
                         g_config_data_buffer,
@@ -649,15 +648,20 @@ void CloseIoConnection( CipConn* conn )
             {
                 next_non_control_master_connection->socket[kUdpCommuncationDirectionProducing] =
                     conn->socket[kUdpCommuncationDirectionProducing];
+
                 memcpy( &(next_non_control_master_connection->remote_address),
                         &(conn->remote_address),
                         sizeof(next_non_control_master_connection->remote_address) );
+
                 next_non_control_master_connection->eip_level_sequence_count_producing =
                     conn->eip_level_sequence_count_producing;
+
                 next_non_control_master_connection->sequence_count_producing =
                     conn->sequence_count_producing;
+
                 conn->socket[kUdpCommuncationDirectionProducing] =
                     kEipInvalidSocket;
+
                 next_non_control_master_connection->transmission_trigger_timer =
                     conn->transmission_trigger_timer;
             }
@@ -683,8 +687,7 @@ void HandleIoConnectionTimeOut( CipConn* conn )
             kIoConnectionEventTimedOut );
 
     if( kRoutingTypeMulticastConnection
-        == (conn->t_to_o_network_connection_parameter
-            & kRoutingTypeMulticastConnection) )
+        == (conn->t_to_o_network_connection_parameter & kRoutingTypeMulticastConnection) )
     {
         switch( conn->instance_type )
         {

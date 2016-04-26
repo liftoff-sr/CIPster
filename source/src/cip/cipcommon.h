@@ -49,6 +49,12 @@ EipStatus GetAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response );
 
+
+EipStatus SetAttributeSingle( CipInstance* instance,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response );
+
+
 /** @brief Generic implementation of the GetAttributeAll CIP service
  *
  * Copy all attributes from Object into the global message buffer.

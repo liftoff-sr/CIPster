@@ -36,9 +36,9 @@ static CipInstance* createEthernetLinkInstance()
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
-    i->AttributeInsert( 1, kCipUdint,  &g_ethernet_link.interface_speed, kGetableSingleAndAll );
-    i->AttributeInsert( 2, kCipDword,  &g_ethernet_link.interface_flags, kGetableSingleAndAll );
-    i->AttributeInsert( 3, kCip6Usint, &g_ethernet_link.physical_address, kGetableSingleAndAll );
+    i->AttributeInsert( 1, kCipUdint,  kGetableSingleAndAll, GetAttrData, NULL, &g_ethernet_link.interface_speed );
+    i->AttributeInsert( 2, kCipDword,  kGetableSingleAndAll, GetAttrData, NULL, &g_ethernet_link.interface_flags );
+    i->AttributeInsert( 3, kCip6Usint, kGetableSingleAndAll, GetAttrData, NULL, &g_ethernet_link.physical_address );
 
     return i;
 }

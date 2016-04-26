@@ -38,7 +38,7 @@ public:
     }
 
     /** @brief Register a Class in the CIP class registry for the message router
-     *  @param cip_class Pointer to a class object to be registered.
+     *  @param aClass a class object to be registered, and to take ownership over.
      *  @return bool - true.. success
      *                 false.. class with conflicting class_id is already registered
      */

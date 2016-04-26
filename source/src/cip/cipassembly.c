@@ -22,15 +22,34 @@ EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
         CipMessageRouterResponse* response );
 
 
+
+static EipStatus getAttrAssemblyData( CipAttribute* attr,
+        CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+{
+    BeforeAssemblyDataSend( attr->Instance() );
+
+    return GetAttrData( attr, request, response );
+}
+
+
+static EipStatus setAttrAssemblyData( CipAttribute* attr,
+        CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+{
+    EipStatus sts = SetAttrData( attr, request, response );
+
+    // notify application that new data arrived
+    AfterAssemblyDataReceived( attr->Instance() );
+}
+
+
 EipStatus CipAssemblyInitialize()
 {
-    // may only register once.
     if( !GetCipClass( kCipAssemblyClassCode ) )
     {
         CipClass* clazz = new CipClass( kCipAssemblyClassCode,
                 "assembly",  // aClassName
-                0,           // assembly object should not have a get_attribute_all service
-                0,           // assembly object should not have a get_attribute_all service
+                0,           // assembly class should not have a get_attribute_all service
+                0,           // assembly instance should not have a get_attribute_all service
                 2            // aRevision, according to the CIP spec currently this has to be 2
                 );
 
@@ -42,6 +61,22 @@ EipStatus CipAssemblyInitialize()
     return kEipStatusOk;
 }
 
+/**
+ * Class AssemblyInstance
+ * is a CipInstance with an extra CipByteArray at the end.
+ * That byte array has no ownership of the low level array.
+ */
+class AssemblyInstance : public CipInstance
+{
+public:
+    AssemblyInstance( EipUint16 aInstanceId ) :
+        CipInstance( aInstanceId )
+    {
+    }
+
+    CipByteArray    byte_array;
+};
+
 
 CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
         EipUint16 data_length )
@@ -52,28 +87,21 @@ CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
 
     OPENER_TRACE_INFO( "%s: creating assembly instance_id %d\n", __func__, instance_id );
 
-    CipByteArray* byte_array = (CipByteArray*) CipCalloc( 1, sizeof(CipByteArray) );
-    if( !byte_array )
-    {
-        return NULL;    // TODO remove assembly instance in case of error
-    }
+    AssemblyInstance* i = new AssemblyInstance( instance_id );
 
-    byte_array->length = data_length;
-    byte_array->data   = data;
+    i->byte_array.length = data_length;
+    i->byte_array.data   = data;
 
-    CipInstance* instance = new CipInstance( instance_id );
-
-    // add true so ~CipAttribute() deletes the byte_array.
-    instance->AttributeInsert( 3, kCipByteArray, byte_array, kSetAndGetAble, true );
+    i->AttributeInsert( 3, kCipByteArray, kSetAndGetAble, getAttrAssemblyData, setAttrAssemblyData, &i->byte_array );
 
     // Attribute 4 Number of bytes in Attribute 3
-    instance->AttributeInsert( 4, kCipUint, &byte_array->length, kGetableSingle );
+    i->AttributeInsert( 4, kCipUint, kGetableSingle, &i->byte_array.length );
 
     // This is a public function, we don't expect caller to insert instance
     // into the class, do it here.
-    clazz->InstanceInsert( instance );
+    clazz->InstanceInsert( i );
 
-    return instance;
+    return i;
 }
 
 

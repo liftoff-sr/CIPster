@@ -165,24 +165,6 @@ CipClass* CreateCipClass( EipUint32 class_id,
         const char* class_name,
         EipUint16 class_revision );
 
-
-/** @ingroup CIP_API
- * @brief Insert an attribute in an instance of a CIP class
- *
- *  Note that attributes are stored in an array pointer in the instance
- *  the attributes array is not expandable if you insert an attributes that has
- *  already been defined, the previous attributes will be replaced
- *
- *  @param instance is a pointer to CIP class. (may be also instance 0)
- *  @param attribute_id is which attribute to be inserted.
- *  @param cip_data_type is the type of attribute to be inserted.
- *  @param cip_data is a pointer to data of attribute.
- *  @param cip_flags flags to indicate set-ability and get-ability of attribute.
- *  @return bool - true if attribute_id was unique, else false.
- */
-bool InsertAttribute( CipInstance* instance, EipUint16 attribute_id,
-        EipUint8 cip_data_type, void* cip_data, EipByte cip_flags );
-
 /** @ingroup CIP_API
  * @brief Insert a service into a #CipClass
  *
@@ -190,15 +172,19 @@ bool InsertAttribute( CipInstance* instance, EipUint16 attribute_id,
  *  the service array is not expandable if you insert a service that has
  *  already been defined, the previous service will be replaced
  *
- * @param cip_class_to_add_service pointer to CIP object. (may be also
- * instance# 0)
+ * @param aClass which CIP class to add service to
  * @param service_code service code of service to be inserted.
  * @param service_function pointer to function which represents the service.
  * @param service_name name of the service
  * @return CipService* - new service or NULL if service_code was not unique.
  */
-CipService* InsertService( CipClass* cip_class_to_add_service, EipUint8 service_code,
-        CipServiceFunction service_function, const char* service_name );
+inline CipService* InsertService( CipClass* aClass, EipUint8 service_id,
+        CipServiceFunction service_function, const char* service_name )
+{
+    return aClass->ServiceInsert( service_id, service_function, service_name );
+}
+
+
 
 /** @ingroup CIP_API
  * @brief Produce the data according to CIP encoding onto the message buffer.
