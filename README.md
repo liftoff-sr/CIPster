@@ -12,7 +12,7 @@ ODVA (http://www.odva.org).
 CIPster is a C++ port of C based OpENer with additional features. C++ is a
 higher level language than C so many things are made easier. Much credit goes to
 original authors of OpENer. Since that code was assigned to Rockwell Automation
-as a copyright holder, then this code has portions copyright to Rockwell as
+as a copyright holder, then this code has original portions copyright to Rockwell as
 well, with additional contributions owned by their respective contributors.
 
 
@@ -60,11 +60,11 @@ building the library is easy and the out of tree build directory can be anywhere
 
 $ mkdir /tmp/build
 $ cd /tmp/build
-$ cmake -DCIPster_PLATFORM=POSIX DCMAKE_BUILD_TYPE=Debug <path-to-CIPster>/source
+$ cmake -DCIPster_PLATFORM=POSIX DCMAKE_BUILD_TYPE=Debug &lt;path-to-CIPster&gt;/source
 
 You will get a warning about a missing USER_INCLUDE_DIR setting.  That needs
 to be a directory containing your modified open_user_conf.h file.  For this
-first build, we can set it to <path-to-CIPster>/examples/POSIX/sample_application .
+first build, we can set it to &lt;path-to-CIPster&gt;/examples/POSIX/sample_application .
 
 We can set this USER_INCLUDE_DIR after the CMakeCache.txt file is created
 using ccmake from package cmake-curses-gui.
@@ -78,7 +78,7 @@ Press c for configure and g for generate.
 Or you can delete the CMakeCache.txt file and simply add in the USER_INCLUDE_DIR
 setting on the command line:
 
-$ cmake -DUSER_INCLUDE_DIR=<path-to-CIPster>/examples/POSIX/sample_application -DCIPster_PLATFORM=POSIX -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster>/source
+$ cmake -DUSER_INCLUDE_DIR=&lt;path-to-CIPster&gt;/examples/POSIX/sample_application -DCIPster_PLATFORM=POSIX -DCMAKE_BUILD_TYPE=Debug &lt;path-to-CIPster&gt;/source
 
 $ make
 
