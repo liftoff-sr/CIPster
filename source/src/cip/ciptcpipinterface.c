@@ -274,7 +274,7 @@ EipStatus CipTcpIpInterfaceInit()
     if( !GetCipClass( kCipTcpIpInterfaceClassCode ) )
     {
         CipClass* clazz = new CipClass( kCipTcpIpInterfaceClassCode,
-              "TCP/IP interface",
+              "TCP/IP Interface",
               0xffffffff,               // class getAttributeAll mask
               0xffffffff,               // instance getAttributeAll mask
               4                         // version
@@ -291,7 +291,6 @@ EipStatus CipTcpIpInterfaceInit()
 
 void ShutdownTcpIpInterface()
 {
-    //Only free the resources if they are initialized
     if( hostname_.string )
     {
         CipFree( hostname_.string );

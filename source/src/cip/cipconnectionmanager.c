@@ -178,7 +178,7 @@ EipStatus ConnectionManagerInit( EipUint16 unique_connection_id )
     if( !GetCipClass( kCipConnectionManagerClassCode ) )
     {
         CipClass* clazz = new CipClass( kCipConnectionManagerClassCode,
-                "connection manager",       // class name
+                "Connection Manager",       // class name
                 0xC6,                       // class getAttributeAll mask
                 0xffffffff,                 // instance getAttributeAll mask
                 1                           // revision
@@ -1338,24 +1338,21 @@ void RemoveFromActiveConnections( CipConn* pa_pstConn )
 }
 
 
-EipBool8 IsConnectedOutputAssembly( EipUint32 pa_nInstanceNr )
+bool IsConnectedOutputAssembly( EipUint32 aInstanceId )
 {
-    EipBool8 bRetVal = false;
+    CipConn* conn = g_active_connection_list;
 
-    CipConn* pstRunner = g_active_connection_list;
-
-    while( NULL != pstRunner )
+    while( conn )
     {
-        if( pa_nInstanceNr == pstRunner->connection_path.connection_point[0] )
+        if( aInstanceId == conn->connection_path.connection_point[0] )
         {
-            bRetVal = true;
-            break;
+            return true;
         }
 
-        pstRunner = pstRunner->next_cip_conn;
+        conn = conn->next_cip_conn;
     }
 
-    return bRetVal;
+    return false;
 }
 
 

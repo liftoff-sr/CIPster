@@ -281,7 +281,7 @@ void CopyConnectionData( CipConn* destination, CipConn* source );
 void CloseConnection( CipConn* cip_conn );
 
 // TODO: Missing documentation
-EipBool8 IsConnectedOutputAssembly( EipUint32 instance_number );
+bool IsConnectedOutputAssembly( EipUint32 aInstanceId );
 
 /** @brief Generate the ConnectionIDs and set the general configuration
  * parameter in the given connection object.

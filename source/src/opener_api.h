@@ -513,12 +513,12 @@ EipStatus AfterAssemblyDataReceived( CipInstance* instance );
  * Within this function the user can update the data of the assembly object
  * before it gets sent. The application can inform the application if data has
  * changed.
- * @param instance instance of assembly object that should send data.
+ * @param aInstance is the assembly instance that should send data.
  * @return data has changed:
  *          - true assembly data has changed
  *          - false assembly data has not changed
  */
-EipBool8 BeforeAssemblyDataSend( CipInstance* instance );
+bool BeforeAssemblyDataSend( CipInstance* aInstance );
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Emulate as close a possible a power cycle of the device

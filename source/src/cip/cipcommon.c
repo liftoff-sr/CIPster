@@ -715,50 +715,7 @@ EipStatus GetAttributeSingle( CipInstance* instance,
                     __func__, request->request_path.attribute_number );
 
             // create a reply message containing the data
-
-#if 0
-            /* TODO think if it is better to put this code in an own
-             * getAssemblyAttributeSingle functions which will call get attribute
-             * single.
-             */
-
-            if( attribute->type == kCipByteArray
-                && instance->owning_class->class_id == kCipAssemblyClassCode )
-            {
-                OPENER_ASSERT( attribute->data );
-
-                OPENER_TRACE_INFO( " -> getAttributeSingle CIP_BYTE_ARRAY\r\n" );
-
-                // client asked for attribute which is a byte array of an assembly instance,
-                // give app a chance to update data before we send it.
-                BeforeAssemblyDataSend( instance );
-            }
-
-            if( attribute->data )
-            {
-                response->data_length = EncodeData( attribute->type,
-                        attribute->data,
-                        &message );
-
-                response->general_status = kCipErrorSuccess;
-            }
-            else if( instance->instance_id == 0 )   // instance is a CipClass
-            {
-                if( attribute->attribute_id == 3 )
-                {
-                    CipClass* clazz = dynamic_cast<CipClass*>( instance );
-                    EipUint16 instance_count = clazz->Instances().size();
-
-                    response->data_length = EncodeData( attribute->type,
-                            &instance_count,
-                            &message );
-
-                    response->general_status = kCipErrorSuccess;
-                }
-            }
-#else
             attribute->Get( request, response );
-#endif
         }
     }
 
@@ -782,6 +739,9 @@ EipStatus SetAttributeSingle( CipInstance* instance,
         {
             OPENER_TRACE_INFO( "%s: attribute_id:%d calling Set()\n",
                 __func__, attribute->attribute_id );
+
+            // Set() is very "attribute specific" and is determined by which
+            // AttributeFunc is installed into the attribute, if any.
             return attribute->Set( request, response );
         }
 
@@ -944,8 +904,10 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
 
     case kCipByteArray:
         {
-            OPENER_TRACE_INFO( " -> get attribute byte array\r\n" );
+            OPENER_TRACE_INFO( "%s: CipByteArray\n", __func__ );
             CipByteArray* cip_byte_array = (CipByteArray*) data;
+
+            // the array length is not encoded for CipByteArray.
             memcpy( *message, cip_byte_array->data, cip_byte_array->length );
             *message += cip_byte_array->length;
             counter = cip_byte_array->length;
@@ -1015,18 +977,19 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
         break;
 #endif
 
-#if 0
-    // has no notion of buffer overrun or memory ownership
     case kCipByteArray:
+        // this code has no notion of buffer overrun protection or memory ownership, be careful.
         {
-            OPENER_TRACE_INFO( " -> get attribute byte array\r\n" );
+            OPENER_TRACE_INFO( "%s: kCipByteArray\n", __func__ );
+
+            // The CipByteArray's length must be set by caller, i.e. known
+            // in advance and set in advance by caller.  And the data field
+            // must point to a buffer large enough for this.
             CipByteArray* byte_array = (CipByteArray*) data;
-            byte_array->length = GetIntFromMessage( message );
-            memcpy( byte_array->data, *message, cip_byte_array->length );
-            number_of_decoded_bytes = byte_array->length + 2;   // 2 byte length field
+            memcpy( byte_array->data, *message, byte_array->length );
+            number_of_decoded_bytes = byte_array->length;   // no length field
         }
         break;
-#endif
 
     case kCipString:
         {
@@ -1035,7 +998,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
             memcpy( string->string, *message, string->length );
             *message += string->length;
 
-            number_of_decoded_bytes = string->length + 2; // we have a two byte length field
+            number_of_decoded_bytes = string->length + 2; // 2 byte length field
 
             if( number_of_decoded_bytes & 1 )
             {

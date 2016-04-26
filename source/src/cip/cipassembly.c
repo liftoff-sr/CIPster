@@ -13,32 +13,73 @@
 #include "trace.h"
 #include "cipconnectionmanager.h"
 
-/** @brief Implementation of the SetAttributeSingle CIP service for Assembly
- *          Objects.
- *  Currently only supports Attribute 3 (CIP_BYTE_ARRAY) of an Assembly
- */
-EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response );
 
-
+// getter and setter of type AssemblyFunc, specific to this CIP class called "Assembly"
 
 static EipStatus getAttrAssemblyData( CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    BeforeAssemblyDataSend( attr->Instance() );
+    if( attr->data )
+    {
+        BeforeAssemblyDataSend( attr->Instance() );
 
-    return GetAttrData( attr, request, response );
+        return GetAttrData( attr, request, response );
+    }
 }
 
 
 static EipStatus setAttrAssemblyData( CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    EipStatus sts = SetAttrData( attr, request, response );
+    if( attr->data )
+    {
+        CipByteArray*      byte_array = (CipByteArray*) attr->data;
+        CipInstance*    instance = attr->Instance();
 
-    // notify application that new data arrived
-    AfterAssemblyDataReceived( attr->Instance() );
+        if( IsConnectedOutputAssembly( instance->instance_id ) )
+        {
+            OPENER_TRACE_WARN( "%s: received data for connected output assembly\n", __func__ );
+            response->general_status = kCipErrorAttributeNotSetable;
+        }
+        else if( request->data_length < byte_array->length )
+        {
+            OPENER_TRACE_INFO( "%s: not enough data received.\n", __func__ );
+            response->general_status = kCipErrorNotEnoughData;
+        }
+        else if( request->data_length > byte_array->length )
+        {
+            OPENER_TRACE_INFO( "%s: too much data received.\n", __func__ );
+            response->general_status = kCipErrorTooMuchData;
+        }
+        else
+        {
+            memcpy( byte_array->data, request->data, byte_array->length );
+
+            if( AfterAssemblyDataReceived( instance ) != kEipStatusOk )
+            {
+                /* punt early without updating the status... though I don't know
+                 * how much this helps us here, as the attribute's data has already
+                 * been overwritten.
+                 *
+                 * however this is the task of the application side which will
+                 * take the data. In addition we have to inform the sender that the
+                 * data was not ok.
+                 */
+                response->general_status = kCipErrorInvalidAttributeValue;
+            }
+            else
+            {
+                response->general_status = kCipErrorSuccess;
+            }
+        }
+    }
+    else
+    {
+        // attr->data was zero; this is a heartbeat assembly
+        response->general_status = kCipErrorTooMuchData;
+    }
+
+    return kEipStatusOkSend;
 }
 
 
@@ -47,24 +88,25 @@ EipStatus CipAssemblyInitialize()
     if( !GetCipClass( kCipAssemblyClassCode ) )
     {
         CipClass* clazz = new CipClass( kCipAssemblyClassCode,
-                "assembly",  // aClassName
+                "Assembly",  // aClassName
                 0,           // assembly class should not have a get_attribute_all service
                 0,           // assembly instance should not have a get_attribute_all service
                 2            // aRevision, according to the CIP spec currently this has to be 2
                 );
 
         RegisterCipClass( clazz );
-
-        clazz->ServiceInsert( kSetAttributeSingle, &SetAssemblyAttributeSingle, "SetAssemblyAttributeSingle" );
     }
 
     return kEipStatusOk;
 }
 
+
 /**
  * Class AssemblyInstance
- * is a CipInstance with an extra CipByteArray at the end.
- * That byte array has no ownership of the low level array.
+ * is extended from CipInstance with an extra CipByteArray at the end.
+ * That byte array has no ownership of the low level array, which for an
+ * assembly is owned by the application program and passed into
+ * CreateAssemblyObject().
  */
 class AssemblyInstance : public CipInstance
 {
@@ -83,7 +125,7 @@ CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
 {
     CipClass* clazz = GetCipClass( kCipAssemblyClassCode );
 
-    OPENER_ASSERT( clazz );     // Stack startup should call CipAssemblyInitialize()
+    OPENER_ASSERT( clazz ); // Stack startup should have called CipAssemblyInitialize()
 
     OPENER_TRACE_INFO( "%s: creating assembly instance_id %d\n", __func__, instance_id );
 
@@ -92,13 +134,14 @@ CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
     i->byte_array.length = data_length;
     i->byte_array.data   = data;
 
+    // Attribute 3 is the byte array transfer of the assembly data itself
     i->AttributeInsert( 3, kCipByteArray, kSetAndGetAble, getAttrAssemblyData, setAttrAssemblyData, &i->byte_array );
 
     // Attribute 4 Number of bytes in Attribute 3
     i->AttributeInsert( 4, kCipUint, kGetableSingle, &i->byte_array.length );
 
-    // This is a public function, we don't expect caller to insert instance
-    // into the class, do it here.
+    // This is a public function, we should not expect caller to insert this
+    // instance its proper public CIP class "Assembly", so do it here.
     clazz->InstanceInsert( i );
 
     return i;
@@ -122,7 +165,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
 
     if( byte_array->length != data_length )
     {
-        OPENER_TRACE_ERR( "wrong amount of data arrived for assembly object\n" );
+        OPENER_TRACE_ERR( "%s: wrong amount of data arrived for assembly object\n", __func__ );
         return kEipStatusError;
 
         // TODO question should we notify the application that
@@ -137,92 +180,3 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
     return AfterAssemblyDataReceived( instance );
 }
 
-
-EipStatus SetAssemblyAttributeSingle( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response )
-{
-    OPENER_TRACE_INFO( "%s: setAttribute %d on assembly instance %d\n",
-            __func__,
-            request->request_path.attribute_number,
-            instance->instance_id
-            );
-
-    EipUint8* router_request_data = request->data;
-
-    response->data_length = 0;
-    response->reply_service = 0x80 | request->service;
-    response->general_status = kCipErrorAttributeNotSupported;
-    response->size_of_additional_status = 0;
-
-    CipAttribute*  attribute = instance->Attribute( request->request_path.attribute_number );
-
-    if( attribute  &&  3 == request->request_path.attribute_number )
-    {
-        OPENER_TRACE_INFO( "%s: attr3\n" );
-
-        if( attribute->data )
-        {
-            CipByteArray* byte_array = (CipByteArray*) attribute->data;
-
-            // TODO: check for ATTRIBUTE_SET/GETABLE MASK
-            if( IsConnectedOutputAssembly( instance->instance_id ) )
-            {
-                OPENER_TRACE_WARN(
-                        "Assembly AssemblyAttributeSingle: received data for connected output assembly\n\r" );
-                response->general_status = kCipErrorAttributeNotSetable;
-            }
-            else
-            {
-                if( request->data_length < byte_array->length )
-                {
-                    OPENER_TRACE_INFO(
-                            "Assembly setAssemblyAttributeSingle: not enough data received.\r\n" );
-                    response->general_status = kCipErrorNotEnoughData;
-                }
-                else
-                {
-                    if( request->data_length > byte_array->length )
-                    {
-                        OPENER_TRACE_INFO(
-                                "Assembly setAssemblyAttributeSingle: too much data received.\r\n" );
-                        response->general_status = kCipErrorTooMuchData;
-                    }
-                    else
-                    {
-                        memcpy( byte_array->data, router_request_data, byte_array->length );
-
-                        if( AfterAssemblyDataReceived( instance ) != kEipStatusOk )
-                        {
-                            /* punt early without updating the status... though I don't know
-                             * how much this helps us here, as the attribute's data has already
-                             * been overwritten.
-                             *
-                             * however this is the task of the application side which will
-                             * take the data. In addition we have to inform the sender that the
-                             * data was not ok.
-                             */
-                            response->general_status = kCipErrorInvalidAttributeValue;
-                        }
-                        else
-                        {
-                            response->general_status = kCipErrorSuccess;
-                        }
-                    }
-                }
-            }
-        }
-        else
-        {
-            // the attribute was zero we are a heartbeat assembly
-            response->general_status = kCipErrorTooMuchData;
-        }
-    }
-
-    else if( attribute && 4 == request->request_path.attribute_number )
-    {
-        response->general_status = kCipErrorAttributeNotSetable;
-    }
-
-    return kEipStatusOkSend;
-}

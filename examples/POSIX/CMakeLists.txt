@@ -1,34 +1,75 @@
-add_subdirectory(sample_application)
 
-set( PLATFORM_SPEC_SRC networkhandler.c)
+project( "OpENER on Linux" )
 
-#######################################
-# Add common includes                 #
-#######################################
-opener_common_includes()
 
-#######################################
-# Add platform-specific includes      #
-#######################################
-opener_platform_support("INCLUDES")
+include(ExternalProject)
 
-set( PLATFORMLIBNAME ${OpENer_PLATFORM}PLATFORM )
+cmake_minimum_required(VERSION 2.8.0 FATAL_ERROR)
 
-add_library( ${PLATFORMLIBNAME} OBJECT
-    ${PLATFORM_SPEC_SRC}
+
+set( OPENER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../ )
+
+set( USER_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/sample_application )
+
+if( CMAKE_BUILD_TYPE STREQUAL Debug )
+    add_definitions( -DOPENER_WITH_TRACES -DOPENER_TRACE_LEVEL=15 )
+    set( TRACE_SPEC "-DOpENer_TRACES=ON" )
+endif()
+
+add_definitions( -std=c++0x )
+
+# PREFIX is for ExternalProject_Add, and tells where to build OpENer as a sub project:
+# below our current out of tree build directory.
+set( PREFIX ${CMAKE_CURRENT_BINARY_DIR}/build-OpENer )
+
+# build OpENer as a nested project, the result of which is libeip.a
+# in directory ${PREFIX}
+ExternalProject_Add( eip
+    PREFIX ${PREFIX}
+    SOURCE_DIR ${OPENER_DIR}/source
+    CONFIGURE_COMMAND
+        ${CMAKE_COMMAND}
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        -DCMAKE_INSTALL_PREFIX=${PREFIX}
+        -DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}
+        -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
+        -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+        -DUSER_INCLUDE_DIR=${USER_INCLUDE_DIR}
+        -DOpENer_PLATFORM=POSIX
+        ${TRACE_SPEC}       # empty for non Debug CMAKE_BUILD_TYPE
+        <SOURCE_DIR>
+    BUILD_COMMAND make
+
+    INSTALL_COMMAND make install
     )
 
-add_executable( OpENer
-    main.c
+#message( "TRACE_SPEC=${TRACE_SPEC}" )
+
+
+# These variables would typically be found by a CMake find EIP module, but set
+# them manually here
+set( EIP_INCLUDE_DIR ${OPENER_DIR}/source/src )
+set( EIP_LIBRARIES   ${PREFIX}/libeip.a )
+
+include_directories(
+    .
+    ${EIP_INCLUDE_DIR}
+    ${USER_INCLUDE_DIR}
     )
-target_link_libraries( OpENer
-    ${PLATFORMLIBNAME}
-    CIP
-    SAMPLE_APP
-    ENET_ENCAP
-    ${PLATFORM_SPEC_LIBS}
-    ${OpENer_ADD_CIP_OBJECTS}
+
+set( PGM sample )     # name of program
+
+set( PGM_SRCS
+    main.cc
+    networkhandler.cc
+    sample_application/sampleapplication.cc
     )
-set_target_properties( OpENer PROPERTIES
-    ENABLE_EXPORTS  1
+
+add_executable( ${PGM}
+    ${PGM_SRCS}
     )
+target_link_libraries( ${PGM}
+    ${EIP_LIBRARIES}
+    )
+add_dependencies( ${PGM} eip )
+

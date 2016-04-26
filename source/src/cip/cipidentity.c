@@ -177,7 +177,7 @@ EipStatus CipIdentityInit()
     if( !GetCipClass( kIdentityClassCode ) )
     {
         CipClass* clazz = new CipClass( kIdentityClassCode,
-                "identity",                     // class name
+                "Identity",                     // class name
                 MASK4( 1, 2, 6, 7 ),            // class getAttributeAll mask		CIP spec 5-2.3.2
                 MASK7( 1, 2, 3, 4, 5, 6, 7 ),   // instance getAttributeAll mask	CIP spec 5-2.3.2
                 1                               // class revision

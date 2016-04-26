@@ -123,7 +123,7 @@ EipStatus CipMessageRouterInit()
     if( !GetCipClass( kCipMessageRouterClassCode ) )
     {
         CipClass* clazz = new CipClass( kCipMessageRouterClassCode,
-                "message router",  // class name
+                "Message Router",  // class name
                 0xffffffff,        // class getAttributeAll mask
                 0xffffffff,        // instance getAttributeAll mask
                 1                  // revision

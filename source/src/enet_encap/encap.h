@@ -27,7 +27,7 @@ static const int kOpenerEthernetPort = 0xAF12;
  * All other codes are either legacy codes, or reserved for future use
  *
  */
-typedef enum
+enum EncapsulationProtocolErrorCode
 {
     kEncapsulationProtocolSuccess = 0x0000,
     kEncapsulationProtocolInvalidCommand = 0x0001,
@@ -36,11 +36,11 @@ typedef enum
     kEncapsulationProtocolInvalidSessionHandle = 0x0064,
     kEncapsulationProtocolInvalidLength = 0x0065,
     kEncapsulationProtocolUnsupportedProtocol = 0x0069
-} EncapsulationProtocolErrorCode;
+};
 
 
 //** structs **
-typedef struct encapsulation_data
+struct  EncapsulationData
 {
     CipUint     command_code;
     CipUint     data_length;
@@ -50,17 +50,17 @@ typedef struct encapsulation_data
     CipUdint    options;
     EipUint8*   buf_start;              ///< Pointer to the communication buffer used for this message
     EipUint8*   buf_pos;                ///< The current position in the communication buffer during the decoding process
-} EncapsulationData;
+};
 
 
-typedef struct encapsulation_interface_information
+struct  EncapsulationInterfaceInformation
 {
     EipUint16   type_code;
     EipUint16   length;
     EipUint16   encapsulation_protocol_version;
     EipUint16   capability_flags;
     EipInt8     name_of_service[16];
-} EncapsulationInterfaceInformation;
+};
 
 //** global variables (public) **
 
@@ -68,14 +68,14 @@ typedef struct encapsulation_interface_information
 /** @ingroup ENCAP
  * @brief Initialize the encapsulation layer.
  */
-void EncapsulationInit( void );
+void EncapsulationInit();
 
 /** @ingroup ENCAP
  * @brief Shutdown the encapsulation layer.
  *
  * This means that all open sessions including their sockets are closed.
  */
-void EncapsulationShutDown( void );
+void EncapsulationShutDown();
 
 /** @ingroup ENCAP
  * @brief Handle delayed encapsulation message responses
@@ -84,6 +84,6 @@ void EncapsulationShutDown( void );
  * message. This functions checks if messages need to be sent and performs the
  * sending.
  */
-void ManageEncapsulationMessages( void );
+void ManageEncapsulationMessages();
 
 #endif // OPENER_ENCAP_H_
