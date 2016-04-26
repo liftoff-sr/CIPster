@@ -174,7 +174,7 @@ int EncapsulateIpAddress( EipUint16 port, EipUint32 address,
 {
     int size = 0;
 
-    if( kOpENerEndianessLittle == g_opener_platform_endianess )
+    if( kCIPsterEndianessLittle == g_opener_platform_endianess )
     {
         size += AddIntToMessage( htons( AF_INET ), communication_buffer );
         size += AddIntToMessage( port, communication_buffer );
@@ -182,7 +182,7 @@ int EncapsulateIpAddress( EipUint16 port, EipUint32 address,
     }
     else
     {
-        if( kOpENerEndianessBig == g_opener_platform_endianess )
+        if( kCIPsterEndianessBig == g_opener_platform_endianess )
         {
             (*communication_buffer)[0]  = (unsigned char) (AF_INET >> 8);
             (*communication_buffer)[1]  = (unsigned char) AF_INET;
@@ -214,9 +214,9 @@ int EncapsulateIpAddress( EipUint16 port, EipUint32 address,
 
 
 /**
- * @brief Detects Endianess of the platform and sets global g_nOpENerPlatformEndianess variable accordingly
+ * @brief Detects Endianess of the platform and sets global g_nCIPsterPlatformEndianess variable accordingly
  *
- * Detects Endianess of the platform and sets global variable g_nOpENerPlatformEndianess accordingly,
+ * Detects Endianess of the platform and sets global variable g_nCIPsterPlatformEndianess accordingly,
  * whereas 0 equals little endian and 1 equals big endian
  */
 void DetermineEndianess()
@@ -226,17 +226,17 @@ void DetermineEndianess()
 
     if( p[0] == 1 )
     {
-        g_opener_platform_endianess = kOpENerEndianessLittle;
+        g_opener_platform_endianess = kCIPsterEndianessLittle;
     }
     else
     {
-        g_opener_platform_endianess = kOpENerEndianessBig;
+        g_opener_platform_endianess = kCIPsterEndianessBig;
     }
 }
 
 
 /**
- * @brief Returns global variable g_nOpENerPlatformEndianess, whereas 0 equals little endian and 1 equals big endian
+ * @brief Returns global variable g_nCIPsterPlatformEndianess, whereas 0 equals little endian and 1 equals big endian
  *
  * @return 0 equals little endian and 1 equals big endian
  */

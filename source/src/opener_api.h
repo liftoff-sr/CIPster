@@ -18,15 +18,15 @@
 #include "cip/ciperror.h"
 #include "opener_user_conf.h"
 
-/**  @defgroup CIP_API OpENer User interface
- * @brief This is the public interface of the OpENer. It provides all function
+/**  @defgroup CIP_API CIPster User interface
+ * @brief This is the public interface of the CIPster. It provides all function
  * needed to implement an EtherNet/IP enabled slave-device.
  */
 
 /** @ingroup CIP_API
  * @brief Configure the data of the network interface of the device
  *
- *  This function setup the data of the network interface needed by OpENer.
+ *  This function setup the data of the network interface needed by CIPster.
  *  The multicast address is automatically calculated from he given data.
  *
  *  @param ip_address    the current IP address of the device
@@ -443,10 +443,10 @@ EipStatus TriggerConnections( unsigned output_assembly_id,
  */
 void CloseSession( int socket );
 
-/**  @defgroup CIP_CALLBACK_API Callback Functions Demanded by OpENer
+/**  @defgroup CIP_CALLBACK_API Callback Functions Demanded by CIPster
  * @ingroup CIP_API
  *
- * @brief These functions have to implemented in order to give the OpENer a
+ * @brief These functions have to implemented in order to give the CIPster a
  * method to inform the application on certain state changes.
  */
 
@@ -559,7 +559,7 @@ static inline void CipFree( void* pa_poData )
  * @brief Allocate memory for the CIP stack
  *
  * emulate the common c-library function calloc
- * In OpENer allocation only happens on application startup and on
+ * In CIPster allocation only happens on application startup and on
  * class/instance creation and configuration not on during operation
  * (processing messages).
  * @param number_of_elements number of elements to allocate
@@ -569,7 +569,7 @@ static inline void CipFree( void* pa_poData )
 void* CipCalloc( unsigned number_of_elements, unsigned size_of_element );
 
 /** @ingroup CIP_CALLBACK_API
- * @brief Free memory allocated by the OpENer
+ * @brief Free memory allocated by the CIPster
  *
  * emulate the common c-library function free
  * @param pa_poData pointer to the allocated memory
@@ -594,7 +594,7 @@ void RunIdleChanged( EipUint32 run_idle_value );
  * @param communication_direction PRODCUER or CONSUMER
  * @param socket_data pointer to the address holding structure
  *     Attention: For producing point-to-point connection the
- *     *pa_pstAddr->sin_addr.s_addr member is set to 0 by OpENer. The network
+ *     *pa_pstAddr->sin_addr.s_addr member is set to 0 by CIPster. The network
  *     layer of the application has to set the correct address of the
  *     originator.
  *     Attention: For consuming connection the network layer has to set the
@@ -631,7 +631,7 @@ void    IApp_CloseSocket_udp( int socket_handle );
 void    IApp_CloseSocket_tcp( int socket_handle );
 
 
-/** @mainpage OpENer - Open Source EtherNet/IP(TM) Communication Stack
+/** @mainpage CIPster - Open Source EtherNet/IP(TM) Communication Stack
  * Documentation
  *
  * EtherNet/IP stack for adapter devices (connection target); supports multiple
@@ -644,10 +644,10 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  * This is the introduction.
  *
  * @section install_sec Building
- * How to compile, install and run OpENer on a specific platform.
+ * How to compile, install and run CIPster on a specific platform.
  *
  * @subsection build_req_sec Requirements
- * OpENer has been developed to be highly portable. The default version targets
+ * CIPster has been developed to be highly portable. The default version targets
  * PCs with a POSIX operating system and a BSD-socket network interface. To
  * test this version we recommend a Linux PC or Windows with Cygwin installed.
  *  You will need to have the following installed:
@@ -657,8 +657,8 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  * and are part of the development packages of Cygwin.
  *
  * For the development itself we recommend the use of Eclipse with the CDT
- * plugin. For your convenience OpENer already comes with an Eclipse project
- * file. This allows to just import the OpENer source tree into Eclipse.
+ * plugin. For your convenience CIPster already comes with an Eclipse project
+ * file. This allows to just import the CIPster source tree into Eclipse.
  *
  * @subsection compile_pcs_sec Compile for PCs
  *   -# Directly in the shell
@@ -683,7 +683,7 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  *   - @ref extending
  *   - @ref license
  *
- * @page porting Porting OpENer
+ * @page porting Porting CIPster
  * @section gen_config_section General Stack Configuration
  * The general stack properties have to be defined prior to building your
  * production. This is done by providing a file called opener_user_conf.h. An
@@ -697,7 +697,7 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  * During startup of your EtherNet/IP(TM) device the following steps have to be
  * performed:
  *   -# Configure the network properties:\n
- *       With the following functions the network interface of OpENer is
+ *       With the following functions the network interface of CIPster is
  *       configured:
  *        - EIP_STATUS ConfigureNetworkInterface(const char *ip_address,
  *        const char *subnet_mask, const char *gateway_address)
@@ -714,7 +714,7 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  *      each of its devices has a unique 32Bit device id. You can set it with
  *      the function:
  *       - void setDeviceSerialNumber(EIP_UINT32 serial_number)
- *   -# Initialize OpENer: \n
+ *   -# Initialize CIPster: \n
  *      With the function CipStackInit(EIP_UINT16 unique_connection_id) the
  *      internal data structures of opener are correctly setup. After this
  *      step own CIP objects and Assembly objects instances may be created. For
@@ -752,7 +752,7 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  *     be sent is in the given buffer pa_buf.
  *   - Create UDP sending and receiving sockets for implicit connected
  * messages\n
- *     OpENer will use to call-back function int CreateUdpSocket(
+ *     CIPster will use to call-back function int CreateUdpSocket(
  *     UdpCommuncationDirection connection_direction,
  *     struct sockaddr_in *pa_pstAddr)
  *     for informing the platform specific code that a new connection is
@@ -762,30 +762,30 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  *     with the function EIP_STATUS HandleReceivedConnectedData(EIP_UINT8
  * *data, int data_length)
  *   - Close UDP and TCP sockets:
- *      -# Requested by OpENer through the call back function: void
+ *      -# Requested by CIPster through the call back function: void
  * CloseSocket(int socket_handle)
- *      -# For TCP connection when the peer closed the connection OpENer needs
+ *      -# For TCP connection when the peer closed the connection CIPster needs
  *         to be informed to clean up internal data structures. This is done
  * with
  *         the function void CloseSession(int socket_handle).
  *      .
  *   - Cyclically update the connection status:\n
- *     In order that OpENer can determine when to produce new data on
+ *     In order that CIPster can determine when to produce new data on
  *     connections or that a connection timed out every @ref OPENER_TIMER_TICK
  * milliseconds the
  *     function EIP_STATUS ManageConnections(void) has to be called.
  *
  * @section callback_funcs_sec Callback Functions
- * In order to make OpENer more platform independent and in order to inform the
+ * In order to make CIPster more platform independent and in order to inform the
  * application on certain state changes and actions within the stack a set of
  * call-back functions is provided. These call-back functions are declared in
  * the file opener_api.h and have to be implemented by the application specific
- * code. An overview and explanation of OpENer's call-back API may be found in
+ * code. An overview and explanation of CIPster's call-back API may be found in
  * the module @ref CIP_CALLBACK_API.
  *
- * @page extending Extending OpENer
- * OpENer provides an API for adding own CIP objects and instances with
- * specific services and attributes. Therefore OpENer can be easily adapted to
+ * @page extending Extending CIPster
+ * CIPster provides an API for adding own CIP objects and instances with
+ * specific services and attributes. Therefore CIPster can be easily adapted to
  * support different device profiles and specific CIP objects needed for your
  * device. The functions to be used are:
  *   - S_CIP_Class *CreateCIPClass(EIP_UINT32 class_id, int
@@ -802,10 +802,10 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  *   - void InsertService(S_CIP_Class *class, EIP_UINT8 service_number,
  * CipServiceFunction service_function, char *service_name);
  *
- * @page license OpENer Open Source License
- * The OpENer Open Source License is an adapted BSD style license. The
+ * @page license CIPster Open Source License
+ * The CIPster Open Source License is an adapted BSD style license. The
  * adaptations include the use of the term EtherNet/IP(TM) and the necessary
- * guarding conditions for using OpENer in own products. For this please look
+ * guarding conditions for using CIPster in own products. For this please look
  * in license text as shown below:
  *
  * @include "license.txt"

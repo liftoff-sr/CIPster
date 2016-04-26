@@ -13,16 +13,16 @@ set( USER_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/sample_application )
 
 if( CMAKE_BUILD_TYPE STREQUAL Debug )
     add_definitions( -DOPENER_WITH_TRACES -DOPENER_TRACE_LEVEL=15 )
-    set( TRACE_SPEC "-DOpENer_TRACES=ON" )
+    set( TRACE_SPEC "-DCIPster_TRACES=ON" )
 endif()
 
 add_definitions( -std=c++0x )
 
-# PREFIX is for ExternalProject_Add, and tells where to build OpENer as a sub project:
+# PREFIX is for ExternalProject_Add, and tells where to build CIPster as a sub project:
 # below our current out of tree build directory.
-set( PREFIX ${CMAKE_CURRENT_BINARY_DIR}/build-OpENer )
+set( PREFIX ${CMAKE_CURRENT_BINARY_DIR}/build-CIPster )
 
-# build OpENer as a nested project, the result of which is libeip.a
+# build CIPster as a nested project, the result of which is libeip.a
 # in directory ${PREFIX}
 ExternalProject_Add( eip
     PREFIX ${PREFIX}
@@ -35,7 +35,7 @@ ExternalProject_Add( eip
         -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
         -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
         -DUSER_INCLUDE_DIR=${USER_INCLUDE_DIR}
-        -DOpENer_PLATFORM=POSIX
+        -DCIPster_PLATFORM=POSIX
         ${TRACE_SPEC}       # empty for non Debug CMAKE_BUILD_TYPE
         <SOURCE_DIR>
     BUILD_COMMAND make

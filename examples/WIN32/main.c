@@ -36,9 +36,9 @@ int main(int argc, char *arg[]) {
     printf("Wrong number of command line parameters!\n");
     printf("The correct command line parameters are:\n");
     printf(
-        "./OpENer ipaddress subnetmask gateway domainname hostaddress macaddress\n");
+        "./CIPster ipaddress subnetmask gateway domainname hostaddress macaddress\n");
     printf(
-        "    e.g. ./OpENer 192.168.0.2 255.255.255.0 192.168.0.1 test.com testdevice 00 15 C5 BF D0 87\n");
+        "    e.g. ./CIPster 192.168.0.2 255.255.255.0 192.168.0.1 test.com testdevice 00 15 C5 BF D0 87\n");
     exit(0);
   } else {
     // fetch Internet address info from the platform

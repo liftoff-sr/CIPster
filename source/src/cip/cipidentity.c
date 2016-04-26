@@ -50,7 +50,7 @@ CipRevision revision_ =
 
 EipUint16 status_ = 0;                                  //*< Attribute 5: Status
 
-EipUint32 serial_number_ = 0;                           //*< Attribute 6: Serial Number, has to be set prior to OpENer initialization
+EipUint32 serial_number_ = 0;                           //*< Attribute 6: Serial Number, has to be set prior to CIPster initialization
 
 CipShortString product_name_ =
 {

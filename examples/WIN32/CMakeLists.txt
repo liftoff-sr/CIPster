@@ -13,10 +13,10 @@ opener_common_includes()
 
 opener_platform_support("INCLUDES")
 
-set (PLATFORMLIBNAME ${OpENer_PLATFORM}PLATFORM)
+set (PLATFORMLIBNAME ${CIPster_PLATFORM}PLATFORM)
 
-add_library( ${PLATFORMLIBNAME} ${PLATFORM_SPEC_SRC}) 
+add_library( ${PLATFORMLIBNAME} ${PLATFORM_SPEC_SRC})
 
-add_executable(OpENer main.c)
+add_executable(CIPster main.c)
 
-target_link_libraries( OpENer ${PLATFORMLIBNAME} CIP SAMPLE_APP ENET_ENCAP ws2_32 ${OpENer_CIP_OBJECTS} )
+target_link_libraries( CIPster ${PLATFORMLIBNAME} CIP SAMPLE_APP ENET_ENCAP ws2_32 ${CIPster_CIP_OBJECTS} )

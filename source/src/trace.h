@@ -10,7 +10,7 @@
 
 
 /** @file trace.h
- * @brief Tracing infrastructure for OpENer
+ * @brief Tracing infrastructure for CIPster
  */
 
 #ifdef OPENER_WITH_TRACES

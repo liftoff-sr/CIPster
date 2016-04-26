@@ -7,23 +7,23 @@ else()
 endif()
 
 
-# Default to OpENer_PLATFORM = POSIX
-if( DEFINED OpENer_PLATFORM )
-    set( OpENer_PLATFORM ${OpENer_PLATFORM} CACHE STRINGS "Platform OpENer will be built for" )
+# Default to CIPster_PLATFORM = POSIX
+if( DEFINED CIPster_PLATFORM )
+    set( CIPster_PLATFORM ${CIPster_PLATFORM} CACHE STRINGS "Platform CIPster will be built for" )
 else()
-    set( OpENer_PLATFORM POSIX CACHE STRINGS "Platform OpENer will be built for" )
+    set( CIPster_PLATFORM POSIX CACHE STRINGS "Platform CIPster will be built for" )
 endif()
 
-set( OpENer_KNOWN_PLATFORMS "POSIX" "WIN32" )
-set_property(CACHE OpENer_PLATFORM PROPERTY STRINGS ${OpENer_KNOWN_PLATFORMS} )
+set( CIPster_KNOWN_PLATFORMS "POSIX" "WIN32" )
+set_property(CACHE CIPster_PLATFORM PROPERTY STRINGS ${CIPster_KNOWN_PLATFORMS} )
 
 
 cmake_minimum_required( VERSION 2.8.3 )
 
-project( OpENer )
+project( CIPster )
 
-set( OpENer_VERSION_MAJOR 1 )
-set( OpENer_VERSION_MINOR 2 )
+set( CIPster_VERSION_MAJOR 1 )
+set( CIPster_VERSION_MINOR 0 )
 
 set( USER_INCLUDE_DIR "" CACHE PATH "Location of user specific include file (opener_user_conf.h)" )
 
@@ -33,31 +33,31 @@ endif()
 
 include_directories( ${USER_INCLUDE_DIR} )
 
-set( OpENer_BUILDSUPPORT_DIR ${PROJECT_SOURCE_DIR}/buildsupport )
+set( CIPster_BUILDSUPPORT_DIR ${PROJECT_SOURCE_DIR}/buildsupport )
 
-include( ${OpENer_BUILDSUPPORT_DIR}/OpENer.cmake )
+include( ${CIPster_BUILDSUPPORT_DIR}/CIPster.cmake )
 
 
-include( ${OpENer_BUILDSUPPORT_DIR}/OpENer_function_checks.cmake )
+include( ${CIPster_BUILDSUPPORT_DIR}/CIPster_function_checks.cmake )
 
-set( OpENer_64_BIT_DATA_TYPES_ENABLED CACHE BOOL "Enable 64-bit data type support" )
+set( CIPster_64_BIT_DATA_TYPES_ENABLED CACHE BOOL "Enable 64-bit data type support" )
 
-if( OpENer_64_BIT_DATA_TYPES_ENABLED )
+if( CIPster_64_BIT_DATA_TYPES_ENABLED )
     add_definitions( -DOPENER_SUPPORT_64BIT_DATATYPES )
 endif()
 
-set( OpENer_TRACES OFF CACHE BOOL "Activate OpENer traces" )
-if(OpENer_TRACES)
+set( CIPster_TRACES OFF CACHE BOOL "Activate CIPster traces" )
+if(CIPster_TRACES)
     createTraceLevelOptions()
 endif()
 
 
-set( OpENer_TESTS OFF CACHE BOOL "Enable tests to be built" )
-if( OpENer_TESTS )
+set( CIPster_TESTS OFF CACHE BOOL "Enable tests to be built" )
+if( CIPster_TESTS )
     enable_testing()
     enable_language( CXX )
     set( CPPUTEST_HOME "" CACHE PATH "Path to CppUTest directory" )
-    include( ${OpENer_BUILDSUPPORT_DIR}/OpENer_Tests.cmake )
+    include( ${CIPster_BUILDSUPPORT_DIR}/CIPster_Tests.cmake )
     add_subdirectory( tests )
 endif()
 
@@ -73,12 +73,12 @@ endif()
 ####################################################
 # Internal cache holding the available CIP objects #
 ####################################################
-set( OpENer_ADD_CIP_OBJECTS "" CACHE INTERNAL STRING )
+set( CIPster_ADD_CIP_OBJECTS "" CACHE INTERNAL STRING )
 
 #######################################
 # Add custom CIP objects              #
 #######################################
-set( OpENer_CIP_OBJECTS_DIR ${PROJECT_SOURCE_DIR}/src/cip_objects )
-include( ${OpENer_BUILDSUPPORT_DIR}/OpENer_CIP_Object_generator.cmake )
+set( CIPster_CIP_OBJECTS_DIR ${PROJECT_SOURCE_DIR}/src/cip_objects )
+include( ${CIPster_BUILDSUPPORT_DIR}/CIPster_CIP_Object_generator.cmake )
 
 add_subdirectory( src )

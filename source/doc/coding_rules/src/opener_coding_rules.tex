@@ -2,14 +2,14 @@
 \usepackage[latin1]{inputenc}
 \usepackage[T1]{fontenc}
 
-\usepackage{a4wide} 
+\usepackage{a4wide}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%   important definitions at the beginning
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-\title{Coding Rules for\\ \emph{OpENer} --- Open Source EtherNet/IP$^{TM}$ Adapter Stack\\\large Version 2.0}
+\title{Coding Rules for\\ \emph{CIPster} --- Open Source EtherNet/IP$^{TM}$ Adapter Stack\\\large Version 2.0}
 \author{Martin Melik Merkumians\thanks{melik-merkumians\@@acin.tuwien.ac.at}}
 \date{2015-11-15}
 
@@ -26,7 +26,7 @@
  \usepackage[dvipdfm, colorlinks]{hyperref}
 \fi
 
-\hypersetup{colorlinks, linkcolor=black, filecolor=black, urlcolor=black, citecolor=black, pdftitle={Coding Rules for OpENer},pdfauthor={Alois Zoitl}}
+\hypersetup{colorlinks, linkcolor=black, filecolor=black, urlcolor=black, citecolor=black, pdftitle={Coding Rules for CIPster},pdfauthor={Alois Zoitl}}
 
 % Font
 \usepackage{mathpazo}
@@ -55,12 +55,12 @@
 \tableofcontents
 
 \section{Introduction}
-This document describes the coding rules, which has to be used in the OpENer project. These rules are mainly the Google C++ style rules, with some extensions specific to C and the OpENer project. If something is not covered by the rules given in this document, please check the official Google C++ style guide, available at \url{http://google.github.io/styleguide/cppguide.html}. Additional code style examples can be found at \url{https://gist.github.com/davidzchen/9187878}.
+This document describes the coding rules, which has to be used in the CIPster project. These rules are mainly the Google C++ style rules, with some extensions specific to C and the CIPster project. If something is not covered by the rules given in this document, please check the official Google C++ style guide, available at \url{http://google.github.io/styleguide/cppguide.html}. Additional code style examples can be found at \url{https://gist.github.com/davidzchen/9187878}.
 
-As the OpENer code style aims to be as close as possible to the established Google C++ code style, please file an issue if anything in this guide contradicts the Google C++ code style.
+As the CIPster code style aims to be as close as possible to the established Google C++ code style, please file an issue if anything in this guide contradicts the Google C++ code style.
 
 \section{Comments}
-A sufficient amount of comments has to be written. There are never too many comments, whereas invalid comments are worse than none --- thus invalid comments have to be removed from the source code. Comments have to be written in English. 
+A sufficient amount of comments has to be written. There are never too many comments, whereas invalid comments are worse than none --- thus invalid comments have to be removed from the source code. Comments have to be written in English.
 
 
 Comments for function, structure, \ldots~ definitions have to follow the conventions of \emph{Doxygen} to allow the automated generation of documentation for the source code. Hereby Java-style Doxygen comments shall be used. Doxygen comments shall therefore start with slash and two starts, and use the @ symbol to indicate Doxygen keywords. For enums, variables, and strucutres inline documentation with \emph{/**<} shall be used. Autobrief behavior shall not be assumed for Doxygen comments. See the example below.
@@ -87,13 +87,13 @@ Every source-file must contain a fileheader as follows:
 \begin{lstlisting}[frame=trbl]{}
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Contributors:
  *     <date>: <author>, <author email> - changes
  ******************************************************************************/
 \end{lstlisting}
-Each author needs to explain his changes in the code. 
+Each author needs to explain his changes in the code.
 \subsection{Revision History}
 %To track changes in the source files every new file version must contain it's version information in the following form:
 %\begin{center}
@@ -105,51 +105,51 @@ The revision history has to be done in a style  usable by Doxygen. This means th
 \subsection{Keywords}
 The following Keywords should be used in the source code to mark special comments:
 \begin{itemize}
-	\item \textbf{TODO:} For comments about possible or needed extensions
-	\item \textbf{FIXME:} To be used for comments about potential (or known) bugs
+    \item \textbf{TODO:} For comments about possible or needed extensions
+    \item \textbf{FIXME:} To be used for comments about potential (or known) bugs
 \end{itemize}
 
 \section{Datatypes}
-\Fref{tab:datatypes} contains the definitions of important standard datatypes. This is done to ensure a machine independant defintion of the bit-width of the standard data types. For \emph{OpENer}-development these definitions are in the file: \verb|src/typedefs.h|
+\Fref{tab:datatypes} contains the definitions of important standard datatypes. This is done to ensure a machine independant defintion of the bit-width of the standard data types. For \emph{CIPster}-development these definitions are in the file: \verb|src/typedefs.h|
 
-\begin{table}[h] 
-\caption{Data types used in OpENer} \label{tab:datatypes}
-	\centering 
-		\begin{tabular}{lll}
-			defined data type	& bit-width / description & used C-datatype \\
-			\hline
-			EipByte	&	8 bit unsigned	&   uint8\_t\\
-			EipInt8	&	8 bit signed	&	int8\_t	 \\
-			EipInt16	&	16 bit signed	&	int16\_t	 \\
-			EipInt32	&	32 bit signed	&	int32\_t	 \\
-			EipInt64 & 64 bit signed & int64\_t \\
-			EipUint8	&	8 bit unsigned	&	uint8\_t	 \\
-			EipUint16	&	16 bit unsigned	&	uint16\_t	 \\
-			EipUint32	&	32 bit unsigned	&	uint32\_t	 \\
-			EipUint64 & 64 bit unsigned & uint64\_t \\
-			EipFloat	&	single precission IEEE float (32 bit) &	float	 \\
-			EipDfloat	&	double precission IEEE float (64 bit) &	double	\\
-			EipBool8	&	byte variable as boolean value	&	unit8\_t	 \\
-			
-			CipOctet & unspecified type & uint8\_t \\
-			CipBool & byte variable as boolean value & uint8\_t \\
-			CipByte & 8 bit unsigned & uint8\_t \\
-			CipWord & 16 bit unsigned & uint16\_t \\
-			CipDword & 32 bit unsigned & uint32\_t \\
-			CipUsint & 8 bit unsigned & uint8\_t \\
-			CipUint & 16 bit unsigned & uint16\_t \\
-			CipUdint & 32 bit unsigned & uint32\_t \\
-			CipSint & 8 bit signed & int8\_t \\
-			CipInt & 16 bit signed & int16\_t \\
-			CipDint & 32 bit signed & int32\_t \\
-			CipReal & single precission IEEE float (32 bit) & float \\
-			CipLreal & double precission IEEE float (64 bit) & double \\
+\begin{table}[h]
+\caption{Data types used in CIPster} \label{tab:datatypes}
+    \centering
+        \begin{tabular}{lll}
+            defined data type	& bit-width / description & used C-datatype \\
+            \hline
+            EipByte	&	8 bit unsigned	&   uint8\_t\\
+            EipInt8	&	8 bit signed	&	int8\_t	 \\
+            EipInt16	&	16 bit signed	&	int16\_t	 \\
+            EipInt32	&	32 bit signed	&	int32\_t	 \\
+            EipInt64 & 64 bit signed & int64\_t \\
+            EipUint8	&	8 bit unsigned	&	uint8\_t	 \\
+            EipUint16	&	16 bit unsigned	&	uint16\_t	 \\
+            EipUint32	&	32 bit unsigned	&	uint32\_t	 \\
+            EipUint64 & 64 bit unsigned & uint64\_t \\
+            EipFloat	&	single precission IEEE float (32 bit) &	float	 \\
+            EipDfloat	&	double precission IEEE float (64 bit) &	double	\\
+            EipBool8	&	byte variable as boolean value	&	unit8\_t	 \\
 
-			CipLint & 64 bit signed & int64\_t \\
-			CipUlint & 64 bit unsigned & uint64\_t \\
-			CipLword & 64 bit unsigned & uint64\_t
-		\end{tabular}
-\end{table} 
+            CipOctet & unspecified type & uint8\_t \\
+            CipBool & byte variable as boolean value & uint8\_t \\
+            CipByte & 8 bit unsigned & uint8\_t \\
+            CipWord & 16 bit unsigned & uint16\_t \\
+            CipDword & 32 bit unsigned & uint32\_t \\
+            CipUsint & 8 bit unsigned & uint8\_t \\
+            CipUint & 16 bit unsigned & uint16\_t \\
+            CipUdint & 32 bit unsigned & uint32\_t \\
+            CipSint & 8 bit signed & int8\_t \\
+            CipInt & 16 bit signed & int16\_t \\
+            CipDint & 32 bit signed & int32\_t \\
+            CipReal & single precission IEEE float (32 bit) & float \\
+            CipLreal & double precission IEEE float (64 bit) & double \\
+
+            CipLint & 64 bit signed & int64\_t \\
+            CipUlint & 64 bit unsigned & uint64\_t \\
+            CipLword & 64 bit unsigned & uint64\_t
+        \end{tabular}
+\end{table}
 
 These data types shall only be used when the bit size is important for the correct operation of the code, whereby Eip-prefixed data types shall be used for communication functions, and Cip-prefixed data types shall be used for CIP related functions and objects. If not we advice to use the type \verb|int| or \verb|unsigned int| for most variables, as this is the most efficient data type and can lead on some platforms (e.g., ARM) even to smaller code size.
 
@@ -159,8 +159,8 @@ Every identifier has to be named in English. The first character of an identifie
 \subsection{Pre- \& Postfixes}
 The following prefixes have to be applied to identifiers:\\
 \begin{itemize}
-	\item \emph{"g\_"} shall be prefixed for global variables.
-	\item \emph{"\_"} shall be postfixed for member variables. These are usually CIP object variables with file-global scope.
+    \item \emph{"g\_"} shall be prefixed for global variables.
+    \item \emph{"\_"} shall be postfixed for member variables. These are usually CIP object variables with file-global scope.
 \end{itemize}
 
 \subsection{Variables}
@@ -194,9 +194,9 @@ const int kAnImportantConstant = 42;
 \subsection{Functions}
 Functions names shall be Pascal cased, function parameters shall be named like variables. The parameter list shall adhere to the following rules:
 \begin{itemize}
-	\item Input parameters shall come first
-	\item Input parameters shall be const
-	\item Output parameters shall be last
+    \item Input parameters shall come first
+    \item Input parameters shall be const
+    \item Output parameters shall be last
 \end{itemize}
 
 \paragraph{Examples}

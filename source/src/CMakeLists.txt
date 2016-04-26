@@ -60,7 +60,7 @@ message( "OBJECTS_SRC:${OBJECTS_SRC}" )
 
 
 add_library( eip STATIC
-    ${OpENer_ADD_CIP_OBJECTS}
+    ${CIPster_ADD_CIP_OBJECTS}
     ${CIP_SRCS}
     ${ENCAP_SRCS}
     ${UTILS_SRCS}

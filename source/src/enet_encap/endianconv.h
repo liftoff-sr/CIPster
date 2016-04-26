@@ -14,8 +14,8 @@
 
 typedef enum {
   kOpenerEndianessUnknown = -1,
-  kOpENerEndianessLittle = 0,
-  kOpENerEndianessBig = 1
+  kCIPsterEndianessLittle = 0,
+  kCIPsterEndianessBig = 1
 } OpenerEndianess;
 
 /** @ingroup ENCAP

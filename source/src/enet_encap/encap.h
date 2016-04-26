@@ -12,7 +12,7 @@
  * @brief This file contains the public interface of the encapsulation layer
  */
 
-/**  @defgroup ENCAP OpENer Ethernet encapsulation layer
+/**  @defgroup ENCAP CIPster Ethernet encapsulation layer
  * The Ethernet encapsulation layer handles provides the abstraction between the Ethernet and the CIP layer.
  */
 
