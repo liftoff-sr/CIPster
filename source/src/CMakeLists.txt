@@ -1,10 +1,5 @@
 
 opener_common_includes()
-opener_platform_support("INCLUDES")
-
-add_definitions( -fPIC )        # The static library might eventually be linked into a DSO
-
-set( CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined" )
 
 set( CIP_SRCS
     cip/appcontype.c
@@ -52,8 +47,6 @@ add_definitions( -std=c++0x )
 
 
 opener_common_includes()
-
-opener_platform_support( "INCLUDES" )
 
 
 message( "OBJECTS_SRC:${OBJECTS_SRC}" )

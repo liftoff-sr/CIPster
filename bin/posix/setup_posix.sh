@@ -1,2 +1,0 @@
-cmake -DCIPster_PLATFORM:STRING="POSIX" -DCMAKE_BUILD_TYPE:STRING="" ../../source
-

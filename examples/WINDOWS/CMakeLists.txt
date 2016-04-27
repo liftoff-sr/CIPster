@@ -50,6 +50,8 @@ ExternalProject_Add( eip
 set( EIP_INCLUDE_DIR ${OPENER_DIR}/source/src )
 set( EIP_LIBRARIES   ${PREFIX}/libeip.a )
 
+set( CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -static ) # statically link the gcc and socket libraries
+
 include_directories(
     .
     ${EIP_INCLUDE_DIR}
@@ -69,6 +71,7 @@ add_executable( ${PGM}
     )
 target_link_libraries( ${PGM}
     ${EIP_LIBRARIES}
+    ws2_32
     )
 add_dependencies( ${PGM} eip )
 

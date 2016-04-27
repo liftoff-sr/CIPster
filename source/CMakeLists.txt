@@ -7,20 +7,11 @@ else()
 endif()
 
 
-# Default to CIPster_PLATFORM = POSIX
-if( DEFINED CIPster_PLATFORM )
-    set( CIPster_PLATFORM ${CIPster_PLATFORM} CACHE STRINGS "Platform CIPster will be built for" )
-else()
-    set( CIPster_PLATFORM POSIX CACHE STRINGS "Platform CIPster will be built for" )
-endif()
-
-set( CIPster_KNOWN_PLATFORMS "POSIX" "WIN32" )
-set_property(CACHE CIPster_PLATFORM PROPERTY STRINGS ${CIPster_KNOWN_PLATFORMS} )
-
-
 cmake_minimum_required( VERSION 2.8.3 )
 
+
 project( CIPster )
+
 
 set( CIPster_VERSION_MAJOR 1 )
 set( CIPster_VERSION_MINOR 0 )
@@ -30,6 +21,7 @@ set( USER_INCLUDE_DIR "" CACHE PATH "Location of user specific include file (ope
 if( USER_INCLUDE_DIR STREQUAL "" )
     message( WARNING "Please set variable USER_INCLUDE_DIR to a directory containing a file named opener_user_conf.h" )
 endif()
+
 
 include_directories( ${USER_INCLUDE_DIR} )
 
@@ -65,8 +57,13 @@ endif()
 if( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
     set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Werror=implicit-function-declaration" )
 
-    # enable clock_gettime:
-    add_definitions( -D_POSIX_C_SOURCE=199309L )
+    if( NOT WIN32 )
+        add_definitions( -fPIC )        # The static library might eventually be linked into a DSO
+
+        # enable clock_gettime:
+        add_definitions( -D_POSIX_C_SOURCE=199309L )
+    endif()
+
 endif()
 
 

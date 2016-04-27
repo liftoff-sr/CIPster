@@ -6,22 +6,11 @@ function(opener_add_definition)
 endfunction()
 
 
-# Adds platform specific include directories
-macro(opener_platform_support ARGS)
-
-    if(CIPster_PLATFORM STREQUAL "")
-        message(FATAL_ERROR "No platform selected!")
-    endif()
-endmacro()
-
-
-
 # Adds common Include directories
 macro(opener_common_includes)
     set( SRC_DIR "${PROJECT_SOURCE_DIR}/src" )
     set( CIP_SRC_DIR "${SRC_DIR}/cip" )
     set( ENET_ENCAP_SRC_DIR "${SRC_DIR}/enet_encap" )
-    set( PORTS_SRC_DIR "${SRC_DIR}/ports")
     set( UTILS_SRC_DIR "${SRC_DIR}/utils")
 
     include_directories(
