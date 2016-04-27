@@ -37,8 +37,8 @@
  *
  */
 
-#ifndef OPENER_CIPIOCONNECTION_H_
-#define OPENER_CIPIOCONNECTION_H_
+#ifndef CIPSTER_CIPIOCONNECTION_H_
+#define CIPSTER_CIPIOCONNECTION_H_
 
 #include "opener_api.h"
 #include "cipconnectionmanager.h"
@@ -76,4 +76,4 @@ void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList(
 extern EipUint8* g_config_data_buffer;
 extern unsigned g_config_data_length;
 
-#endif // OPENER_CIPIOCONNECTION_H_
+#endif // CIPSTER_CIPIOCONNECTION_H_

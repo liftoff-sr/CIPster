@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CIPASSEMBLY_H_
-#define OPENER_CIPASSEMBLY_H_
+#ifndef CIPSTER_CIPASSEMBLY_H_
+#define CIPSTER_CIPASSEMBLY_H_
 
 #include "typedefs.h"
 #include "ciptypes.h"
@@ -39,4 +39,4 @@ EipStatus NotifyAssemblyConnectedDataReceived(CipInstance *instance,
                                               EipUint8 *data,
                                               EipUint16 data_length);
 
-#endif // OPENER_CIPASSEMBLY_H_
+#endif // CIPSTER_CIPASSEMBLY_H_

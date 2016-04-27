@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CIPETHERNETLINK_H_
-#define OPENER_CIPETHERNETLINK_H_
+#ifndef CIPSTER_CIPETHERNETLINK_H_
+#define CIPSTER_CIPETHERNETLINK_H_
 
 #include "typedefs.h"
 #include "ciptypes.h"
@@ -16,4 +16,4 @@
  */
 EipStatus CipEthernetLinkInit(void);
 
-#endif // OPENER_CIPETHERNETLINK_H_
+#endif // CIPSTER_CIPETHERNETLINK_H_

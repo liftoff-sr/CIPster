@@ -5,8 +5,8 @@
  *      Author: mmm
  */
 
-#ifndef OPENER_RANDOM_H_
-#define OPENER_RANDOM_H_
+#ifndef CIPSTER_RANDOM_H_
+#define CIPSTER_RANDOM_H_
 
 #include <stdint.h>
 
@@ -22,4 +22,4 @@ typedef struct
 
 Random* RandomNew( SetSeed, GetNextUInt32 );
 
-#endif    // OPENER_RANDOM_H_
+#endif    // CIPSTER_RANDOM_H_

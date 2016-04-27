@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CPF_H_
-#define OPENER_CPF_H_
+#ifndef CIPSTER_CPF_H_
+#define CIPSTER_CPF_H_
 
 #include "typedefs.h"
 #include "ciptypes.h"
@@ -137,4 +137,4 @@ int AssembleLinearMessage(
  */
 extern CipCommonPacketFormatData g_common_packet_format_data_item;
 
-#endif // OPENER_CPF_H_
+#endif // CIPSTER_CPF_H_

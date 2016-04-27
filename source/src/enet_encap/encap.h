@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_ENCAP_H_
-#define OPENER_ENCAP_H_
+#ifndef CIPSTER_ENCAP_H_
+#define CIPSTER_ENCAP_H_
 
 #include "typedefs.h"
 
@@ -86,4 +86,4 @@ void EncapsulationShutDown();
  */
 void ManageEncapsulationMessages();
 
-#endif // OPENER_ENCAP_H_
+#endif // CIPSTER_ENCAP_H_

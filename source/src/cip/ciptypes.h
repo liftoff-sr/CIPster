@@ -6,8 +6,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CIPTYPES_H_
-#define OPENER_CIPTYPES_H_
+#ifndef CIPSTER_CIPTYPES_H_
+#define CIPSTER_CIPTYPES_H_
 
 
 #include <string>
@@ -177,7 +177,6 @@ enum CIPAttributeFlag           // TODO: Rework
     kSetAndGetAble = 0x07,      ///< both set and get-able
     kGetableSingleAndAll = 0x03 ///< both single and all
 };
-
 
 
 enum IoConnectionEvent
@@ -511,7 +510,7 @@ protected:
         for( CipAttributes::const_iterator it = attributes.begin();
             it != attributes.end();  ++it )
         {
-            OPENER_TRACE_INFO( "id:%d\n",
+            CIPSTER_TRACE_INFO( "id:%d\n",
                 (*it)->Id() );
         }
     }
@@ -605,7 +604,7 @@ public:
         EipUint16   aRevision = 1
         );
 
-    ~CipClass();
+    virtual ~CipClass();
 
     /// Return true if this is a meta-class, false if public.
     bool IsMetaClass() const    { return !owning_class; }
@@ -644,7 +643,8 @@ public:
      *
      * @return bool - true on succes, else false.  Failure happens when the instance
      *  was marked as already being in another class, or if the instance_id was
-     *  not unique.
+     *  not unique.  On success, ownership is passed to this class as a container.
+     *  On failure, ownership remains with the caller.
      */
     bool InstanceInsert( CipInstance* aInstances );
 
@@ -683,14 +683,16 @@ protected:
 
         Constructor for the meta-class, and only called by public constructor
         above. The constructor above constructs the "public" CIP class. This one
-        constructs the meta-class. The meta-class is owned by the public class (
-        => is responsible for deleting it).
+        constructs the meta-class. The meta-class is "owned" by the public class,
+        i.e. ownership means "is responsible for deleting it".
 
-        A metaClass is a class that holds the class attributes and services.
-        CIP can talk to an instance, therefore an instance has a pointer to
-        its class. CIP can talk to a class, therefore a class struct is a
-        subclass of the instance struct, and contains a pointer to a
-        metaclass. CIP never explicitly addresses a metaclass.
+        A metaClass is a class that holds the attributes and services of the
+        single public class object. CIP can talk to an instance, therefore an
+        instance has a pointer to its class. CIP can talk to a class, therefore
+        CipClass is a subclass of CipInstance, and this base C++ class contains
+        a pointer to a CipClass used as the meta-class. CIP never explicitly
+        addresses a meta-class.
+
     */
 
     CipClass(
@@ -706,7 +708,7 @@ protected:
         for( CipServices::const_iterator it = services.begin();
             it != services.end();  ++it )
         {
-            OPENER_TRACE_INFO( "id:%d %s\n",
+            CIPSTER_TRACE_INFO( "id:%d %s\n",
                 (*it)->Id(),
                 (*it)->service_name.c_str() );
         }
@@ -717,7 +719,7 @@ protected:
         for( CipInstances::const_iterator it = instances.begin();
             it != instances.end();  ++it )
         {
-            OPENER_TRACE_INFO( "id:%d\n", (*it)->Id() );
+            CIPSTER_TRACE_INFO( "id:%d\n", (*it)->Id() );
         }
     }
 
@@ -780,4 +782,4 @@ struct CipUnconnectedSendParameter
     ( 1 << (a) | 1 << (b) | 1 << (c) | 1 << (d) | 1 << (e) | 1 << (f) | \
         1 << (g) | 1 << (h) )
 
-#endif // OPENER_CIPTYPES_H_
+#endif // CIPSTER_CIPTYPES_H_

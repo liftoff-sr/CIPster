@@ -7,12 +7,12 @@ include(ExternalProject)
 cmake_minimum_required(VERSION 2.8.0 FATAL_ERROR)
 
 
-set( OPENER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../ )
+set( CIPSTER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../ )
 
 set( USER_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/sample_application )
 
 if( CMAKE_BUILD_TYPE STREQUAL Debug )
-    add_definitions( -DOPENER_WITH_TRACES -DOPENER_TRACE_LEVEL=15 )
+    add_definitions( -DCIPSTER_WITH_TRACES -DCIPSTER_TRACE_LEVEL=15 )
     set( TRACE_SPEC "-DCIPster_TRACES=ON" )
 endif()
 
@@ -26,7 +26,7 @@ set( PREFIX ${CMAKE_CURRENT_BINARY_DIR}/build-CIPster )
 # in directory ${PREFIX}
 ExternalProject_Add( eip
     PREFIX ${PREFIX}
-    SOURCE_DIR ${OPENER_DIR}/source
+    SOURCE_DIR ${CIPSTER_DIR}/source
     CONFIGURE_COMMAND
         ${CMAKE_COMMAND}
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
@@ -47,7 +47,7 @@ ExternalProject_Add( eip
 
 # These variables would typically be found by a CMake find EIP module, but set
 # them manually here
-set( EIP_INCLUDE_DIR ${OPENER_DIR}/source/src )
+set( EIP_INCLUDE_DIR ${CIPSTER_DIR}/source/src )
 set( EIP_LIBRARIES   ${PREFIX}/libeip.a )
 
 include_directories(

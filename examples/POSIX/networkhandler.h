@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_NETWORKHANDLER_H_
-#define OPENER_NETWORKHANDLER_H_
+#ifndef CIPSTER_NETWORKHANDLER_H_
+#define CIPSTER_NETWORKHANDLER_H_
 
 
 #include "typedefs.h"
@@ -20,4 +20,4 @@ EipStatus NetworkHandlerProcessOnce();
 
 EipStatus NetworkHandlerFinish();
 
-#endif // OPENER_NETWORKHANDLER_H_
+#endif // CIPSTER_NETWORKHANDLER_H_

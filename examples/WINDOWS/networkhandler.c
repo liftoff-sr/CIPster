@@ -23,7 +23,7 @@
 // values needed from the connection manager
 extern ConnectionObject *g_active_connection_list;
 // communication buffer
-EipUint8 g_ethernet_communciation_buffer[PC_OPENER_ETHERNET_BUFFER_SIZE];
+EipUint8 g_ethernet_communciation_buffer[PC_CIPSTER_ETHERNET_BUFFER_SIZE];
 
 #define MAX_NO_OF_TCP_SOCKETS 10
 
@@ -139,7 +139,7 @@ NetworkHandlerInitialize(void)
     // create a new TCP socket
     if ((g_network_status.tcp_listener = socket(PF_INET, SOCK_STREAM, 0)) == -1)
     {
-        OPENER_TRACE_ERR("error allocating socket stream listener, %d\n", errno);
+        CIPSTER_TRACE_ERR("error allocating socket stream listener, %d\n", errno);
         return kEipStatusError;
     }
 
@@ -147,35 +147,35 @@ NetworkHandlerInitialize(void)
     if (setsockopt(g_network_status.tcp_listener, SOL_SOCKET, SO_REUSEADDR,
         (char *)&nOptVal, sizeof(nOptVal)) == -1)
     {
-        OPENER_TRACE_ERR("error setting socket option SO_REUSEADDR on nTCPListener\n");
+        CIPSTER_TRACE_ERR("error setting socket option SO_REUSEADDR on nTCPListener\n");
         return kEipStatusError;
     }
 
     // create a new UDP unicast socket
     if ((g_network_status.udp_unicast_listener = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
     {
-        OPENER_TRACE_ERR("error allocating udp listener socket, %d\n", errno);
+        CIPSTER_TRACE_ERR("error allocating udp listener socket, %d\n", errno);
         return kEipStatusError;
     }
 
     if (setsockopt(g_network_status.udp_unicast_listener, SOL_SOCKET, SO_REUSEADDR,
         (char *)&nOptVal, sizeof(nOptVal)) == -1)
     {
-        OPENER_TRACE_ERR("error setting socket option SO_REUSEADDR on nUDPListener\n");
+        CIPSTER_TRACE_ERR("error setting socket option SO_REUSEADDR on nUDPListener\n");
         return kEipStatusError;
     }
 
     // create a new UDP broadcast socket
     if ((g_network_status.udp_broadcast_listener = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
     {
-        OPENER_TRACE_ERR("error allocating udp listener socket, %d\n", errno);
+        CIPSTER_TRACE_ERR("error allocating udp listener socket, %d\n", errno);
         return kEipStatusError;
     }
 
     if (setsockopt(g_network_status.udp_broadcast_listener, SOL_SOCKET, SO_REUSEADDR,
         (char *)&nOptVal, sizeof(nOptVal)) == -1)
     {
-        OPENER_TRACE_ERR("error setting socket option SO_REUSEADDR on nUDPListener\n");
+        CIPSTER_TRACE_ERR("error setting socket option SO_REUSEADDR on nUDPListener\n");
         return kEipStatusError;
     }
 
@@ -190,7 +190,7 @@ NetworkHandlerInitialize(void)
         sizeof(struct sockaddr))) == -1)
     {
         int error_code = WSAGetLastError();
-        OPENER_TRACE_ERR("error with udp bind: %d, %s\n", error_code, strerror(error_code));
+        CIPSTER_TRACE_ERR("error with udp bind: %d, %s\n", error_code, strerror(error_code));
         return kEipStatusError;
     }
 
@@ -204,7 +204,7 @@ NetworkHandlerInitialize(void)
   if ((bind(g_network_status.tcp_listener, (struct sockaddr *) &my_address,
       sizeof(struct sockaddr))) == -1)
     {
-      OPENER_TRACE_ERR("error with bind: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("error with bind: %s\n", strerror(errno));
       return kEipStatusError;
     }
 
@@ -214,21 +214,21 @@ NetworkHandlerInitialize(void)
       > setsockopt(g_network_status.udp_broadcast_listener, SOL_SOCKET, SO_BROADCAST, (char *)&y,
           sizeof(int)))
     {
-      OPENER_TRACE_ERR("error with setting broadcast receive for udp socket: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("error with setting broadcast receive for udp socket: %s\n", strerror(errno));
       return kEipStatusError;
     }
 
   if ((bind(g_network_status.udp_broadcast_listener, (struct sockaddr *) &my_address,
       sizeof(struct sockaddr))) == -1)
     {
-      OPENER_TRACE_ERR("error with udp bind: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("error with udp bind: %s\n", strerror(errno));
       return kEipStatusError;
     }
 
   // switch socket in listen mode
   if ((listen(g_network_status.tcp_listener, MAX_NO_OF_TCP_SOCKETS)) == -1)
     {
-      OPENER_TRACE_ERR("networkhandler: error with listen: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("networkhandler: error with listen: %s\n", strerror(errno));
       return kEipStatusError;
     }
 
@@ -269,7 +269,7 @@ NetworkHandlerProcessOnce(void)
         }
       else
         {
-          OPENER_TRACE_ERR("networkhandler: error with select: %s\n", strerror(errno));
+          CIPSTER_TRACE_ERR("networkhandler: error with select: %s\n", strerror(errno));
           return kEipStatusError;
         }
     }
@@ -300,12 +300,12 @@ NetworkHandlerProcessOnce(void)
   g_network_status.elapsed_time += actual_time - last_time;
   last_time = actual_time;
 
-  /* check if we had been not able to update the connection manager for several OPENER_TIMER_TICK.
+  /* check if we had been not able to update the connection manager for several CIPSTER_TIMER_TICK.
    * This should compensate the jitter of the windows timer
    */
   while (g_network_status.elapsed_time >= kOpenerTimerTickInMilliSeconds)
     {
-      // call manage_connections() in connection manager every OPENER_TIMER_TICK ms
+      // call manage_connections() in connection manager every CIPSTER_TIMER_TICK ms
       ManageConnections();
       g_network_status.elapsed_time -= kOpenerTimerTickInMilliSeconds;
     }
@@ -333,7 +333,7 @@ checkSocketSet(int pa_nSocket)
         }
       else
         {
-          OPENER_TRACE_INFO("socket: %d closed with pending message\n", pa_nSocket);
+          CIPSTER_TRACE_INFO("socket: %d closed with pending message\n", pa_nSocket);
         }
       FD_CLR(pa_nSocket, &read_fds);
       // remove it from the read set so that later checks will not find it
@@ -353,12 +353,12 @@ SendUdpData(struct sockaddr_in *pa_pstAddr, int pa_nSockFd,
 
   if (sentlength < 0)
     {
-      OPENER_TRACE_ERR("networkhandler: error with sendto in sendUDPData: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("networkhandler: error with sendto in sendUDPData: %s\n", strerror(errno));
       return kEipStatusError;
     }
   else if (sentlength != pa_nDataLength)
     {
-      OPENER_TRACE_WARN("not all data was sent in sendUDPData, sent %d of %d\n",
+      CIPSTER_TRACE_WARN("not all data was sent in sendUDPData, sent %d of %d\n",
           sentlength, pa_nDataLength);
       return kEipStatusError;
     }
@@ -386,23 +386,23 @@ handleDataOnTCPSocket(int pa_nSocket)
 
   if (nCheckVal == 0)
     {
-      OPENER_TRACE_ERR("networkhandler: connection closed by client: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("networkhandler: connection closed by client: %s\n", strerror(errno));
       return kEipStatusError;
     }
   if (nCheckVal < 0)
     {
-      OPENER_TRACE_ERR("networkhandler: error on recv: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("networkhandler: error on recv: %s\n", strerror(errno));
       return kEipStatusError;
     }
 
   rxp = &g_ethernet_communciation_buffer[2]; // at this place EIP stores the data length
   unDataSize = GetIntFromMessage(&rxp) + ENCAPSULATION_HEADER_LENGTH - 4; // -4 is for the 4 bytes we have already read
   // (NOTE this advances the buffer pointer)
-  if (PC_OPENER_ETHERNET_BUFFER_SIZE - 4 < unDataSize)
+  if (PC_CIPSTER_ETHERNET_BUFFER_SIZE - 4 < unDataSize)
     { //TODO can this be handled in a better way?
-      OPENER_TRACE_ERR("too large packet received will be ignored, will drop the data\n");
+      CIPSTER_TRACE_ERR("too large packet received will be ignored, will drop the data\n");
       // Currently we will drop the whole packet
-      nDataSent = PC_OPENER_ETHERNET_BUFFER_SIZE;
+      nDataSent = PC_CIPSTER_ETHERNET_BUFFER_SIZE;
 
       do
         {
@@ -410,16 +410,16 @@ handleDataOnTCPSocket(int pa_nSocket)
 
           if (nCheckVal == 0) // got error or connection closed by client
             {
-              OPENER_TRACE_ERR("networkhandler: connection closed by client: %s\n", strerror(errno));
+              CIPSTER_TRACE_ERR("networkhandler: connection closed by client: %s\n", strerror(errno));
               return kEipStatusError;
             }
           if (nCheckVal < 0)
             {
-              OPENER_TRACE_ERR("networkhandler: error on recv: %s\n", strerror(errno));
+              CIPSTER_TRACE_ERR("networkhandler: error on recv: %s\n", strerror(errno));
               return kEipStatusError;
             }
           unDataSize -= nCheckVal;
-          if ((unDataSize < PC_OPENER_ETHERNET_BUFFER_SIZE)
+          if ((unDataSize < PC_CIPSTER_ETHERNET_BUFFER_SIZE)
               && (unDataSize != 0))
             {
               nDataSent = unDataSize;
@@ -433,12 +433,12 @@ handleDataOnTCPSocket(int pa_nSocket)
 
   if (nCheckVal == 0) // got error or connection closed by client
     {
-      OPENER_TRACE_ERR("networkhandler: connection closed by client: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("networkhandler: connection closed by client: %s\n", strerror(errno));
       return kEipStatusError;
     }
   if (nCheckVal < 0)
     {
-      OPENER_TRACE_ERR("networkhandler: error on recv: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("networkhandler: error on recv: %s\n", strerror(errno));
       return kEipStatusError;
     }
 
@@ -447,7 +447,7 @@ handleDataOnTCPSocket(int pa_nSocket)
       //we got the right amount of data
       unDataSize += 4;
       //TODO handle partial packets
-      OPENER_TRACE_INFO("Data received on tcp:\n");
+      CIPSTER_TRACE_INFO("Data received on tcp:\n");
 
       g_current_active_tcp_socket = pa_nSocket;
 
@@ -458,19 +458,19 @@ handleDataOnTCPSocket(int pa_nSocket)
 
       if (nRemainingBytes != 0)
         {
-          OPENER_TRACE_WARN("Warning: received packet was to long: %d Bytes left!\n",
+          CIPSTER_TRACE_WARN("Warning: received packet was to long: %d Bytes left!\n",
               nRemainingBytes);
         }
 
       if (nCheckVal > 0)
         {
-          OPENER_TRACE_INFO("reply sent:\n");
+          CIPSTER_TRACE_INFO("reply sent:\n");
 
           nDataSent = send(pa_nSocket, (char *) g_ethernet_communciation_buffer,
               nCheckVal, 0);
           if (nDataSent != nCheckVal)
             {
-              OPENER_TRACE_WARN("TCP response was not fully sent\n");
+              CIPSTER_TRACE_WARN("TCP response was not fully sent\n");
             }
         }
 
@@ -505,11 +505,11 @@ CreateUdpSocket(int pa_nDirection, struct sockaddr_in *pa_pstAddr)
   // create a new UDP socket
   if ((newfd = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
     {
-      OPENER_TRACE_ERR("networkhandler: cannot create UDP socket: %s\n", strerror(errno));
+      CIPSTER_TRACE_ERR("networkhandler: cannot create UDP socket: %s\n", strerror(errno));
       return kEipInvalidSocket;
     }
 
-  OPENER_TRACE_INFO("networkhandler: UDP socket %d\n", newfd);
+  CIPSTER_TRACE_INFO("networkhandler: UDP socket %d\n", newfd);
 
   // check if it is sending or receiving
   if (pa_nDirection == kUdpCommuncationDirectionConsuming)
@@ -518,7 +518,7 @@ CreateUdpSocket(int pa_nDirection, struct sockaddr_in *pa_pstAddr)
       if (setsockopt(newfd, SOL_SOCKET, SO_REUSEADDR, (char *)&nOptVal, sizeof(nOptVal))
           == -1)
         {
-          OPENER_TRACE_ERR("error setting socket option SO_REUSEADDR on consuming udp socket\n");
+          CIPSTER_TRACE_ERR("error setting socket option SO_REUSEADDR on consuming udp socket\n");
           return kEipStatusError;
         }
 
@@ -526,11 +526,11 @@ CreateUdpSocket(int pa_nDirection, struct sockaddr_in *pa_pstAddr)
       if ((bind(newfd, (struct sockaddr *) pa_pstAddr, sizeof(struct sockaddr)))
           == -1)
         {
-          OPENER_TRACE_ERR("error on bind udp: %s\n", strerror(errno));
+          CIPSTER_TRACE_ERR("error on bind udp: %s\n", strerror(errno));
           return kEipInvalidSocket;
         }
 
-      OPENER_TRACE_INFO("networkhandler: bind UDP socket %d\n", newfd);
+      CIPSTER_TRACE_INFO("networkhandler: bind UDP socket %d\n", newfd);
     }
   else
     { // we have a producing udp socket
@@ -542,7 +542,7 @@ CreateUdpSocket(int pa_nDirection, struct sockaddr_in *pa_pstAddr)
               if (setsockopt(newfd, IPPROTO_IP, IP_MULTICAST_TTL,
                   &g_time_to_live_value, sizeof(g_time_to_live_value) < 0))
                 {
-                  OPENER_TRACE_ERR("networkhandler: could not set the TTL to: %d, error: %s\n", g_time_to_live_value, strerror(errno));
+                  CIPSTER_TRACE_ERR("networkhandler: could not set the TTL to: %d, error: %s\n", g_time_to_live_value, strerror(errno));
                   return kEipInvalidSocket;
                 }
             }
@@ -555,7 +555,7 @@ CreateUdpSocket(int pa_nDirection, struct sockaddr_in *pa_pstAddr)
       if (getpeername(g_current_active_tcp_socket, (struct sockaddr *) &stPeerAdr,
           &nPeerAddrLen) < 0)
         {
-          OPENER_TRACE_ERR("networkhandler: could not get peername: %s\n", strerror(errno));
+          CIPSTER_TRACE_ERR("networkhandler: could not get peername: %s\n", strerror(errno));
           return kEipInvalidSocket;
         }
       // store the originators address
@@ -587,7 +587,7 @@ void
 CloseSocket(int pa_nSockFd)
 {
 
-  OPENER_TRACE_INFO("networkhandler: closing socket %d\n", pa_nSockFd);
+  CIPSTER_TRACE_INFO("networkhandler: closing socket %d\n", pa_nSockFd);
   if (kEipInvalidSocket != pa_nSockFd)
     {
       FD_CLR(pa_nSockFd, &master);
@@ -607,12 +607,12 @@ CheckAndHandleTcpListenerSocket()
   // see if this is a connection request to the TCP listener
   if (true == checkSocketSet(g_network_status.tcp_listener))
     {
-      OPENER_TRACE_INFO("networkhandler: new TCP connection\n");
+      CIPSTER_TRACE_INFO("networkhandler: new TCP connection\n");
 
       newfd = accept(g_network_status.tcp_listener, NULL, NULL);
       if (newfd == -1)
         {
-          OPENER_TRACE_ERR("networkhandler: error on accept: %s\n", strerror(errno));
+          CIPSTER_TRACE_ERR("networkhandler: error on accept: %s\n", strerror(errno));
           return;
         }
 
@@ -623,7 +623,7 @@ CheckAndHandleTcpListenerSocket()
           fdmax = newfd;
         }
 
-      OPENER_TRACE_STATE(
+      CIPSTER_TRACE_STATE(
           "networkhandler: opened new TCP connection on fd %d\n",
           newfd);
     }
@@ -649,23 +649,23 @@ CheckAndHandleUdpBroadCastSocket()
 
       nFromLen = sizeof(stFrom);
 
-      OPENER_TRACE_STATE(
+      CIPSTER_TRACE_STATE(
           "networkhandler: unsolicited UDP message on EIP broadcast socket\n");
 
       //Handle udp broadcast messages
       nReceived_size = recvfrom(g_network_status.udp_broadcast_listener,
-          g_ethernet_communciation_buffer, PC_OPENER_ETHERNET_BUFFER_SIZE, 0,
+          g_ethernet_communciation_buffer, PC_CIPSTER_ETHERNET_BUFFER_SIZE, 0,
           (struct sockaddr *) &stFrom, &nFromLen);
 
       if (nReceived_size <= 0)
         { // got error
-          OPENER_TRACE_ERR(
+          CIPSTER_TRACE_ERR(
               "networkhandler: error on recvfrom udp broadcast port: %s\n",
               strerror(errno));
           return;
         }
 
-      OPENER_TRACE_INFO("Data received on udp:\n");
+      CIPSTER_TRACE_INFO("Data received on udp:\n");
 
       rxp = &g_ethernet_communciation_buffer[0];
       do
@@ -679,14 +679,14 @@ CheckAndHandleUdpBroadCastSocket()
 
           if (nReplyLen > 0)
             {
-              OPENER_TRACE_INFO("reply sent:\n");
+              CIPSTER_TRACE_INFO("reply sent:\n");
 
               // if the active fd matches a registered UDP callback, handle a UDP packet
               if (sendto(g_network_status.udp_broadcast_listener,
                   (char *) g_ethernet_communciation_buffer, nReplyLen, 0,
                   (struct sockaddr *) &stFrom, sizeof(stFrom)) != nReplyLen)
                 {
-                  OPENER_TRACE_INFO(
+                  CIPSTER_TRACE_INFO(
                       "networkhandler: UDP response was not fully sent\n");
                 }
             }
@@ -711,23 +711,23 @@ CheckAndHandleUdpUnicastSocket()
 
         nFromLen = sizeof(stFrom);
 
-        OPENER_TRACE_STATE(
+        CIPSTER_TRACE_STATE(
             "networkhandler: unsolicited UDP message on EIP broadcast socket\n");
 
         //Handle udp broadcast messages
         nReceived_size = recvfrom(g_network_status.udp_unicast_listener,
-            g_ethernet_communciation_buffer, PC_OPENER_ETHERNET_BUFFER_SIZE, 0,
+            g_ethernet_communciation_buffer, PC_CIPSTER_ETHERNET_BUFFER_SIZE, 0,
             (struct sockaddr *) &stFrom, &nFromLen);
 
         if (nReceived_size <= 0)
         { // got error
-            OPENER_TRACE_ERR(
+            CIPSTER_TRACE_ERR(
                 "networkhandler: error on recvfrom udp broadcast port: %s\n",
                 strerror(errno));
             return;
         }
 
-        OPENER_TRACE_INFO("Data received on udp:\n");
+        CIPSTER_TRACE_INFO("Data received on udp:\n");
 
         rxp = &g_ethernet_communciation_buffer[0];
         do
@@ -741,14 +741,14 @@ CheckAndHandleUdpUnicastSocket()
 
             if (nReplyLen > 0)
             {
-                OPENER_TRACE_INFO("reply sent:\n");
+                CIPSTER_TRACE_INFO("reply sent:\n");
 
                 // if the active fd matches a registered UDP callback, handle a UDP packet
                 if (sendto(g_network_status.udp_unicast_listener,
                     (char *)g_ethernet_communciation_buffer, nReplyLen, 0,
                     (struct sockaddr *) &stFrom, sizeof(stFrom)) != nReplyLen)
                 {
-                    OPENER_TRACE_INFO(
+                    CIPSTER_TRACE_INFO(
                         "networkhandler: UDP response was not fully sent\n");
                 }
             }
@@ -781,18 +781,18 @@ CheckAndHandleConsumingUdpSockets()
         {
           nFromLen = sizeof(stFrom);
           nReceived_size = recvfrom(pstCurrent->socket[kUdpCommuncationDirectionConsuming],
-              g_ethernet_communciation_buffer, PC_OPENER_ETHERNET_BUFFER_SIZE, 0,
+              g_ethernet_communciation_buffer, PC_CIPSTER_ETHERNET_BUFFER_SIZE, 0,
               (struct sockaddr *) &stFrom, &nFromLen);
           if (0 == nReceived_size)
             {
-              OPENER_TRACE_STATE("connection closed by client\n");
+              CIPSTER_TRACE_STATE("connection closed by client\n");
               pstCurrent->connection_close_function(pstCurrent);
               continue;
             }
 
           if (0 > nReceived_size)
             {
-              OPENER_TRACE_ERR("networkhandler: error on recv: %s\n", strerror(errno));
+              CIPSTER_TRACE_ERR("networkhandler: error on recv: %s\n", strerror(errno));
               pstCurrent->connection_close_function(pstCurrent);
               continue;
             }

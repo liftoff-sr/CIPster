@@ -46,7 +46,7 @@ IterT vec_search( IterT begin, IterT end, T target )
 }
 
 // global public variables
-EipUint8 g_message_data_reply_buffer[OPENER_MESSAGE_DATA_REPLY_BUFFER];
+EipUint8 g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
 
 const EipUint16 kCipUintZero = 0;
 
@@ -61,27 +61,27 @@ void CipStackInit( EipUint16 unique_connection_id )
 
     // The message router is the first CIP object be initialized!!!
     eip_status = CipMessageRouterInit();
-    OPENER_ASSERT( kEipStatusOk == eip_status );
+    CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
     eip_status = CipIdentityInit();
-    OPENER_ASSERT( kEipStatusOk == eip_status );
+    CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
     eip_status = CipTcpIpInterfaceInit();
-    OPENER_ASSERT( kEipStatusOk == eip_status );
+    CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
     eip_status = CipEthernetLinkInit();
-    OPENER_ASSERT( kEipStatusOk == eip_status );
+    CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
     eip_status = ConnectionManagerInit( unique_connection_id );
-    OPENER_ASSERT( kEipStatusOk == eip_status );
+    CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
     eip_status = CipAssemblyInitialize();
-    OPENER_ASSERT( kEipStatusOk == eip_status );
+    CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
 #if 0    // do this in caller after return from this function.
     // the application has to be initialized last
     eip_status = ApplicationInitialization();
-    OPENER_ASSERT( kEipStatusOk == eip_status );
+    CIPSTER_ASSERT( kEipStatusOk == eip_status );
 #endif
 
     (void) eip_status;
@@ -115,21 +115,21 @@ EipStatus NotifyClass( CipClass* cip_class,
 
     if( instance )
     {
-        OPENER_TRACE_INFO( "notify: found instance %d%s\n", instance_number,
+        CIPSTER_TRACE_INFO( "notify: found instance %d%s\n", instance_number,
                 instance_number == 0 ? " (class object)" : "" );
 
         CipService* service = cip_class->Service( request->service );
 
         if( service )
         {
-            OPENER_TRACE_INFO( "notify: calling '%s' service\n", service->service_name.c_str() );
-            OPENER_ASSERT( service->service_function );
+            CIPSTER_TRACE_INFO( "notify: calling '%s' service\n", service->service_name.c_str() );
+            CIPSTER_ASSERT( service->service_function );
 
             // call the service, and return what it returns
             return service->service_function( instance, request, response );
         }
 
-        OPENER_TRACE_WARN( "notify: service 0x%x not supported\n",
+        CIPSTER_TRACE_WARN( "notify: service 0x%x not supported\n",
                 request->service );
 
         // if no services or service not found, return an error reply
@@ -137,7 +137,7 @@ EipStatus NotifyClass( CipClass* cip_class,
     }
     else
     {
-        OPENER_TRACE_WARN( "notify: instance number %d unknown\n", instance_number );
+        CIPSTER_TRACE_WARN( "notify: instance number %d unknown\n", instance_number );
 
         // If instance not found, return an error reply.
         // According to the test tool this should be the correct error flag
@@ -270,7 +270,7 @@ CipInstance::~CipInstance()
     {
         if( instance_id )   // and not nested in a public class, then I am an instance.
         {
-            OPENER_TRACE_INFO( "deleting instance %d of class '%s'\n",
+            CIPSTER_TRACE_INFO( "deleting instance %d of class '%s'\n",
                 instance_id, owning_class->class_name.c_str() );
         }
     }
@@ -381,7 +381,7 @@ CipClass::CipClass(
 
 CipClass::~CipClass()
 {
-    OPENER_TRACE_INFO( "deleting class '%s'\n", class_name.c_str() );
+    CIPSTER_TRACE_INFO( "deleting class '%s'\n", class_name.c_str() );
 
     // a meta-class does not own its one public class instance
     if( !IsMetaClass() )
@@ -429,7 +429,7 @@ CipService* CipClass::Service( EipUint8 service_id ) const
     if( it != services.end() )
         return *it;
 
-    OPENER_TRACE_WARN( "service %d not defined\n", service_id );
+    CIPSTER_TRACE_WARN( "service %d not defined\n", service_id );
 
     return NULL;
 }
@@ -439,7 +439,7 @@ bool CipClass::InstanceInsert( CipInstance* aInstance )
 {
     if( aInstance->owning_class )
     {
-        OPENER_TRACE_ERR( "%s: aInstance id:%d is already owned\n", __func__, aInstance->Id() );
+        CIPSTER_TRACE_ERR( "%s: aInstance id:%d is already owned\n", __func__, aInstance->Id() );
         return false;
     }
 
@@ -453,7 +453,7 @@ bool CipClass::InstanceInsert( CipInstance* aInstance )
 
         else if( aInstance->Id() == (*it)->Id() )
         {
-            OPENER_TRACE_ERR( "class '%s' already has instance %d\n",
+            CIPSTER_TRACE_ERR( "class '%s' already has instance %d\n",
                 class_name.c_str(), aInstance->Id()
                 );
 
@@ -503,7 +503,7 @@ CipInstance* CipClass::Instance( EipUint32 instance_id ) const
     if( it != instances.end() )
         return *it;
 
-    OPENER_TRACE_WARN( "instance %d not in class '%s'\n",
+    CIPSTER_TRACE_WARN( "instance %d not in class '%s'\n",
         instance_id, class_name.c_str() );
 
     return NULL;
@@ -514,7 +514,7 @@ bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 {
     CipAttributes::iterator it;
 
-    OPENER_ASSERT( !aAttribute->owning_instance );  // only un-owned attributes may be inserted
+    CIPSTER_ASSERT( !aAttribute->owning_instance );  // only un-owned attributes may be inserted
 
     // Keep sorted by id
     for( it = attributes.begin(); it != attributes.end();  ++it )
@@ -524,7 +524,7 @@ bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 
         else if( aAttribute->Id() == (*it)->Id() )
         {
-            OPENER_TRACE_ERR( "class '%s' instance %d already has attribute %d, ovveriding\n",
+            CIPSTER_TRACE_ERR( "class '%s' instance %d already has attribute %d, ovveriding\n",
                 owning_class ? owning_class->class_name.c_str() : "meta-something",
                 instance_id,
                 aAttribute->Id()
@@ -623,7 +623,7 @@ bool CipClass::ServiceInsert( CipService* aService )
 
         else if( aService->Id() == (*it)->Id() )
         {
-            OPENER_TRACE_ERR( "class '%s' already has service %d, overriding.\n",
+            CIPSTER_TRACE_ERR( "class '%s' already has service %d, overriding.\n",
                 class_name.c_str(), aService->Id()
                 );
 
@@ -665,7 +665,7 @@ CipAttribute* CipInstance::Attribute( EipUint16 attribute_id ) const
     if( it != attributes.end() )
         return *it;
 
-    OPENER_TRACE_WARN( "attribute %d not defined\n", attribute_id );
+    CIPSTER_TRACE_WARN( "attribute %d not defined\n", attribute_id );
 
     return NULL;
 }
@@ -711,7 +711,7 @@ EipStatus GetAttributeSingle( CipInstance* instance,
     {
         if( attribute->attribute_flags & get_mask )
         {
-            OPENER_TRACE_INFO( "%s: getAttribute %d\n",
+            CIPSTER_TRACE_INFO( "%s: getAttribute %d\n",
                     __func__, request->request_path.attribute_number );
 
             // create a reply message containing the data
@@ -737,7 +737,7 @@ EipStatus SetAttributeSingle( CipInstance* instance,
     {
         if( attribute->attribute_flags & kSetable )
         {
-            OPENER_TRACE_INFO( "%s: attribute_id:%d calling Set()\n",
+            CIPSTER_TRACE_INFO( "%s: attribute_id:%d calling Set()\n",
                 __func__, attribute->attribute_id );
 
             // Set() is very "attribute specific" and is determined by which
@@ -789,7 +789,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         counter = 4;
         break;
 
-#ifdef OPENER_SUPPORT_64BIT_DATATYPES
+#ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
     case kCipLint:
     case kCipUlint:
     case kCipLword:
@@ -904,7 +904,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
 
     case kCipByteArray:
         {
-            OPENER_TRACE_INFO( "%s: CipByteArray\n", __func__ );
+            CIPSTER_TRACE_INFO( "%s: CipByteArray\n", __func__ );
             CipByteArray* cip_byte_array = (CipByteArray*) data;
 
             // the array length is not encoded for CipByteArray.
@@ -966,7 +966,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
         number_of_decoded_bytes = 4;
         break;
 
-#ifdef OPENER_SUPPORT_64BIT_DATATYPES
+#ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
     case kCipLint:
     case kCipUlint:
     case kCipLword:
@@ -980,7 +980,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipByteArray:
         // this code has no notion of buffer overrun protection or memory ownership, be careful.
         {
-            OPENER_TRACE_INFO( "%s: kCipByteArray\n", __func__ );
+            CIPSTER_TRACE_INFO( "%s: kCipByteArray\n", __func__ );
 
             // The CipByteArray's length must be set by caller, i.e. known
             // in advance and set in advance by caller.  And the data field
@@ -1040,7 +1040,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
     /*
     if( instance->instance_id == 2 )
     {
-        OPENER_TRACE_INFO( "GetAttributeAll: instance number 2\n" );
+        CIPSTER_TRACE_INFO( "GetAttributeAll: instance number 2\n" );
     }
     */
 
@@ -1225,7 +1225,7 @@ int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
             break;
 
         default:
-            OPENER_TRACE_ERR( "wrong path requested\n" );
+            CIPSTER_TRACE_ERR( "wrong path requested\n" );
             return kEipStatusError;
             break;
         }

@@ -24,7 +24,7 @@ struct InputOnlyConnection
     unsigned output_assembly;           ///< the O-to-T point for the connection
     unsigned input_assembly;            ///< the T-to-O point for the connection
     unsigned config_assembly;           ///< the config point for the connection
-    CipConn connection_data[OPENER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH]; ///< the connection data
+    CipConn connection_data[CIPSTER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH]; ///< the connection data
 };
 
 struct ListenOnlyConnection
@@ -32,14 +32,14 @@ struct ListenOnlyConnection
     unsigned output_assembly;           ///< the O-to-T point for the connection
     unsigned input_assembly;            ///< the T-to-O point for the connection
     unsigned config_assembly;           ///< the config point for the connection
-    CipConn connection_data[OPENER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH];    ///< the connection data
+    CipConn connection_data[CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH];    ///< the connection data
 };
 
-ExclusiveOwnerConnection g_exlusive_owner_connections[OPENER_CIP_NUM_EXLUSIVE_OWNER_CONNS];
+ExclusiveOwnerConnection g_exlusive_owner_connections[CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS];
 
-InputOnlyConnection g_input_only_connections[OPENER_CIP_NUM_INPUT_ONLY_CONNS];
+InputOnlyConnection g_input_only_connections[CIPSTER_CIP_NUM_INPUT_ONLY_CONNS];
 
-ListenOnlyConnection g_listen_only_connections[OPENER_CIP_NUM_LISTEN_ONLY_CONNS];
+ListenOnlyConnection g_listen_only_connections[CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS];
 
 CipConn* GetExclusiveOwnerConnection( CipConn* cip_conn,
         EipUint16* extended_error );
@@ -55,7 +55,7 @@ void ConfigureExclusiveOwnerConnectionPoint( unsigned connection_number,
         unsigned input_assembly,
         unsigned config_assembly )
 {
-    if( OPENER_CIP_NUM_EXLUSIVE_OWNER_CONNS > connection_number )
+    if( CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS > connection_number )
     {
         g_exlusive_owner_connections[connection_number].output_assembly =
             output_assembly;
@@ -72,7 +72,7 @@ void ConfigureInputOnlyConnectionPoint( unsigned connection_number,
         unsigned input_assembly,
         unsigned config_assembly )
 {
-    if( OPENER_CIP_NUM_INPUT_ONLY_CONNS > connection_number )
+    if( CIPSTER_CIP_NUM_INPUT_ONLY_CONNS > connection_number )
     {
         g_input_only_connections[connection_number].output_assembly =
             output_assembly;
@@ -88,7 +88,7 @@ void ConfigureListenOnlyConnectionPoint( unsigned connection_number,
         unsigned input_assembly,
         unsigned config_assembly )
 {
-    if( OPENER_CIP_NUM_LISTEN_ONLY_CONNS > connection_number )
+    if( CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS > connection_number )
     {
         g_listen_only_connections[connection_number].output_assembly =
             output_assembly;
@@ -163,7 +163,7 @@ CipConn* GetExclusiveOwnerConnection( CipConn* cip_conn,
 {
     CipConn* exclusive_owner_connection = NULL;
 
-    for( int i = 0; i < OPENER_CIP_NUM_EXLUSIVE_OWNER_CONNS; i++ )
+    for( int i = 0; i < CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS; i++ )
     {
         if( (g_exlusive_owner_connections[i].output_assembly
              == cip_conn->connection_path.connection_point[0])
@@ -193,7 +193,7 @@ CipConn* GetInputOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
 {
     CipConn* input_only_connection = NULL;
 
-    for( int i = 0; i < OPENER_CIP_NUM_INPUT_ONLY_CONNS; i++ )
+    for( int i = 0; i < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS; i++ )
     {
         if( g_input_only_connections[i].output_assembly
             == cip_conn->connection_path.connection_point[0] ) // we have the same output assembly
@@ -214,7 +214,7 @@ CipConn* GetInputOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
                 break;
             }
 
-            for( int j = 0; j < OPENER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH; j++ )
+            for( int j = 0; j < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH; j++ )
             {
                 if( kConnectionStateNonExistent
                     == g_input_only_connections[i].connection_data[j].state )
@@ -247,7 +247,7 @@ CipConn* GetListenOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
         return NULL;
     }
 
-    for( int i = 0; i < OPENER_CIP_NUM_LISTEN_ONLY_CONNS; i++ )
+    for( int i = 0; i < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS; i++ )
     {
         if( g_listen_only_connections[i].output_assembly
             == cip_conn->connection_path.connection_point[0] ) // we have the same output assembly
@@ -276,7 +276,7 @@ CipConn* GetListenOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
                 break;
             }
 
-            for( int j = 0; j < OPENER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
+            for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
             {
                 if( kConnectionStateNonExistent
                     == g_listen_only_connections[i].connection_data[j].state )

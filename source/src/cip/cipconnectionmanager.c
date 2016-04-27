@@ -38,7 +38,7 @@ const int g_kForwardOpenHeaderLength = 36;  //*< the length in bytes of the forw
 /// @brief Compares the logical path on equality
 #define EQLOGICALPATH( x, y ) ( ( (x) & 0xfc )==(y) )
 
-#define NUM_CONNECTABLE_OBJECTS     (2 + OPENER_CIP_NUM_APPLICATION_SPECIFIC_CONNECTABLE_OBJECTS)
+#define NUM_CONNECTABLE_OBJECTS     (2 + CIPSTER_CIP_NUM_APPLICATION_SPECIFIC_CONNECTABLE_OBJECTS)
 
 struct ConnectionManagementHandling
 {
@@ -150,7 +150,7 @@ unsigned GetPaddedLogicalPath( unsigned char** logical_path_segment )
     }
     else
     {
-        OPENER_TRACE_ERR( "illegal logical path segment\n" );
+        CIPSTER_TRACE_ERR( "illegal logical path segment\n" );
     }
 
     return padded_logical_path;
@@ -209,7 +209,7 @@ EipStatus ConnectionManagerInit( EipUint16 unique_connection_id )
 EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
         struct sockaddr_in* from_address )
 {
-    OPENER_TRACE_INFO( "%s:\n", __func__ );
+    CIPSTER_TRACE_INFO( "%s:\n", __func__ );
 
     if( ( CreateCommonPacketFormatStructure( data, data_length,
                   &g_common_packet_format_data_item ) ) == kEipStatusError )
@@ -247,7 +247,7 @@ EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
                         conn->inactivity_watchdog_timer =
                             (conn->o_to_t_requested_packet_interval / 1000) << (2 + conn->connection_timeout_multiplier);
 
-                        OPENER_TRACE_INFO( "%s: reset inactivity_watchdog_timer:%u\n",
+                        CIPSTER_TRACE_INFO( "%s: reset inactivity_watchdog_timer:%u\n",
                             __func__,
                             conn->inactivity_watchdog_timer );
 
@@ -266,7 +266,7 @@ EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
                 }
                 else
                 {
-                    OPENER_TRACE_WARN(
+                    CIPSTER_TRACE_WARN(
                             "Connected Message Data Received with wrong address information\n" );
                 }
             }
@@ -317,7 +317,7 @@ EipStatus ForwardOpen( CipInstance* instance,
         {
             //TODO implement reconfiguration of connection
 
-            OPENER_TRACE_ERR(
+            CIPSTER_TRACE_ERR(
                     "this looks like a duplicate forward open -- I can't handle this yet, sending a CIP_CON_MGR_ERROR_CONNECTION_IN_USE response\n" );
         }
 
@@ -337,7 +337,7 @@ EipStatus ForwardOpen( CipInstance* instance,
     request->data += 3; // reserved
 
     // the requested packet interval parameter needs to be a multiple of TIMERTICK from the header file
-    OPENER_TRACE_INFO(
+    CIPSTER_TRACE_INFO(
             "ForwardOpen: ConConnID %" PRIu32 ", ProdConnID %" PRIu32 ", ConnSerNo %u\n",
             s_dummy_conn.consumed_connection_id,
             s_dummy_conn.produced_connection_id,
@@ -406,18 +406,18 @@ EipStatus ForwardOpen( CipInstance* instance,
         temp = connection_management_entry->open_connection_function(
                 &s_dummy_conn, &connection_status );
 
-        OPENER_TRACE_INFO( "open_connection_function, temp = %d\n", temp );
+        CIPSTER_TRACE_INFO( "open_connection_function, temp = %d\n", temp );
     }
     else
     {
-        OPENER_TRACE_INFO( "%s: GetConnMgmEntry returned NULL\n", __func__ );
+        CIPSTER_TRACE_INFO( "%s: GetConnMgmEntry returned NULL\n", __func__ );
         temp = kEipStatusError;
         connection_status = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
     }
 
     if( kEipStatusOk != temp )
     {
-        OPENER_TRACE_INFO( "connection manager: connect failed. temp:%d\n", temp );
+        CIPSTER_TRACE_INFO( "connection manager: connect failed. temp:%d\n", temp );
 
         // in case of error the dummy objects holds all necessary information
         return AssembleForwardOpenResponse( &s_dummy_conn,
@@ -426,7 +426,7 @@ EipStatus ForwardOpen( CipInstance* instance,
     }
     else
     {
-        OPENER_TRACE_INFO( "connection manager: connect succeeded\n" );
+        CIPSTER_TRACE_INFO( "connection manager: connect succeeded\n" );
 
         // in case of success the g_pstActiveConnectionList points to the new connection
         return AssembleForwardOpenResponse( g_active_connection_list,
@@ -489,7 +489,7 @@ void GeneralConnectionConfiguration( CipConn* conn )
           << (2 + conn->connection_timeout_multiplier) ) :
         10000;
 
-    OPENER_TRACE_INFO( "%s: inactivity_watchdog_timer:%u\n", __func__,
+    CIPSTER_TRACE_INFO( "%s: inactivity_watchdog_timer:%u\n", __func__,
             conn->inactivity_watchdog_timer );
 
     conn->consumed_connection_size = conn->o_to_t_network_connection_parameter & 0x01FF;
@@ -520,7 +520,7 @@ EipStatus ForwardClose( CipInstance* instance,
     EipUint16 originator_vendor_id = GetIntFromMessage( &request->data );
     EipUint32 originator_serial_number = GetDintFromMessage( &request->data );
 
-    OPENER_TRACE_INFO( "ForwardClose: ConnSerNo %d\n", connection_serial_number );
+    CIPSTER_TRACE_INFO( "ForwardClose: ConnSerNo %d\n", connection_serial_number );
 
     while( NULL != active )
     {
@@ -535,7 +535,7 @@ EipStatus ForwardClose( CipInstance* instance,
                     == originator_serial_number) )
             {
                 // found the corresponding connection object -> close it
-                OPENER_ASSERT( NULL != active->connection_close_function );
+                CIPSTER_ASSERT( NULL != active->connection_close_function );
                 active->connection_close_function( active );
                 connection_status = kConnectionManagerStatusCodeSuccess;
                 break;
@@ -592,12 +592,12 @@ EipStatus ManageConnections()
                 if( active->inactivity_watchdog_timer <= 0 )
                 {
                     // we have a timed out connection: perform watchdog check
-                    OPENER_TRACE_INFO( "%s: >>>>>Connection timed out socket[0]:%d socket[1]:%d\n",
+                    CIPSTER_TRACE_INFO( "%s: >>>>>Connection timed out socket[0]:%d socket[1]:%d\n",
                         __func__,
                         active->socket[0], active->socket[1]
                         );
 
-                    OPENER_ASSERT( active->connection_timeout_function );
+                    CIPSTER_ASSERT( active->connection_timeout_function );
 
                     active->connection_timeout_function( active );
                 }
@@ -624,13 +624,13 @@ EipStatus ManageConnections()
 
                     if( active->transmission_trigger_timer <= 0 ) // need to send package
                     {
-                        OPENER_ASSERT( active->connection_send_data_function );
+                        CIPSTER_ASSERT( active->connection_send_data_function );
 
                         eip_status = active->connection_send_data_function( active );
 
                         if( eip_status == kEipStatusError )
                         {
-                            OPENER_TRACE_ERR( "sending of UDP data in manage Connection failed\n" );
+                            CIPSTER_TRACE_ERR( "sending of UDP data in manage Connection failed\n" );
                         }
 
                         // reload the timer value
@@ -685,7 +685,7 @@ EipStatus AssembleForwardOpenResponse( CipConn* co,
 
     if( kCipErrorSuccess == general_status )
     {
-        OPENER_TRACE_INFO( "assembleFWDOpenResponse: sending success response\n" );
+        CIPSTER_TRACE_INFO( "assembleFWDOpenResponse: sending success response\n" );
         response->data_length = 26; // if there is no application specific data
         response->size_of_additional_status = 0;
 
@@ -705,7 +705,7 @@ EipStatus AssembleForwardOpenResponse( CipConn* co,
     else
     {
         // we have an connection creation error
-        OPENER_TRACE_INFO( "assembleFWDOpenResponse: sending error response\n" );
+        CIPSTER_TRACE_INFO( "assembleFWDOpenResponse: sending error response\n" );
         co->state = kConnectionStateNonExistent;
         response->data_length = 10;
 
@@ -1029,7 +1029,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
             conn->electronic_key.key_data.minor_revision   = *message++;
             remaining_path_size -= 5; //length of the electronic key
 
-            OPENER_TRACE_INFO(
+            CIPSTER_TRACE_INFO(
                     "key: ven ID %d, dev type %d, prod code %d, major %d, minor %d\n",
                     conn->electronic_key.key_data.vendor_id,
                     conn->electronic_key.key_data.device_type,
@@ -1046,7 +1046,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
         }
         else
         {
-            OPENER_TRACE_INFO( "no key\n" );
+            CIPSTER_TRACE_INFO( "no key\n" );
         }
 
         if( kConnectionTriggerTypeCyclicConnection !=
@@ -1069,7 +1069,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
 
             if( 0 == clazz )
             {
-                OPENER_TRACE_ERR( "classid %d not found\n",
+                CIPSTER_TRACE_ERR( "classid %d not found\n",
                         (int) conn->connection_path.class_id );
 
                 if( conn->connection_path.class_id >= 0xC8 ) //reserved range of class ids
@@ -1086,7 +1086,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
                 return kCipErrorConnectionFailure;
             }
 
-            OPENER_TRACE_INFO( "classid %d (%s)\n",
+            CIPSTER_TRACE_INFO( "classid %d (%s)\n",
                     (int) conn->connection_path.class_id,
                     clazz->class_name.c_str() );
         }
@@ -1103,7 +1103,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
         {
             conn->connection_path.connection_point[2] = GetPaddedLogicalPath( &message );
 
-            OPENER_TRACE_INFO( "Configuration instance id %" PRId32 "\n",
+            CIPSTER_TRACE_INFO( "Configuration instance id %" PRId32 "\n",
                     conn->connection_path.connection_point[2] );
 
             if( NULL == clazz->Instance( conn->connection_path.connection_point[2] ) )
@@ -1121,7 +1121,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
         }
         else
         {
-            OPENER_TRACE_INFO( "no config data\n" );
+            CIPSTER_TRACE_INFO( "no config data\n" );
         }
 
         if( 0x03 == (conn->transport_type_class_trigger & 0x03) )
@@ -1129,7 +1129,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
             // we have Class 3 connection
             if( remaining_path_size > 0 )
             {
-                OPENER_TRACE_WARN(
+                CIPSTER_TRACE_WARN(
                         "Too much data in connection path for class 3 connection\n" );
                 *extended_error =
                     kConnectionManagerStatusCodeErrorInvalidSegmentTypeInPath;
@@ -1165,11 +1165,11 @@ EipUint8 ParseConnectionPath( CipConn* conn,
                 if( target_to_originator_connection_type == 0 ) // configuration only connection
                 {
                     number_of_encoded_paths = 0;
-                    OPENER_TRACE_WARN( "assembly: type invalid\n" );
+                    CIPSTER_TRACE_WARN( "assembly: type invalid\n" );
                 }
                 else // 1 path -> path is for production
                 {
-                    OPENER_TRACE_INFO( "assembly: type produce\n" );
+                    CIPSTER_TRACE_INFO( "assembly: type produce\n" );
                     number_of_encoded_paths = 1;
                 }
             }
@@ -1177,12 +1177,12 @@ EipUint8 ParseConnectionPath( CipConn* conn,
             {
                 if( target_to_originator_connection_type == 0 ) // 1 path -> path is for consumption
                 {
-                    OPENER_TRACE_INFO( "assembly: type consume\n" );
+                    CIPSTER_TRACE_INFO( "assembly: type consume\n" );
                     number_of_encoded_paths = 1;
                 }
                 else // 2 paths -> 1st for production 2nd for consumption
                 {
-                    OPENER_TRACE_INFO( "assembly: type bidirectional\n" );
+                    CIPSTER_TRACE_INFO( "assembly: type bidirectional\n" );
                     number_of_encoded_paths = 2;
                 }
             }
@@ -1194,7 +1194,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
                     // InstanceNR
                     conn->connection_path.connection_point[i] = GetPaddedLogicalPath( &message );
 
-                    OPENER_TRACE_INFO(
+                    CIPSTER_TRACE_INFO(
                             "connection point %u\n",
                             (unsigned) conn->connection_path.connection_point[i] );
 
@@ -1253,7 +1253,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
                     break;
 
                 default:
-                    OPENER_TRACE_WARN(
+                    CIPSTER_TRACE_WARN(
                             "No data segment identifier found for the configuration data\n" );
 
                     *extended_error = conn->connection_path_size
@@ -1363,7 +1363,7 @@ EipStatus AddConnectableObject( EipUint32 aClassId, OpenConnectionFunction func 
     {
         if( !g_astConnMgmList[i].class_id || aClassId == g_astConnMgmList[i].class_id )
         {
-            OPENER_TRACE_INFO(
+            CIPSTER_TRACE_INFO(
                 "%s: adding classId %d with function ptr %p at index %d\n",
                 __func__, aClassId, func, i
                 );
@@ -1377,7 +1377,7 @@ EipStatus AddConnectableObject( EipUint32 aClassId, OpenConnectionFunction func 
         }
     }
 
-    OPENER_TRACE_INFO( "%s: unable to aClassId:%d add\n", __func__, aClassId );
+    CIPSTER_TRACE_INFO( "%s: unable to aClassId:%d add\n", __func__, aClassId );
 
     return kEipStatusError;
 }
@@ -1387,17 +1387,17 @@ ConnectionManagementHandling* GetConnMgmEntry( EipUint32 class_id )
 {
     for( int i = 0;  i < NUM_CONNECTABLE_OBJECTS;  ++i )
     {
-        OPENER_TRACE_INFO( "%s: [%d]:class_id: %d\n",
+        CIPSTER_TRACE_INFO( "%s: [%d]:class_id: %d\n",
             __func__, i, g_astConnMgmList[i].class_id );
 
         if( class_id == g_astConnMgmList[i].class_id )
         {
-            OPENER_TRACE_ERR( "%s: found class %d at entry %d\n", __func__, class_id, i );
+            CIPSTER_TRACE_ERR( "%s: found class %d at entry %d\n", __func__, class_id, i );
             return &g_astConnMgmList[i];
         }
     }
 
-    OPENER_TRACE_ERR( "%s: could not find class %d\n", __func__, class_id );
+    CIPSTER_TRACE_ERR( "%s: could not find class %d\n", __func__, class_id );
 
     return NULL;
 }
@@ -1435,7 +1435,7 @@ EipStatus TriggerConnections( unsigned pa_unOutputAssembly,
 
 void InitializeConnectionManagerData()
 {
-    OPENER_TRACE_INFO( "%s: \n", __func__ );
+    CIPSTER_TRACE_INFO( "%s: \n", __func__ );
 
     memset( g_astConnMgmList, 0, sizeof g_astConnMgmList );
 

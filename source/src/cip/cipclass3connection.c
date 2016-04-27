@@ -13,7 +13,7 @@ CipConn* GetFreeExplicitConnection();
 // *** Global variables ***
 
 /// @brief Array of the available explicit connections
-CipConn g_explicit_connections[OPENER_CIP_NUM_EXPLICIT_CONNS];
+CipConn g_explicit_connections[CIPSTER_CIP_NUM_EXPLICIT_CONNS];
 
 // *** Implementation ***
 int EstablishClass3Connection( CipConn* cip_conn,
@@ -59,7 +59,7 @@ int EstablishClass3Connection( CipConn* cip_conn,
 
 CipConn* GetFreeExplicitConnection( void )
 {
-    for( int i = 0; i < OPENER_CIP_NUM_EXPLICIT_CONNS; i++ )
+    for( int i = 0; i < CIPSTER_CIP_NUM_EXPLICIT_CONNS; i++ )
     {
         if( g_explicit_connections[i].state == kConnectionStateNonExistent )
             return &(g_explicit_connections[i]);

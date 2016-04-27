@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CIPCOMMON_H_
-#define OPENER_CIPCOMMON_H_
+#ifndef CIPSTER_CIPCOMMON_H_
+#define CIPSTER_CIPCOMMON_H_
 
 /** @file cipcommon.h
  * Common CIP object interface
@@ -75,4 +75,4 @@ EipStatus GetAttributeAll( CipInstance* instance,
  */
 int DecodePaddedEPath( CipEpath* epath, EipUint8** data );
 
-#endif    // OPENER_CIPCOMMON_H_
+#endif    // CIPSTER_CIPCOMMON_H_

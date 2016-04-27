@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CIPIDENTITY_H_
-#define OPENER_CIPIDENTITY_H_
+#ifndef CIPSTER_CIPIDENTITY_H_
+#define CIPSTER_CIPIDENTITY_H_
 
 #include "typedefs.h"
 #include "ciptypes.h"
@@ -52,4 +52,4 @@ enum CipIdentityExtendedStatus
  */
 EipStatus CipIdentityInit();
 
-#endif    // OPENER_CIPIDENTITY_H_
+#endif    // CIPSTER_CIPIDENTITY_H_

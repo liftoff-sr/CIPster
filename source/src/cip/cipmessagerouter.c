@@ -151,14 +151,14 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
     // set reply buffer, using a fixed buffer (about 100 bytes)
     g_response.data = g_message_data_reply_buffer;
 
-    OPENER_TRACE_INFO( "notifyMR: routing unconnected message\n" );
+    CIPSTER_TRACE_INFO( "notifyMR: routing unconnected message\n" );
 
     EipByte nStatus = CreateMessageRouterRequestStructure(
                         data, data_length, &g_request );
 
     if( nStatus != kCipErrorSuccess )
     {
-        OPENER_TRACE_ERR( "notifyMR: error from createMRRequeststructure\n" );
+        CIPSTER_TRACE_ERR( "notifyMR: error from createMRRequeststructure\n" );
         g_response.general_status = nStatus;
         g_response.size_of_additional_status = 0;
         g_response.reserved = 0;
@@ -172,7 +172,7 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
 
         if( !clazz )
         {
-            OPENER_TRACE_ERR(
+            CIPSTER_TRACE_ERR(
                     "notifyMR: sending CIP_ERROR_OBJECT_DOES_NOT_EXIST reply, class id 0x%x is not registered\n",
                     (unsigned) g_request.request_path.class_id );
 
@@ -191,27 +191,27 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
             // object will or will not make an reply into gMRResponse.
             g_response.reserved = 0;
 
-            OPENER_TRACE_INFO( "notifyMR: calling notify function of class '%s'\n",
+            CIPSTER_TRACE_INFO( "notifyMR: calling notify function of class '%s'\n",
                     clazz->class_name.c_str() );
 
             eip_status = NotifyClass( clazz, &g_request, &g_response );
 
-#ifdef OPENER_TRACE_ENABLED
+#ifdef CIPSTER_TRACE_ENABLED
             if( eip_status == kEipStatusError )
             {
-                OPENER_TRACE_ERR(
+                CIPSTER_TRACE_ERR(
                         "notifyMR: notify function of class '%s' returned an error\n",
                         clazz->class_name.c_str() );
             }
             else if( eip_status == kEipStatusOk )
             {
-                OPENER_TRACE_INFO(
+                CIPSTER_TRACE_INFO(
                         "notifyMR: notify function of class '%s' returned no reply\n",
                         clazz->class_name.c_str() );
             }
             else
             {
-                OPENER_TRACE_INFO(
+                CIPSTER_TRACE_INFO(
                         "notifyMR: notify function of class '%s' returned a reply\n",
                         clazz->class_name.c_str() );
             }

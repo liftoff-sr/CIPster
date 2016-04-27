@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CIPTCPIPINTERFACE_H_
-#define OPENER_CIPTCPIPINTERFACE_H_
+#ifndef CIPSTER_CIPTCPIPINTERFACE_H_
+#define CIPSTER_CIPTCPIPINTERFACE_H_
 
 /** @file ciptcpipinterface.h
  * @brief Public interface of the TCP/IP Interface Object
@@ -45,4 +45,4 @@ EipStatus CipTcpIpInterfaceInit(void);
  */
 void ShutdownTcpIpInterface(void);
 
-#endif // OPENER_CIPTCPIPINTERFACE_H_
+#endif // CIPSTER_CIPTCPIPINTERFACE_H_

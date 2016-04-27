@@ -168,7 +168,7 @@ CipInstance* cip_file_object_create_instance( EipUint32 instance_id,
                     &download_transfer,
                     "Download_Transfer" );
 
-            OPENER_TRACE_INFO( "An instance #%i of the file object is created", instance_id );
+            CIPSTER_TRACE_INFO( "An instance #%i of the file object is created", instance_id );
 
             // Check file
             FILE* f =
@@ -177,7 +177,7 @@ CipInstance* cip_file_object_create_instance( EipUint32 instance_id,
             if( f == NULL )
             {
                 // Create the file if it doesn't exist
-                OPENER_TRACE_WARN( "The file %s hasn't been found. The file will be created.",
+                CIPSTER_TRACE_WARN( "The file %s hasn't been found. The file will be created.",
                         (char*) dir[count].file_name->strings[0].content->String );
 
                 f = IApp_FileOpen( (char*) dir[count].file_name->strings[0].content->String, "w" );
@@ -188,7 +188,7 @@ CipInstance* cip_file_object_create_instance( EipUint32 instance_id,
                     rt_fo->state = CIP_FILE_STATE_EMPTY;
                 }
                 else
-                    OPENER_TRACE_ERR( "The file %s isn't created.",
+                    CIPSTER_TRACE_ERR( "The file %s isn't created.",
                             (char*) dir[count].file_name->strings[0].content->String );
             }
             else
@@ -216,11 +216,11 @@ CipInstance* cip_file_object_create_instance( EipUint32 instance_id,
             }
         }
         else
-            OPENER_TRACE_ERR( "The limit %i of number of files is reached.",
+            CIPSTER_TRACE_ERR( "The limit %i of number of files is reached.",
                     CIP_FILE_MAX_NUM_INSTANCES );
     }
     else
-        OPENER_TRACE_ERR( "The File Object class hasn't been found.",
+        CIPSTER_TRACE_ERR( "The File Object class hasn't been found.",
                 CIP_FILE_MAX_NUM_INSTANCES );
 
     return file_object_instance;
@@ -258,7 +258,7 @@ EipStatus initiate_upload( CipInstance* instance,
 
     rt_fo->state = CIP_FILE_STATE_UPLOAD_INIT;
 
-    OPENER_TRACE_INFO( "The uploading for object #%i has been initiated.", instance->nInstanceNr );
+    CIPSTER_TRACE_INFO( "The uploading for object #%i has been initiated.", instance->nInstanceNr );
 
     return EIP_OK_SEND;
 }
@@ -278,7 +278,7 @@ EipStatus upload_transfer( CipInstance* instance,
         resp->ReplyService = (0x80 | req->Service);
         resp->DataLength = 0;
 
-        OPENER_TRACE_ERR(
+        CIPSTER_TRACE_ERR(
                 "The file object #%i cannot perform the request service %x in its current state.\n",
                 instance->nInstanceNr,
                 req->Service );
@@ -300,7 +300,7 @@ EipStatus upload_transfer( CipInstance* instance,
             resp->ReplyService = (0x80 | req->Service);
             resp->DataLength = 0;
 
-            OPENER_TRACE_ERR( "The sequence of transfers for file object #%i is wrong.",
+            CIPSTER_TRACE_ERR( "The sequence of transfers for file object #%i is wrong.",
                     instance->nInstanceNr );
         }
         else
@@ -399,7 +399,7 @@ EipStatus initiate_download( CipInstance* instance,
                 // There is a object with the same file name
                 resp->GeneralStatus = CIP_ERROR_INVALID_PARAMETER;
 
-                OPENER_TRACE_ERR( "The file with name %s already exists.\n",
+                CIPSTER_TRACE_ERR( "The file with name %s already exists.\n",
                         file_name->strings[0].content->String );
 
                 rt_fo->state = CIP_FILE_STATE_EMPTY;
@@ -477,7 +477,7 @@ EipStatus download_transfer( CipInstance* instance,
         resp->ReplyService = (0x80 | req->Service);
         resp->DataLength = 0;
 
-        OPENER_TRACE_ERR(
+        CIPSTER_TRACE_ERR(
                 "The file object #%i cannot perform the request service %x in its current state.\n",
                 instance->nInstanceNr,
                 req->Service );
@@ -508,7 +508,7 @@ EipStatus download_transfer( CipInstance* instance,
 
             rt_fo->state = CIP_FILE_STATE_LOADED;
 
-            OPENER_TRACE_ERR( "The sequence of transfers for file object #%i is wrong.\n",
+            CIPSTER_TRACE_ERR( "The sequence of transfers for file object #%i is wrong.\n",
                     instance->nInstanceNr );
 
             erase_file( tr->file_name, instance );

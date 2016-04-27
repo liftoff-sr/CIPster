@@ -28,7 +28,7 @@ int NotifyCommonPacketFormat( EncapsulationData* receive_data,
 
     if( return_value == kEipStatusError )
     {
-        OPENER_TRACE_ERR( "notifyCPF: error from createCPFstructure\n" );
+        CIPSTER_TRACE_ERR( "notifyCPF: error from createCPFstructure\n" );
     }
     else
     {
@@ -57,14 +57,14 @@ int NotifyCommonPacketFormat( EncapsulationData* receive_data,
             else
             {
                 // wrong data item detected
-                OPENER_TRACE_ERR(
+                CIPSTER_TRACE_ERR(
                         "notifyCPF: got something besides the expected CIP_ITEM_ID_UNCONNECTEDMESSAGE\n" );
                 receive_data->status = kEncapsulationProtocolIncorrectData;
             }
         }
         else
         {
-            OPENER_TRACE_ERR(
+            CIPSTER_TRACE_ERR(
                     "notifyCPF: got something besides the expected CIP_ITEM_ID_NULL\n" );
             receive_data->status = kEncapsulationProtocolIncorrectData;
         }
@@ -83,7 +83,7 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
 
     if( kEipStatusError == return_value )
     {
-        OPENER_TRACE_ERR( "notifyConnectedCPF: error from createCPFstructure\n" );
+        CIPSTER_TRACE_ERR( "notifyConnectedCPF: error from createCPFstructure\n" );
     }
     else
     {
@@ -131,19 +131,19 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
                 else
                 {
                     // wrong data item detected
-                    OPENER_TRACE_ERR(
+                    CIPSTER_TRACE_ERR(
                             "notifyConnectedCPF: got something besides the expected CIP_ITEM_ID_UNCONNECTEDMESSAGE\n" );
                 }
             }
             else
             {
-                OPENER_TRACE_ERR(
+                CIPSTER_TRACE_ERR(
                         "notifyConnectedCPF: connection with given ID could not be found\n" );
             }
         }
         else
         {
-            OPENER_TRACE_ERR(
+            CIPSTER_TRACE_ERR(
                     "notifyConnectedCPF: got something besides the expected CIP_ITEM_ID_NULL\n" );
         }
     }
@@ -245,7 +245,7 @@ EipStatus CreateCommonPacketFormatStructure( EipUint8* data, int data_length,
     }
     else
     {
-        OPENER_TRACE_WARN(
+        CIPSTER_TRACE_WARN(
                 "something is wrong with the length in Message Router @ CreateCommonPacketFormatStructure\n" );
 
         if( cpfd->item_count > 2 )
@@ -490,7 +490,7 @@ int EncodeSockaddrInfoItemTypeId( int size, int item_type,
         CipCommonPacketFormatData* cpfd,
         EipUint8** message )
 {
-    OPENER_ASSERT( item_type == 0 || item_type == 1 );
+    CIPSTER_ASSERT( item_type == 0 || item_type == 1 );
 
     size += AddIntToMessage( cpfd->address_info_item[item_type].type_id,
                 message );

@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_OPENER_API_H_
-#define OPENER_OPENER_API_H_
+#ifndef CIPSTER_CIPSTER_API_H_
+#define CIPSTER_CIPSTER_API_H_
 
 #include <assert.h>
 
@@ -302,7 +302,7 @@ EipStatus AddConnectableObject( EipUint32 class_id,
  *
  * @param connection_number The number of the exclusive owner connection. The
  *        enumeration starts with 0. Has to be smaller than
- *        OPENER_CIP_NUM_EXLUSIVE_OWNER_CONNS.
+ *        CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS.
  * @param output_assembly_id ID of the O-to-T point to be used for this
  * connection
  * @param input_assembly_id ID of the T-to-O point to be used for this
@@ -320,7 +320,7 @@ void ConfigureExclusiveOwnerConnectionPoint( unsigned connection_number,
  *
  * @param connection_number The number of the input only connection. The
  *        enumeration starts with 0. Has to be smaller than
- *        OPENER_CIP_NUM_INPUT_ONLY_CONNS.
+ *        CIPSTER_CIP_NUM_INPUT_ONLY_CONNS.
  * @param output_assembly_id ID of the O-to-T point to be used for this
  * connection
  * @param input_assembly_id ID of the T-to-O point to be used for this
@@ -338,7 +338,7 @@ void ConfigureInputOnlyConnectionPoint( unsigned connection_number,
  *
  * @param connection_number The number of the input only connection. The
  *        enumeration starts with 0. Has to be smaller than
- *        OPENER_CIP_NUM_LISTEN_ONLY_CONNS.
+ *        CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS.
  * @param output_assembly_id ID of the O-to-T point to be used for this
  * connection
  * @param input_assembly_id ID of the T-to-O point to be used for this
@@ -404,7 +404,7 @@ EipStatus HandleReceivedConnectedData( EipUint8* received_data, int received_dat
  * WatchdogTimeout) have timed out.
  *
  * If the a timeout occurs the function performs the necessary action. This
- * function should be called periodically once every OPENER_TIMER_TICK
+ * function should be called periodically once every CIPSTER_TIMER_TICK
  * milliseconds.
  *
  * @return EIP_OK on success
@@ -771,7 +771,7 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  *      .
  *   - Cyclically update the connection status:\n
  *     In order that CIPster can determine when to produce new data on
- *     connections or that a connection timed out every @ref OPENER_TIMER_TICK
+ *     connections or that a connection timed out every @ref CIPSTER_TIMER_TICK
  * milliseconds the
  *     function EIP_STATUS ManageConnections(void) has to be called.
  *
@@ -817,4 +817,4 @@ void    IApp_CloseSocket_tcp( int socket_handle );
 #endif
 
 
-#endif //OPENER_OPENER_API_H_
+#endif //CIPSTER_CIPSTER_API_H_

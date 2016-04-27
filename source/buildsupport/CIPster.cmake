@@ -1,7 +1,7 @@
 
 function(opener_add_definition)
     foreach(ARG ${ARGV})
-        set_property(GLOBAL APPEND PROPERTY OPENER_DEFINITION ${ARG})
+        set_property(GLOBAL APPEND PROPERTY CIPSTER_DEFINITION ${ARG})
     endforeach(ARG)
 endfunction()
 
@@ -43,7 +43,7 @@ endmacro()
 
 # Creates options for trace level
 macro(createTraceLevelOptions)
-    add_definitions( -DOPENER_WITH_TRACES )
+    add_definitions( -DCIPSTER_WITH_TRACES )
     set( TRACE_LEVEL 0 )
     set( CIPster_TRACE_LEVEL_ERROR ON CACHE BOOL "Error trace level" )
     set( CIPster_TRACE_LEVEL_WARNING ON CACHE BOOL "Warning trace level" )
@@ -66,5 +66,5 @@ macro(createTraceLevelOptions)
         math( EXPR TRACE_LEVEL "${TRACE_LEVEL} + 8" )
     endif()
 
-    add_definitions(-DOPENER_TRACE_LEVEL=${TRACE_LEVEL})
+    add_definitions(-DCIPSTER_TRACE_LEVEL=${TRACE_LEVEL})
 endmacro()

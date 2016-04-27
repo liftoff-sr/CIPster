@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CIPERROR_H_
-#define OPENER_CIPERROR_H_
+#ifndef CIPSTER_CIPERROR_H_
+#define CIPSTER_CIPERROR_H_
 
 enum CipError
 {
@@ -52,4 +52,4 @@ enum CipError
     kCipErrorGroup2OnlyServerGeneralFailure = 0x2A              ///< This error code may only be reported by DeviceNet group 2 only servers with 4K or less code space and only in place of Service not supported, Attribute not supported and Attribute not setable.
 //2B - CF Reserved by CIP for future extensions D0 - FF Reserved for Object Class and service errors
 };
-#endif // OPENER_CIPERROR_H_
+#endif // CIPSTER_CIPERROR_H_

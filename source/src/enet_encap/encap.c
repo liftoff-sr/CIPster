@@ -66,7 +66,7 @@ typedef enum
 #define ENCAP_NUMBER_OF_SUPPORTED_DELAYED_ENCAP_MESSAGES    2 //*< According to EIP spec at least 2 delayed message requests should be supported
 
 #define ENCAP_MAX_DELAYED_ENCAP_MESSAGE_SIZE                ( ENCAPSULATION_HEADER_LENGTH + 39 + \
-                                                              sizeof(OPENER_DEVICE_NAME) )                   // currently we only have the size of an encapsulation message
+                                                              sizeof(CIPSTER_DEVICE_NAME) )                   // currently we only have the size of an encapsulation message
 
 // Encapsulation layer data
 
@@ -82,7 +82,7 @@ typedef struct
 
 EncapsulationInterfaceInformation g_interface_information;
 
-int g_registered_sessions[OPENER_NUMBER_OF_SUPPORTED_SESSIONS];
+int g_registered_sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];
 
 DelayedEncapsulationMessage g_delayed_encapsulation_messages[
     ENCAP_NUMBER_OF_SUPPORTED_DELAYED_ENCAP_MESSAGES];
@@ -132,7 +132,7 @@ void EncapsulationInit()
     srand( interface_configuration_.ip_address );
 
     // initialize Sessions to invalid == free session
-    for( unsigned i = 0; i < OPENER_NUMBER_OF_SUPPORTED_SESSIONS; i++ )
+    for( unsigned i = 0; i < CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS; i++ )
     {
         g_registered_sessions[i] = kEipInvalidSocket;
     }
@@ -483,7 +483,7 @@ void HandleReceivedRegisterSessionCommand( int socket, EncapsulationData* receiv
         && (0 == nOptionFlag) ) //Option field should be zero
     {
         // check if the socket has already a session open
-        for( int i = 0; i < OPENER_NUMBER_OF_SUPPORTED_SESSIONS; ++i )
+        for( int i = 0; i < CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS; ++i )
         {
             if( g_registered_sessions[i] == socket )
             {
@@ -543,7 +543,7 @@ EipStatus HandleReceivedUnregisterSessionCommand( EncapsulationData* receive_dat
     int i;
 
     if( (0 < receive_data->session_handle)
-        && (receive_data->session_handle <= OPENER_NUMBER_OF_SUPPORTED_SESSIONS) )
+        && (receive_data->session_handle <= CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS) )
     {
         i = receive_data->session_handle - 1;
 
@@ -658,7 +658,7 @@ EipStatus HandleReceivedSendRequestResponseDataCommand( EncapsulationData* recei
 int GetFreeSessionIndex()
 {
     for( int session_index = 0;
-         session_index < OPENER_NUMBER_OF_SUPPORTED_SESSIONS;
+         session_index < CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS;
          session_index++ )
     {
         if( kEipInvalidSocket == g_registered_sessions[session_index] )
@@ -707,7 +707,7 @@ EipInt16 CreateEncapsulationStructure( EipUint8* receive_buffer,
 SessionStatus CheckRegisteredSessions( EncapsulationData* receive_data )
 {
     if( 0 < receive_data->session_handle
-        && receive_data->session_handle <= OPENER_NUMBER_OF_SUPPORTED_SESSIONS )
+        && receive_data->session_handle <= CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS )
     {
         if( kEipInvalidSocket != g_registered_sessions[receive_data->session_handle - 1] )
         {
@@ -721,7 +721,7 @@ SessionStatus CheckRegisteredSessions( EncapsulationData* receive_data )
 
 void CloseSession( int socket )
 {
-    for( int i = 0; i < OPENER_NUMBER_OF_SUPPORTED_SESSIONS; ++i )
+    for( int i = 0; i < CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS; ++i )
     {
         if( g_registered_sessions[i] == socket )
         {
@@ -735,7 +735,7 @@ void CloseSession( int socket )
 
 void EncapsulationShutDown()
 {
-    for( int i = 0; i < OPENER_NUMBER_OF_SUPPORTED_SESSIONS; ++i )
+    for( int i = 0; i < CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS; ++i )
     {
         if( kEipInvalidSocket != g_registered_sessions[i] )
         {

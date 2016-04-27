@@ -118,7 +118,7 @@ int AddDintToMessage( EipUint32 data, EipUint8** buffer )
 }
 
 
-#ifdef OPENER_SUPPORT_64BIT_DATATYPES
+#ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
 
 /**
  *   @brief Reads EipUint64 from *pa_buf and converts little endian to host.

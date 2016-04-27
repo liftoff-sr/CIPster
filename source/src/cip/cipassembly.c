@@ -38,17 +38,17 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
 
         if( IsConnectedOutputAssembly( instance->instance_id ) )
         {
-            OPENER_TRACE_WARN( "%s: received data for connected output assembly\n", __func__ );
+            CIPSTER_TRACE_WARN( "%s: received data for connected output assembly\n", __func__ );
             response->general_status = kCipErrorAttributeNotSetable;
         }
         else if( request->data_length < byte_array->length )
         {
-            OPENER_TRACE_INFO( "%s: not enough data received.\n", __func__ );
+            CIPSTER_TRACE_INFO( "%s: not enough data received.\n", __func__ );
             response->general_status = kCipErrorNotEnoughData;
         }
         else if( request->data_length > byte_array->length )
         {
-            OPENER_TRACE_INFO( "%s: too much data received.\n", __func__ );
+            CIPSTER_TRACE_INFO( "%s: too much data received.\n", __func__ );
             response->general_status = kCipErrorTooMuchData;
         }
         else
@@ -125,9 +125,9 @@ CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
 {
     CipClass* clazz = GetCipClass( kCipAssemblyClassCode );
 
-    OPENER_ASSERT( clazz ); // Stack startup should have called CipAssemblyInitialize()
+    CIPSTER_ASSERT( clazz ); // Stack startup should have called CipAssemblyInitialize()
 
-    OPENER_TRACE_INFO( "%s: creating assembly instance_id %d\n", __func__, instance_id );
+    CIPSTER_TRACE_INFO( "%s: creating assembly instance_id %d\n", __func__, instance_id );
 
     AssemblyInstance* i = new AssemblyInstance( instance_id );
 
@@ -152,20 +152,20 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
         EipUint8* data,
         EipUint16 data_length )
 {
-    OPENER_ASSERT( instance->owning_class->Id() == kCipAssemblyClassCode );
+    CIPSTER_ASSERT( instance->owning_class->Id() == kCipAssemblyClassCode );
 
     // empty path (path size = 0) need to be checked and taken care of in future
 
     // copy received data to Attribute 3
     CipAttribute* attr3 = instance->Attribute( 3 );
-    OPENER_ASSERT( attr3 );
+    CIPSTER_ASSERT( attr3 );
 
     CipByteArray* byte_array = (CipByteArray*) attr3->data;
-    OPENER_ASSERT( byte_array );
+    CIPSTER_ASSERT( byte_array );
 
     if( byte_array->length != data_length )
     {
-        OPENER_TRACE_ERR( "%s: wrong amount of data arrived for assembly object\n", __func__ );
+        CIPSTER_TRACE_ERR( "%s: wrong amount of data arrived for assembly object\n", __func__ );
         return kEipStatusError;
 
         // TODO question should we notify the application that

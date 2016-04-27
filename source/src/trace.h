@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_TRACE_H_
-#define OPENER_TRACE_H_
+#ifndef CIPSTER_TRACE_H_
+#define CIPSTER_TRACE_H_
 
 #include <opener_user_conf.h>
 
@@ -13,82 +13,82 @@
  * @brief Tracing infrastructure for CIPster
  */
 
-#ifdef OPENER_WITH_TRACES
+#ifdef CIPSTER_WITH_TRACES
 
-/** @def OPENER_TRACE_LEVEL_ERROR Enable tracing of error messages. This is the
+/** @def CIPSTER_TRACE_LEVEL_ERROR Enable tracing of error messages. This is the
  *  default if no trace level is given.
  */
-#define OPENER_TRACE_LEVEL_ERROR        0x01
+#define CIPSTER_TRACE_LEVEL_ERROR        0x01
 
-//* @def OPENER_TRACE_LEVEL_WARNING Enable tracing of warning messages
-#define OPENER_TRACE_LEVEL_WARNING      0x02
+//* @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of warning messages
+#define CIPSTER_TRACE_LEVEL_WARNING      0x02
 
-//* @def OPENER_TRACE_LEVEL_WARNING Enable tracing of state messages
-#define OPENER_TRACE_LEVEL_STATE        0x04
+//* @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of state messages
+#define CIPSTER_TRACE_LEVEL_STATE        0x04
 
-//* @def OPENER_TRACE_LEVEL_INFO Enable tracing of info messages
-#define OPENER_TRACE_LEVEL_INFO         0x08
+//* @def CIPSTER_TRACE_LEVEL_INFO Enable tracing of info messages
+#define CIPSTER_TRACE_LEVEL_INFO         0x08
 
 
-#ifndef OPENER_TRACE_LEVEL
+#ifndef CIPSTER_TRACE_LEVEL
 #ifdef WIN32
 #pragma message( \
-    "OPENER_TRACE_LEVEL was not defined setting it to OPENER_TRACE_LEVEL_ERROR")
+    "CIPSTER_TRACE_LEVEL was not defined setting it to CIPSTER_TRACE_LEVEL_ERROR")
 #else
-#warning OPENER_TRACE_LEVEL was not defined setting it to OPENER_TRACE_LEVEL_ERROR
+#warning CIPSTER_TRACE_LEVEL was not defined setting it to CIPSTER_TRACE_LEVEL_ERROR
 #endif
 
-#define OPENER_TRACE_LEVEL OPENER_TRACE_LEVEL_ERROR
+#define CIPSTER_TRACE_LEVEL CIPSTER_TRACE_LEVEL_ERROR
 #endif
 
-// @def OPENER_TRACE_ENABLED Can be used for conditional code compilation
-#define OPENER_TRACE_ENABLED
+// @def CIPSTER_TRACE_ENABLED Can be used for conditional code compilation
+#define CIPSTER_TRACE_ENABLED
 
-/** @def OPENER_TRACE_ERR(...) Trace error messages.
- *  In order to activate this trace level set the OPENER_TRACE_LEVEL_ERROR flag
- *  in OPENER_TRACE_LEVEL.
+/** @def CIPSTER_TRACE_ERR(...) Trace error messages.
+ *  In order to activate this trace level set the CIPSTER_TRACE_LEVEL_ERROR flag
+ *  in CIPSTER_TRACE_LEVEL.
  */
-#define OPENER_TRACE_ERR(...)                                                  \
+#define CIPSTER_TRACE_ERR(...)                                                  \
   do {                                                                         \
-    if (OPENER_TRACE_LEVEL_ERROR & OPENER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
+    if (CIPSTER_TRACE_LEVEL_ERROR & CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
   } while (0)
 
-/** @def OPENER_TRACE_WARN(...) Trace warning messages.
- *  In order to activate this trace level set the OPENER_TRACE_LEVEL_WARNING
- * flag in OPENER_TRACE_LEVEL.
+/** @def CIPSTER_TRACE_WARN(...) Trace warning messages.
+ *  In order to activate this trace level set the CIPSTER_TRACE_LEVEL_WARNING
+ * flag in CIPSTER_TRACE_LEVEL.
  */
-#define OPENER_TRACE_WARN(...)                           \
+#define CIPSTER_TRACE_WARN(...)                           \
   do {                                                   \
-    if (OPENER_TRACE_LEVEL_WARNING & OPENER_TRACE_LEVEL) \
+    if (CIPSTER_TRACE_LEVEL_WARNING & CIPSTER_TRACE_LEVEL) \
       LOG_TRACE(__VA_ARGS__);                            \
   } while (0)
 
-/** @def OPENER_TRACE_STATE(...) Trace state messages.
- *  In order to activate this trace level set the OPENER_TRACE_LEVEL_STATE flag
- *  in OPENER_TRACE_LEVEL.
+/** @def CIPSTER_TRACE_STATE(...) Trace state messages.
+ *  In order to activate this trace level set the CIPSTER_TRACE_LEVEL_STATE flag
+ *  in CIPSTER_TRACE_LEVEL.
  */
-#define OPENER_TRACE_STATE(...)                                                \
+#define CIPSTER_TRACE_STATE(...)                                                \
   do {                                                                         \
-    if (OPENER_TRACE_LEVEL_STATE & OPENER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
+    if (CIPSTER_TRACE_LEVEL_STATE & CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
   } while (0)
 
-/** @def OPENER_TRACE_INFO(...) Trace information messages.
- *  In order to activate this trace level set the OPENER_TRACE_LEVEL_INFO flag
- *  in OPENER_TRACE_LEVEL.
+/** @def CIPSTER_TRACE_INFO(...) Trace information messages.
+ *  In order to activate this trace level set the CIPSTER_TRACE_LEVEL_INFO flag
+ *  in CIPSTER_TRACE_LEVEL.
  */
-#define OPENER_TRACE_INFO(...)                                                \
+#define CIPSTER_TRACE_INFO(...)                                                \
   do {                                                                        \
-    if (OPENER_TRACE_LEVEL_INFO & OPENER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
+    if (CIPSTER_TRACE_LEVEL_INFO & CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
   } while (0)
 
 #else
 // define the tracing macros empty in order to save space
 
-#define OPENER_TRACE_ERR(...)
-#define OPENER_TRACE_WARN(...)
-#define OPENER_TRACE_STATE(...)
-#define OPENER_TRACE_INFO(...)
+#define CIPSTER_TRACE_ERR(...)
+#define CIPSTER_TRACE_WARN(...)
+#define CIPSTER_TRACE_STATE(...)
+#define CIPSTER_TRACE_INFO(...)
 #endif
 // TRACING ******************************************************************
 
-#endif //OPENER_TRACE_H_
+#endif //CIPSTER_TRACE_H_

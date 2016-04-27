@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_ENDIANCONV_H_
-#define OPENER_ENDIANCONV_H_
+#ifndef CIPSTER_ENDIANCONV_H_
+#define CIPSTER_ENDIANCONV_H_
 
 #include "typedefs.h"
 
@@ -69,7 +69,7 @@ int AddIntToMessage(EipUint16 data, EipUint8 **buffer);
  */
 int AddDintToMessage(EipUint32 data, EipUint8 **buffer);
 
-#ifdef OPENER_SUPPORT_64BIT_DATATYPES
+#ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
 
 EipUint64 GetLintFromMessage(EipUint8 **buffer);
 
@@ -115,4 +115,4 @@ int FillNextNMessageOctetsWithValueAndMoveToNextPosition( EipByte value,
         int count, CipOctet **message_runner);
 
 
-#endif // OPENER_ENDIANCONV_H_
+#endif // CIPSTER_ENDIANCONV_H_

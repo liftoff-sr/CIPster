@@ -105,7 +105,7 @@ void LeaveStack( int signal )
 {
     (void) signal;      // kill unused parameter warning
 
-    OPENER_TRACE_STATE( "got signal\n" );
+    CIPSTER_TRACE_STATE( "got signal\n" );
 
     g_end_stack = 1;
 }

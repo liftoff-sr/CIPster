@@ -4,8 +4,8 @@
  *
  ******************************************************************************/
 
-#ifndef OPENER_CIPCLASS3CONNECTION_H_
-#define OPENER_CIPCLASS3CONNECTION_H_
+#ifndef CIPSTER_CIPCLASS3CONNECTION_H_
+#define CIPSTER_CIPCLASS3CONNECTION_H_
 
 /** @file cipclass3connection.h
  *  @brief CIP Class 3 connection
@@ -28,4 +28,4 @@ int EstablishClass3Connection( CipConn *cip_conn,
 
 void InitializeClass3ConnectionData(void);
 
-#endif // OPENER_CIPCLASS3CONNECTION_H_
+#endif // CIPSTER_CIPCLASS3CONNECTION_H_

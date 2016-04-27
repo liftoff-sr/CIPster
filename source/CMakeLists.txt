@@ -35,7 +35,7 @@ include( ${CIPster_BUILDSUPPORT_DIR}/CIPster_function_checks.cmake )
 set( CIPster_64_BIT_DATA_TYPES_ENABLED CACHE BOOL "Enable 64-bit data type support" )
 
 if( CIPster_64_BIT_DATA_TYPES_ENABLED )
-    add_definitions( -DOPENER_SUPPORT_64BIT_DATATYPES )
+    add_definitions( -DCIPSTER_SUPPORT_64BIT_DATATYPES )
 endif()
 
 set( CIPster_TRACES OFF CACHE BOOL "Activate CIPster traces" )

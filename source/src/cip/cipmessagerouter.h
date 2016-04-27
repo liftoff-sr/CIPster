@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CIPMESSAGEROUTER_H_
-#define OPENER_CIPMESSAGEROUTER_H_
+#ifndef CIPSTER_CIPMESSAGEROUTER_H_
+#define CIPSTER_CIPMESSAGEROUTER_H_
 
 #include "typedefs.h"
 #include "ciptypes.h"
@@ -50,4 +50,4 @@ EipStatus NotifyMR(EipUint8 *data, int data_length);
  */
 EipStatus RegisterCipClass(CipClass *object);
 
-#endif // OPENER_CIPMESSAGEROUTER_H_
+#endif // CIPSTER_CIPMESSAGEROUTER_H_

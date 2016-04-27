@@ -8,10 +8,17 @@ compliant products defined in THE ETHERNET/IP SPECIFICATION and published by
 ODVA (http://www.odva.org).
 
 CIPster is a C++ port of C based OpENer with additional features. C++ is a
-higher level language than C so many things are made easier. Much credit goes to
-original authors of OpENer. Since that code was assigned to Rockwell Automation
-as a copyright holder, then this code has original portions copyright to Rockwell as
-well, with additional contributions owned by their respective contributors.
+higher level language than C so many things are made easier. Easier means
+faster.  Over time this will affect rate of evolution.
+
+Thank yous go to the original authors of OpENer. See the AUTHORS. Since OpENer
+code was assigned to Rockwell Automation as a copyright holder, then this
+CIPster code has original portions copyright to Rockwell as well, however
+additional contributions are owned by their respective contributors. This
+project does not require copyright assignment, so the resulting code is under
+a license to its licensees, and the licensors are its multiple contributors.
+Should a question about ownership arise, the git version control system has a
+full record of who did what.
 
 
 ## Requirements:
@@ -26,6 +33,7 @@ On Linux, you will need to have the following installed:
 * gcc
 * make
 * binutils
+* cmake-curses-gui or cmake-gui
 
 These should be in package repositories of most Linux distros.
 
@@ -37,8 +45,8 @@ https://github.com/cpputest/cpputest
 I use JEdit as my text editor, you don't need an IDE, building from the command
 line is not bad with the makefiles that CMake creates.
 
-For configuring the project we recommend the use of a CMake GUI (e.g.,the
-cmake-gui oackage on Linux)
+For configuring the project we recommend the use of a CMake GUI (i.e. the
+cmake-curses-gui or cmake-gui package on Linux).
 
 ## Compiling on Linux for POSIX:
 
@@ -51,6 +59,11 @@ support, you might build the library alone at first. Since you are building out
 of tree, (i.e. not in the source tree) you can simply delete the out of tree
 directory at any time and try something else.
 
+### Building the Library
+
+This is not a mandatory step, but is provided as a learning experience.  If you
+want to build a sample program, skip to *Building the Sample Programs*.
+
 Let's create our out of tree directory in /tmp, which is erased on Ubuntu
 after each reboot.  This means it will disappear, but we don't care because
 building the library is easy and the out of tree build directory can be anywhere
@@ -62,7 +75,7 @@ after you get the hang of it.
 
 You will get a warning about a missing USER_INCLUDE_DIR setting.  That needs
 to be a directory containing your modified open_user_conf.h file.  For this
-first build, we can set it to <path-to-CIPster>/examples/POSIX/sample_application .
+first build, we can set it to &lt;path-to-CIPster&gt;/examples/POSIX/sample_application .
 
 We can set this USER_INCLUDE_DIR after the CMakeCache.txt file is created
 using ccmake from package cmake-curses-gui.
@@ -70,19 +83,27 @@ using ccmake from package cmake-curses-gui.
     $ sudo apt-get install cmake-curses-gui
     $ ccmake .
 
-Press c for configure and g for generate.
+While inside ccmake, edit the field USER_INCLUDE_DIR to contain
+"&lt;path-to-CIPster&gt;/examples/POSIX/sample_application". After changing the
+field Press c for configure and g for generate.  Then quit.
 
-Or you can delete the CMakeCache.txt file and simply add in the USER_INCLUDE_DIR
-setting on the command line:
+Or you can delete the CMakeCache.txt file and start over by simply adding in the
+missing USER_INCLUDE_DIR setting on the command line:
 
     $ cmake -DUSER_INCLUDE_DIR=<path-to-CIPster>/examples/POSIX/sample_application -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster>/source
     $ make
 
 You must delete CMakeCache.txt before running cmake, but not before running ccmake.
 
-Building either sample application (linux or windows) is also easy. These will
-each be built in their own "out of tree" build directory. With CMake, there's
-never a good reason to build in the source tree, ever.
+### Building the Sample Programs
+
+Building either sample program (linux or windows) is also easy. These will each
+be built in their own "out of tree" build directory. (With CMake, there's never
+a good reason to build in the source tree, ever.) When building either sample
+program, the library will also be built for you within a subdirectory called
+build-CIPster of your build directory. It is a nested project that gets built
+once. (You can later trigger a rebuild of this subproject by deleting this
+subdirectory followed by a make of the parent project.)
 
 For a Release build instead of a Debug build, substitute *Release* for *Debug* in
 the following instructions. From another dedicated out of tree build directory:
@@ -103,7 +124,7 @@ You can build 32 bit or 64 bit windows libraries or programs on linux using the
 mingw tools with CMake. CMake supports toolchain files which can be passed in
 the original invocation of CMake to identify the cross compiling toolchain set.
 There is one supplied for 64 bit Windows, so here we build a 64 bit windows
-sample application, and actually run in on Linux under Wine. (You can copy the
+sample program, and actually run in on Linux under Wine. (You can copy the
 toolchain file and modify it for your toolchain. Or if building on Windows, omit
 it. Truth be told, it is easier to build a Windows console binary on Linux than
 on Windows.)

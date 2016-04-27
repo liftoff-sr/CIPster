@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_CIPCONNECTIONMANAGER_H_
-#define OPENER_CIPCONNECTIONMANAGER_H_
+#ifndef CIPSTER_CIPCONNECTIONMANAGER_H_
+#define CIPSTER_CIPCONNECTIONMANAGER_H_
 
 #include "opener_user_conf.h"
 #include "opener_api.h"
@@ -305,4 +305,4 @@ void AddNewActiveConnection( CipConn* cip_conn );
 // TODO: Missing documentation
 void RemoveFromActiveConnections( CipConn* cip_conn );
 
-#endif // OPENER_CIPCONNECTIONMANAGER_H_
+#endif // CIPSTER_CIPCONNECTIONMANAGER_H_

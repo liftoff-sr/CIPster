@@ -35,17 +35,17 @@
 
 // attributes in CIP Identity Object
 
-EipUint16 vendor_id_ = OPENER_DEVICE_VENDOR_ID;         //*< Attribute 1: Vendor ID
+EipUint16 vendor_id_ = CIPSTER_DEVICE_VENDOR_ID;         //*< Attribute 1: Vendor ID
 
-EipUint16 device_type_ = OPENER_DEVICE_TYPE;            //*< Attribute 2: Device Type
+EipUint16 device_type_ = CIPSTER_DEVICE_TYPE;            //*< Attribute 2: Device Type
 
-EipUint16 product_code_ = OPENER_DEVICE_PRODUCT_CODE;   //*< Attribute 3: Product Code
+EipUint16 product_code_ = CIPSTER_DEVICE_PRODUCT_CODE;   //*< Attribute 3: Product Code
 
 CipRevision revision_ =
 {
     //*< Attribute 4: Revision / USINT Major, USINT Minor
-    OPENER_DEVICE_MAJOR_REVISION,
-    OPENER_DEVICE_MINOR_REVISION
+    CIPSTER_DEVICE_MAJOR_REVISION,
+    CIPSTER_DEVICE_MINOR_REVISION
 };
 
 EipUint16 status_ = 0;                                  //*< Attribute 5: Status
@@ -55,8 +55,8 @@ EipUint32 serial_number_ = 0;                           //*< Attribute 6: Serial
 CipShortString product_name_ =
 {
     //*< Attribute 7: Product Name
-    sizeof(OPENER_DEVICE_NAME) - 1,
-    (EipByte*) OPENER_DEVICE_NAME
+    sizeof(CIPSTER_DEVICE_NAME) - 1,
+    (EipByte*) CIPSTER_DEVICE_NAME
 };
 
 

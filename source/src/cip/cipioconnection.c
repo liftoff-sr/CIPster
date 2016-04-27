@@ -85,7 +85,7 @@ int EstablishIoConnction( CipConn* conn,
 
     if( !io_conn )
     {
-        OPENER_TRACE_ERR( "%s: GetIoConnectionForConnectionData return NULL\n", __func__ );
+        CIPSTER_TRACE_ERR( "%s: GetIoConnectionForConnectionData return NULL\n", __func__ );
         return kCipErrorConnectionFailure;
     }
 
@@ -170,7 +170,7 @@ int EstablishIoConnction( CipConn* conn,
                 io_conn->consumed_connection_path.attribute_number = 3;
 
                 attribute = GetCipAttribute( instance, 3 );
-                OPENER_ASSERT( attribute != NULL );
+                CIPSTER_ASSERT( attribute != NULL );
 
                 // an assembly object should always have an attribute 3
                 data_size   = io_conn->consumed_connection_size;
@@ -200,7 +200,7 @@ int EstablishIoConnction( CipConn* conn,
                     *extended_error =
                         kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize;
 
-                    OPENER_TRACE_INFO( "%s: byte_array length != data_size\n", __func__ );
+                    CIPSTER_TRACE_INFO( "%s: byte_array length != data_size\n", __func__ );
                     return kCipErrorConnectionFailure;
                 }
             }
@@ -209,7 +209,7 @@ int EstablishIoConnction( CipConn* conn,
                 *extended_error =
                     kConnectionManagerStatusCodeInvalidConsumingApllicationPath;
 
-                OPENER_TRACE_INFO( "%s: no instance\n", __func__ );
+                CIPSTER_TRACE_INFO( "%s: no instance\n", __func__ );
                 return kCipErrorConnectionFailure;
             }
         }
@@ -232,7 +232,7 @@ int EstablishIoConnction( CipConn* conn,
                 io_conn->produced_connection_path.attribute_number = 3;
 
                 attribute = GetCipAttribute( instance, 3 );
-                OPENER_ASSERT( attribute );
+                CIPSTER_ASSERT( attribute );
 
                 // an assembly object should always have an attribute 3
                 data_size   = io_conn->produced_connection_size;
@@ -261,7 +261,7 @@ int EstablishIoConnction( CipConn* conn,
                     *extended_error =
                         kConnectionManagerStatusCodeErrorInvalidTToOConnectionSize;
 
-                    OPENER_TRACE_INFO( "%s: bytearray length != data_size\n", __func__ );
+                    CIPSTER_TRACE_INFO( "%s: bytearray length != data_size\n", __func__ );
                     return kCipErrorConnectionFailure;
                 }
             }
@@ -270,7 +270,7 @@ int EstablishIoConnction( CipConn* conn,
                 *extended_error =
                     kConnectionManagerStatusCodeInvalidProducingApplicationPath;
 
-                OPENER_TRACE_INFO( "%s: 2 noinstance\n", __func__ );
+                CIPSTER_TRACE_INFO( "%s: 2 noinstance\n", __func__ );
 
                 return kCipErrorConnectionFailure;
             }
@@ -282,7 +282,7 @@ int EstablishIoConnction( CipConn* conn,
 
             if( 0 != *extended_error )
             {
-                OPENER_TRACE_INFO( "%s: extended_error != 0\n", __func__ );
+                CIPSTER_TRACE_INFO( "%s: extended_error != 0\n", __func__ );
                 return kCipErrorConnectionFailure;
             }
         }
@@ -293,7 +293,7 @@ int EstablishIoConnction( CipConn* conn,
         {
             *extended_error = 0; //TODO find out the correct extended error code
 
-            OPENER_TRACE_ERR( "%s: OpenCommunicationChannels failed\n", __func__ );
+            CIPSTER_TRACE_ERR( "%s: OpenCommunicationChannels failed\n", __func__ );
             return eip_status;
         }
     }
@@ -342,7 +342,7 @@ EipStatus OpenConsumingPointToPointConnection( CipConn* conn,
 
     if( socket == kEipInvalidSocket )
     {
-        OPENER_TRACE_ERR(
+        CIPSTER_TRACE_ERR(
                 "cannot create UDP socket in OpenPointToPointConnection\n" );
         return kEipStatusError;
     }
@@ -398,7 +398,7 @@ CipError OpenProducingPointToPointConnection( CipConn* conn,
 
     if( socket == kEipInvalidSocket )
     {
-        OPENER_TRACE_ERR(
+        CIPSTER_TRACE_ERR(
                 "cannot create UDP socket in OpenPointToPointConnection\n" );
         // *pa_pnExtendedError = 0x0315; miscellaneous
         return kCipErrorConnectionFailure;
@@ -514,7 +514,7 @@ EipStatus OpenMulticastConnection( UdpCommuncationDirection direction,
                         && (kCipItemIdSocketAddressInfoOriginatorToTarget
                             == common_packet_format_data->address_info_item[0].type_id) ) ) )
             {
-                OPENER_TRACE_ERR( "no suitable addr info item available\n" );
+                CIPSTER_TRACE_ERR( "no suitable addr info item available\n" );
                 return kEipStatusError;
             }
         }
@@ -535,7 +535,7 @@ EipStatus OpenMulticastConnection( UdpCommuncationDirection direction,
     if( htons( AF_INET )
         != common_packet_format_data->address_info_item[j].sin_family )
     {
-        OPENER_TRACE_ERR(
+        CIPSTER_TRACE_ERR(
                 "Sockaddr Info Item with wrong sin family value recieved\n" );
         return kEipStatusError;
     }
@@ -553,7 +553,7 @@ EipStatus OpenMulticastConnection( UdpCommuncationDirection direction,
 
     if( socket == kEipInvalidSocket )
     {
-        OPENER_TRACE_ERR( "cannot create UDP socket in OpenMulticastConnection\n" );
+        CIPSTER_TRACE_ERR( "cannot create UDP socket in OpenMulticastConnection\n" );
         return kEipStatusError;
     }
 
@@ -614,7 +614,7 @@ EipUint16 HandleConfigData( CipClass* assembly_class,
                         g_config_data_buffer,
                         g_config_data_length ) )
             {
-                OPENER_TRACE_WARN( "Configuration data was invalid\n" );
+                CIPSTER_TRACE_WARN( "Configuration data was invalid\n" );
                 connection_manager_status =
                     kConnectionManagerStatusCodeInvalidConfigurationApplicationPath;
             }
@@ -733,7 +733,7 @@ void HandleIoConnectionTimeOut( CipConn* conn )
         }
     }
 
-    OPENER_ASSERT( NULL != conn->connection_close_function );
+    CIPSTER_ASSERT( NULL != conn->connection_close_function );
     conn->connection_close_function( conn );
 }
 
@@ -772,10 +772,10 @@ EipStatus SendConnectedData( CipConn* conn )
     common_packet_format_data->data_item.type_id = kCipItemIdConnectedDataItem;
 
     CipAttribute* attr3 = conn->producing_instance->Attribute( 3 );
-    OPENER_ASSERT( attr3 );
+    CIPSTER_ASSERT( attr3 );
 
     CipByteArray* producing_instance_attributes = (CipByteArray*) attr3->data;
-    OPENER_ASSERT( producing_instance_attributes );
+    CIPSTER_ASSERT( producing_instance_attributes );
 
     common_packet_format_data->data_item.length = 0;
 
@@ -905,7 +905,7 @@ CipError OpenCommunicationChannels( CipConn* conn )
         if( OpenMulticastConnection( kUdpCommuncationDirectionConsuming,
                     conn, common_packet_format_data ) == kEipStatusError )
         {
-            OPENER_TRACE_ERR( "error in OpenMulticast Connection\n" );
+            CIPSTER_TRACE_ERR( "error in OpenMulticast Connection\n" );
             return kCipErrorConnectionFailure;
         }
     }
@@ -914,7 +914,7 @@ CipError OpenCommunicationChannels( CipConn* conn )
         if( OpenConsumingPointToPointConnection( conn, common_packet_format_data )
             == kEipStatusError )
         {
-            OPENER_TRACE_ERR( "error in PointToPoint consuming connection\n" );
+            CIPSTER_TRACE_ERR( "error in PointToPoint consuming connection\n" );
             return kCipErrorConnectionFailure;
         }
     }
@@ -924,7 +924,7 @@ CipError OpenCommunicationChannels( CipConn* conn )
         if( OpenProducingMulticastConnection( conn, common_packet_format_data )
             == kEipStatusError )
         {
-            OPENER_TRACE_ERR( "error in OpenMulticast Connection\n" );
+            CIPSTER_TRACE_ERR( "error in OpenMulticast Connection\n" );
             return kCipErrorConnectionFailure;
         }
     }
@@ -933,7 +933,7 @@ CipError OpenCommunicationChannels( CipConn* conn )
         if( OpenProducingPointToPointConnection( conn, common_packet_format_data )
             != kCipErrorSuccess )
         {
-            OPENER_TRACE_ERR( "error in PointToPoint producing connection\n" );
+            CIPSTER_TRACE_ERR( "error in PointToPoint producing connection\n" );
             return kCipErrorConnectionFailure;
         }
     }

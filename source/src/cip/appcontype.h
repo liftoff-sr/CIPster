@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  ******************************************************************************/
-#ifndef OPENER_APPCONTYPE_H_
-#define OPENER_APPCONTYPE_H_
+#ifndef CIPSTER_APPCONTYPE_H_
+#define CIPSTER_APPCONTYPE_H_
 
 #include "cipconnectionmanager.h"
 
@@ -68,4 +68,4 @@ void CloseAllConnections(void);
  */
 EipBool8 ConnectionWithSameConfigPointExists(EipUint32 config_point);
 
-#endif // OPENER_APPCONTYPE_H_
+#endif // CIPSTER_APPCONTYPE_H_
