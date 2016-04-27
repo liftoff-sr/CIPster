@@ -131,7 +131,7 @@ on Windows.)
 
     $ mkdir /tmp/build-win-cip
     $ cd /tmp/build-win-cip
-    $ cmake -DCMAKE_TOOLCHAIN_FILE=<path-to-CIPster&gt/source/buildsupport/Toolchain/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster&gt/examples/WINDOWS
+    $ cmake -DCMAKE_TOOLCHAIN_FILE=<path-to-CIPster>/source/buildsupport/Toolchain/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster&gt/examples/WINDOWS
 
 Then if you have 64 bit Wine installed, simply run the program as if it were a linux binary on linux.
 
@@ -158,7 +158,7 @@ The documentation of the functions of CIPster is part of the source code. The so
 packages contain the generated documentation in the directory api_doc. If you
 use the GIT version you will need the program Doxygen for generating the HTML
 documentation. You can generate the documentation by invoking doxygen from the
-command line in the opener main directory.
+command line in the CIPster main directory.
 
 Porting CIPster:
 ---------------
