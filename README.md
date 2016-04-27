@@ -58,11 +58,11 @@ after you get the hang of it.
 
     $ mkdir /tmp/build
     $ cd /tmp/build
-    $ cmake DCMAKE_BUILD_TYPE=Debug &lt;path-to-CIPster&gt;/source
+    $ cmake DCMAKE_BUILD_TYPE=Debug <path-to-CIPster>/source
 
 You will get a warning about a missing USER_INCLUDE_DIR setting.  That needs
 to be a directory containing your modified open_user_conf.h file.  For this
-first build, we can set it to &lt;path-to-CIPster&gt;/examples/POSIX/sample_application .
+first build, we can set it to <path-to-CIPster>/examples/POSIX/sample_application .
 
 We can set this USER_INCLUDE_DIR after the CMakeCache.txt file is created
 using ccmake from package cmake-curses-gui.
@@ -75,7 +75,7 @@ Press c for configure and g for generate.
 Or you can delete the CMakeCache.txt file and simply add in the USER_INCLUDE_DIR
 setting on the command line:
 
-    $ cmake -DUSER_INCLUDE_DIR=&lt;path-to-CIPster&gt;/examples/POSIX/sample_application -DCMAKE_BUILD_TYPE=Debug &lt;path-to-CIPster&gt;/source
+    $ cmake -DUSER_INCLUDE_DIR=<path-to-CIPster>/examples/POSIX/sample_application -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster>/source
     $ make
 
 You must delete CMakeCache.txt before running cmake, but not before running ccmake.
@@ -87,7 +87,7 @@ never a good reason to build in the source tree, ever.
 For a Release build instead of a Debug build, substitute *Release* for *Debug* in
 the following instructions. From another dedicated out of tree build directory:
 
-    $ cmake -DCMAKE_BUILD_TYPE=Debug &lt;path-to-CIPster&gt;/examples/POSIX
+    $ cmake -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster>/examples/POSIX
     $ make
 
 Wasn't that simple?  CMake is indeed king of the build tools.
@@ -110,7 +110,7 @@ on Windows.)
 
     $ mkdir /tmp/build-win-cip
     $ cd /tmp/build-win-cip
-    $ cmake -DCMAKE_TOOLCHAIN_FILE=&lt;path-to-CIPster&gt/source/buildsupport/Toolchain/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Debug &lt;path-to-CIPster&gt/examples/WINDOWS
+    $ cmake -DCMAKE_TOOLCHAIN_FILE=<path-to-CIPster&gt/source/buildsupport/Toolchain/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster&gt/examples/WINDOWS
 
 Then if you have 64 bit Wine installed, simply run the program as if it were a linux binary on linux.
 
