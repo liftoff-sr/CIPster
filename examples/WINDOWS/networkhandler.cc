@@ -84,7 +84,7 @@ void CheckAndHandleConsumingUdpSockets();
  * @param socket The socket to check
  * @return
  */
-EipBool8 CheckSocketSet( int socket );
+bool CheckSocketSet( int socket );
 
 /** @brief
  *
@@ -421,9 +421,9 @@ EipStatus NetworkHandlerFinish()
 }
 
 
-EipBool8 CheckSocketSet( int socket )
+bool CheckSocketSet( int socket )
 {
-    EipBool8 return_value = false;
+    bool return_value = false;
 
     if( FD_ISSET( socket, &read_set ) )
     {

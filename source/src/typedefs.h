@@ -33,7 +33,6 @@ typedef uint16_t    EipUint16;  ///< 16-bit unsigned number
 typedef uint32_t    EipUint32;  ///< 32-bit unsigned number
 typedef float       EipFloat;   ///< IEEE 754 32-bit floating point number
 typedef double      EipDfloat;  ///< IEEE 754 64-bit floating point number
-typedef uint8_t     EipBool8;   ///< bool data types
 
 /** @brief Data types as defined in the CIP Specification Vol 1 Appendix C
  */

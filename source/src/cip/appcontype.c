@@ -406,7 +406,7 @@ void CloseAllConnections()
 }
 
 
-EipBool8 ConnectionWithSameConfigPointExists( EipUint32 config_point )
+bool ConnectionWithSameConfigPointExists( EipUint32 config_point )
 {
     CipConn* connection = g_active_connection_list;
 

@@ -8,7 +8,7 @@
 
 #include "cipconnectionmanager.h"
 
-void InitializeIoConnectionData(void);
+void InitializeIoConnectionData();
 
 /** @brief check if for the given connection data received in a forward_open request
  *  a suitable connection is available.
@@ -23,8 +23,7 @@ void InitializeIoConnectionData(void);
  *          data given in pa_pstConnData.
  *        - on error: NULL
  */
-CipConn *GetIoConnectionForConnectionData(
-    CipConn *cip_conn, EipUint16 *extended_error);
+CipConn* GetIoConnectionForConnectionData( CipConn* cip_conn, EipUint16* extended_error );
 
 /** @brief Check if there exists already an exclusive owner or listen only connection
  *         which produces the input assembly.
@@ -32,7 +31,7 @@ CipConn *GetIoConnectionForConnectionData(
  *  @param input_point the Input point to be produced
  *  @return if a connection could be found a pointer to this connection if not NULL
  */
-CipConn *GetExistingProducerMulticastConnection(EipUint32 input_point);
+CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point );
 
 /** @brief check if there exists an producing multicast exclusive owner or
  * listen only connection that should produce the same input but is not in charge
@@ -42,7 +41,7 @@ CipConn *GetExistingProducerMulticastConnection(EipUint32 input_point);
  * @return if a connection could be found the pointer to this connection
  *      otherwise NULL.
  */
-CipConn *GetNextNonControlMasterConnection(EipUint32 input_point);
+CipConn* GetNextNonControlMasterConnection( EipUint32 input_point );
 
 /** @brief Close all connection producing the same input and have the same type
  * (i.e., listen only or input only).
@@ -50,15 +49,15 @@ CipConn *GetNextNonControlMasterConnection(EipUint32 input_point);
  * @param input_point  the input point
  * @param instance_type the connection application type
  */
-void CloseAllConnectionsForInputWithSameType(EipUint32 input_point,
-                                             ConnectionType instance_type);
+void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,
+        ConnectionType instance_type );
 
 /**@ brief close all open connections.
  *
  * For I/O connections the sockets will be freed. The sockets for explicit
  * connections are handled by the encapsulation layer, and freed there.
  */
-void CloseAllConnections(void);
+void CloseAllConnections( void );
 
 /** @brief Check if there is an established connection that uses the same
  * config point.
@@ -66,6 +65,6 @@ void CloseAllConnections(void);
  * @param config_point The configuration point
  * @return true if connection was found, otherwise false
  */
-EipBool8 ConnectionWithSameConfigPointExists(EipUint32 config_point);
+bool ConnectionWithSameConfigPointExists( EipUint32 config_point );
 
-#endif // CIPSTER_APPCONTYPE_H_
+#endif    // CIPSTER_APPCONTYPE_H_
