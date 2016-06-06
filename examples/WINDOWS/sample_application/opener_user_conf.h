@@ -25,12 +25,12 @@
 typedef unsigned short in_port_t;
 
 //! Identity configuration of the device
-#define CIPSTER_DEVICE_VENDOR_ID           1
-#define CIPSTER_DEVICE_TYPE               12
-#define CIPSTER_DEVICE_PRODUCT_CODE      65001
-#define CIPSTER_DEVICE_MAJOR_REVISION      1
-#define CIPSTER_DEVICE_MINOR_REVISION      2
-#define CIPSTER_DEVICE_NAME      "CIPster PC"
+#define CIPSTER_DEVICE_VENDOR_ID            1
+#define CIPSTER_DEVICE_TYPE                 12
+#define CIPSTER_DEVICE_PRODUCT_CODE         65001
+#define CIPSTER_DEVICE_MAJOR_REVISION       1
+#define CIPSTER_DEVICE_MINOR_REVISION       2
+#define CIPSTER_DEVICE_NAME                 "amphibius goodie"
 
 /** @brief Define the number of objects that may be used in connections
  *

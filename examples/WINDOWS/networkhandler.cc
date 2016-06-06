@@ -93,6 +93,20 @@ EipStatus HandleDataOnTcpSocket( int socket );
 
 int GetMaxSocket( int socket1, int socket2, int socket3, int socket4 );
 
+
+const std::string strerrno()
+{
+#if 0   // mingw seems not to have this in its libraries, although it is in headers.
+    char    buf[256];
+
+    strerror_r( errno, buf, sizeof buf );
+    return buf;
+#else
+    return strerror( errno );
+#endif
+}
+
+
 static MicroSeconds getMicroSeconds()
 {
     LARGE_INTEGER performance_counter;
@@ -177,7 +191,7 @@ EipStatus NetworkHandlerInitialize()
     // bind the new socket to port 0xAF12 (CIP)
     if( bind( g_sockets.tcp_listener, (sockaddr*) &address, sizeof( address ) ) == -1 )
     {
-        CIPSTER_TRACE_ERR( "error with tcp_listener bind: %s\n", strerror( errno ) );
+        CIPSTER_TRACE_ERR( "error with tcp_listener bind: %s\n", strerrno().c_str() );
         goto error;
     }
 
@@ -206,7 +220,7 @@ EipStatus NetworkHandlerInitialize()
     {
         CIPSTER_TRACE_ERR(
                 "error with setting broadcast receive for UDP socket: %s\n",
-                strerror( errno ) );
+                strerrno().c_str() );
         goto error;
     }
 
@@ -220,7 +234,7 @@ EipStatus NetworkHandlerInitialize()
     {
         CIPSTER_TRACE_ERR(
                 "error with global broadcast UDP bind: %s\n",
-                strerror( errno ) );
+                strerrno().c_str() );
         goto error;
     }
 
@@ -257,7 +271,7 @@ EipStatus NetworkHandlerInitialize()
     {
         CIPSTER_TRACE_ERR(
                 "error with udp_local_broadcast_listener bind: %s\n",
-                strerror( errno ) );
+                strerrno().c_str() );
         goto error;
     }
 
@@ -291,7 +305,7 @@ EipStatus NetworkHandlerInitialize()
     {
         CIPSTER_TRACE_ERR(
             "error with udp_unicast_listener bind: %s\n",
-            strerror( errno ) );
+            strerrno().c_str() );
         goto error;
     }
 
@@ -302,7 +316,7 @@ EipStatus NetworkHandlerInitialize()
     if( ( listen( g_sockets.tcp_listener, MAX_NO_OF_TCP_SOCKETS ) ) == -1 )
     {
         CIPSTER_TRACE_ERR( "%s: error with listen: %s\n",
-                __func__, strerror( errno ) );
+                __func__, strerrno().c_str() );
         goto error;
     }
 
@@ -365,7 +379,7 @@ EipStatus NetworkHandlerProcessOnce()
         else
         {
             CIPSTER_TRACE_ERR( "%s: error with select: %s\n",
-                    __func__, strerror( errno ) );
+                    __func__, strerrno().c_str() );
             return kEipStatusError;
         }
     }
@@ -455,7 +469,7 @@ EipStatus SendUdpData( struct sockaddr_in* address, int socket, EipUint8* data,
     if( sent_count < 0 )
     {
         CIPSTER_TRACE_ERR( "%s: error with sendto in sendUDPData: %s\n",
-                __func__, strerror( errno ) );
+                __func__, strerrno().c_str() );
 
         return kEipStatusError;
     }
@@ -489,13 +503,13 @@ EipStatus HandleDataOnTcpSocket( int socket )
     if( num_read == 0 )
     {
         CIPSTER_TRACE_ERR( "networkhandler: connection closed by client: %s\n",
-                strerror( errno ) );
+                strerrno().c_str() );
         return kEipStatusError;
     }
 
     if( num_read < 0 )
     {
-        CIPSTER_TRACE_ERR( "networkhandler: error on recv: %s\n", strerror( errno ) );
+        CIPSTER_TRACE_ERR( "networkhandler: error on recv: %s\n", strerrno().c_str() );
         return kEipStatusError;
     }
 
@@ -521,14 +535,14 @@ EipStatus HandleDataOnTcpSocket( int socket )
             if( num_read == 0 ) // got error or connection closed by client
             {
                 CIPSTER_TRACE_ERR( "networkhandler: connection closed by client: %s\n",
-                        strerror( errno ) );
+                        strerrno().c_str() );
                 return kEipStatusError;
             }
 
             if( num_read < 0 )
             {
                 CIPSTER_TRACE_ERR( "networkhandler: error on recv: %s\n",
-                        strerror( errno ) );
+                        strerrno().c_str() );
                 return kEipStatusError;
             }
 
@@ -548,13 +562,13 @@ EipStatus HandleDataOnTcpSocket( int socket )
     if( num_read == 0 ) // got error or connection closed by client
     {
         CIPSTER_TRACE_ERR( "networkhandler: connection closed by client: %s\n",
-                strerror( errno ) );
+                strerrno().c_str() );
         return kEipStatusError;
     }
 
     if( num_read < 0 )
     {
-        CIPSTER_TRACE_ERR( "networkhandler: error on recv: %s\n", strerror( errno ) );
+        CIPSTER_TRACE_ERR( "networkhandler: error on recv: %s\n", strerrno().c_str() );
         return kEipStatusError;
     }
 
@@ -631,7 +645,7 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
     if( ( new_socket = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP ) ) == -1 )
     {
         CIPSTER_TRACE_ERR( "networkhandler: cannot create UDP socket: %s\n",
-                strerror( errno ) );
+                strerrno().c_str() );
         return kEipInvalidSocket;
     }
 
@@ -654,7 +668,7 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
         if( ( bind( new_socket, (struct sockaddr*) socket_data,
                       sizeof(struct sockaddr) ) ) == -1 )
         {
-            CIPSTER_TRACE_ERR( "error on bind udp: %s\n", strerror( errno ) );
+            CIPSTER_TRACE_ERR( "error on bind udp: %s\n", strerrno().c_str() );
             return kEipInvalidSocket;
         }
 
@@ -673,7 +687,7 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
                 {
                     CIPSTER_TRACE_ERR(
                             "networkhandler: could not set the TTL to: %d, error: %s\n",
-                            g_time_to_live_value, strerror( errno ) );
+                            g_time_to_live_value, strerrno().c_str() );
                     return kEipInvalidSocket;
                 }
             }
@@ -689,7 +703,7 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
             < 0 )
         {
             CIPSTER_TRACE_ERR( "networkhandler: could not get peername: %s\n",
-                    strerror( errno ) );
+                    strerrno().c_str() );
             return kEipInvalidSocket;
         }
 
@@ -753,7 +767,7 @@ void CheckAndHandleTcpListenerSocket()
         if( new_socket == -1 )
         {
             CIPSTER_TRACE_ERR( "networkhandler: error on accept: %s\n",
-                    strerror( errno ) );
+                    strerrno().c_str() );
             return;
         }
 
@@ -796,7 +810,7 @@ void CheckAndHandleUdpLocalBroadcastSocket()
         {
             CIPSTER_TRACE_ERR(
                     "networkhandler: error on recvfrom UDP broadcast port: %s\n",
-                    strerror( errno ) );
+                    strerrno().c_str() );
             return;
         }
 
@@ -859,7 +873,7 @@ void CheckAndHandleUdpGlobalBroadcastSocket()
         {
             CIPSTER_TRACE_ERR(
                     "networkhandler: error on recvfrom UDP global broadcast port: %s\n",
-                    strerror( errno ) );
+                    strerrno().c_str() );
             return;
         }
 
@@ -922,7 +936,7 @@ void CheckAndHandleUdpUnicastSocket()
         {
             CIPSTER_TRACE_ERR(
                     "networkhandler: error on recvfrom UDP unicast port: %s\n",
-                    strerror( errno ) );
+                    strerrno().c_str() );
             return;
         }
 
@@ -1000,7 +1014,7 @@ void CheckAndHandleConsumingUdpSockets()
             if( 0 > received_size )
             {
                 CIPSTER_TRACE_ERR( "%s: error on recv: %s\n",
-                        __func__, strerror( errno ) );
+                        __func__, strerrno().c_str() );
 
                 conn->connection_close_function( conn );
                 continue;
