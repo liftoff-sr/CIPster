@@ -139,14 +139,15 @@ EipStatus ResetDevice()
 }
 
 
-EipStatus ResetDeviceToInitialConfiguration()
+EipStatus ResetDeviceToInitialConfiguration( bool also_reset_comm_params )
 {
-    // rest the parameters
+    // reset the parameters
 
-    // than perform device reset
-    ResetDevice();
+    // then perform device reset
+
     return kEipStatusOk;
 }
+
 
 void RunIdleChanged( EipUint32 run_idle_value )
 {

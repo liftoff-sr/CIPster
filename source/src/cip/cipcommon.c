@@ -24,6 +24,9 @@
 #include "cpf.h"
 #include "appcontype.h"
 
+
+int g_CIPSTER_TRACE_LEVEL = CIPSTER_TRACE_LEVEL;
+
 /// Binary search function template, dedicated for classes with Id() member func
 template< typename T, typename IterT >
 IterT vec_search( IterT begin, IterT end, T target )
@@ -280,6 +283,122 @@ CipInstance::~CipInstance()
     attributes.clear();
 }
 
+bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
+{
+    CipAttributes::iterator it;
+
+    CIPSTER_ASSERT( !aAttribute->owning_instance );  // only un-owned attributes may be inserted
+
+    // Keep sorted by id
+    for( it = attributes.begin(); it != attributes.end();  ++it )
+    {
+        if( aAttribute->Id() < (*it)->Id() )
+            break;
+
+        else if( aAttribute->Id() == (*it)->Id() )
+        {
+            CIPSTER_TRACE_ERR( "class '%s' instance %d already has attribute %d, ovveriding\n",
+                owning_class ? owning_class->class_name.c_str() : "meta-something",
+                instance_id,
+                aAttribute->Id()
+                );
+
+            // Re-use this slot given by position 'it'.
+            delete *it;
+            attributes.erase( it );    // will re-insert at this position below
+            break;
+        }
+    }
+
+    attributes.insert( it, aAttribute );
+
+    aAttribute->owning_instance = this; // until now there was no owner of this attribute.
+
+    // remember the max attribute number that was inserted
+    if( aAttribute->Id() > highest_inst_attr_id )
+    {
+        highest_inst_attr_id = aAttribute->Id();
+    }
+
+    if( owning_class )
+    {
+        if( highest_inst_attr_id > owning_class->highest_attr_id )
+            owning_class->highest_attr_id = highest_inst_attr_id;
+    }
+
+    return true;
+}
+
+
+CipAttribute* CipInstance::AttributeInsert(
+        EipUint16       attribute_id,
+        EipUint8        cip_type,
+        EipByte         cip_flags,
+        AttributeFunc   aGetter,
+        AttributeFunc   aSetter,
+        void* data
+        )
+{
+    CipAttribute* attribute = new CipAttribute(
+                    attribute_id,
+                    cip_type,
+                    cip_flags,
+                    aGetter,
+                    aSetter,
+                    data
+                    );
+
+    if( !AttributeInsert( attribute ) )
+    {
+        delete attribute;
+        attribute = NULL;   // return NULL on failure
+    }
+
+    return attribute;
+}
+
+
+CipAttribute* CipInstance::AttributeInsert(
+        EipUint16       attribute_id,
+        EipUint8        cip_type,
+        EipByte         cip_flags,
+        void* data
+        )
+{
+    CipAttribute* attribute = new CipAttribute(
+                    attribute_id,
+                    cip_type,
+                    cip_flags,
+                    NULL,
+                    NULL,
+                    data
+                    );
+
+    if( !AttributeInsert( attribute ) )
+    {
+        delete attribute;
+        attribute = NULL;   // return NULL on failure
+    }
+
+    return attribute;
+}
+
+
+CipAttribute* CipInstance::Attribute( EipUint16 attribute_id ) const
+{
+    CipAttributes::const_iterator  it;
+
+    // a binary search thru the vector of pointers looking for attribute_id
+    it = vec_search( attributes.begin(), attributes.end(), attribute_id );
+
+    if( it != attributes.end() )
+        return *it;
+
+    CIPSTER_TRACE_WARN( "attribute %d not defined\n", attribute_id );
+
+    return NULL;
+}
+
 
 //-----<CipClass>--------------------------------------------------------------
 
@@ -510,107 +629,6 @@ CipInstance* CipClass::Instance( EipUint32 instance_id ) const
 }
 
 
-bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
-{
-    CipAttributes::iterator it;
-
-    CIPSTER_ASSERT( !aAttribute->owning_instance );  // only un-owned attributes may be inserted
-
-    // Keep sorted by id
-    for( it = attributes.begin(); it != attributes.end();  ++it )
-    {
-        if( aAttribute->Id() < (*it)->Id() )
-            break;
-
-        else if( aAttribute->Id() == (*it)->Id() )
-        {
-            CIPSTER_TRACE_ERR( "class '%s' instance %d already has attribute %d, ovveriding\n",
-                owning_class ? owning_class->class_name.c_str() : "meta-something",
-                instance_id,
-                aAttribute->Id()
-                );
-
-            // Re-use this slot given by position 'it'.
-            delete *it;
-            attributes.erase( it );    // will re-insert at this position below
-            break;
-        }
-    }
-
-    attributes.insert( it, aAttribute );
-
-    aAttribute->owning_instance = this; // until now there was no owner of this attribute.
-
-    // remember the max attribute number that was inserted
-    if( aAttribute->Id() > highest_inst_attr_id )
-    {
-        highest_inst_attr_id = aAttribute->Id();
-    }
-
-    if( owning_class )
-    {
-        if( highest_inst_attr_id > owning_class->highest_attr_id )
-            owning_class->highest_attr_id = highest_inst_attr_id;
-    }
-
-    return true;
-}
-
-
-CipAttribute* CipInstance::AttributeInsert(
-        EipUint16       attribute_id,
-        EipUint8        cip_type,
-        EipByte         cip_flags,
-        AttributeFunc   aGetter,
-        AttributeFunc   aSetter,
-        void* data
-        )
-{
-    CipAttribute* attribute = new CipAttribute(
-                    attribute_id,
-                    cip_type,
-                    cip_flags,
-                    aGetter,
-                    aSetter,
-                    data
-                    );
-
-    if( !AttributeInsert( attribute ) )
-    {
-        delete attribute;
-        attribute = NULL;   // return NULL on failure
-    }
-
-    return attribute;
-}
-
-
-CipAttribute* CipInstance::AttributeInsert(
-        EipUint16       attribute_id,
-        EipUint8        cip_type,
-        EipByte         cip_flags,
-        void* data
-        )
-{
-    CipAttribute* attribute = new CipAttribute(
-                    attribute_id,
-                    cip_type,
-                    cip_flags,
-                    NULL,
-                    NULL,
-                    data
-                    );
-
-    if( !AttributeInsert( attribute ) )
-    {
-        delete attribute;
-        attribute = NULL;   // return NULL on failure
-    }
-
-    return attribute;
-}
-
-
 bool CipClass::ServiceInsert( CipService* aService )
 {
     CipServices::iterator it;
@@ -652,29 +670,6 @@ CipService* CipClass::ServiceInsert( EipUint8 service_id,
     }
 
     return service;
-}
-
-
-CipAttribute* CipInstance::Attribute( EipUint16 attribute_id ) const
-{
-    CipAttributes::const_iterator  it;
-
-    // a binary search thru the vector of pointers looking for attribute_id
-    it = vec_search( attributes.begin(), attributes.end(), attribute_id );
-
-    if( it != attributes.end() )
-        return *it;
-
-    CIPSTER_TRACE_WARN( "attribute %d not defined\n", attribute_id );
-
-    return NULL;
-}
-
-
-CipAttribute* GetCipAttribute( CipInstance* instance,
-        EipUint16 attribute_id )
-{
-    return instance->Attribute( attribute_id );
 }
 
 
@@ -1120,7 +1115,7 @@ int EncodeEPath( CipEpath* epath, EipUint8** message )
         length -= 2;
     }
 
-    if( 0 < length )
+    if( length > 0 )
     {
         if( epath->instance_number < 256 )
         {
@@ -1136,7 +1131,7 @@ int EncodeEPath( CipEpath* epath, EipUint8** message )
             length -= 2;
         }
 
-        if( 0 < length )
+        if( length > 0 )
         {
             if( epath->attribute_number < 256 )
             {
@@ -1156,13 +1151,14 @@ int EncodeEPath( CipEpath* epath, EipUint8** message )
 
     *message = p;
 
-    return 2 + epath->path_size * 2; // path size is in 16 bit chunks according to the specification
+    // path size is in 16 bit chunks according to the specification
+    return 2 + epath->path_size * 2;
 }
 
 
 int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
 {
-    unsigned    number_of_decoded_elements;
+    unsigned    decoded_element_count;
     EipUint8*   p = *message;
 
     epath->path_size = *p++;
@@ -1173,9 +1169,9 @@ int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
     epath->instance_number  = 0;
     epath->attribute_number = 0;
 
-    for( number_of_decoded_elements = 0;
-         number_of_decoded_elements < epath->path_size;
-         number_of_decoded_elements++ )
+    for( decoded_element_count = 0;
+         decoded_element_count < epath->path_size;
+         decoded_element_count++ )
     {
         if( kSegmentTypeSegmentTypeReserved == ( *p & kSegmentTypeSegmentTypeReserved ) )
         {
@@ -1195,7 +1191,7 @@ int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
                 kLogicalSegmentLogicalFormatSixteenBitValue:
             p += 2;
             epath->class_id = GetIntFromMessage( &p );
-            number_of_decoded_elements++;
+            decoded_element_count++;
             break;
 
         case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeInstanceId +
@@ -1208,7 +1204,7 @@ int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
                 kLogicalSegmentLogicalFormatSixteenBitValue:
             p += 2;
             epath->instance_number = GetIntFromMessage( &p );
-            number_of_decoded_elements++;
+            decoded_element_count++;
             break;
 
         case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeAttributeId +
@@ -1221,16 +1217,63 @@ int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
                 kLogicalSegmentLogicalFormatSixteenBitValue:
             p += 2;
             epath->attribute_number = GetIntFromMessage( &p );
-            number_of_decoded_elements++;
+            decoded_element_count++;
             break;
 
         default:
             CIPSTER_TRACE_ERR( "wrong path requested\n" );
             return kEipStatusError;
-            break;
         }
     }
 
     *message = p;
-    return number_of_decoded_elements * 2 + 1;  // times 2 since every encoding uses 2 bytes
+    return decoded_element_count * 2 + 1;  // times 2 since every encoding uses 2 bytes
 }
+
+
+int DecodePortSegment( CipPortSegment* aSegment, EipUint8** aMessage )
+{
+    EipUint8*   p = *aMessage;
+    EipUint8    first = *p++;
+
+    if( (first & 0xE0) != kSegmentTypePortSegment )
+    {
+        CIPSTER_TRACE_ERR( "wrong path requested\n" );
+        return kEipStatusError;
+    }
+
+    int link_addrz = (first & kPortSegmentFlagExtendedLinkAddressSize) ? *p++ : 0;
+
+    if( first & 0xf == 15 )
+        aSegment->port = GetIntFromMessage( &p );
+    else
+        aSegment->port = first & 0xf;
+
+    switch( link_addrz )
+    {
+    case 0:
+        break;
+    case 1:
+        aSegment->address = *p++;
+        break;
+    case 2:
+        aSegment->address = GetIntFromMessage( &p );
+        break;
+    case 4:
+        aSegment->address = GetDintFromMessage( &p );
+        break;
+    default:
+        CIPSTER_TRACE_ERR( "unsupported link address size\n" );
+        return kEipStatusError;
+    }
+
+    if( (p - *aMessage) & 1 )
+        ++p;
+
+    int ret = p - *aMessage;
+
+    *aMessage = p;
+
+    return ret;
+}
+

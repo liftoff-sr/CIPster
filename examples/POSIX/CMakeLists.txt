@@ -1,5 +1,5 @@
 
-project( "OpENER on Linux" )
+project( "CIPster on Linux" )
 
 
 include(ExternalProject)

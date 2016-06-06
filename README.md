@@ -85,7 +85,7 @@ using ccmake from package cmake-curses-gui.
 
 While inside ccmake, edit the field USER_INCLUDE_DIR to contain
 "&lt;path-to-CIPster&gt;/examples/POSIX/sample_application". After changing the
-field Press c for configure and g for generate.  Then quit.
+field, press c for configure and g for generate.  Then quit.
 
 Or you can delete the CMakeCache.txt file and start over by simply adding in the
 missing USER_INCLUDE_DIR setting on the command line:
@@ -131,7 +131,7 @@ on Windows.)
 
     $ mkdir /tmp/build-win-cip
     $ cd /tmp/build-win-cip
-    $ cmake -DCMAKE_TOOLCHAIN_FILE=<path-to-CIPster>/source/buildsupport/Toolchain/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster&gt/examples/WINDOWS
+    $ cmake -DCMAKE_TOOLCHAIN_FILE=<path-to-CIPster>/source/buildsupport/Toolchain/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster>/examples/WINDOWS
 
 Then if you have 64 bit Wine installed, simply run the program as if it were a linux binary on linux.
 

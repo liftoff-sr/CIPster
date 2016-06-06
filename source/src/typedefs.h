@@ -24,7 +24,7 @@
 
 /** @brief EIP Data type definitions
  */
-typedef uint8_t     EipByte;    ///< 8-bit bit string
+typedef uint8_t     EipByte;    ///< unsigned byte
 typedef int8_t      EipInt8;    ///< 8-bit signed number
 typedef int16_t     EipInt16;   ///< 16-bit signed number
 typedef int32_t     EipInt32;   ///< 32-bit signed number

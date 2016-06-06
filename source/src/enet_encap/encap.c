@@ -109,10 +109,6 @@ EipStatus HandleReceivedSendRequestResponseDataCommand( EncapsulationData* recei
 
 int GetFreeSessionIndex();
 
-EipInt16 CreateEncapsulationStructure( EipUint8* receive_buffer,
-        int receive_buffer_length,
-        EncapsulationData* encapsulation_data );
-
 SessionStatus CheckRegisteredSessions( EncapsulationData* receive_data );
 
 int EncapsulateData( const EncapsulationData* const send_data );
@@ -163,8 +159,7 @@ int HandleReceivedExplictTcpData( int socket, EipUint8* buffer,
     // eat the encapsulation header
     // the structure contains a pointer to the encapsulated data
     // returns how many bytes are left after the encapsulated data
-    *remaining_bytes = CreateEncapsulationStructure( buffer, length,
-            &encapsulation_data );
+    *remaining_bytes = encapsulation_data.Init( buffer, length );
 
     if( kEncapsulationHeaderOptionsFlag == encapsulation_data.options ) //TODO generate appropriate error response
     {
@@ -242,8 +237,7 @@ int HandleReceivedExplictUdpData( int socket, struct sockaddr_in* from_address,
     // eat the encapsulation header
     // the structure contains a pointer to the encapsulated data
     // returns how many bytes are left after the encapsulated data
-    *number_of_remaining_bytes = CreateEncapsulationStructure(
-            buffer, buffer_length, &encapsulation_data );
+    *number_of_remaining_bytes = encapsulation_data.Init( buffer, buffer_length );
 
     if( kEncapsulationHeaderOptionsFlag == encapsulation_data.options ) //TODO generate appropriate error response
     {
@@ -671,31 +665,20 @@ int GetFreeSessionIndex()
 }
 
 
-/** @brief copy data from pa_buf in little endian to host in structure.
- * @param receive_buffer
- * @param length Length of the data in receive_buffer. Might be more than one message
- * @param encapsulation_data	structure to which data shall be copied
- * @return return difference between bytes in pa_buf an data_length
- *          0 .. full package received
- *          >0 .. more than one packet received
- *          <0 .. only fragment of data portion received
- */
-EipInt16 CreateEncapsulationStructure( EipUint8* receive_buffer,
-        int receive_buffer_length,
-        EncapsulationData* encapsulation_data )
+EipInt16 EncapsulationData::Init( EipUint8* receive_buffer, int receive_buffer_length )
 {
-    encapsulation_data->buf_start = receive_buffer;
-    encapsulation_data->command_code = GetIntFromMessage( &receive_buffer );
-    encapsulation_data->data_length = GetIntFromMessage( &receive_buffer );
-    encapsulation_data->session_handle = GetDintFromMessage( &receive_buffer );
-    encapsulation_data->status = GetDintFromMessage( &receive_buffer );
+    buf_start = receive_buffer;
+    command_code = GetIntFromMessage( &receive_buffer );
+    data_length = GetIntFromMessage( &receive_buffer );
+    session_handle = GetDintFromMessage( &receive_buffer );
+    status = GetDintFromMessage( &receive_buffer );
 
     receive_buffer += kSenderContextSize;
-    encapsulation_data->options = GetDintFromMessage( &receive_buffer );
-    encapsulation_data->buf_pos = receive_buffer;
 
-    return receive_buffer_length - ENCAPSULATION_HEADER_LENGTH
-           - encapsulation_data->data_length;
+    options = GetDintFromMessage( &receive_buffer );
+    buf_pos = receive_buffer;
+
+    return receive_buffer_length - ENCAPSULATION_HEADER_LENGTH - data_length;
 }
 
 

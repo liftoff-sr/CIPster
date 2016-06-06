@@ -21,43 +21,26 @@ OpenerEndianess g_opener_platform_endianess = kOpenerEndianessUnknown;
 
 // THESE ROUTINES MODIFY THE BUFFER POINTER
 
-/**
- *   @brief Reads EIP_UINT8 from *buffer and converts little endian to host.
- *   @param buffer pointer where data should be reed.
- *   @return EIP_UINT8 data value
- */
 EipUint8 GetSintFromMessage( EipUint8** buffer )
 {
-    unsigned char* buffer_address = (unsigned char*) *buffer;
-    EipUint16 data = buffer_address[0];
+    unsigned char* p = (unsigned char*) *buffer;
+    EipUint8 data = p[0];
 
     *buffer += 1;
     return data;
 }
 
 
-// little-endian-to-host unsigned 16 bit
-
-/**
- *   @brief Reads EIP_UINT16 from *buffer and converts little endian to host.
- *   @param buffer pointer where data should be reed.
- *   @return EIP_UINT16 data value
- */
 EipUint16 GetIntFromMessage( EipUint8** buffer )
 {
-    unsigned char* buffer_address = (unsigned char*) *buffer;
-    EipUint16 data = buffer_address[0] | buffer_address[1] << 8;
+    unsigned char* p = (unsigned char*) *buffer;
+    EipUint16 data = p[0] | p[1] << 8;
 
     *buffer += 2;
     return data;
 }
 
 
-/**
- *   @brief Reads EIP_UINT32 from *buffer and converts little endian to host.
- *   @param buffer pointer where data should be reed.
- *   @return EIP_UNÍT32 value
- */
 EipUint32 GetDintFromMessage( EipUint8** buffer )
 {
     unsigned char* p = (unsigned char*) *buffer;
@@ -68,11 +51,6 @@ EipUint32 GetDintFromMessage( EipUint8** buffer )
 }
 
 
-/**
- * @brief converts UINT8 data from host to little endian an writes it to buffer.
- * @param data value to be written
- * @param buffer pointer where data should be written.
- */
 int AddSintToMessage( EipUint8 data, EipUint8** buffer )
 {
     unsigned char* p = (unsigned char*) *buffer;
@@ -83,11 +61,6 @@ int AddSintToMessage( EipUint8 data, EipUint8** buffer )
 }
 
 
-/**
- * @brief converts UINT16 data from host to little endian an writes it to buffer.
- * @param data value to be written
- * @param buffer pointer where data should be written.
- */
 int AddIntToMessage( EipUint16 data, EipUint8** buffer )
 {
     unsigned char* p = (unsigned char*) *buffer;
@@ -99,11 +72,6 @@ int AddIntToMessage( EipUint16 data, EipUint8** buffer )
 }
 
 
-/**
- * @brief Converts UINT32 data from host to little endian and writes it to buffer.
- * @param data value to be written
- * @param buffer pointer where data should be written.
- */
 int AddDintToMessage( EipUint32 data, EipUint8** buffer )
 {
     unsigned char* p = (unsigned char*) *buffer;
@@ -120,86 +88,71 @@ int AddDintToMessage( EipUint32 data, EipUint8** buffer )
 
 #ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
 
-/**
- *   @brief Reads EipUint64 from *pa_buf and converts little endian to host.
- *   @param pa_buf pointer where data should be reed.
- *   @return EipUint64 value
- */
 EipUint64 GetLintFromMessage( EipUint8** buffer )
 {
-    EipUint8* buffer_address = *buffer;
-    EipUint64 data = ( ( ( (EipUint64) buffer_address[0] ) << 56 )
-                       & 0xFF00000000000000LL )
-                     + ( ( ( (EipUint64) buffer_address[1] ) << 48 ) & 0x00FF000000000000LL )
-                     + ( ( ( (EipUint64) buffer_address[2] ) << 40 ) & 0x0000FF0000000000LL )
-                     + ( ( ( (EipUint64) buffer_address[3] ) << 32 ) & 0x000000FF00000000LL )
-                     + ( ( ( (EipUint64) buffer_address[4] ) << 24 ) & 0x00000000FF000000 )
-                     + ( ( ( (EipUint64) buffer_address[5] ) << 16 ) & 0x0000000000FF0000 )
-                     + ( ( ( (EipUint64) buffer_address[6] ) << 8 ) & 0x000000000000FF00 )
-                     + ( ( (EipUint64) buffer_address[7] ) & 0x00000000000000FF );
+    EipUint8* p = *buffer;
+    EipUint64 data = (((EipUint64) p[0] ) << 56 ) |
+                     (((EipUint64) p[1] ) << 48 ) |
+                     (((EipUint64) p[2] ) << 40 ) |
+                     (((EipUint64) p[3] ) << 32 ) |
+                     (((EipUint64) p[4] ) << 24 ) |
+                     (((EipUint64) p[5] ) << 16 ) |
+                     (((EipUint64) p[6] ) <<  8 ) |
+                     (((EipUint64) p[7] ) <<  0;
 
     (*buffer) += 8;
     return data;
 }
 
 
-/**
- * @brief Converts EipUint64 data from host to little endian and writes it to buffer.
- * @param data value to be written
- * @param buffer pointer where data should be written.
- */
 int AddLintToMessage( EipUint64 data, EipUint8** buffer )
 {
-    EipUint8* buffer_address = *buffer;
+    EipUint8* p = *buffer;
 
-    buffer_address[0] = (EipUint8) (data >> 56) & 0xFF;
-    buffer_address[1] = (EipUint8) (data >> 48) & 0xFF;
-    buffer_address[2] = (EipUint8) (data >> 40) & 0xFF;
-    buffer_address[3] = (EipUint8) (data >> 32) & 0xFF;
-    buffer_address[4] = (EipUint8) (data >> 24) & 0xFF;
-    buffer_address[5] = (EipUint8) (data >> 16) & 0xFF;
-    buffer_address[6] = (EipUint8) (data >> 8) & 0xFF;
-    buffer_address[7] = (EipUint8) (data) & 0xFF;
+    p[0] = (EipUint8) (data >> 56);
+    p[1] = (EipUint8) (data >> 48);
+    p[2] = (EipUint8) (data >> 40);
+    p[3] = (EipUint8) (data >> 32);
+    p[4] = (EipUint8) (data >> 24);
+    p[5] = (EipUint8) (data >> 16);
+    p[6] = (EipUint8) (data >> 8);
+    p[7] = (EipUint8) data;
+
     (*buffer) += 8;
-
     return 8;
 }
-
-
 #endif
 
 
-int EncapsulateIpAddress( EipUint16 port, EipUint32 address,
-        EipByte** communication_buffer )
+int EncapsulateIpAddress( EipUint16 port, EipUint32 address, EipByte** buffer )
 {
     int size = 0;
 
     if( kCIPsterEndianessLittle == g_opener_platform_endianess )
     {
-        size += AddIntToMessage( htons( AF_INET ), communication_buffer );
-        size += AddIntToMessage( port, communication_buffer );
-        size += AddDintToMessage( address, communication_buffer );
+        size += AddIntToMessage( htons( AF_INET ), buffer );
+        size += AddIntToMessage( port, buffer );
+        size += AddDintToMessage( address, buffer );
     }
     else
     {
         if( kCIPsterEndianessBig == g_opener_platform_endianess )
         {
-            (*communication_buffer)[0]  = (unsigned char) (AF_INET >> 8);
-            (*communication_buffer)[1]  = (unsigned char) AF_INET;
-            *communication_buffer += 2;
-            size += 2;
+            EipByte* p = *buffer;
 
-            (*communication_buffer)[0]  = (unsigned char) (port >> 8);
-            (*communication_buffer)[1]  = (unsigned char) port;
-            *communication_buffer += 2;
-            size += 2;
+            *p++ = (EipByte) (AF_INET >> 8);
+            *p++ = (EipByte) AF_INET;
 
-            (*communication_buffer)[3]  = (unsigned char) address;
-            (*communication_buffer)[2]  = (unsigned char) (address >> 8);
-            (*communication_buffer)[1]  = (unsigned char) (address >> 16);
-            (*communication_buffer)[0]  = (unsigned char) (address >> 24);
-            *communication_buffer += 4;
-            size += 4;
+            *p++ = (EipByte) (port >> 8);
+            *p++ = (EipByte) port;
+
+            *p++ = (EipByte) (address >> 24);
+            *p++ = (EipByte) (address >> 16);
+            *p++ = (EipByte) (address >> 8);
+            *p++ = (EipByte) address;
+
+            *buffer = p;
+            size += 8;
         }
         else
         {
@@ -213,12 +166,6 @@ int EncapsulateIpAddress( EipUint16 port, EipUint32 address,
 }
 
 
-/**
- * @brief Detects Endianess of the platform and sets global g_nCIPsterPlatformEndianess variable accordingly
- *
- * Detects Endianess of the platform and sets global variable g_nCIPsterPlatformEndianess accordingly,
- * whereas 0 equals little endian and 1 equals big endian
- */
 void DetermineEndianess()
 {
     int i = 1;
@@ -235,11 +182,6 @@ void DetermineEndianess()
 }
 
 
-/**
- * @brief Returns global variable g_nCIPsterPlatformEndianess, whereas 0 equals little endian and 1 equals big endian
- *
- * @return 0 equals little endian and 1 equals big endian
- */
 int GetEndianess()
 {
     return g_opener_platform_endianess;

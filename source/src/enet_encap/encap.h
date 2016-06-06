@@ -39,7 +39,6 @@ enum EncapsulationProtocolErrorCode
 };
 
 
-//** structs **
 struct  EncapsulationData
 {
     CipUint     command_code;
@@ -50,6 +49,17 @@ struct  EncapsulationData
     CipUdint    options;
     EipUint8*   buf_start;              ///< Pointer to the communication buffer used for this message
     EipUint8*   buf_pos;                ///< The current position in the communication buffer during the decoding process
+
+    /** @brief copy data from pa_buf in little endian to host in structure.
+     * @param receive_buffer
+     * @param length Length of the data in receive_buffer. Might be more than one message
+     * @param encapsulation_data	structure to which data shall be copied
+     * @return return difference between bytes in pa_buf an data_length
+     *          0 .. full package received
+     *          >0 .. more than one packet received
+     *          <0 .. only fragment of data portion received
+     */
+    EipInt16 Init( EipUint8* receive_buffer, int receive_buffer_length );
 };
 
 
@@ -85,5 +95,6 @@ void EncapsulationShutDown();
  * sending.
  */
 void ManageEncapsulationMessages();
+
 
 #endif // CIPSTER_ENCAP_H_

@@ -13,27 +13,31 @@
  * @brief Tracing infrastructure for CIPster
  */
 
-#ifdef CIPSTER_WITH_TRACES
 
 /** @def CIPSTER_TRACE_LEVEL_ERROR Enable tracing of error messages. This is the
  *  default if no trace level is given.
  */
-#define CIPSTER_TRACE_LEVEL_ERROR        0x01
+#define CIPSTER_TRACE_LEVEL_ERROR        (1<<0)
 
 //* @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of warning messages
-#define CIPSTER_TRACE_LEVEL_WARNING      0x02
+#define CIPSTER_TRACE_LEVEL_WARNING      (1<<1)
 
 //* @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of state messages
-#define CIPSTER_TRACE_LEVEL_STATE        0x04
+#define CIPSTER_TRACE_LEVEL_STATE        (1<<2)
 
 //* @def CIPSTER_TRACE_LEVEL_INFO Enable tracing of info messages
-#define CIPSTER_TRACE_LEVEL_INFO         0x08
+#define CIPSTER_TRACE_LEVEL_INFO         (1<<3)
 
+
+extern int g_CIPSTER_TRACE_LEVEL;       // defined in cipcommon.c
+
+
+#ifdef CIPSTER_WITH_TRACES
 
 #ifndef CIPSTER_TRACE_LEVEL
-#ifdef WIN32
-#pragma message( \
-    "CIPSTER_TRACE_LEVEL was not defined setting it to CIPSTER_TRACE_LEVEL_ERROR")
+
+#if !defined(__GNUG__)
+#pragma message( "CIPSTER_TRACE_LEVEL was not defined setting it to CIPSTER_TRACE_LEVEL_ERROR" )
 #else
 #warning CIPSTER_TRACE_LEVEL was not defined setting it to CIPSTER_TRACE_LEVEL_ERROR
 #endif
@@ -50,7 +54,7 @@
  */
 #define CIPSTER_TRACE_ERR(...)                                                  \
   do {                                                                         \
-    if (CIPSTER_TRACE_LEVEL_ERROR & CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
+    if (CIPSTER_TRACE_LEVEL_ERROR & g_CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
   } while (0)
 
 /** @def CIPSTER_TRACE_WARN(...) Trace warning messages.
@@ -59,7 +63,7 @@
  */
 #define CIPSTER_TRACE_WARN(...)                           \
   do {                                                   \
-    if (CIPSTER_TRACE_LEVEL_WARNING & CIPSTER_TRACE_LEVEL) \
+    if (CIPSTER_TRACE_LEVEL_WARNING & g_CIPSTER_TRACE_LEVEL) \
       LOG_TRACE(__VA_ARGS__);                            \
   } while (0)
 
@@ -69,7 +73,7 @@
  */
 #define CIPSTER_TRACE_STATE(...)                                                \
   do {                                                                         \
-    if (CIPSTER_TRACE_LEVEL_STATE & CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
+    if (CIPSTER_TRACE_LEVEL_STATE & g_CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
   } while (0)
 
 /** @def CIPSTER_TRACE_INFO(...) Trace information messages.
@@ -78,11 +82,14 @@
  */
 #define CIPSTER_TRACE_INFO(...)                                                \
   do {                                                                        \
-    if (CIPSTER_TRACE_LEVEL_INFO & CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
+    if (CIPSTER_TRACE_LEVEL_INFO & g_CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
   } while (0)
 
 #else
 // define the tracing macros empty in order to save space
+
+#undef CIPSTER_TRACE_LEVEL
+#define CIPSTER_TRACE_LEVEL 0
 
 #define CIPSTER_TRACE_ERR(...)
 #define CIPSTER_TRACE_WARN(...)

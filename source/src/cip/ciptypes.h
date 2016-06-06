@@ -16,12 +16,12 @@
 #include "typedefs.h"
 #include "trace.h"
 #include "opener_user_conf.h"
+#include "ciperror.h"
 
 
-/** @brief Segment type Enum
- *
- * Bits 7-5 in the Segment Type/Format byte
- *
+/**
+ * Enum SegmentType
+ * is the set of bits 7-5 in the Segment Type/Format byte
  */
 enum SegmentType
 {
@@ -55,8 +55,12 @@ enum LogicalSegmentLogicalType
     kLogicalSegmentLogicalTypeExtendedLogical = 0x1C    ///< Extended Logical
 };
 
-/** @brief Enum containing values how long the encoded value will be (8, 16, or
- * 32 bit) */
+
+/**
+ * Enum LogicalSegmentLogicalFormat
+ * is the set of values telling how long the encoded value will be (8, 16, or
+ * 32 bit)
+ */
 enum LogicalSegmentLogicalFormat
 {
     kLogicalSegmentLogicalFormatEightBitValue = 0x00,
@@ -64,10 +68,12 @@ enum LogicalSegmentLogicalFormat
     kLogicalSegmentLogicalFormatThirtyTwoBitValue = 0x02
 };
 
+
 enum NetworkSegmentSubType
 {
     kProductionTimeInhibitTimeNetworkSegment = 0x43 ///< identifier indicating a production inhibit time network segment
 };
+
 
 enum DataSegmentType
 {
@@ -75,8 +81,11 @@ enum DataSegmentType
     kDataSegmentTypeAnsiExtendedSymbolMessage = kSegmentTypeDataSegment + 0x11
 };
 
-/** @brief Enum containing the encoding values for CIP data types for CIP
- * Messages */
+
+/**
+ * Enum CipDataType
+ * is the set of encoded CIP data types for CIP Messages
+ */
 enum CipDataType
 {
     kCipAny = 0x00,         ///< data type that can not be directly encoded
@@ -125,11 +134,11 @@ enum CipDataType
                                                  *  figure out the right way to handle it */
 };
 
-/** @brief Definition of CIP service codes
- *
- * An Enum with all CIP service codes. Common services codes range from 0x01 to
- * 0x1C
- *
+
+/**
+ * Enum CIPServiceCode
+ * is the set of all CIP service codes.
+ * Common services codes range from 0x01 to 0x1C.
  */
 enum CIPServiceCode
 {
@@ -160,6 +169,7 @@ enum CIPServiceCode
 
     // Start CIP object-specific services
     kForwardOpen = 0x54,
+    kLargeForwardOpen = 0x5b,
     kForwardClose = 0x4E,
     kUnconnectedSend = 0x52,
     kGetConnectionOwner = 0x5A
@@ -250,22 +260,38 @@ struct CipEpath
     EipUint16   attribute_number;   ///< Requested Attribute Number of the linked object
 };
 
-/** @brief CIP Connection Path
- *
+
+struct CipPortSegment
+{
+    EipUint32   port;               ///< if == 0, means not used
+    EipUint32   address;
+    EipUint8    address_size;
+
+    CipPortSegment( EipUint32 aPort = 0, EipUint32 aAddress = 0, EipUint8 aAddrSize = 0 ) :
+        port( aPort ),
+        address( aAddress ),
+        address_size( aAddrSize )
+    {}
+};
+
+
+/**
+ * Struct CipConnectionPath
  */
 struct CipConnectionPath
 {
-    EipUint8    path_size;          ///< Size of the Path in 16-bit words
+    EipUint8        path_size;          ///< Size of the Path in 16-bit words
     // TODO: Fix, should be UINT (EIP_UINT16)
 
-    EipUint32   class_id;           ///< Class ID of the linked object
-    EipUint32   connection_point[3];// TODO:  Why array length 3?
-    EipUint8    data_segment;
-    EipUint8*   segment_data;
+    EipUint32       class_id;           ///< Class ID of the linked object
+    EipUint32       connection_point[3];// TODO:  Why array length 3?
+    CipPortSegment  port_segment;
 };
 
-/** @brief Struct representing the key data format of the electronic key segment
- *
+
+/**
+ * Struct CipKeyData
+ * represents the key data format of the electronic key segment
  */
 struct CipKeyData
 {
@@ -284,20 +310,21 @@ struct CipRevision
     EipUint8    minor_revision;
 };
 
-/** @brief CIP Electronic Key Segment struct
- *
+
+/**
+ * Struct CipElectronicKey
  */
 struct CipElectronicKey
 {
-    CipUsint    segment_type;  ///< Specifies the Segment Type
     CipUsint    key_format;    /**< Key Format 0-3 reserved, 4 = see Key Format Table,
                                 *  5-255 = Reserved */
     CipKeyData  key_data;       /**< Depends on key format used, usually Key Format 4 as
                                  *  specified in CIP Specification, Volume 1*/
 };
 
-/** @brief CIP Message Router Request
- *
+
+/**
+ * Struct CipMessageRouterRequest
  */
 struct CipMessageRouterRequest
 {
@@ -305,9 +332,21 @@ struct CipMessageRouterRequest
     CipEpath    request_path;
     EipInt16    data_length;
     CipOctet*   data;
+
+    /**
+     * Function InitRequest.
+     * parses the UCMM header consisting of: service, IOI size, IOI, data into a request structure
+     * @param aRequest the message data received
+     * @param aCount number of bytes in the message
+     * @param request pointer to structure of MRRequest data item.
+     * @return status  0 .. success
+     *                 -1 .. error
+     */
+    CipError InitRequest( EipUint8* aRequest, EipInt16 aCount );
 };
 
-#define MAX_SIZE_OF_ADD_STATUS 2    // for now we support extended status codes up to 2 16bit values there is mostly only one 16bit value used
+
+#define MAX_SIZE_OF_ADD_STATUS      2    // for now we support extended status codes up to 2 16bit values there is mostly only one 16bit value used
 
 /** @brief CIP Message Router Response
  *
@@ -351,15 +390,13 @@ typedef EipStatus (*AttributeFunc)( CipAttribute* aAttribute,
             CipMessageRouterRequest* aRequest,
             CipMessageRouterResponse* aResponse );
 
-// some standard getter functions, and you may add your own elsewhere also:
-EipStatus   GetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
-EipStatus   GetAttrAssemblyData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
-EipStatus   GetInstanceCount( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
-EipStatus   GetAttrHighestId( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+// Standard attribute getter functions, and you may add your own elsewhere also:
+EipStatus   GetAttrData( CipAttribute* attr, CipMessageRouterRequest* request,
+                CipMessageRouterResponse* response );
 
-// some standard setter functions, and you may add your own elsewhere also:
-EipStatus   SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
-EipStatus   SetAttrAssemblyData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+// Standard attribute setter functions, and you may add your own elsewhere also:
+EipStatus   SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request,
+                CipMessageRouterResponse* response );
 
 
 /**
@@ -385,7 +422,7 @@ public:
 
     virtual ~CipAttribute();
 
-    EipUint16   Id() const { return attribute_id; }
+    EipUint16   Id() const              { return attribute_id; }
 
     EipUint16   attribute_id;
     EipUint8    type;
@@ -398,7 +435,7 @@ public:
 
     void*       data;                   // no ownership of data
 
-    CipInstance* Instance() const   { return owning_instance; }
+    CipInstance* Instance() const       { return owning_instance; }
 
     /**
      * Function Get
@@ -432,13 +469,13 @@ protected:
 
     /**
      * Function Pointer getter
-     * is fixed during construction to one of the getter functions.
+     * may be fixed during construction to a custom getter function.
      */
     const AttributeFunc   getter;
 
     /**
      * Function Pointer setter
-     * is fixed during construction to one of the setter functions.
+     * may be fixed during construction to a custom setter function.
      */
     const AttributeFunc   setter;
 };
@@ -510,8 +547,7 @@ protected:
         for( CipAttributes::const_iterator it = attributes.begin();
             it != attributes.end();  ++it )
         {
-            CIPSTER_TRACE_INFO( "id:%d\n",
-                (*it)->Id() );
+            CIPSTER_TRACE_INFO( "id:%d\n", (*it)->Id() );
         }
     }
 
@@ -557,7 +593,7 @@ public:
 
     virtual ~CipService() {}
 
-    EipUint8  Id() const { return service_id; }
+    EipUint8  Id() const                    { return service_id; }
 
     std::string service_name;               ///< name of the service
     EipUint8    service_id;                 ///< service number
@@ -663,7 +699,7 @@ public:
         return instances;
     }
 
-    // the rest of these are specific to the Class class only.
+
     EipUint32   class_id;                   ///< class ID
     std::string class_name;                 ///< class name
     EipUint16   revision;                   ///< class revision
@@ -742,12 +778,6 @@ struct CipTcpIpNetworkInterfaceConfiguration
     CipString   domain_name;
 };
 
-struct CipRoutePath
-{
-    EipUint8    path_size;
-    EipUint32   port; // support up to 32 bit path
-    EipUint32   address;
-};
 
 struct CipUnconnectedSendParameter
 {
@@ -759,7 +789,7 @@ struct CipUnconnectedSendParameter
     CipMessageRouterResponse*   message_response;
 
     EipUint8        reserved;
-    CipRoutePath    route_path;
+    // CipRoutePath    route_path;      CipPortSegment?
     void*           data;
 };
 

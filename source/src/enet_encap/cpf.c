@@ -15,7 +15,7 @@
 #include "cipconnectionmanager.h"
 #include "trace.h"
 
-CipCommonPacketFormatData g_common_packet_format_data_item;    //*< CPF global data items
+CipCommonPacketFormatData g_cpf;
 
 int NotifyCommonPacketFormat( EncapsulationData* receive_data,
         EipUint8* reply_buffer )
@@ -23,7 +23,7 @@ int NotifyCommonPacketFormat( EncapsulationData* receive_data,
     int return_value = CreateCommonPacketFormatStructure(
           receive_data->buf_pos,
           receive_data->data_length,
-          &g_common_packet_format_data_item
+          &g_cpf
           );
 
     if( return_value == kEipStatusError )
@@ -36,22 +36,19 @@ int NotifyCommonPacketFormat( EncapsulationData* receive_data,
 
         // Check if NullAddressItem received, otherwise it is no unconnected
         // message and should not be here
-        if( g_common_packet_format_data_item.address_item.type_id
-            == kCipItemIdNullAddress )
+        if( g_cpf.address_item.type_id == kCipItemIdNullAddress )
         {
             // found null address item
-            if( g_common_packet_format_data_item.data_item.type_id
-                == kCipItemIdUnconnectedDataItem ) // unconnected data item received
+            if( g_cpf.data_item.type_id == kCipItemIdUnconnectedDataItem )
             {
-                return_value = NotifyMR(
-                        g_common_packet_format_data_item.data_item.data,
-                        g_common_packet_format_data_item.data_item.length );
+                // unconnected data item received
+
+                return_value = NotifyMR( g_cpf.data_item.data, g_cpf.data_item.length );
 
                 if( return_value != kEipStatusError )
                 {
                     return_value = AssembleLinearMessage(
-                            &g_response, &g_common_packet_format_data_item,
-                            reply_buffer );
+                            &g_response, &g_cpf, reply_buffer );
                 }
             }
             else
@@ -79,7 +76,7 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
 {
     int return_value = CreateCommonPacketFormatStructure(
             received_data->buf_pos,
-            received_data->data_length, &g_common_packet_format_data_item );
+            received_data->data_length, &g_cpf );
 
     if( kEipStatusError == return_value )
     {
@@ -92,13 +89,10 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
         /*  check if ConnectedAddressItem received, otherwise it is no connected
             message and should not be here
         */
-        if( g_common_packet_format_data_item.address_item.type_id
-            == kCipItemIdConnectionAddress )
+        if( g_cpf.address_item.type_id == kCipItemIdConnectionAddress )
         {
             // ConnectedAddressItem item
-            CipConn* conn = GetConnectedObject(
-                    g_common_packet_format_data_item.address_item.data
-                    .connection_identifier );
+            CipConn* conn = GetConnectedObject( g_cpf.address_item.data.connection_identifier );
 
             if( conn )
             {
@@ -107,24 +101,23 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
                                                         ( 2 + conn->connection_timeout_multiplier );
 
                 // TODO check connection id  and sequence count
-                if( g_common_packet_format_data_item.data_item.type_id
+                if( g_cpf.data_item.type_id
                     == kCipItemIdConnectedDataItem ) // connected data item received
                 {
-                    EipUint8* pnBuf = g_common_packet_format_data_item.data_item.data;
+                    EipUint8* pnBuf = g_cpf.data_item.data;
 
-                    g_common_packet_format_data_item.address_item.data.sequence_number =
+                    g_cpf.address_item.data.sequence_number =
                         (EipUint32) GetIntFromMessage( &pnBuf );
 
-                    return_value = NotifyMR(
-                            pnBuf, g_common_packet_format_data_item.data_item.length - 2 );
+                    return_value = NotifyMR( pnBuf, g_cpf.data_item.length - 2 );
 
                     if( return_value != kEipStatusError )
                     {
-                        g_common_packet_format_data_item.address_item.data
-                        .connection_identifier = conn
-                                                 ->produced_connection_id;
+                        g_cpf.address_item.data.connection_identifier =
+                            conn->produced_connection_id;
+
                         return_value = AssembleLinearMessage(
-                                &g_response, &g_common_packet_format_data_item,
+                                &g_response, &g_cpf,
                                 reply_buffer );
                     }
                 }
@@ -538,23 +531,17 @@ int AssembleLinearMessage( CipMessageRouterResponse* response,
     switch( cpfd->address_item.type_id )
     {
     case kCipItemIdNullAddress:
-        {
-            message_size = EncodeNullAddressItem( &message, message_size );
-        }
+        message_size = EncodeNullAddressItem( &message, message_size );
         break;
 
     case kCipItemIdConnectionAddress:
-        {
             message_size = EncodeConnectedAddressItem( &message,
                                 cpfd, message_size );
-        }
         break;
 
     case kCipItemIdSequencedAddressItem:
-        {
             message_size = EncodeSequencedAddressItem( &message,
                                 cpfd, message_size );
-        }
         break;
     }
 
@@ -572,7 +559,7 @@ int AssembleLinearMessage( CipMessageRouterResponse* response,
                         &message, message_size );
 
                 message_size = EncodeSequenceNumber( message_size,
-                        &g_common_packet_format_data_item,
+                        &g_cpf,
                         &message );
             }
             else // Unconnected Item

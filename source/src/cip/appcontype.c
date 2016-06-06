@@ -166,15 +166,15 @@ CipConn* GetExclusiveOwnerConnection( CipConn* cip_conn,
     for( int i = 0; i < CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS; i++ )
     {
         if( (g_exlusive_owner_connections[i].output_assembly
-             == cip_conn->connection_path.connection_point[0])
+             == cip_conn->conn_path.connection_point[0])
             && (g_exlusive_owner_connections[i].input_assembly
-                == cip_conn->connection_path.connection_point[1])
+                == cip_conn->conn_path.connection_point[1])
             && (g_exlusive_owner_connections[i].config_assembly
-                == cip_conn->connection_path.connection_point[2]) )
+                == cip_conn->conn_path.connection_point[2]) )
         {
             // check if on other connection point with the same output assembly is currently connected
             if( GetConnectedOutputAssembly(
-                        cip_conn->connection_path.connection_point[0] ) )
+                        cip_conn->conn_path.connection_point[0] ) )
             {
                 *extended_error = kConnectionManagerStatusCodeErrorOwnershipConflict;
                 break;
@@ -196,10 +196,10 @@ CipConn* GetInputOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
     for( int i = 0; i < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS; i++ )
     {
         if( g_input_only_connections[i].output_assembly
-            == cip_conn->connection_path.connection_point[0] ) // we have the same output assembly
+            == cip_conn->conn_path.connection_point[0] ) // we have the same output assembly
         {
             if( g_input_only_connections[i].input_assembly
-                != cip_conn->connection_path.connection_point[1] )
+                != cip_conn->conn_path.connection_point[1] )
             {
                 *extended_error =
                     kConnectionManagerStatusCodeInvalidProducingApplicationPath;
@@ -207,7 +207,7 @@ CipConn* GetInputOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
             }
 
             if( g_input_only_connections[i].config_assembly
-                != cip_conn->connection_path.connection_point[2] )
+                != cip_conn->conn_path.connection_point[2] )
             {
                 *extended_error =
                     kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
@@ -250,10 +250,10 @@ CipConn* GetListenOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
     for( int i = 0; i < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS; i++ )
     {
         if( g_listen_only_connections[i].output_assembly
-            == cip_conn->connection_path.connection_point[0] ) // we have the same output assembly
+            == cip_conn->conn_path.connection_point[0] ) // we have the same output assembly
         {
             if( g_listen_only_connections[i].input_assembly
-                != cip_conn->connection_path.connection_point[1] )
+                != cip_conn->conn_path.connection_point[1] )
             {
                 *extended_error =
                     kConnectionManagerStatusCodeInvalidProducingApplicationPath;
@@ -261,7 +261,7 @@ CipConn* GetListenOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
             }
 
             if( g_listen_only_connections[i].config_assembly
-                != cip_conn->connection_path.connection_point[2] )
+                != cip_conn->conn_path.connection_point[2] )
             {
                 *extended_error =
                     kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
@@ -269,7 +269,7 @@ CipConn* GetListenOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
             }
 
             if( NULL == GetExistingProducerMulticastConnection(
-                        cip_conn->connection_path.connection_point[1] ) )
+                        cip_conn->conn_path.connection_point[1] ) )
             {
                 *extended_error =
                     kConnectionManagerStatusCodeNonListenOnlyConnectionNotOpened;
@@ -305,7 +305,7 @@ CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
             || (kConnectionTypeIoInputOnly   == producer_multicast_connection->instance_type) )
         {
             if( (input_point
-                 == producer_multicast_connection->connection_path.connection_point[1])
+                 == producer_multicast_connection->conn_path.connection_point[1])
                 && ( kRoutingTypeMulticastConnection
                      == (producer_multicast_connection
                          ->t_to_o_network_connection_parameter
@@ -338,7 +338,7 @@ CipConn* GetNextNonControlMasterConnection( EipUint32 input_point )
         if( (kConnectionTypeIoExclusiveOwner == next_non_control_master_connection->instance_type)
             || (kConnectionTypeIoInputOnly   == next_non_control_master_connection->instance_type) )
         {
-            if( (input_point == next_non_control_master_connection->connection_path.connection_point[1])
+            if( (input_point == next_non_control_master_connection->conn_path.connection_point[1])
                 && ( kRoutingTypeMulticastConnection ==
                     (next_non_control_master_connection->t_to_o_network_connection_parameter & kRoutingTypeMulticastConnection) )
                 && (kEipInvalidSocket == next_non_control_master_connection->socket[kUdpCommuncationDirectionProducing]) )
@@ -367,14 +367,14 @@ void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,
     while( connection )
     {
         if( (instance_type == connection->instance_type)
-            && (input_point == connection->connection_path.connection_point[1]) )
+            && (input_point == connection->conn_path.connection_point[1]) )
         {
             connection_to_delete = connection;
             connection = connection->next_cip_conn;
 
             CheckIoConnectionEvent(
-                    connection_to_delete->connection_path.connection_point[0],
-                    connection_to_delete->connection_path.connection_point[1],
+                    connection_to_delete->conn_path.connection_point[0],
+                    connection_to_delete->conn_path.connection_point[1],
                     kIoConnectionEventClosed );
 
             // FIXME check if this is ok
@@ -412,7 +412,7 @@ EipBool8 ConnectionWithSameConfigPointExists( EipUint32 config_point )
 
     while( connection )
     {
-        if( config_point == connection->connection_path.connection_point[2] )
+        if( config_point == connection->conn_path.connection_point[2] )
         {
             break;
         }

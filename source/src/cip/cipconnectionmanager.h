@@ -106,6 +106,7 @@ enum WatchdogTimeoutAction
     kWatchdogTimeoutActionDeferredDelete = 3        ///< Only valid for DeviceNet, invalid for I/O connections
 };
 
+
 struct LinkConsumer
 {
     ConnectionState state;
@@ -115,11 +116,13 @@ struct LinkConsumer
  *  TCMReceiveDataFunc m_ptfuncReceiveData; */
 };
 
+
 struct LinkProducer
 {
     ConnectionState state;
     EipUint16 connection_id;
 };
+
 
 struct LinkObject
 {
@@ -129,7 +132,7 @@ struct LinkObject
 
 
 /**
- * Class CipConn
+ * Struct CipConn
  * holds the data needed for handling connections. This data is strongly related to
  * the connection object defined in the CIP-specification. However the full
  * functionality of the connection object is not implemented. Therefore this
@@ -178,9 +181,9 @@ struct CipConn
     EipUint8    connection_path_size;
 
     CipElectronicKey    electronic_key;
-    CipConnectionPath   connection_path; // padded EPATH
+    CipConnectionPath   conn_path;                  ///< padded EPATH
 
-    LinkObject  link_object;
+    LinkObject          link_object;
 
     CipInstance* consuming_instance;
 
@@ -228,10 +231,10 @@ struct CipConn
     int socket[2];                          // socket handles, indexed by kConsuming or kProducing
 
     // pointers to connection handling functions
-    ConnectionCloseFunction connection_close_function;
-    ConnectionTimeoutFunction connection_timeout_function;
-    ConnectionSendDataFunction connection_send_data_function;
-    ConnectionReceiveDataFunction connection_receive_data_function;
+    ConnectionCloseFunction         connection_close_function;
+    ConnectionTimeoutFunction       connection_timeout_function;
+    ConnectionSendDataFunction      connection_send_data_function;
+    ConnectionReceiveDataFunction   connection_receive_data_function;
 
     // pointers to be used in the active connection list
     CipConn*    next_cip_conn;

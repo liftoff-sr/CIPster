@@ -103,25 +103,26 @@ static EipStatus Reset( CipInstance* instance,
     {
         switch( request->data[0] )
         {
-        case 0: // Reset type 0 -> emulate device reset / Power cycle
-
+        case 0:     // Reset type 0 -> emulate device reset / Power cycle
             if( kEipStatusError == ResetDevice() )
             {
                 response->general_status = kCipErrorInvalidParameter;
             }
-
             break;
 
-        case 1: // Reset type 1 -> reset to device settings
-
-            if( kEipStatusError == ResetDeviceToInitialConfiguration() )
+        case 1:     // Reset type 1 -> reset to device settings
+            if( kEipStatusError == ResetDeviceToInitialConfiguration( true ) )
             {
                 response->general_status = kCipErrorInvalidParameter;
             }
-
             break;
 
-        // case 2: Not supported Reset type 2 -> Return to factory defaults except communications parameters
+        case 2:     // Reset type 2 -> Return to factory defaults except communications parameters
+            if( kEipStatusError == ResetDeviceToInitialConfiguration( false ) )
+            {
+                response->general_status = kCipErrorInvalidParameter;
+            }
+            break;
 
         default:
             response->general_status = kCipErrorInvalidParameter;

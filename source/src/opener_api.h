@@ -8,10 +8,6 @@
 
 #include <assert.h>
 
-#if __cplusplus
-//extern "C" {
-#endif
-
 
 #include "typedefs.h"
 #include "cip/ciptypes.h"
@@ -130,12 +126,15 @@ inline CipInstance* GetCipInstance( CipClass* cip_class, EipUint32 instance_numb
  * As instances and objects are selfsimilar this function can also be used
  * to retrieve the attribute of an object.
  * @param intance pointer to the instance the attribute belongs to
- * @param attribute_number number of the attribute to retrieve
+ * @param attribute_id number of the attribute to retrieve
  * @return pointer to attribute
  *          0 if instance is not in the object
  */
-CipAttribute* GetCipAttribute( CipInstance* instance,
-        EipUint16 attribute_number );
+inline CipAttribute* GetCipAttribute( CipInstance* instance,  EipUint16 attribute_id )
+{
+    return instance->Attribute( attribute_id );
+}
+
 
 /** @ingroup CIP_API
  * @brief Allocate memory for new CIP Class and attributes
@@ -531,11 +530,15 @@ EipStatus ResetDevice();
 /** @ingroup CIP_CALLBACK_API
  * @brief Reset the device to the initial configuration and emulate as close as
  * possible a power cycle of the device
+ * @param also_reset_comm_parameters when true means reset everything including
+ *   communications parameters, else all but comm params.
  *
  * @return if the service is supported the function will not return.
  *     EIP_ERROR if this service is not supported
+ *
+ * @see CIP Identity Service 5: Reset
  */
-EipStatus ResetDeviceToInitialConfiguration();
+EipStatus ResetDeviceToInitialConfiguration( bool also_reset_comm_parameters );
 
 #if defined(__linux__) || defined(__WIN32)
 
@@ -811,10 +814,6 @@ void    IApp_CloseSocket_tcp( int socket_handle );
  * @include "license.txt"
  *
  */
-
-#if __cplusplus
-//}
-#endif
 
 
 #endif //CIPSTER_CIPSTER_API_H_

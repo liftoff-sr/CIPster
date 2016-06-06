@@ -1,5 +1,5 @@
 
-project( "CIPster on Linux" )
+project( "CIPster on Windows" )
 
 
 include(ExternalProject)

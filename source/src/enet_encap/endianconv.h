@@ -12,76 +12,84 @@
  * @brief Responsible for Endianess conversion
  */
 
-typedef enum {
-  kOpenerEndianessUnknown = -1,
-  kCIPsterEndianessLittle = 0,
-  kCIPsterEndianessBig = 1
-} OpenerEndianess;
+enum OpenerEndianess
+{
+    kOpenerEndianessUnknown = -1,
+    kCIPsterEndianessLittle = 0,
+    kCIPsterEndianessBig = 1
+};
+
 
 /** @ingroup ENCAP
  *   @brief Reads EIP_UINT8 from *buffer and converts little endian to host.
  *   @param buffer pointer where data should be reed.
  *   @return EIP_UINT8 data value
  */
-EipUint8 GetSintFromMessage(EipUint8** buffer);
+EipUint8 GetSintFromMessage( EipUint8** buffer );
 
 /** @ingroup ENCAP
- *
- * @brief Get an 16Bit integer from the network buffer, and moves pointer beyond the 16 bit value
+ * Function GetIntFromMessage
+ * returns a 16Bit integer from the network buffer, and moves pointer beyond the 16 bit value
  * @param buffer Pointer to the network buffer array. This pointer will be incremented by 2!
  * @return Extracted 16 bit integer value
  */
-EipUint16 GetIntFromMessage(EipUint8 **buffer);
+EipUint16 GetIntFromMessage( EipUint8** buffer );
 
 /** @ingroup ENCAP
- *
- * @brief Get an 32Bit integer from the network buffer.
+ * Function GetDintFromMessage
+ * returns a 32Bit integer from the network buffer.
  * @param buffer pointer to the network buffer array. This pointer will be incremented by 4!
  * @return Extracted 32 bit integer value
  */
-EipUint32 GetDintFromMessage(EipUint8 **buffer);
+EipUint32 GetDintFromMessage( EipUint8** buffer );
 
 /** @ingroup ENCAP
- *
- * @brief converts UINT8 data from host to little endian an writes it to buffer.
+ * Function AddSintToMessage
+ * converts UINT8 data from host to little endian and writes it to buffer and advances buffer.
  * @param data value to be written
  * @param buffer pointer where data should be written.
  */
-int AddSintToMessage(EipUint8 data, EipUint8 **buffer);
+int AddSintToMessage( EipUint8 data, EipUint8** buffer );
 
 /** @ingroup ENCAP
- *
- * @brief Write an 16Bit integer to the network buffer.
+ * Function AddIntToMessage
+ * writes a 16Bit integer to buffer and advances buffer.
  * @param data value to write
- * @param buffer pointer to the network buffer array. This pointer will be incremented by 2!
+ * @param buffer pointer to pointer to array.
  *
  * @return Length in bytes of the encoded message
  */
-int AddIntToMessage(EipUint16 data, EipUint8 **buffer);
+int AddIntToMessage( EipUint16 data, EipUint8** buffer );
 
 /** @ingroup ENCAP
- *
- * @brief Write an 32Bit integer to the network buffer.
+ * Function AddDintToMessage
+ * writes a 32Bit integer to the buffer and advances buffer.
  * @param data value to write
  * @param buffer pointer to the network buffer array. This pointer will be incremented by 4!
  *
  * @return Length in bytes of the encoded message
  */
-int AddDintToMessage(EipUint32 data, EipUint8 **buffer);
+int AddDintToMessage( EipUint32 data, EipUint8** buffer );
 
 #ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
 
-EipUint64 GetLintFromMessage(EipUint8 **buffer);
+/**
+ * Function GetLintFromMessage
+ * reads EipUint64 from buffer and advances buffer.
+ * @param buffer pointer to pointer to bytes
+ * @return EipUint64
+ */
+EipUint64 GetLintFromMessage( EipUint8** buffer );
 
 /** @ingroup ENCAP
- *
- * @brief Write an 64Bit integer to the network buffer.
+ * Functgoin AddLintToMessage
+ * writes a 64Bit integer to buffer and advances buffer.
  * @param data value to write
- * @param buffer pointer to the network buffer array. This pointer will be incremented by 8!
+ * @param buffer pointer to pointer byte array. This pointer will be incremented by 8.
  *
- * @return Length in bytes of the encoded message
+ * @return int - 8
  */
-int AddLintToMessage(EipUint64 pa_unData, EipUint8 **buffer);
+int AddLintToMessage( EipUint64 pa_unData, EipUint8** buffer );
 
 #endif
 
@@ -93,13 +101,16 @@ int AddLintToMessage(EipUint64 pa_unData, EipUint8 **buffer);
  * @param address IP address of the socket, has to be provided in big-endian
  * @param communcation_buffer The message buffer for sending the message
  */
-int EncapsulateIpAddress(EipUint16 port, EipUint32 address,
-                                           EipByte **communication_buffer);
+int EncapsulateIpAddress( EipUint16 port, EipUint32 address,
+        EipByte** communication_buffer );
 
-/** Identify if we are running on a big or little endian system and set
- * variable.
+/**
+ * Function DetermineEndianess
+ * detects Endianess of the platform and sets global
+ * g_nCIPsterPlatformEndianess variable accordingly:
+ * 0 equals little endian and 1 equals big endian
  */
-void DetermineEndianess(void);
+void DetermineEndianess();
 
 /** @brief Return the endianess identified on system startup
  * @return
@@ -107,12 +118,12 @@ void DetermineEndianess(void);
  *    - 0  little endian system
  *    - 1  big endian system
  */
-int GetEndianess(void);
+int GetEndianess();
 
-void MoveMessageNOctets(CipOctet **message_runner, int n);
+void MoveMessageNOctets( CipOctet** message_runner, int n );
 
 int FillNextNMessageOctetsWithValueAndMoveToNextPosition( EipByte value,
-        int count, CipOctet **message_runner);
+        int count, CipOctet** message_runner );
 
 
-#endif // CIPSTER_ENDIANCONV_H_
+#endif    // CIPSTER_ENDIANCONV_H_

@@ -71,7 +71,7 @@ private:
 };
 
 
-CipClassRegistry    g_class_registry;
+static CipClassRegistry    g_class_registry;
 
 
 void DeleteAllClasses()
@@ -94,18 +94,6 @@ CipClass* GetCipClass( EipUint32 class_id )
     return g_class_registry.FindClass( class_id );
 }
 
-
-/** @brief Create Message Router Request structure out of the received data.
- *
- * Parses the UCMM header consisting of: service, IOI size, IOI, data into a request structure
- * @param data pointer to the message data received
- * @param data_length number of bytes in the message
- * @param request pointer to structure of MRRequest data item.
- * @return status  0 .. success
- *                 -1 .. error
- */
-CipError CreateMessageRouterRequestStructure( EipUint8* data, EipInt16 data_length,
-        CipMessageRouterRequest* request );
 
 static CipInstance* createCipMessageRouterInstance()
 {
@@ -153,8 +141,7 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
 
     CIPSTER_TRACE_INFO( "notifyMR: routing unconnected message\n" );
 
-    EipByte nStatus = CreateMessageRouterRequestStructure(
-                        data, data_length, &g_request );
+    EipByte nStatus = g_request.InitRequest( data, data_length );
 
     if( nStatus != kCipErrorSuccess )
     {
@@ -223,29 +210,26 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
 }
 
 
-CipError CreateMessageRouterRequestStructure( EipUint8* data, EipInt16 data_length,
-        CipMessageRouterRequest* request )
+CipError CipMessageRouterRequest::InitRequest( EipUint8* aRequest, EipInt16 aCount )
 {
-    int number_of_decoded_bytes;
+    service = *aRequest++;
 
-    request->service = *data;
-    data++; //TODO: Fix for 16 bit path lengths (+1
-    data_length--;
+    // TODO: Fix for 16 bit path lengths (+1
 
-    number_of_decoded_bytes = DecodePaddedEPath(
-            &(request->request_path), &data );
+    --aCount;
+
+    int number_of_decoded_bytes = DecodePaddedEPath( &request_path, &aRequest );
 
     if( number_of_decoded_bytes < 0 )
     {
         return kCipErrorPathSegmentError;
     }
 
-    request->data = data;
-    request->data_length = data_length - number_of_decoded_bytes;
+    data = aRequest;
+    data_length = aCount - number_of_decoded_bytes;
 
-    if( request->data_length < 0 )
+    if( data_length < 0 )
         return kCipErrorPathSizeInvalid;
     else
         return kCipErrorSuccess;
 }
-
