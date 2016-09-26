@@ -50,8 +50,13 @@ ExternalProject_Add( eip
 set( EIP_INCLUDE_DIR ${CIPSTER_DIR}/source/src )
 set( EIP_LIBRARIES   ${PREFIX}/libeip.a )
 
-# statically link the gcc and socket libraries
-set( CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -static )
+
+if( CMAKE_COMPILER_IS_GNUCXX )
+    # statically link the gcc and socket libraries so that dynamic ones do not have to be
+    # installed on the ultimate target separately.
+    set( CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS} -static )
+endif()
+
 
 include_directories(
     .

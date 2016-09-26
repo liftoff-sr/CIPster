@@ -933,7 +933,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
 
 int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
 {
-    int number_of_decoded_bytes = -1;
+    int decode_byte_count = -1;
 
     // check the data type of attribute
     switch( cip_type )
@@ -944,21 +944,21 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipByte:
         *(EipUint8*) data = **message;
         ++(*message);
-        number_of_decoded_bytes = 1;
+        decode_byte_count = 1;
         break;
 
     case kCipInt:
     case kCipUint:
     case kCipWord:
         *(EipUint16*) data = GetIntFromMessage( message );
-        number_of_decoded_bytes = 2;
+        decode_byte_count = 2;
         break;
 
     case kCipDint:
     case kCipUdint:
     case kCipDword:
         *(EipUint32*) data = GetDintFromMessage( message );
-        number_of_decoded_bytes = 4;
+        decode_byte_count = 4;
         break;
 
 #ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
@@ -967,7 +967,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipLword:
         {
             *(EipUint64*) data = GetLintFromMessage( message );
-            number_of_decoded_bytes = 8;
+            decode_byte_count = 8;
         }
         break;
 #endif
@@ -982,7 +982,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
             // must point to a buffer large enough for this.
             CipByteArray* byte_array = (CipByteArray*) data;
             memcpy( byte_array->data, *message, byte_array->length );
-            number_of_decoded_bytes = byte_array->length;   // no length field
+            decode_byte_count = byte_array->length;   // no length field
         }
         break;
 
@@ -993,13 +993,13 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
             memcpy( string->string, *message, string->length );
             *message += string->length;
 
-            number_of_decoded_bytes = string->length + 2; // 2 byte length field
+            decode_byte_count = string->length + 2; // 2 byte length field
 
-            if( number_of_decoded_bytes & 1 )
+            if( decode_byte_count & 1 )
             {
                 // we have an odd byte count
                 ++(*message);
-                number_of_decoded_bytes++;
+                decode_byte_count++;
             }
         }
         break;
@@ -1014,7 +1014,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
             memcpy( short_string->string, *message, short_string->length );
             *message += short_string->length;
 
-            number_of_decoded_bytes = short_string->length + 1;
+            decode_byte_count = short_string->length + 1;
         }
         break;
 
@@ -1022,7 +1022,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
         break;
     }
 
-    return number_of_decoded_bytes;
+    return decode_byte_count;
 }
 
 

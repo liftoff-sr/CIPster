@@ -141,7 +141,7 @@ CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
     i->AttributeInsert( 4, kCipUint, kGetableSingle, &i->byte_array.length );
 
     // This is a public function, we should not expect caller to insert this
-    // instance its proper public CIP class "Assembly", so do it here.
+    // instance into its proper public CIP class "Assembly", so do it here.
     clazz->InstanceInsert( i );
 
     return i;
