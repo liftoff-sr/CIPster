@@ -16,19 +16,20 @@
 #include "cipethernetlink.h"
 #include "opener_api.h"
 
-CipDword tcp_status_ = 0x1;                         //*< #1  TCP status with 1 we indicate that we got a valid configuration from DHCP or BOOTP
+static CipDword tcp_status_ = 0x1;                         //*< #1  TCP status with 1 we indicate that we got a valid configuration from DHCP or BOOTP
 
-CipDword configuration_capability_ = 0x04 | 0x20;   //*< #2  This is a default value meaning that it is a DHCP client see 5-3.2.2.2 EIP specification; 0x20 indicates "Hardware Configurable"
+static CipDword configuration_capability_ = 0x04 | 0x20;   //*< #2  This is a default value meaning that it is a DHCP client see 5-3.2.2.2 EIP specification; 0x20 indicates "Hardware Configurable"
 
-CipDword configuration_control_ = 0;                //*< #3  This is a TCP/IP object attribute. For now it is always zero and is not used for anything.
+static CipDword configuration_control_ = 0;                //*< #3  This is a TCP/IP object attribute. For now it is always zero and is not used for anything.
 
-CipEpath physical_link_object_ =                    //*< #4
+static CipEpath physical_link_object_ =                    //*< #4
 {
     2,                               //*< EIP_UINT16 (UINT) PathSize in 16 Bit chunks
     CIP_ETHERNETLINK_CLASS_CODE,     //*< EIP_UINT16 ClassID
     1,                               //*< EIP_UINT16 InstanceNr
     0                                //*< EIP_UINT16 AttributNr (not used as this is the EPATH the EthernetLink object)
 };
+
 
 CipTcpIpNetworkInterfaceConfiguration interface_configuration_ =    //*< #5 IP, network mask, gateway, name server 1 & 2, domain name
 {
@@ -42,7 +43,7 @@ CipTcpIpNetworkInterfaceConfiguration interface_configuration_ =    //*< #5 IP, 
     }
 };
 
-CipString hostname_ =    //*< #6 Hostname
+static CipString hostname_ =    //*< #6 Hostname
 { 0, NULL };
 
 /** @brief #8 the time to live value to be used for multi-cast connections
@@ -50,6 +51,7 @@ CipString hostname_ =    //*< #6 Hostname
  * Currently we implement it non set-able and with the default value of 1.
  */
 EipUint8 g_time_to_live_value = 1;
+
 
 /** @brief #9 The multicast configuration for this device
  *
@@ -275,6 +277,7 @@ EipStatus CipTcpIpInterfaceInit()
     {
         CipClass* clazz = new CipClass( kCipTcpIpInterfaceClassCode,
               "TCP/IP Interface",
+              (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
               0xffffffff,               // class getAttributeAll mask
               0xffffffff,               // instance getAttributeAll mask
               4                         // version

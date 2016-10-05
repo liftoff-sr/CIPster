@@ -76,7 +76,7 @@ CipConn* CheckForExistingConnection( CipConn* conn )
 {
     CipConn* active = g_active_connection_list;
 
-    while( NULL != active )
+    while( active )
     {
         if( active->state == kConnectionStateEstablished )
         {
@@ -335,7 +335,7 @@ EipUint8 ParseConnectionPath( CipConn* conn,
 
             CIPSTER_TRACE_INFO( "classid %d (%s)\n",
                     (int) conn->conn_path.class_id,
-                    clazz->class_name.c_str() );
+                    clazz->ClassName().c_str() );
         }
         else
         {
@@ -867,20 +867,14 @@ static EipStatus assembleForwardOpenResponse( CipConn* co,
 }
 
 
-/*   INT8 assembleFWDCloseResponse(UINT16 pa_ConnectionSerialNr, UINT16 pa_OriginatorVendorID, UINT32 pa_OriginatorSerialNr, S_CIP_MR_Request *pa_MRRequest, S_CIP_MR_Response *pa_MRResponse, S_CIP_CPF_Data *pa_CPF_data, INT8 pa_status, INT8 *pa_msg)
- *   create FWDClose response dependent on status.
- *      pa_ConnectionSerialNr	requested ConnectionSerialNr
- *      pa_OriginatorVendorID	requested OriginatorVendorID
- *      pa_OriginatorSerialNr	requested OriginalSerialNr
- *      pa_MRRequest		pointer to message router request
- *      pa_MRResponse		pointer to message router response
- *      pa_CPF_data		pointer to CPF Data Item
- *      pa_status		status of FWDClose
- *      pa_msg			pointer to memory where reply has to be stored
- *  return status
+/**
+ * Function assembleFWDCloseResponse
+ * creates FWDClose response dependent on status.
+ *
+ * @return EipStatus -
  *          0 .. no reply need to ne sent back
  *          1 .. need to send reply
- *             -1 .. error
+ *         -1 .. error
  */
 static EipStatus assembleForwardCloseResponse( EipUint16 connection_serial_number,
         EipUint16 originatior_vendor_id,
@@ -894,8 +888,7 @@ static EipStatus assembleForwardCloseResponse( EipUint16 connection_serial_numbe
     EipByte* message = response->data;
 
     cpfd->item_count = 2;
-    cpfd->data_item.type_id =
-        kCipItemIdUnconnectedDataItem;
+    cpfd->data_item.type_id = kCipItemIdUnconnectedDataItem;
 
     AddNullAddressItem( cpfd );
 
@@ -903,27 +896,25 @@ static EipStatus assembleForwardCloseResponse( EipUint16 connection_serial_numbe
     AddIntToMessage( originatior_vendor_id, &message );
     AddDintToMessage( originator_serial_number, &message );
 
-    response->reply_service = (0x80 | request->service);
+    response->reply_service = 0x80 | request->service;
 
     response->data_length = 10; // if there is no application specific data
 
     if( kConnectionManagerStatusCodeSuccess == extended_error_code )
     {
-        *message = 0; // no application data
+        *message++ = 0; // no application data
         response->general_status = kCipErrorSuccess;
         response->size_of_additional_status = 0;
     }
     else
     {
-        *message = *request->data; // remaining path size
+        *message++ = *request->data; // remaining path size
         response->general_status = kCipErrorConnectionFailure;
         response->additional_status[0] = extended_error_code;
         response->size_of_additional_status = 1;
     }
 
-    message++;
-    *message = 0; // reserved
-    message++;
+    *message++ = 0;         // reserved
 
     return kEipStatusOkSend;
 }
@@ -967,69 +958,83 @@ CipConn* GetConnectedOutputAssembly( EipUint32 output_assembly_id )
 }
 
 
-void CloseConnection( CipConn* pa_pstConnObj )
+void CloseConnection( CipConn* conn )
 {
-    pa_pstConnObj->state = kConnectionStateNonExistent;
+    conn->state = kConnectionStateNonExistent;
 
-    if( 0x03 != (pa_pstConnObj->transport_type_class_trigger & 0x03) )
+    if( 0x03 != (conn->transport_type_class_trigger & 0x03) )
     {
         // only close the UDP connection for not class 3 connections
-        IApp_CloseSocket_udp(
-                pa_pstConnObj->socket[kUdpCommuncationDirectionConsuming] );
-        pa_pstConnObj->socket[kUdpCommuncationDirectionConsuming] =
-            kEipInvalidSocket;
-        IApp_CloseSocket_udp(
-                pa_pstConnObj->socket[kUdpCommuncationDirectionProducing] );
-        pa_pstConnObj->socket[kUdpCommuncationDirectionProducing] =
-            kEipInvalidSocket;
+        IApp_CloseSocket_udp( conn->socket[kUdpCommuncationDirectionConsuming] );
+        conn->socket[kUdpCommuncationDirectionConsuming] = kEipInvalidSocket;
+
+        IApp_CloseSocket_udp( conn->socket[kUdpCommuncationDirectionProducing] );
+        conn->socket[kUdpCommuncationDirectionProducing] = kEipInvalidSocket;
     }
 
-    RemoveFromActiveConnections( pa_pstConnObj );
+    RemoveFromActiveConnections( conn );
 }
 
 
-void CopyConnectionData( CipConn* pa_pstDst, CipConn* pa_pstSrc )
+void CopyConnectionData( CipConn* aDst, CipConn* aSrc )
 {
-    memcpy( pa_pstDst, pa_pstSrc, sizeof(CipConn) );
+    memcpy( aDst, aSrc, sizeof(CipConn) );
 }
 
 
-void AddNewActiveConnection( CipConn* pa_pstConn )
+void AddNewActiveConnection( CipConn* conn )
 {
-    pa_pstConn->first_cip_conn = NULL;
-    pa_pstConn->next_cip_conn  = g_active_connection_list;
+    conn->first_cip_conn = NULL;
+    conn->next_cip_conn  = g_active_connection_list;
 
     if( NULL != g_active_connection_list )
     {
-        g_active_connection_list->first_cip_conn = pa_pstConn;
+        g_active_connection_list->first_cip_conn = conn;
     }
 
-    g_active_connection_list = pa_pstConn;
+    g_active_connection_list = conn;
     g_active_connection_list->state = kConnectionStateEstablished;
 }
 
 
-void RemoveFromActiveConnections( CipConn* pa_pstConn )
+void RemoveFromActiveConnections( CipConn* conn )
 {
-    if( NULL != pa_pstConn->first_cip_conn )
+    if( NULL != conn->first_cip_conn )
     {
-        pa_pstConn->first_cip_conn->next_cip_conn =
-            pa_pstConn->next_cip_conn;
+        conn->first_cip_conn->next_cip_conn =
+            conn->next_cip_conn;
     }
     else
     {
-        g_active_connection_list = pa_pstConn->next_cip_conn;
+        g_active_connection_list = conn->next_cip_conn;
     }
 
-    if( NULL != pa_pstConn->next_cip_conn )
+    if( NULL != conn->next_cip_conn )
     {
-        pa_pstConn->next_cip_conn->first_cip_conn =
-            pa_pstConn->first_cip_conn;
+        conn->next_cip_conn->first_cip_conn =
+            conn->first_cip_conn;
     }
 
-    pa_pstConn->first_cip_conn = NULL;
-    pa_pstConn->next_cip_conn  = NULL;
-    pa_pstConn->state = kConnectionStateNonExistent;
+    conn->first_cip_conn = NULL;
+    conn->next_cip_conn  = NULL;
+    conn->state = kConnectionStateNonExistent;
+}
+
+
+
+bool IsConnectedInputAssembly( EipUint32 aInstanceId )
+{
+    CipConn* conn = g_active_connection_list;
+
+    while( conn )
+    {
+        if( aInstanceId == conn->conn_path.connection_point[1] )
+            return true;
+
+        conn = conn->next_cip_conn;
+    }
+
+    return false;
 }
 
 
@@ -1040,9 +1045,7 @@ bool IsConnectedOutputAssembly( EipUint32 aInstanceId )
     while( conn )
     {
         if( aInstanceId == conn->conn_path.connection_point[0] )
-        {
             return true;
-        }
 
         conn = conn->next_cip_conn;
     }
@@ -1098,25 +1101,22 @@ ConnectionManagementHandling* GetConnMgmEntry( EipUint32 class_id )
 }
 
 
-EipStatus TriggerConnections( unsigned pa_unOutputAssembly,
-        unsigned pa_unInputAssembly )
+EipStatus TriggerConnections( unsigned aOutputAssembly, unsigned aInputAssembly )
 {
     EipStatus nRetVal = kEipStatusError;
 
-    CipConn* pstRunner = g_active_connection_list;
+    CipConn* conn = g_active_connection_list;
 
-    while( NULL != pstRunner )
+    while( conn )
     {
-        if( (pa_unOutputAssembly == pstRunner->conn_path.connection_point[0])
-            && (pa_unInputAssembly == pstRunner->conn_path.connection_point[1]) )
+        if( aOutputAssembly == conn->conn_path.connection_point[0]
+         && aInputAssembly  == conn->conn_path.connection_point[1] )
         {
             if( kConnectionTriggerTypeApplicationTriggeredConnection
-                == (pstRunner->transport_type_class_trigger
-                    & kConnectionTriggerTypeProductionTriggerMask) )
+                == (conn->transport_type_class_trigger & kConnectionTriggerTypeProductionTriggerMask) )
             {
                 // produce at the next allowed occurrence
-                pstRunner->transmission_trigger_timer =
-                    pstRunner->production_inhibit_timer;
+                conn->transmission_trigger_timer = conn->production_inhibit_timer;
                 nRetVal = kEipStatusOk;
             }
 
@@ -1147,8 +1147,9 @@ void InitializeConnectionManagerData()
  * @param instance CIP object instance
  * @param request CipMessageRouterRequest.
  * @param response CipMessageRouterResponse.
- * @return >0 .. success, 0 .. no reply to send back
- *          -1 .. error
+ * @return EipStatus -
+ *         >0 .. success, 0 .. no reply to send back
+ *         -1 .. error
  */
 static EipStatus forwardOpenCommon( CipInstance* instance,
         CipMessageRouterRequest* request,
@@ -1164,13 +1165,13 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     s_dummy_conn.timeout_ticks = *request->data++;
 
     // O_to_T Conn ID
-    s_dummy_conn.consumed_connection_id = GetDintFromMessage( &request->data );
+    s_dummy_conn.consumed_connection_id   = GetDintFromMessage( &request->data );
 
     // T_to_O Conn ID
-    s_dummy_conn.produced_connection_id = GetDintFromMessage( &request->data );
+    s_dummy_conn.produced_connection_id   = GetDintFromMessage( &request->data );
 
     s_dummy_conn.connection_serial_number = GetIntFromMessage( &request->data );
-    s_dummy_conn.originator_vendor_id = GetIntFromMessage( &request->data );
+    s_dummy_conn.originator_vendor_id     = GetIntFromMessage( &request->data );
     s_dummy_conn.originator_serial_number = GetDintFromMessage( &request->data );
 
     if( CheckForExistingConnection( &s_dummy_conn ) )
@@ -1178,13 +1179,13 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         // TODO this test is  incorrect, see CIP spec 3-5.5.2 re: duplicate forward open
         // it should probably be testing the connection type fields
         // TODO think on how a reconfiguration request could be handled correctly.
-        if( (0 == s_dummy_conn.consumed_connection_id)
-            && (0 == s_dummy_conn.produced_connection_id) )
+        if( !s_dummy_conn.consumed_connection_id && !s_dummy_conn.produced_connection_id )
         {
             // TODO implement reconfiguration of connection
 
             CIPSTER_TRACE_ERR(
-                    "this looks like a duplicate forward open -- I can't handle this yet, sending a CIP_CON_MGR_ERROR_CONNECTION_IN_USE response\n" );
+                    "this looks like a duplicate forward open -- I can't handle this yet,\n"
+                    "sending a CIP_CON_MGR_ERROR_CONNECTION_IN_USE response\n" );
         }
 
         return assembleForwardOpenResponse(
@@ -1205,18 +1206,19 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     // the requested packet interval parameter needs to be a multiple of
     // TIMERTICK from the header file
     CIPSTER_TRACE_INFO(
-            "ForwardOpen: ConConnID %" PRIu32 ", ProdConnID %" PRIu32 ", ConnSerNo %u\n",
-            s_dummy_conn.consumed_connection_id,
-            s_dummy_conn.produced_connection_id,
-            s_dummy_conn.connection_serial_number );
+        "%s: ConConnID %u, ProdConnID %u, ConnSerNo %u\n",
+        __func__,
+        s_dummy_conn.consumed_connection_id,
+        s_dummy_conn.produced_connection_id,
+        s_dummy_conn.connection_serial_number
+        );
 
-    s_dummy_conn.o_to_t_requested_packet_interval = GetDintFromMessage( &request->data );
-
+    s_dummy_conn.o_to_t_requested_packet_interval    = GetDintFromMessage( &request->data );
     s_dummy_conn.o_to_t_network_connection_parameter = GetIntFromMessage( &request->data );
     s_dummy_conn.t_to_o_requested_packet_interval    = GetDintFromMessage( &request->data );
 
     EipUint32 temp = s_dummy_conn.t_to_o_requested_packet_interval
-                     % (kOpenerTimerTickInMilliSeconds * 1000);
+                         % (kOpenerTimerTickInMilliSeconds * 1000);
 
     if( temp > 0 )
     {
@@ -1232,6 +1234,8 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     // check if Network connection parameters are ok
     if( CIP_CONN_TYPE_MASK == (s_dummy_conn.o_to_t_network_connection_parameter & CIP_CONN_TYPE_MASK) )
     {
+        CIPSTER_TRACE_INFO( "%s: invalid O to T type\n", __func__ );
+
         return assembleForwardOpenResponse(
                 &s_dummy_conn, response,
                 kCipErrorConnectionFailure,
@@ -1240,6 +1244,8 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
 
     if( CIP_CONN_TYPE_MASK == (s_dummy_conn.t_to_o_network_connection_parameter & CIP_CONN_TYPE_MASK) )
     {
+        CIPSTER_TRACE_INFO( "%s: invalid T to O type\n", __func__ );
+
         return assembleForwardOpenResponse(
                 &s_dummy_conn, response,
                 kCipErrorConnectionFailure,
@@ -1251,6 +1257,8 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     // check if the trigger type value is ok
     if( 0x40 & s_dummy_conn.transport_type_class_trigger )
     {
+        CIPSTER_TRACE_INFO( "%s: trigger not supported\n", __func__ );
+
         return assembleForwardOpenResponse(
                 &s_dummy_conn, response,
                 kCipErrorConnectionFailure,
@@ -1261,6 +1269,8 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
 
     if( kEipStatusOk != temp )
     {
+        CIPSTER_TRACE_INFO( "%s: unable to parse connection path\n", __func__ );
+
         return assembleForwardOpenResponse( &s_dummy_conn,
                 response, temp,
                 connection_status );
@@ -1273,7 +1283,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         temp = connection_management_entry->open_connection_function(
                 &s_dummy_conn, &connection_status );
 
-        CIPSTER_TRACE_INFO( "open_connection_function, temp = %d\n", temp );
+        CIPSTER_TRACE_INFO( "%s: open_connection_function, temp = %d\n", __func__, temp );
     }
     else
     {
@@ -1284,7 +1294,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
 
     if( kEipStatusOk != temp )
     {
-        CIPSTER_TRACE_INFO( "connection manager: connect failed. temp:%d\n", temp );
+        CIPSTER_TRACE_INFO( "%s: open_connection_function() failed. ret:%d\n", __func__, temp );
 
         // in case of error the dummy objects holds all necessary information
         return assembleForwardOpenResponse( &s_dummy_conn,
@@ -1293,7 +1303,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     }
     else
     {
-        CIPSTER_TRACE_INFO( "connection manager: connect succeeded\n" );
+        CIPSTER_TRACE_INFO( "%s: open_connection_function() succeeded\n", __func__ );
 
         // in case of success the g_pstActiveConnectionList points to the new connection
         return assembleForwardOpenResponse( g_active_connection_list,
@@ -1342,20 +1352,19 @@ static EipStatus forwardClose( CipInstance* instance,
 
     CIPSTER_TRACE_INFO( "ForwardClose: ConnSerNo %d\n", connection_serial_number );
 
-    while( NULL != active )
+    while( active )
     {
-        // this check should not be necessary as only established connections should be in the active connection list
-        if( (active->state == kConnectionStateEstablished)
-            || (active->state == kConnectionStateTimedOut) )
+        // This check should not be necessary as only established connections
+        // should be in the active connection list
+        if( active->state == kConnectionStateEstablished
+         || active->state == kConnectionStateTimedOut )
         {
-            if( (active->connection_serial_number
-                 == connection_serial_number)
-                && (active->originator_vendor_id == originator_vendor_id)
-                && (active->originator_serial_number
-                    == originator_serial_number) )
+            if( (active->connection_serial_number == connection_serial_number)
+             && (active->originator_vendor_id == originator_vendor_id)
+             && (active->originator_serial_number == originator_serial_number) )
             {
                 // found the corresponding connection object -> close it
-                CIPSTER_ASSERT( NULL != active->connection_close_function );
+                CIPSTER_ASSERT( active->connection_close_function );
                 active->connection_close_function( active );
                 connection_status = kConnectionManagerStatusCodeSuccess;
                 break;
@@ -1388,21 +1397,32 @@ static EipStatus getConnectionOwner( CipInstance* instance,
 }
 
 
+static CipInstance* createConnectionManagerInstance()
+{
+    CipClass* clazz = GetCipClass( kCipConnectionManagerClassCode );
+
+    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
+
+    return i;
+}
+
+
 EipStatus ConnectionManagerInit( EipUint16 unique_connection_id )
 {
     if( !GetCipClass( kCipConnectionManagerClassCode ) )
     {
         CipClass* clazz = new CipClass( kCipConnectionManagerClassCode,
                 "Connection Manager",       // class name
-                0xC6,                       // class getAttributeAll mask
-                0xffffffff,                 // instance getAttributeAll mask
+                (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
+                MASK4( 7, 6, 2, 1 ),        // class getAttributeAll mask
+                0,                          // instance getAttributeAll mask
                 1                           // revision
                 );
 
         RegisterCipClass( clazz );
 
-        // add one instance
-        clazz->InstanceInsert(  new CipInstance( 1 ) );
+        // There are no attributes in instance of this class yet, so nothing to set.
+        delete clazz->ServiceRemove( kSetAttributeSingle );
 
         clazz->ServiceInsert( kForwardOpen, forwardOpen, "ForwardOpen" );
         clazz->ServiceInsert( kLargeForwardOpen, largeForwardOpen, "LargeForwardOpen" );
@@ -1411,9 +1431,13 @@ EipStatus ConnectionManagerInit( EipUint16 unique_connection_id )
 
         clazz->ServiceInsert( kGetConnectionOwner, getConnectionOwner, "GetConnectionOwner" );
 
+        // add one instance
+        clazz->InstanceInsert( createConnectionManagerInstance() );
+
         g_incarnation_id = ( (EipUint32) unique_connection_id ) << 16;
 
         InitializeConnectionManagerData();
+
         AddConnectableObject( kCipMessageRouterClassCode, EstablishClass3Connection );
         AddConnectableObject( kCipAssemblyClassCode, EstablishIoConnction );
     }

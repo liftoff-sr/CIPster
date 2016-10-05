@@ -52,8 +52,7 @@
  *    - EIP_OK ... on success
  *    - On an error the general status code to be put into the response
  */
-int EstablishIoConnction( CipConn* cip_conn,
-        EipUint16* extended_error );
+int EstablishIoConnction( CipConn* cip_conn,  EipUint16* extended_error );
 
 /** @brief Take the data given in the connection object structure and open the necessary communication channels
  *
@@ -70,8 +69,7 @@ CipError OpenCommunicationChannels( CipConn* cip_conn );
  *
  * @param cip_conn pointer to the connection object data
  */
-void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList(
-        CipConn* cip_conn );
+void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList( CipConn* cip_conn );
 
 extern EipUint8* g_config_data_buffer;
 extern unsigned g_config_data_length;

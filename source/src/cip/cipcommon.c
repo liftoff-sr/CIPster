@@ -110,29 +110,33 @@ EipStatus NotifyClass( CipClass* cip_class,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    // find the instance: if instNr==0, the class is addressed, else find the instance
-    unsigned instance_number = request->request_path.instance_number;
+    unsigned instance_id = request->request_path.instance_number;
 
-    // look up the instance (note that if inst==0 this will be the class itself)
-    CipInstance* instance = cip_class->Instance( instance_number );
+    CipInstance* instance = cip_class->Instance( instance_id );
 
     if( instance )
     {
-        CIPSTER_TRACE_INFO( "notify: found instance %d%s\n", instance_number,
-                instance_number == 0 ? " (class object)" : "" );
+        CIPSTER_TRACE_INFO(
+            "%s: targeting instance %d of class %s\n",
+            __func__,
+            instance_id,
+            instance_id ? instance->owning_class->ClassName().c_str() :
+                          ((CipClass*)instance)->ClassName().c_str()
+            );
 
         CipService* service = cip_class->Service( request->service );
 
         if( service )
         {
-            CIPSTER_TRACE_INFO( "notify: calling '%s' service\n", service->service_name.c_str() );
+            CIPSTER_TRACE_INFO( "%s: calling service '%s'\n", service->ServiceName().c_str() );
             CIPSTER_ASSERT( service->service_function );
 
             // call the service, and return what it returns
             return service->service_function( instance, request, response );
         }
 
-        CIPSTER_TRACE_WARN( "notify: service 0x%x not supported\n",
+        CIPSTER_TRACE_WARN( "%s: service 0x%x not supported\n",
+                __func__,
                 request->service );
 
         // if no services or service not found, return an error reply
@@ -140,7 +144,7 @@ EipStatus NotifyClass( CipClass* cip_class,
     }
     else
     {
-        CIPSTER_TRACE_WARN( "notify: instance number %d unknown\n", instance_number );
+        CIPSTER_TRACE_WARN( "%s: instance %d does not exist\n", __func__, instance_id );
 
         // If instance not found, return an error reply.
         // According to the test tool this should be the correct error flag
@@ -148,11 +152,10 @@ EipStatus NotifyClass( CipClass* cip_class,
         response->general_status = kCipErrorPathDestinationUnknown;
     }
 
-    // handle error replies
-    response->size_of_additional_status = 0; // fill in the rest of the reply with not much of anything
-    response->data_length = 0;
+    // handle error replies, general_status was set above.
 
-    // but the reply code is an echo of the command + the reply flag
+    response->size_of_additional_status = 0;
+    response->data_length = 0;
     response->reply_service = 0x80 | request->service;
 
     return kEipStatusOkSend;
@@ -274,7 +277,7 @@ CipInstance::~CipInstance()
         if( instance_id )   // and not nested in a public class, then I am an instance.
         {
             CIPSTER_TRACE_INFO( "deleting instance %d of class '%s'\n",
-                instance_id, owning_class->class_name.c_str() );
+                instance_id, owning_class->ClassName().c_str() );
         }
     }
 
@@ -298,7 +301,7 @@ bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
         else if( aAttribute->Id() == (*it)->Id() )
         {
             CIPSTER_TRACE_ERR( "class '%s' instance %d already has attribute %d, ovveriding\n",
-                owning_class ? owning_class->class_name.c_str() : "meta-something",
+                owning_class ? owning_class->ClassName().c_str() : "meta-something",
                 instance_id,
                 aAttribute->Id()
                 );
@@ -405,6 +408,7 @@ CipAttribute* CipInstance::Attribute( EipUint16 attribute_id ) const
 CipClass::CipClass(
         EipUint32   aClassId,
         const char* aClassName,
+        int         aClassAttributesMask,
         EipUint32   a_get_all_class_attributes_mask,
         EipUint32   a_get_all_instance_attributes_mask,
         EipUint16   aRevision
@@ -432,37 +436,43 @@ CipClass::CipClass(
     // But in fact the public class owns the meta-class.
     meta_class->InstanceInsert( this );     // sets this->cip_class also.
 
-    // create the standard class attributes
+    // create the standard class attributes as requested
 
-    AttributeInsert( 1, kCipUint, kGetableSingleAndAll, (void*) &revision );
+    if( aClassAttributesMask & (1<<1) )
+        AttributeInsert( 1, kCipUint, kGetableSingleAndAll, (void*) &revision );
 
     // largest instance id
-    AttributeInsert( 2, kCipUint, kGetableSingleAndAll, (void*) &highest_inst_id );
+    if( aClassAttributesMask & (1<<2) )
+        AttributeInsert( 2, kCipUint, kGetableSingleAndAll, (void*) &highest_inst_id );
 
     // number of instances currently existing, dynamically determined elsewhere
-    AttributeInsert( 3, kCipUint, kGetableSingleAndAll, GetInstanceCount, NULL );
+    if( aClassAttributesMask & (1<<3) )
+        AttributeInsert( 3, kCipUint, kGetableSingleAndAll, GetInstanceCount, NULL );
 
     // optional attribute list - default = 0
-    AttributeInsert( 4, kCipUint, kGetableAll, (void*) &kCipUintZero );
+    if( aClassAttributesMask & (1<<4) )
+        AttributeInsert( 4, kCipUint, kGetableAll, (void*) &kCipUintZero );
 
     // optional service list - default = 0
-    AttributeInsert( 5, kCipUint, kGetableAll, (void*) &kCipUintZero );
+    if( aClassAttributesMask & (1<<5) )
+        AttributeInsert( 5, kCipUint, kGetableAll, (void*) &kCipUintZero );
 
     // max class attribute number
-    AttributeInsert( 6, kCipUint, kGetableSingleAndAll, (void*) &meta_class->highest_attr_id );
+    if( aClassAttributesMask & (1<<6) )
+        AttributeInsert( 6, kCipUint, kGetableSingleAndAll, (void*) &meta_class->highest_attr_id );
 
     // max instance attribute number
-    AttributeInsert( 7, kCipUint, kGetableSingleAndAll, (void*) &highest_attr_id );
+    if( aClassAttributesMask & (1<<7) )
+        AttributeInsert( 7, kCipUint, kGetableSingleAndAll, (void*) &highest_attr_id );
 
     // create the standard instance services
     ServiceInsert( kGetAttributeSingle, GetAttributeSingle, "GetAttributeSingle" );
+    ServiceInsert( kSetAttributeSingle, SetAttributeSingle, "SetAttributeSingle" );
 
-    if( a_get_all_instance_attributes_mask )
+    if( get_attribute_all_mask )
     {
         ServiceInsert( kGetAttributeAll, GetAttributeAll, "GetAttributeAll" );
     }
-
-    ServiceInsert( kSetAttributeSingle, SetAttributeSingle, "SetAttributeSingle" );
 }
 
 
@@ -491,7 +501,7 @@ CipClass::CipClass(
     ServiceInsert( kGetAttributeSingle, GetAttributeSingle, "GetAttributeSingle" );
 
     // create the standard class services
-    if( a_get_all_class_attributes_mask )
+    if( get_attribute_all_mask )
     {
         ServiceInsert( kGetAttributeAll, GetAttributeAll, "GetAttributeAll" );
     }
@@ -673,6 +683,27 @@ CipService* CipClass::ServiceInsert( EipUint8 service_id,
 }
 
 
+CipService* CipClass::ServiceRemove( EipUint8 aServiceId )
+{
+    CipService* ret = NULL;
+
+    for( CipServices::iterator it = services.begin();  it != services.end();  ++it )
+    {
+        if( aServiceId == (*it)->Id() )
+        {
+            CIPSTER_TRACE_INFO(
+                "%s: removing service '%s'.\n", __func__, (*it)->ServiceName().c_str() );
+
+            ret = *it;              // pass ownership to ret
+            services.erase( it );   // close gap
+            break;
+        }
+    }
+
+    return ret;
+}
+
+
 // TODO this needs to check for buffer overflow
 EipStatus GetAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
@@ -704,15 +735,32 @@ EipStatus GetAttributeSingle( CipInstance* instance,
 
     if( attribute )
     {
+        CIPSTER_TRACE_INFO( "%s: attribute->attribute_flags:%02x\n",
+            __func__, attribute->attribute_flags );
+
         if( attribute->attribute_flags & get_mask )
         {
-            CIPSTER_TRACE_INFO( "%s: getAttribute %d\n",
-                    __func__, request->request_path.attribute_number );
+            CIPSTER_TRACE_INFO(
+                "%s: attribute:%d  class:'%s'  instance:%d\n",
+                __func__,
+                request->request_path.attribute_number,
+                instance->Id() == 0 ? ((CipClass*)instance)->ClassName().c_str() :
+                                        instance->owning_class->ClassName().c_str(),
+                instance->Id()
+                );
 
             // create a reply message containing the data
             attribute->Get( request, response );
         }
     }
+
+#if 0
+    else if( request->request_path.attribute_number == 0 )
+    {
+        // This abomination is wanted by the conformance test tool:
+        response->general_status = kCipErrorServiceNotSupported;
+    }
+#endif
 
     return kEipStatusOkSend;
 }
@@ -732,8 +780,14 @@ EipStatus SetAttributeSingle( CipInstance* instance,
     {
         if( attribute->attribute_flags & kSetable )
         {
-            CIPSTER_TRACE_INFO( "%s: attribute_id:%d calling Set()\n",
-                __func__, attribute->attribute_id );
+            CIPSTER_TRACE_INFO(
+                "%s: attribute:%d  class:'%s'  instance:%d\n",
+                __func__,
+                request->request_path.attribute_number,
+                instance->Id() == 0 ? ((CipClass*)instance)->ClassName().c_str() :
+                                        instance->owning_class->ClassName().c_str(),
+                instance->Id()
+                );
 
             // Set() is very "attribute specific" and is determined by which
             // AttributeFunc is installed into the attribute, if any.
@@ -743,6 +797,15 @@ EipStatus SetAttributeSingle( CipInstance* instance,
         // it is an attribute we have, however this attribute is not setable
         response->general_status = kCipErrorAttributeNotSetable;
     }
+
+#if 0
+    else if( request->request_path.attribute_number == 0 )
+    {
+        // This abomination is wanted by the conformance test tool:
+        response->general_status = kCipErrorServiceNotSupported;
+    }
+#endif
+
     else
     {
         // we don't have this attribute

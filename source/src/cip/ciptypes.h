@@ -540,7 +540,7 @@ public:
     EipUint16       highest_inst_attr_id;    ///< highest attribute_id for this instance
 
 protected:
-    CipAttributes       attributes;     ///< sorted pointer array to CipAttributes, unique to this instance
+    CipAttributes       attributes;     ///< sorted pointer array to CipAttribute, unique to this instance
 
     void ShowAttributes()
     {
@@ -595,10 +595,13 @@ public:
 
     EipUint8  Id() const                    { return service_id; }
 
-    std::string service_name;               ///< name of the service
-    EipUint8    service_id;                 ///< service number
+    const std::string& ServiceName() const  { return service_name; }
 
     CipServiceFunction service_function;    ///< pointer to a function call
+
+protected:
+    std::string service_name;               ///< name of the service
+    EipUint8    service_id;                 ///< service number
 };
 
 
@@ -622,6 +625,9 @@ public:
      * @param aClassId ID of the class
      * @param aClassName name of class
      *
+     * @param aClassAttributesMask is a bit map of common class attributes desired
+     *  in this class.
+     *
      * @param a_get_attribute_all_mask mask of which attribute Ids are included in the
      *  class getAttributeAll. If the mask is 0 the getAttributeAll service will not
      *  be added as class service.
@@ -635,6 +641,7 @@ public:
     CipClass(
         EipUint32   aClassId,
         const char* aClassName,
+        int         aClassAttributesMask,
         EipUint32   a_get_all_class_attributes_mask,
         EipUint32   a_get_all_instance_attributes_mask,
         EipUint16   aRevision = 1
@@ -659,6 +666,13 @@ public:
 
     CipService* ServiceInsert( EipUint8 service_id,
         CipServiceFunction service_function, const char* service_name );
+
+    /**
+     * Function ServiceRemove
+     * removes @a a service given by aServiceId and returns ownership to caller
+     * if it exists, else NULL.  Caller may delete it, and typically should.
+     */
+    CipService* ServiceRemove( EipUint8 aServiceId );
 
     /// Get an existing CipService or return NULL if not found.
     CipService* Service( EipUint8 service_id ) const;
@@ -699,9 +713,9 @@ public:
         return instances;
     }
 
+    const std::string& ClassName() const    { return class_name; }
 
     EipUint32   class_id;                   ///< class ID
-    std::string class_name;                 ///< class name
     EipUint16   revision;                   ///< class revision
     EipUint16   highest_attr_id;            /**< highest defined attribute number
                                              *  (attribute numbers are not necessarily
@@ -714,6 +728,9 @@ public:
 
 
 protected:
+
+    std::string class_name;                 ///< class name
+
 
     /**
 
@@ -746,7 +763,7 @@ protected:
         {
             CIPSTER_TRACE_INFO( "id:%d %s\n",
                 (*it)->Id(),
-                (*it)->service_name.c_str() );
+                (*it)->ServiceName().c_str() );
         }
     }
 
@@ -808,8 +825,11 @@ struct CipUnconnectedSendParameter
 #define MASK7( a, b, c, d, e, f, g ) \
     ( 1 << (a) | 1 << (b) | 1 << (c) | 1 << (d) | 1 << (e) | 1 << (f) | 1 << (g) )
 
-#define MASK8( a, b, c, d, e, f, g, h )                                \
+#define MASK8( a, b, c, d, e, f, g, h ) \
     ( 1 << (a) | 1 << (b) | 1 << (c) | 1 << (d) | 1 << (e) | 1 << (f) | \
-        1 << (g) | 1 << (h) )
+      1 << (g) | 1 << (h) )
+
+#define OR7( a, b, c, d, e, f, g ) \
+    ( (a)<<6 | (b)<<5 | (c)<<4 | (d)<<3 | (e)<<2 || (f)<<1 || (g) )
 
 #endif // CIPSTER_CIPTYPES_H_

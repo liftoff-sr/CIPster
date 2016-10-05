@@ -229,7 +229,7 @@ int DecodeData( EipUint8 cip_data_type, void* cip_data, EipUint8** cip_message )
  * The notification on received configuration data is handled with the
  * IApp_after_receive function.
  */
-CipInstance* CreateAssemblyObject( EipUint32 instance_number, EipByte* data,
+CipInstance* CreateAssemblyInstance( EipUint32 instance_number, EipByte* data,
         EipUint16 data_length );
 
 struct CipConn;

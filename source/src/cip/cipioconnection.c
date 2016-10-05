@@ -20,7 +20,7 @@
 //The port to be used per default for I/O messages on UDP.
 const int kOpenerEipIoUdpPort = 2222;   // = 0x08AE;
 
-/* producing multicast connection have to consider the rules that apply for
+/* producing multicast connections have to consider the rules that apply for
  * application connection types.
  */
 EipStatus OpenProducingMulticastConnection( CipConn* conn,
@@ -83,7 +83,7 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
 
     if( !io_conn )
     {
-        CIPSTER_TRACE_ERR( "%s: GetIoConnectionForConnectionData return NULL\n", __func__ );
+        CIPSTER_TRACE_ERR( "%s: GetIoConnectionForConnectionData returned NULL\n", __func__ );
         return kCipErrorConnectionFailure;
     }
 
@@ -126,8 +126,8 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
     target_to_originator_connection_type =
         (io_conn->t_to_o_network_connection_parameter & 0x6000) >> 13;
 
-    if( (originator_to_target_connection_type == 0)
-     && (target_to_originator_connection_type == 0) )
+    if( originator_to_target_connection_type == 0
+     && target_to_originator_connection_type == 0 )
     {
         // this indicates a re-configuration of the connection; currently not
         // supported and we should not come here as this is handled in the
@@ -221,7 +221,7 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
             }
         }
 
-        if( target_to_originator_connection_type != 0 ) //setup producer side
+        if( target_to_originator_connection_type != 0 )     // setup producer side
         {
             instance = assembly_class->Instance( io_conn->conn_path.connection_point[producing_index] );
 
@@ -254,10 +254,10 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
                     diff_size   += 2;
                 }
 
-                if( (kOpenerProducedDataHasRunIdleHeader) &&(data_size > 0)
-                    && (!is_heartbeat) )    // we only have an run idle header if it is not an heartbeat connection
+                if( kOpenerProducedDataHasRunIdleHeader && data_size > 0
+                    && !is_heartbeat )  // we only have a run idle header if it is not a heartbeat connection
                 {
-                    data_size   -= 4;       // remove the 4 bytes needed for run/idle header
+                    data_size   -= 4;   // remove the 4 bytes needed for run/idle header
                     diff_size   += 4;
                 }
 
@@ -284,7 +284,7 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
         }
 
         // If config data has been sent with this forward open request
-        if( NULL != g_config_data_buffer )
+        if( g_config_data_buffer )
         {
             *extended_error = HandleConfigData( assembly_class, io_conn );
 
@@ -627,7 +627,7 @@ EipUint16 HandleConfigData( CipClass* assembly_class, CipConn* conn )
         {
             // put the data into the configuration assembly object
             if( kEipStatusOk != NotifyAssemblyConnectedDataReceived( instance,
-                        g_config_data_buffer,
+                       g_config_data_buffer,
                         g_config_data_length ) )
             {
                 CIPSTER_TRACE_WARN( "Configuration data was invalid\n" );
@@ -918,9 +918,7 @@ CipError OpenCommunicationChannels( CipConn* conn )
 
     // get pointer to the CPF data, currently we have just one global instance
     // of the struct. This may change in the future
-
-    CipCommonPacketFormatData* cpfd =
-        &g_cpf;
+    CipCommonPacketFormatData* cpfd = &g_cpf;
 
     int originator_to_target_connection_type =
         (conn->o_to_t_network_connection_parameter & 0x6000) >> 13;

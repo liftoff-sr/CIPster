@@ -8,6 +8,8 @@
 #include "opener_api.h"
 #include <string.h>
 
+
+
 /// @brief External globals needed from connectionmanager.c
 extern CipConn* g_active_connection_list;
 
@@ -41,28 +43,134 @@ InputOnlyConnection g_input_only_connections[CIPSTER_CIP_NUM_INPUT_ONLY_CONNS];
 
 ListenOnlyConnection g_listen_only_connections[CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS];
 
-CipConn* GetExclusiveOwnerConnection( CipConn* cip_conn,
-        EipUint16* extended_error );
 
-CipConn* GetInputOnlyConnection( CipConn* cip_conn,
-        EipUint16* extended_error );
+static CipConn* getExclusiveOwnerConnection( CipConn* cip_conn, EipUint16* extended_error )
+{
+    CipConn* exclusive_owner_connection = NULL;
 
-CipConn* GetListenOnlyConnection( CipConn* cip_conn,
-        EipUint16* extended_error );
+    for( int i = 0; i < CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS; i++ )
+    {
+        if( g_exlusive_owner_connections[i].output_assembly == cip_conn->conn_path.connection_point[0]
+         && g_exlusive_owner_connections[i].input_assembly  == cip_conn->conn_path.connection_point[1]
+         && g_exlusive_owner_connections[i].config_assembly == cip_conn->conn_path.connection_point[2] )
+        {
+            // check if on other connection point with the same output assembly is currently connected
+            if( GetConnectedOutputAssembly( cip_conn->conn_path.connection_point[0] ) )
+            {
+                *extended_error = kConnectionManagerStatusCodeErrorOwnershipConflict;
+                break;
+            }
+
+            exclusive_owner_connection = &g_exlusive_owner_connections[i].connection_data;
+            break;
+        }
+    }
+
+    return exclusive_owner_connection;
+}
+
+
+static CipConn* getInputOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
+{
+    CipConn* input_only_connection = NULL;
+
+    for( int i = 0; i < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS; i++ )
+    {
+        // we have the same output assembly?
+        if( g_input_only_connections[i].output_assembly == cip_conn->conn_path.connection_point[0] )
+        {
+            if( g_input_only_connections[i].input_assembly != cip_conn->conn_path.connection_point[1] )
+            {
+                *extended_error = kConnectionManagerStatusCodeInvalidProducingApplicationPath;
+                break;
+            }
+
+            if( g_input_only_connections[i].config_assembly != cip_conn->conn_path.connection_point[2] )
+            {
+                *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
+                break;
+            }
+
+            for( int j = 0; j < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH; j++ )
+            {
+                if( kConnectionStateNonExistent == g_input_only_connections[i].connection_data[j].state )
+                {
+                    return &g_input_only_connections[i].connection_data[j];
+                }
+            }
+
+            *extended_error = kConnectionManagerStatusCodeTargetObjectOutOfConnections;
+            break;
+        }
+    }
+
+    return input_only_connection;
+}
+
+
+static CipConn* getListenOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
+{
+    CipConn* listen_only_connection = NULL;
+
+    if( kRoutingTypeMulticastConnection !=
+        (cip_conn->t_to_o_network_connection_parameter & kRoutingTypeMulticastConnection) )
+    {
+        // a listen only connection has to be a multicast connection.
+        *extended_error = kConnectionManagerStatusCodeNonListenOnlyConnectionNotOpened;
+        // maybe not the best error message however there is no suitable definition in the cip spec
+        return NULL;
+    }
+
+    for( int i = 0; i < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS; i++ )
+    {
+        // we have the same output assembly?
+        if( g_listen_only_connections[i].output_assembly == cip_conn->conn_path.connection_point[0] )
+        {
+            if( g_listen_only_connections[i].input_assembly != cip_conn->conn_path.connection_point[1] )
+            {
+                *extended_error = kConnectionManagerStatusCodeInvalidProducingApplicationPath;
+                break;
+            }
+
+            if( g_listen_only_connections[i].config_assembly != cip_conn->conn_path.connection_point[2] )
+            {
+                *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
+                break;
+            }
+
+            if( NULL == GetExistingProducerMulticastConnection( cip_conn->conn_path.connection_point[1] ) )
+            {
+                *extended_error = kConnectionManagerStatusCodeNonListenOnlyConnectionNotOpened;
+                break;
+            }
+
+            for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
+            {
+                if( kConnectionStateNonExistent == g_listen_only_connections[i].connection_data[j].state )
+                {
+                    return &g_listen_only_connections[i].connection_data[j];
+                }
+            }
+
+            *extended_error = kConnectionManagerStatusCodeTargetObjectOutOfConnections;
+            break;
+        }
+    }
+
+    return listen_only_connection;
+}
+
 
 void ConfigureExclusiveOwnerConnectionPoint( unsigned connection_number,
         unsigned output_assembly,
         unsigned input_assembly,
         unsigned config_assembly )
 {
-    if( CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS > connection_number )
+    if( connection_number < CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS )
     {
-        g_exlusive_owner_connections[connection_number].output_assembly =
-            output_assembly;
-        g_exlusive_owner_connections[connection_number].input_assembly =
-            input_assembly;
-        g_exlusive_owner_connections[connection_number].config_assembly =
-            config_assembly;
+        g_exlusive_owner_connections[connection_number].output_assembly = output_assembly;
+        g_exlusive_owner_connections[connection_number].input_assembly  = input_assembly;
+        g_exlusive_owner_connections[connection_number].config_assembly = config_assembly;
     }
 }
 
@@ -72,13 +180,11 @@ void ConfigureInputOnlyConnectionPoint( unsigned connection_number,
         unsigned input_assembly,
         unsigned config_assembly )
 {
-    if( CIPSTER_CIP_NUM_INPUT_ONLY_CONNS > connection_number )
+    if( connection_number < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS )
     {
-        g_input_only_connections[connection_number].output_assembly =
-            output_assembly;
+        g_input_only_connections[connection_number].output_assembly = output_assembly;
         g_input_only_connections[connection_number].input_assembly  = input_assembly;
-        g_input_only_connections[connection_number].config_assembly =
-            config_assembly;
+        g_input_only_connections[connection_number].config_assembly = config_assembly;
     }
 }
 
@@ -88,49 +194,40 @@ void ConfigureListenOnlyConnectionPoint( unsigned connection_number,
         unsigned input_assembly,
         unsigned config_assembly )
 {
-    if( CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS > connection_number )
+    if( connection_number < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS )
     {
-        g_listen_only_connections[connection_number].output_assembly =
-            output_assembly;
-        g_listen_only_connections[connection_number].input_assembly =
-            input_assembly;
-        g_listen_only_connections[connection_number].config_assembly =
-            config_assembly;
+        g_listen_only_connections[connection_number].output_assembly = output_assembly;
+        g_listen_only_connections[connection_number].input_assembly  = input_assembly;
+        g_listen_only_connections[connection_number].config_assembly = config_assembly;
     }
 }
 
 
-CipConn* GetIoConnectionForConnectionData( CipConn* cip_conn,
-        EipUint16* extended_error )
+CipConn* GetIoConnectionForConnectionData( CipConn* cip_conn,  EipUint16* extended_error )
 {
-    CipConn* io_connection = NULL;
-
     *extended_error = 0;
 
-    io_connection = GetExclusiveOwnerConnection( cip_conn,
-            extended_error );
+    CipConn* io_connection = getExclusiveOwnerConnection( cip_conn, extended_error );
 
-    if( NULL == io_connection )
+    if( !io_connection )
     {
         if( 0 == *extended_error )
         {
             // we found no connection and don't have an error so try input only next
-            io_connection = GetInputOnlyConnection( cip_conn, extended_error );
+            io_connection = getInputOnlyConnection( cip_conn, extended_error );
 
-            if( NULL == io_connection )
+            if( !io_connection )
             {
                 if( 0 == *extended_error )
                 {
                     // we found no connection and don't have an error so try listen only next
-                    io_connection = GetListenOnlyConnection( cip_conn,
-                            extended_error );
+                    io_connection = getListenOnlyConnection( cip_conn, extended_error );
 
-                    if( (NULL == io_connection) && (0 == *extended_error) )
+                    if( !io_connection &&  0 == *extended_error )
                     {
                         // no application connection type was found that suits the given data
                         // TODO check error code VS
-                        *extended_error =
-                            kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
+                        *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
                     }
                     else
                     {
@@ -158,143 +255,6 @@ CipConn* GetIoConnectionForConnectionData( CipConn* cip_conn,
 }
 
 
-CipConn* GetExclusiveOwnerConnection( CipConn* cip_conn,
-        EipUint16* extended_error )
-{
-    CipConn* exclusive_owner_connection = NULL;
-
-    for( int i = 0; i < CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS; i++ )
-    {
-        if( (g_exlusive_owner_connections[i].output_assembly
-             == cip_conn->conn_path.connection_point[0])
-            && (g_exlusive_owner_connections[i].input_assembly
-                == cip_conn->conn_path.connection_point[1])
-            && (g_exlusive_owner_connections[i].config_assembly
-                == cip_conn->conn_path.connection_point[2]) )
-        {
-            // check if on other connection point with the same output assembly is currently connected
-            if( GetConnectedOutputAssembly(
-                        cip_conn->conn_path.connection_point[0] ) )
-            {
-                *extended_error = kConnectionManagerStatusCodeErrorOwnershipConflict;
-                break;
-            }
-
-            exclusive_owner_connection = &g_exlusive_owner_connections[i].connection_data;
-            break;
-        }
-    }
-
-    return exclusive_owner_connection;
-}
-
-
-CipConn* GetInputOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
-{
-    CipConn* input_only_connection = NULL;
-
-    for( int i = 0; i < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS; i++ )
-    {
-        if( g_input_only_connections[i].output_assembly
-            == cip_conn->conn_path.connection_point[0] ) // we have the same output assembly
-        {
-            if( g_input_only_connections[i].input_assembly
-                != cip_conn->conn_path.connection_point[1] )
-            {
-                *extended_error =
-                    kConnectionManagerStatusCodeInvalidProducingApplicationPath;
-                break;
-            }
-
-            if( g_input_only_connections[i].config_assembly
-                != cip_conn->conn_path.connection_point[2] )
-            {
-                *extended_error =
-                    kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
-                break;
-            }
-
-            for( int j = 0; j < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH; j++ )
-            {
-                if( kConnectionStateNonExistent
-                    == g_input_only_connections[i].connection_data[j].state )
-                {
-                    return &(g_input_only_connections[i].connection_data[j]);
-                }
-            }
-
-            *extended_error =
-                kConnectionManagerStatusCodeTargetObjectOutOfConnections;
-            break;
-        }
-    }
-
-    return input_only_connection;
-}
-
-
-CipConn* GetListenOnlyConnection( CipConn* cip_conn, EipUint16* extended_error )
-{
-    CipConn* listen_only_connection = NULL;
-
-    if( kRoutingTypeMulticastConnection
-        != (cip_conn->t_to_o_network_connection_parameter
-            & kRoutingTypeMulticastConnection) )
-    {
-        // a listen only connection has to be a multicast connection.
-        *extended_error =
-            kConnectionManagerStatusCodeNonListenOnlyConnectionNotOpened; // maybe not the best error message however there is no suitable definition in the cip spec
-        return NULL;
-    }
-
-    for( int i = 0; i < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS; i++ )
-    {
-        if( g_listen_only_connections[i].output_assembly
-            == cip_conn->conn_path.connection_point[0] ) // we have the same output assembly
-        {
-            if( g_listen_only_connections[i].input_assembly
-                != cip_conn->conn_path.connection_point[1] )
-            {
-                *extended_error =
-                    kConnectionManagerStatusCodeInvalidProducingApplicationPath;
-                break;
-            }
-
-            if( g_listen_only_connections[i].config_assembly
-                != cip_conn->conn_path.connection_point[2] )
-            {
-                *extended_error =
-                    kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
-                break;
-            }
-
-            if( NULL == GetExistingProducerMulticastConnection(
-                        cip_conn->conn_path.connection_point[1] ) )
-            {
-                *extended_error =
-                    kConnectionManagerStatusCodeNonListenOnlyConnectionNotOpened;
-                break;
-            }
-
-            for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
-            {
-                if( kConnectionStateNonExistent
-                    == g_listen_only_connections[i].connection_data[j].state )
-                {
-                    return &(g_listen_only_connections[i].connection_data[j]);
-                }
-            }
-
-            *extended_error =
-                kConnectionManagerStatusCodeTargetObjectOutOfConnections;
-            break;
-        }
-    }
-
-    return listen_only_connection;
-}
-
-
 CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
 {
     CipConn* producer_multicast_connection = g_active_connection_list;
@@ -304,18 +264,13 @@ CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
         if( (kConnectionTypeIoExclusiveOwner == producer_multicast_connection->instance_type)
             || (kConnectionTypeIoInputOnly   == producer_multicast_connection->instance_type) )
         {
-            if( (input_point
-                 == producer_multicast_connection->conn_path.connection_point[1])
-                && ( kRoutingTypeMulticastConnection
-                     == (producer_multicast_connection
-                         ->t_to_o_network_connection_parameter
-                         & kRoutingTypeMulticastConnection) )
-                && (kEipInvalidSocket
-                    != producer_multicast_connection->socket[kUdpCommuncationDirectionProducing]) )
+            if( (input_point == producer_multicast_connection->conn_path.connection_point[1])
+                && ( kRoutingTypeMulticastConnection ==
+                    (producer_multicast_connection->t_to_o_network_connection_parameter & kRoutingTypeMulticastConnection) )
+                && (kEipInvalidSocket != producer_multicast_connection->socket[kUdpCommuncationDirectionProducing]) )
             {
-                /* we have a connection that produces the same input assembly,
-                 * is a multicast producer and manages the connection.
-                 */
+                // we have a connection that produces the same input assembly,
+                // is a multicast producer and manages the connection.
                 break;
             }
         }
@@ -330,8 +285,7 @@ CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
 
 CipConn* GetNextNonControlMasterConnection( EipUint32 input_point )
 {
-    CipConn* next_non_control_master_connection =
-        g_active_connection_list;
+    CipConn* next_non_control_master_connection = g_active_connection_list;
 
     while( next_non_control_master_connection )
     {
@@ -343,9 +297,8 @@ CipConn* GetNextNonControlMasterConnection( EipUint32 input_point )
                     (next_non_control_master_connection->t_to_o_network_connection_parameter & kRoutingTypeMulticastConnection) )
                 && (kEipInvalidSocket == next_non_control_master_connection->socket[kUdpCommuncationDirectionProducing]) )
             {
-                /* we have a connection that produces the same input assembly,
-                 * is a multicast producer and does not manages the connection.
-                 */
+                // we have a connection that produces the same input assembly,
+                // is a multicast producer and does not manages the connection.
                 break;
             }
         }
@@ -358,8 +311,7 @@ CipConn* GetNextNonControlMasterConnection( EipUint32 input_point )
 }
 
 
-void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,
-        ConnectionType instance_type )
+void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,  ConnectionType instance_type )
 {
     CipConn* connection = g_active_connection_list;
     CipConn* connection_to_delete;
@@ -398,9 +350,8 @@ void CloseAllConnections()
         // FIXME check if m_pfCloseFunc would be suitable
         CloseConnection( connection );
 
-        /* Close connection will remove the connection from the list therefore we
-         * need to get again the start until there is no connection left
-         */
+        // Close connection will remove the connection from the list therefore we
+        // need to get again the start until there is no connection left
         connection = g_active_connection_list;
     }
 }

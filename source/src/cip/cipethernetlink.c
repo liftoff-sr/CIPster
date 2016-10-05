@@ -13,15 +13,16 @@
 #include "endianconv.h"
 #include "opener_api.h"
 
-typedef struct
+
+struct CipEthernetLinkObject
 {
     EipUint32   interface_speed;
     EipUint32   interface_flags;
     EipUint8    physical_address[6];
-} CipEthernetLinkObject;
+};
 
 // global private variables
-CipEthernetLinkObject g_ethernet_link;
+static CipEthernetLinkObject g_ethernet_link;
 
 void ConfigureMacAddress( const EipUint8* mac_address )
 {
@@ -57,6 +58,7 @@ EipStatus CipEthernetLinkInit()
 
         CipClass* clazz = new CipClass( CIP_ETHERNETLINK_CLASS_CODE,
               "Ethernet Link",
+              (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
               0xffffffff,               // class getAttributeAll mask
               0xffffffff,               // instance getAttributeAll mask
               1                         // version

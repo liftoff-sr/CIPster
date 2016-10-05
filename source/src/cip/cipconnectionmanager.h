@@ -75,6 +75,7 @@ enum ConnectionTriggerType
 #define SEQ_LEQ16( a, b )   ( (short) ( (a) - (b) ) <= 0 )
 #define SEQ_GEQ16( a, b )   ( (short) ( (a) - (b) ) >= 0 )
 
+
 //* @brief States of a connection
 enum ConnectionState
 {
@@ -87,6 +88,7 @@ enum ConnectionState
     kConnectionStateClosing
 };
 
+
 //* @brief instance_type attributes
 enum ConnectionType
 {
@@ -95,6 +97,7 @@ enum ConnectionType
     kConnectionTypeIoInputOnly  = 0x11,
     kConnectionTypeIoListenOnly = 0x21
 };
+
 
 //* @brief Possible values for the watch dog time out action of a connection
 enum WatchdogTimeoutAction
@@ -110,7 +113,7 @@ enum WatchdogTimeoutAction
 struct LinkConsumer
 {
     ConnectionState state;
-    EipUint16 connection_id;
+    EipUint16       connection_id;
 
 /*TODO think if this is needed anymore
  *  TCMReceiveDataFunc m_ptfuncReceiveData; */
@@ -120,7 +123,7 @@ struct LinkConsumer
 struct LinkProducer
 {
     ConnectionState state;
-    EipUint16 connection_id;
+    EipUint16       connection_id;
 };
 
 
@@ -131,12 +134,20 @@ struct LinkObject
 };
 
 
+
 /**
  * Struct CipConn
  * holds the data needed for handling connections. This data is strongly related to
  * the connection object defined in the CIP-specification. However the full
  * functionality of the connection object is not implemented. Therefore this
  * data can not be accessed with CIP means.
+class CipConn : public CipInstance
+{
+public:
+
+    CipConn( int aId ) :
+        CipInstance( aId )
+    {}
  */
 struct CipConn
 {
@@ -282,6 +293,8 @@ void CopyConnectionData( CipConn* destination, CipConn* source );
  * closed
  */
 void CloseConnection( CipConn* cip_conn );
+
+bool IsConnectedInputAssembly( EipUint32 aInstanceId );
 
 // TODO: Missing documentation
 bool IsConnectedOutputAssembly( EipUint32 aInstanceId );

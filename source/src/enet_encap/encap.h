@@ -63,14 +63,23 @@ struct  EncapsulationData
 };
 
 
-struct  EncapsulationInterfaceInformation
+struct ListServices
 {
-    EipUint16   type_code;
-    EipUint16   length;
-    EipUint16   encapsulation_protocol_version;
+    ListServices( int aId, int aVersion, int aFlags, const char* aName ):
+        id( aId ),
+        byte_count( sizeof(*this) ),
+        protocol_version( aVersion ),
+        capability_flags( aFlags ),
+        name_of_service( aName )
+    {}
+
+    EipUint16   id;
+    EipUint16   byte_count;
+    EipUint16   protocol_version;
     EipUint16   capability_flags;
-    EipInt8     name_of_service[16];
+    std::string name_of_service;
 };
+
 
 //** global variables (public) **
 

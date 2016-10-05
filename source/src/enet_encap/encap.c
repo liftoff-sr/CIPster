@@ -35,16 +35,16 @@ const int kEncapsulationHeaderSessionHandlePosition = 4;    //*< the position of
 const int kListIdentityDefaultDelayTime = 2000;             //*< Default delay time for List Identity response
 const int kListIdentityMinimumDelayTime = 500;              //*< Minimum delay time for List Identity response
 
-typedef enum
+enum SessionStatus
 {
     kSessionStatusInvalid = -1,
     kSessionStatusValid = 0
-} SessionStatus;
+};
 
 const int kSenderContextSize = 8;    //*< size of sender context in encapsulation header
 
 /// @brief definition of known encapsulation commands
-typedef enum
+enum EncapsulationCommand
 {
     kEncapsulationCommandNoOperation = 0x0000,          //*< only allowed for TCP
     kEncapsulationCommandListServices = 0x0004,         //*< allowed for both UDP and TCP
@@ -54,14 +54,14 @@ typedef enum
     kEncapsulationCommandUnregisterSession = 0x0066,    //*< only allowed for TCP
     kEncapsulationCommandSendRequestReplyData = 0x006F, //*< only allowed for TCP
     kEncapsulationCommandSendUnitData = 0x0070          //*< only allowed for TCP
-} EncapsulationCommand;
+};
 
 /// @brief definition of capability flags
-typedef enum
+enum CapabilityFlags
 {
     kCapabilityFlagsCipTcp = 0x0020,
     kCapabilityFlagsCipUdpClass0or1 = 0x0100
-} CapabilityFlags;
+};
 
 #define ENCAP_NUMBER_OF_SUPPORTED_DELAYED_ENCAP_MESSAGES    2 //*< According to EIP spec at least 2 delayed message requests should be supported
 
@@ -71,16 +71,23 @@ typedef enum
 // Encapsulation layer data
 
 /// @brief Delayed Encapsulation Message structure
-typedef struct
+struct DelayedEncapsulationMessage
 {
     EipInt32 time_out;  //*< time out in milli seconds
     int socket;         //*< associated socket
     struct sockaddr_in receiver;
     EipByte message[ENCAP_MAX_DELAYED_ENCAP_MESSAGE_SIZE];
     unsigned message_size;
-} DelayedEncapsulationMessage;
+};
 
-EncapsulationInterfaceInformation g_interface_information;
+
+ListServices g_list_services(
+    kCipItemIdListServiceResponse,
+    1,
+    kCapabilityFlagsCipTcp | kCapabilityFlagsCipUdpClass0or1,
+    "Communications"
+    );
+
 
 int g_registered_sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];
 
@@ -123,8 +130,8 @@ void EncapsulationInit()
 {
     DetermineEndianess();
 
-    /*initialize random numbers for random delayed response message generation
-     * we use the ip address as seed as suggested in the spec */
+    // initialize random numbers for random delayed response message generation
+    // we use the ip address as seed as suggested in the spec
     srand( interface_configuration_.ip_address );
 
     // initialize Sessions to invalid == free session
@@ -137,16 +144,6 @@ void EncapsulationInit()
     {
         g_delayed_encapsulation_messages[i].socket = -1;
     }
-
-    //TODO make the interface information configurable
-    // initialize interface information
-    g_interface_information.type_code = kCipItemIdListServiceResponse;
-    g_interface_information.length = sizeof(g_interface_information);
-    g_interface_information.encapsulation_protocol_version = 1;
-    g_interface_information.capability_flags = kCapabilityFlagsCipTcp
-                                               | kCapabilityFlagsCipUdpClass0or1;
-
-    strcpy( (char*) g_interface_information.name_of_service, "Communications" );
 }
 
 
@@ -161,9 +158,12 @@ int HandleReceivedExplictTcpData( int socket, EipUint8* buffer,
     // returns how many bytes are left after the encapsulated data
     *remaining_bytes = encapsulation_data.Init( buffer, length );
 
-    if( kEncapsulationHeaderOptionsFlag == encapsulation_data.options ) //TODO generate appropriate error response
+    // TODO generate appropriate error response
+    if( kEncapsulationHeaderOptionsFlag == encapsulation_data.options )
     {
-        if( *remaining_bytes >= 0 )                                     // check if the message is corrupt: header size + claimed payload size > than what we actually received
+        // check if the message is corrupt:
+        // header size + claimed payload size > than what we actually received
+        if( *remaining_bytes >= 0 )
         {
             // full package or more received
             encapsulation_data.status = kEncapsulationProtocolSuccess;
@@ -323,21 +323,22 @@ void HandleReceivedListServicesCommand( EncapsulationData* receive_data )
 {
     EipUint8* buf = receive_data->buf_pos;
 
-    receive_data->data_length = g_interface_information.length + 2;
+    receive_data->data_length = g_list_services.byte_count + 2;
 
-    // copy Interface data to msg for sending
+    // copy g_list_services data to msg for sending
     AddIntToMessage( 1, &buf );
 
-    AddIntToMessage( g_interface_information.type_code, &buf );
+    AddIntToMessage( g_list_services.id, &buf );
 
-    AddIntToMessage( (EipUint16) (g_interface_information.length - 4), &buf );
+    AddIntToMessage( (EipUint16) (g_list_services.byte_count - 4), &buf );
 
-    AddIntToMessage( g_interface_information.encapsulation_protocol_version, &buf );
+    AddIntToMessage( g_list_services.protocol_version, &buf );
 
-    AddIntToMessage( g_interface_information.capability_flags, &buf );
+    AddIntToMessage( g_list_services.capability_flags, &buf );
 
-    memcpy( buf, g_interface_information.name_of_service,
-            sizeof(g_interface_information.name_of_service) );
+    memset( buf, 0, 16 );
+    memcpy( buf, g_list_services.name_of_service.data(),
+        std::min( (int) g_list_services.name_of_service.size(), 16 ) );
 }
 
 

@@ -33,12 +33,12 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
 {
     if( attr->data )
     {
-        CipByteArray*      byte_array = (CipByteArray*) attr->data;
+        CipByteArray*   byte_array = (CipByteArray*) attr->data;
         CipInstance*    instance = attr->Instance();
 
-        if( IsConnectedOutputAssembly( instance->instance_id ) )
+        if( IsConnectedInputAssembly( instance->instance_id ) )
         {
-            CIPSTER_TRACE_WARN( "%s: received data for connected output assembly\n", __func__ );
+            CIPSTER_TRACE_WARN( "%s: received data for connected input assembly\n", __func__ );
             response->general_status = kCipErrorAttributeNotSetable;
         }
         else if( request->data_length < byte_array->length )
@@ -53,6 +53,13 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
         }
         else
         {
+            CIPSTER_TRACE_INFO(
+                "%s: writing %d bytes to assembly_id: %d.\n",
+                __func__,
+                request->data_length,
+                instance->Id()
+                );
+
             memcpy( byte_array->data, request->data, byte_array->length );
 
             if( AfterAssemblyDataReceived( instance ) != kEipStatusOk )
@@ -83,49 +90,40 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
 }
 
 
-EipStatus CipAssemblyInitialize()
-{
-    if( !GetCipClass( kCipAssemblyClassCode ) )
-    {
-        CipClass* clazz = new CipClass( kCipAssemblyClassCode,
-                "Assembly",  // aClassName
-                0,           // assembly class should not have a get_attribute_all service
-                0,           // assembly instance should not have a get_attribute_all service
-                2            // aRevision, according to the CIP spec currently this has to be 2
-                );
-
-        RegisterCipClass( clazz );
-    }
-
-    return kEipStatusOk;
-}
-
-
 /**
  * Class AssemblyInstance
  * is extended from CipInstance with an extra CipByteArray at the end.
  * That byte array has no ownership of the low level array, which for an
  * assembly is owned by the application program and passed into
- * CreateAssemblyObject().
+ * CreateAssemblyInstance().
  */
 class AssemblyInstance : public CipInstance
 {
 public:
     AssemblyInstance( EipUint16 aInstanceId ) :
-        CipInstance( aInstanceId )
+        CipInstance( aInstanceId ),
+        type( kConnectionTypeExplicit )
     {
     }
 
+//protected:
     CipByteArray    byte_array;
+    ConnectionType  type;
 };
 
 
-CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
+CipInstance* CreateAssemblyInstance( EipUint32 instance_id, EipByte* data,
         EipUint16 data_length )
 {
     CipClass* clazz = GetCipClass( kCipAssemblyClassCode );
 
     CIPSTER_ASSERT( clazz ); // Stack startup should have called CipAssemblyInitialize()
+
+    if( clazz->Instance( instance_id ) )
+    {
+        CIPSTER_TRACE_ERR( "%s: cannot create another instance_id = %d.\n", __func__, instance_id );
+        return NULL;
+    }
 
     CIPSTER_TRACE_INFO( "%s: creating assembly instance_id %d\n", __func__, instance_id );
 
@@ -145,6 +143,25 @@ CipInstance* CreateAssemblyObject( EipUint32 instance_id, EipByte* data,
     clazz->InstanceInsert( i );
 
     return i;
+}
+
+
+EipStatus CipAssemblyInitialize()
+{
+    if( !GetCipClass( kCipAssemblyClassCode ) )
+    {
+        CipClass* clazz = new CipClass( kCipAssemblyClassCode,
+                "Assembly",     // aClassName
+                (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
+                0,              // assembly class has no get_attribute_all service
+                0,              // assembly instance has no get_attribute_all service
+                2               // aRevision, according to the CIP spec currently this has to be 2
+                );
+
+        RegisterCipClass( clazz );
+    }
+
+    return kEipStatusOk;
 }
 
 

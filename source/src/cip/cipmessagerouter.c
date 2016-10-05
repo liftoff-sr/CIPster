@@ -95,6 +95,9 @@ CipClass* GetCipClass( EipUint32 class_id )
 }
 
 
+
+//-----------------------------------------------------------------------------
+
 static CipInstance* createCipMessageRouterInstance()
 {
     CipClass* clazz = GetCipClass( kCipMessageRouterClassCode );
@@ -112,12 +115,19 @@ EipStatus CipMessageRouterInit()
     {
         CipClass* clazz = new CipClass( kCipMessageRouterClassCode,
                 "Message Router",  // class name
-                0xffffffff,        // class getAttributeAll mask
-                0xffffffff,        // instance getAttributeAll mask
-                1                  // revision
+                (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
+                0,                  // class getAttributeAll mask
+                0,                  // instance getAttributeAll mask
+                1                   // revision
                 );
 
         RegisterCipClass( clazz );
+
+        // CIP_Vol_1 3.19 section 5A-3.3 shows that Message Router class has no
+        // SetAttributeSingle.
+        // Also, conformance test tool does not like SetAttributeSingle on this class,
+        // delete the service which was established in CipClass constructor.
+        delete clazz->ServiceRemove( kSetAttributeSingle );
 
         clazz->InstanceInsert( createCipMessageRouterInstance() );
 
@@ -179,7 +189,7 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
             g_response.reserved = 0;
 
             CIPSTER_TRACE_INFO( "notifyMR: calling notify function of class '%s'\n",
-                    clazz->class_name.c_str() );
+                    clazz->ClassName().c_str() );
 
             eip_status = NotifyClass( clazz, &g_request, &g_response );
 
@@ -188,19 +198,19 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
             {
                 CIPSTER_TRACE_ERR(
                         "notifyMR: notify function of class '%s' returned an error\n",
-                        clazz->class_name.c_str() );
+                        clazz->ClassName().c_str() );
             }
             else if( eip_status == kEipStatusOk )
             {
                 CIPSTER_TRACE_INFO(
                         "notifyMR: notify function of class '%s' returned no reply\n",
-                        clazz->class_name.c_str() );
+                        clazz->ClassName().c_str() );
             }
             else
             {
                 CIPSTER_TRACE_INFO(
                         "notifyMR: notify function of class '%s' returned a reply\n",
-                        clazz->class_name.c_str() );
+                        clazz->ClassName().c_str() );
             }
 #endif
         }
