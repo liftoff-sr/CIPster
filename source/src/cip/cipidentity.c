@@ -174,6 +174,8 @@ static CipInstance* createIdentityInstance()
 
     i->AttributeInsert( 7, kCipShortString, kGetableSingleAndAll, GetAttrData, NULL, &product_name_ );
 
+    clazz->InstanceInsert( i );
+
     return i;
 }
 
@@ -198,7 +200,7 @@ EipStatus CipIdentityInit()
 
         clazz->ServiceInsert( kReset, &reset, "Reset" );
 
-        clazz->InstanceInsert( createIdentityInstance() );
+        createIdentityInstance();
     }
 
     return kEipStatusOk;

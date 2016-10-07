@@ -26,59 +26,41 @@
 enum SegmentType
 {
     // Segments
-    kSegmentTypePortSegment = 0x00,         ///< Port segment
-    kSegmentTypeLogicalSegment  = 0x20,     ///< Logical segment
-    kSegmentTypeNetworkSegment  = 0x40,     ///< Network segment
-    kSegmentTypeSymbolicSegment = 0x60,     ///< Symbolic segment
-    kSegmentTypeDataSegment = 0x80,         ///< Data segment
-    kSegmentTypeDataTypeConstructed = 0xA0, ///< Data type constructed
-    kSegmentTypeDataTypeElementary  = 0xC0, ///< Data type elementary
+    kSegmentTypePort = 0x00,                    ///< Port segment
+    kSegmentTypeLogical  = 0x20,                ///< Logical segment
+    kSegmentTypeNetwork  = 0x40,                ///< Network segment
+    kSegmentTypeSymbolic = 0x60,                ///< Symbolic segment
+    kSegmentTypeData = 0x80,                    ///< Data segment
+    kSegmentTypeDataTypeConstructed = 0xA0,     ///< Data type constructed
+    kSegmentTypeDataTypeElementary  = 0xC0,     ///< Data type elementary
     kSegmentTypeSegmentTypeReserved = 0xE0
 };
 
-//* @brief Port Segment flags
-enum PortSegmentFlag
-{
-    kPortSegmentFlagExtendedLinkAddressSize = 0x10 ///< Extended Link Address Size flag, Port segment
-};
 
 //* @brief Enum containing values which kind of logical segment is encoded
-enum LogicalSegmentLogicalType
+enum LogicalSegmentType
 {
-    kLogicalSegmentLogicalTypeClassId = 0x00,           ///< Class ID
-    kLogicalSegmentLogicalTypeInstanceId = 0x04,        ///< Instance ID
-    kLogicalSegmentLogicalTypeMemberId = 0x08,          ///< Member ID
-    kLogicalSegmentLogicalTypeConnectionPoint = 0x0C,   ///< Connection Point
-    kLogicalSegmentLogicalTypeAttributeId = 0x10,       ///< Attribute ID
-    kLogicalSegmentLogicalTypeSpecial = 0x14,           ///< Special
-    kLogicalSegmentLogicalTypeService = 0x18,           ///< Service ID
-    kLogicalSegmentLogicalTypeExtendedLogical = 0x1C    ///< Extended Logical
-};
-
-
-/**
- * Enum LogicalSegmentLogicalFormat
- * is the set of values telling how long the encoded value will be (8, 16, or
- * 32 bit)
- */
-enum LogicalSegmentLogicalFormat
-{
-    kLogicalSegmentLogicalFormatEightBitValue = 0x00,
-    kLogicalSegmentLogicalFormatSixteenBitValue = 0x01,
-    kLogicalSegmentLogicalFormatThirtyTwoBitValue = 0x02
+    kLogicalSegmentTypeClassId         = 0x00 + kSegmentTypeLogical,    ///< Class ID
+    kLogicalSegmentTypeInstanceId      = 0x04 + kSegmentTypeLogical,    ///< Instance ID
+    kLogicalSegmentTypeMemberId        = 0x08 + kSegmentTypeLogical,    ///< Member ID
+    kLogicalSegmentTypeConnectionPoint = 0x0C + kSegmentTypeLogical,    ///< Connection Point
+    kLogicalSegmentTypeAttributeId     = 0x10 + kSegmentTypeLogical,    ///< Attribute ID
+    kLogicalSegmentTypeSpecial         = 0x14 + kSegmentTypeLogical,    ///< Special
+    kLogicalSegmentTypeService         = 0x18 + kSegmentTypeLogical,    ///< Service ID
+    kLogicalSegmentTypeExtendedLogical = 0x1C + kSegmentTypeLogical,    ///< Extended Logical
 };
 
 
 enum NetworkSegmentSubType
 {
-    kProductionTimeInhibitTimeNetworkSegment = 0x43 ///< identifier indicating a production inhibit time network segment
+    kProductionTimeInhibitTimeNetworkSegment = 0x43 ///< production inhibit time network segment
 };
 
 
 enum DataSegmentType
 {
-    kDataSegmentTypeSimpleDataMessage = kSegmentTypeDataSegment + 0x00,
-    kDataSegmentTypeAnsiExtendedSymbolMessage = kSegmentTypeDataSegment + 0x11
+    kDataSegmentTypeSimpleDataMessage = kSegmentTypeData + 0x00,
+    kDataSegmentTypeAnsiExtendedSymbolMessage = kSegmentTypeData + 0x11
 };
 
 
@@ -247,30 +229,35 @@ struct CipString
 };
 
 
-/** @brief Struct for padded EPATHs
- *
+/**
+ * Struct CipEPath
  */
 struct CipEpath
 {
-    EipUint8    path_size;          ///< Size of the Path in 16-bit words
-    // TODO: Fix, should be UINT (EIP_UINT16)
+    EipUint8    path_size;          ///< count of 16-bit words in serialized path
+    EipUint32   class_id;           ///< Class ID of the linked object
+    EipUint32   instance_number;    ///< Requested Instance Number of the linked object
+    EipUint32   attribute_number;   ///< Requested Attribute Number of the linked object
+    EipUint32   connection_point;
 
-    EipUint16   class_id;           ///< Class ID of the linked object
-    EipUint16   instance_number;    ///< Requested Instance Number of the linked object
-    EipUint16   attribute_number;   ///< Requested Attribute Number of the linked object
+    void Clear()
+    {
+        path_size = 0;
+        class_id = 0;
+        instance_number = 0;
+        attribute_number = 0;
+        connection_point = 0;
+    }
 };
 
 
 struct CipPortSegment
 {
-    EipUint32   port;               ///< if == 0, means not used
-    EipUint32   address;
-    EipUint8    address_size;
+    int port;                       ///< if == -1, means not used
+    std::vector<EipUint8>   link_address;
 
-    CipPortSegment( EipUint32 aPort = 0, EipUint32 aAddress = 0, EipUint8 aAddrSize = 0 ) :
-        port( aPort ),
-        address( aAddress ),
-        address_size( aAddrSize )
+    CipPortSegment() :
+        port(-1)
     {}
 };
 

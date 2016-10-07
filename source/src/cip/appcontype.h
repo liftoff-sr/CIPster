@@ -50,7 +50,7 @@ CipConn* GetNextNonControlMasterConnection( EipUint32 input_point );
  * @param instance_type the connection application type
  */
 void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,
-        ConnectionType instance_type );
+        ConnInstanceType instance_type );
 
 /**@ brief close all open connections.
  *

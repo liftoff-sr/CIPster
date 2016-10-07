@@ -128,7 +128,7 @@ EipStatus NotifyClass( CipClass* cip_class,
 
         if( service )
         {
-            CIPSTER_TRACE_INFO( "%s: calling service '%s'\n", service->ServiceName().c_str() );
+            CIPSTER_TRACE_INFO( "%s: calling service '%s'\n", __func__, service->ServiceName().c_str() );
             CIPSTER_ASSERT( service->service_function );
 
             // call the service, and return what it returns
@@ -1221,121 +1221,65 @@ int EncodeEPath( CipEpath* epath, EipUint8** message )
 
 int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
 {
-    unsigned    decoded_element_count;
     EipUint8*   p = *message;
+    int         count = *p++;
 
-    epath->path_size = *p++;
+    epath->Clear();
+    epath->path_size = count;
 
-    // Copy path to structure, in version 0.1 only 8 bit for Class,Instance
-    // and Attribute, need to be replaced with function
-    epath->class_id = 0;
-    epath->instance_number  = 0;
-    epath->attribute_number = 0;
-
-    for( decoded_element_count = 0;
-         decoded_element_count < epath->path_size;
-         decoded_element_count++ )
+    for( int i = 0;  i < count;  ++i )
     {
-        if( kSegmentTypeSegmentTypeReserved == ( *p & kSegmentTypeSegmentTypeReserved ) )
+        int first = *p++;
+
+        int seg_type = 0xfc & first;
+        int format   = 0x03 & first;
+
+        CipUdint   value;
+
+        if( format == 0 )
+            value = *p++;
+        else if( format == 1 )
         {
-            // If invalid/reserved segment type, segment type greater than 0xE0
-            return kEipStatusError;
+            ++p;
+            value = GetIntFromMessage( &p );
+        }
+        else if( format == 2 )
+        {
+            ++p;
+            value = GetDintFromMessage( &p );
+        }
+        else
+        {
+            CIPSTER_TRACE_ERR( "%s: unexpected format in logical segment\n", __func__ );
+            value = 0;
         }
 
-        switch( *p )
+        switch( seg_type )
         {
-        case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeClassId +
-                kLogicalSegmentLogicalFormatEightBitValue:
-            epath->class_id = p[1];
-            p += 2;
+        case kLogicalSegmentTypeClassId:
+            epath->class_id = value;
             break;
 
-        case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeClassId +
-                kLogicalSegmentLogicalFormatSixteenBitValue:
-            p += 2;
-            epath->class_id = GetIntFromMessage( &p );
-            decoded_element_count++;
+        case kLogicalSegmentTypeInstanceId:
+            epath->instance_number = value;
             break;
 
-        case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeInstanceId +
-                kLogicalSegmentLogicalFormatEightBitValue:
-            epath->instance_number = p[1];
-            p += 2;
+        case kLogicalSegmentTypeAttributeId:
+            epath->attribute_number = value;
             break;
 
-        case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeInstanceId +
-                kLogicalSegmentLogicalFormatSixteenBitValue:
-            p += 2;
-            epath->instance_number = GetIntFromMessage( &p );
-            decoded_element_count++;
-            break;
-
-        case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeAttributeId +
-                kLogicalSegmentLogicalFormatEightBitValue:
-            epath->attribute_number = p[1];
-            p += 2;
-            break;
-
-        case kSegmentTypeLogicalSegment + kLogicalSegmentLogicalTypeAttributeId +
-                kLogicalSegmentLogicalFormatSixteenBitValue:
-            p += 2;
-            epath->attribute_number = GetIntFromMessage( &p );
-            decoded_element_count++;
+        case kLogicalSegmentTypeConnectionPoint:
+            epath->connection_point = value;
             break;
 
         default:
-            CIPSTER_TRACE_ERR( "wrong path requested\n" );
-            return kEipStatusError;
+            CIPSTER_TRACE_ERR( "%s: unexpected EPATH logical segment %02x\n", __func__, first );
         }
     }
 
+    int ret = p - *message;
+
     *message = p;
-    return decoded_element_count * 2 + 1;  // times 2 since every encoding uses 2 bytes
-}
-
-
-int DecodePortSegment( CipPortSegment* aSegment, EipUint8** aMessage )
-{
-    EipUint8*   p = *aMessage;
-    EipUint8    first = *p++;
-
-    if( (first & 0xE0) != kSegmentTypePortSegment )
-    {
-        CIPSTER_TRACE_ERR( "wrong path requested\n" );
-        return kEipStatusError;
-    }
-
-    int link_addrz = (first & kPortSegmentFlagExtendedLinkAddressSize) ? *p++ : 0;
-
-    if( first & 0xf == 15 )
-        aSegment->port = GetIntFromMessage( &p );
-    else
-        aSegment->port = first & 0xf;
-
-    switch( link_addrz )
-    {
-    case 0:
-        break;
-    case 1:
-        aSegment->address = *p++;
-        break;
-    case 2:
-        aSegment->address = GetIntFromMessage( &p );
-        break;
-    case 4:
-        aSegment->address = GetDintFromMessage( &p );
-        break;
-    default:
-        CIPSTER_TRACE_ERR( "unsupported link address size\n" );
-        return kEipStatusError;
-    }
-
-    if( (p - *aMessage) & 1 )
-        ++p;
-
-    int ret = p - *aMessage;
-
-    *aMessage = p;
 
     return ret;
 }

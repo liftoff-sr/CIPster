@@ -44,8 +44,8 @@ struct AddressData
 
 struct AddressItem
 {
-    CipUint type_id;
-    CipUint length;
+    CipUint     type_id;
+    CipUint     length;
     AddressData data;
 };
 
@@ -60,22 +60,56 @@ struct DataItem
 
 struct SocketAddressInfoItem
 {
-    CipUint type_id;
-    CipUint length;
-    CipInt  sin_family;
-    CipUint sin_port;
+    CipUint     type_id;
+    CipUint     length;
+    CipInt      sin_family;
+    CipUint     sin_port;
     CipUdint    sin_addr;
     CipUsint    nasin_zero[8];
 };
+
 
 // this one case of a CPF packet is supported:
 
 struct CipCommonPacketFormatData
 {
-    EipUint16 item_count;
+    EipUint16   item_count;
     AddressItem address_item;
-    DataItem data_item;
+    DataItem    data_item;
+
     SocketAddressInfoItem address_info_item[2];
+
+    /** @ingroup ENCAP
+     *  Create CPF structure out of the received data.
+     *  @param  data		pointer to data which need to be structured.
+     *  @param  data_length	length of data in pa_Data.
+     *  @param  common_packet_format_data	pointer to structure of CPF data item.
+     *  @return status
+     *         EIP_OK .. success
+     *         EIP_ERROR .. error
+     */
+    EipStatus Init( EipUint8* data, int data_length );
+
+    /** @ingroup ENCAP
+     * Copy data from CPFDataItem into linear memory in message for transmission over in encapsulation.
+     * @param  response  pointer to message router response which has to be aligned into linear memory.
+     * @param  common_packet_format_data_item pointer to CPF structure which has to be aligned into linear memory.
+     * @param  message    pointer to linear memory.
+     * @return length of reply in pa_msg in bytes
+     *     EIP_ERROR .. error
+     */
+    int AssembleIOMessage( EipUint8* message );
+
+
+    /** @ingroup ENCAP
+     * Copy data from MRResponse struct and CPFDataItem into linear memory in message for transmission over in encapsulation.
+     * @param  response	pointer to message router response which has to be aligned into linear memory.
+     * @param  common_packet_format_data_item	pointer to CPF structure which has to be aligned into linear memory.
+     * @param  message		pointer to linear memory.
+     * @return length of reply in pa_msg in bytes
+     *     EIP_ERROR .. error
+     */
+    int AssembleLinearMessage( CipMessageRouterResponse* response, EipUint8* message );
 };
 
 
@@ -102,41 +136,6 @@ int NotifyCommonPacketFormat( EncapsulationData* received_data,
 int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
         EipUint8* reply_buffer );
 
-/** @ingroup ENCAP
- *  Create CPF structure out of the received data.
- *  @param  data		pointer to data which need to be structured.
- *  @param  data_length	length of data in pa_Data.
- *  @param  common_packet_format_data	pointer to structure of CPF data item.
- *  @return status
- *         EIP_OK .. success
- *         EIP_ERROR .. error
- */
-EipStatus CreateCommonPacketFormatStructure( EipUint8* data, int data_length,
-        CipCommonPacketFormatData* common_packet_format_data );
-
-/** @ingroup ENCAP
- * Copy data from CPFDataItem into linear memory in message for transmission over in encapsulation.
- * @param  response  pointer to message router response which has to be aligned into linear memory.
- * @param  common_packet_format_data_item pointer to CPF structure which has to be aligned into linear memory.
- * @param  message    pointer to linear memory.
- * @return length of reply in pa_msg in bytes
- *     EIP_ERROR .. error
- */
-int AssembleIOMessage( CipCommonPacketFormatData* common_packet_format_data_item,
-        EipUint8* message );
-
-
-/** @ingroup ENCAP
- * Copy data from MRResponse struct and CPFDataItem into linear memory in message for transmission over in encapsulation.
- * @param  response	pointer to message router response which has to be aligned into linear memory.
- * @param  common_packet_format_data_item	pointer to CPF structure which has to be aligned into linear memory.
- * @param  message		pointer to linear memory.
- * @return length of reply in pa_msg in bytes
- *     EIP_ERROR .. error
- */
-int AssembleLinearMessage( CipMessageRouterResponse* response,
-        CipCommonPacketFormatData* common_packet_format_data_item,
-        EipUint8* message );
 
 /** @ingroup ENCAP
  * @brief Data storage for the any CPF data

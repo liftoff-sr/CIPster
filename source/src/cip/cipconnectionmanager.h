@@ -12,15 +12,19 @@
 #include "ciptypes.h"
 
 /**
- * @brief Sets the routing type of a connection, either
- * - Point-to-point connections (unicast)
- * - Multicast connection
+ * enum IOConnType
+ * is a set values for the bit field named "Connection Type" within the
+ * Network Connection Parameter bit collection.  There are only 4 values
+ * because the bitfield is only 2 bits wide.
  */
-enum RoutingType
+enum IOConnType
 {
-    kRoutingTypePointToPointConnection = 0x4000,
-    kRoutingTypeMulticastConnection = 0x2000
+    kIOConnTypeNull            = 0,
+    kIOConnTypeMulticast       = 1,
+    kIOConnTypePointToPoint    = 2,
+    kIOConnTypeInvalid         = 3,        // reserved
 };
+
 
 //* @brief Connection Manager Error codes
 enum ConnectionManagerStatusCode
@@ -48,13 +52,23 @@ enum ConnectionManagerStatusCode
     kConnectionManagerStatusCodeTargetObjectOutOfConnections    = 0x011A
 };
 
+
 enum ConnectionTriggerType
 {
-    kConnectionTriggerTypeProductionTriggerMask = 0x70,
-    kConnectionTriggerTypeCyclicConnection = 0x0,
-    kConnectionTriggerTypeChangeOfStateTriggeredConnection = 0x10,
-    kConnectionTriggerTypeApplicationTriggeredConnection = 0x20
+    kConnectionTriggerTypeCyclic = 0,
+    kConnectionTriggerTypeChangeOfState = 1,
+    kConnectionTriggerTypeApplication = 2,
 };
+
+
+enum ConnectionTransportClass
+{
+    kConnectionTransportClass0 = 0,
+    kConnectionTransportClass1 = 1,
+    kConnectionTransportClass2 = 2,
+    kConnectionTransportClass3 = 3,
+};
+
 
 /** @brief macros for comparing sequence numbers according to CIP spec vol
  * 2 3-4.2 for int type variables
@@ -90,12 +104,12 @@ enum ConnectionState
 
 
 //* @brief instance_type attributes
-enum ConnectionType
+enum ConnInstanceType
 {
-    kConnectionTypeExplicit = 0,
-    kConnectionTypeIoExclusiveOwner = 0x01,
-    kConnectionTypeIoInputOnly  = 0x11,
-    kConnectionTypeIoListenOnly = 0x21
+    kConnInstanceTypeExplicit = 0,
+    kConnInstanceTypeIoExclusiveOwner = 0x01,
+    kConnInstanceTypeIoInputOnly  = 0x11,
+    kConnInstanceTypeIoListenOnly = 0x21
 };
 
 
@@ -134,13 +148,96 @@ struct LinkObject
 };
 
 
+/**
+ * Class NetCnParams
+ * holds the bitfields for either a forward open or large forward open's
+ * "network connection parameters", and implements details that higher level
+ * code should not be burdened with.
+ */
+class NetCnParams
+{
+public:
+    NetCnParams() :
+        not_large( true ),
+        bits( 0 )
+    {}
+
+    int RedundantOwner() const
+    {
+        return not_large ? ((bits>>15)&1) : ((bits>>31)&1);
+    }
+
+    IOConnType ConnectionType() const
+    {
+        return not_large ? IOConnType((bits>>13)&3) : IOConnType((bits>>29)&3);
+    }
+
+    int Priority() const
+    {
+        return not_large ? ((bits>>10)&3) : ((bits>>26)&3);
+    }
+
+    bool IsFixed() const
+    {
+        return not_large ? ((bits>>9)&1) : ((bits>>25)&1);
+    }
+
+    unsigned ConnectionSize() const
+    {
+        return not_large ? (bits & 0x1ff) : (bits & 0xffff);
+    }
+
+    void SetLarge( EipUint32 aNCP )
+    {
+        bits = aNCP;
+        not_large = false;
+    }
+
+    void SetNotLarge( EipUint16 aNCP )
+    {
+        bits = aNCP;
+        not_large = true;
+    }
+
+private:
+    bool        not_large;
+    EipUint32   bits;
+};
+
+
+class TransportTrigger
+{
+public:
+    TransportTrigger() :
+        bits( 0 )
+    {}
+
+    void Set( EipByte aByte )   { bits = aByte; }
+
+    /// Return true if server else false for client.
+    bool IsServer() const       { return bits & 0x80; }
+
+    ConnectionTriggerType Trigger()  const
+    {
+        return ConnectionTriggerType((bits >> 4) & 7);
+    }
+
+    ConnectionTransportClass Class() const
+    {
+        return ConnectionTransportClass( bits & 15 );
+    }
+
+private:
+    EipByte     bits;
+};
+
 
 /**
  * Struct CipConn
  * holds the data needed for handling connections. This data is strongly related to
- * the connection object defined in the CIP-specification. However the full
- * functionality of the connection object is not implemented. Therefore this
- * data can not be accessed with CIP means.
+ * the connection object defined in the CIP-specification.
+ */
+#if 0
 class CipConn : public CipInstance
 {
 public:
@@ -148,11 +245,12 @@ public:
     CipConn( int aId ) :
         CipInstance( aId )
     {}
- */
+#else
 struct CipConn
 {
-    ConnectionState state;
-    ConnectionType  instance_type;
+#endif
+    ConnectionState     state;
+    ConnInstanceType    instance_type;
 
     /* conditional
      *  EipUint16 DeviceNetProductedConnectionID;
@@ -185,10 +283,15 @@ struct CipConn
     EipUint32   originator_serial_number;
     EipUint16   connection_timeout_multiplier;
     EipUint32   o_to_t_requested_packet_interval;
-    EipUint16   o_to_t_network_connection_parameter;
+
+    NetCnParams o_to_t_ncp;
+
     EipUint32   t_to_o_requested_packet_interval;
-    EipUint16   t_to_o_network_connection_parameter;
-    EipByte     transport_type_class_trigger;
+
+    NetCnParams t_to_o_ncp;
+
+    TransportTrigger    transport_trigger;          ///< TransportClass_trigger
+
     EipUint8    connection_path_size;
 
     CipElectronicKey    electronic_key;
@@ -281,9 +384,14 @@ CipConn* GetConnectedObject( EipUint32 connection_id );
  */
 CipConn* GetConnectedOutputAssembly( EipUint32 output_assembly_id );
 
+
 /** Copy the given connection data from pa_pstSrc to pa_pstDst
  */
-void CopyConnectionData( CipConn* destination, CipConn* source );
+inline void CopyConnectionData( CipConn* aDst, CipConn* aSrc )
+{
+    *aDst = *aSrc;
+}
+
 
 /** @brief Close the given connection
  *

@@ -41,9 +41,9 @@ typedef uint8_t     CipBool;    ///< Boolean data type
 typedef uint8_t     CipByte;    ///< 8-bit bit string
 typedef uint16_t    CipWord;    ///< 16-bit bit string
 typedef uint32_t    CipDword;   ///< 32-bit bit string
-typedef uint8_t     CipUsint;   ///< 8-bit unsignedeger
-typedef uint16_t    CipUint;    ///< CipUint 16-bit unsignedeger
-typedef uint32_t    CipUdint;   ///< CipUdint 32-bit unsignedeger
+typedef uint8_t     CipUsint;   ///< 8-bit unsigned
+typedef uint16_t    CipUint;    ///< CipUint 16-bit unsigned
+typedef uint32_t    CipUdint;   ///< CipUdint 32-bit unsigned
 typedef int8_t      CipSint;    ///< 8-bit signed integer
 typedef int16_t     CipInt;     ///< 16-bit signed integer
 typedef int32_t     CipDint;    ///< 32-bit signed integer

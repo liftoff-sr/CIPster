@@ -40,7 +40,7 @@ int EstablishClass3Connection( CipConn* cip_conn,
         produced_connection_id_buffer = explicit_connection->produced_connection_id;
         GeneralConnectionConfiguration( explicit_connection );
         explicit_connection->produced_connection_id = produced_connection_id_buffer;
-        explicit_connection->instance_type = kConnectionTypeExplicit;
+        explicit_connection->instance_type = kConnInstanceTypeExplicit;
         explicit_connection->socket[0] = explicit_connection->socket[1] =
                                              kEipInvalidSocket;
         // set the connection call backs

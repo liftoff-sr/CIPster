@@ -74,7 +74,6 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
 
     // currently we allow I/O connections only to assembly objects
 
-    // we don't need to check for zero as this is handled in the connection path parsing
     CipClass* assembly_class = GetCipClass( kCipAssemblyClassCode );
 
     CipInstance* instance = NULL;
@@ -83,18 +82,20 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
 
     if( !io_conn )
     {
-        CIPSTER_TRACE_ERR( "%s: GetIoConnectionForConnectionData returned NULL\n", __func__ );
+        CIPSTER_TRACE_ERR( "%s: GetIoConnectionForConnectionData() returned NULL\n", __func__ );
         return kCipErrorConnectionFailure;
     }
 
-    // TODO add check for transport type trigger
+    // Both Change of State and Cyclic triggers use the Transmission Trigger Timer
+    // according to Vol1_3.19_3-4.4.3.7.
 
-    if( kConnectionTriggerTypeCyclicConnection
-        != (io_conn->transport_type_class_trigger & kConnectionTriggerTypeProductionTriggerMask) )
+    if( io_conn->transport_trigger.Trigger() != kConnectionTriggerTypeCyclic )
     {
+        // trigger is not cyclic, it is Change of State here.
+
         if( 256 == io_conn->production_inhibit_time )
         {
-            // there was no PIT segment in the connection path set PIT to one fourth of RPI
+            // there was no PIT segment in the connection path, set PIT to one fourth of RPI
             io_conn->production_inhibit_time =
                 ( (EipUint16) (io_conn->t_to_o_requested_packet_interval)
                   / 4000 );
@@ -106,31 +107,28 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
                 > ( (EipUint16) ( (io_conn->t_to_o_requested_packet_interval) / 1000 ) ) )
             {
                 // see section C-1.4.3.3
-                *extended_error = 0x111; //*< RPI not supported. Extended Error code deprecated
+                *extended_error = 0x111;    //*< RPI not supported. Extended Error code deprecated
                 return kCipErrorConnectionFailure;
             }
         }
     }
 
     // set the connection call backs
-    io_conn->connection_close_function = CloseIoConnection;
-    io_conn->connection_timeout_function = HandleIoConnectionTimeOut;
-    io_conn->connection_send_data_function = SendConnectedData;
+    io_conn->connection_close_function        = CloseIoConnection;
+    io_conn->connection_timeout_function      = HandleIoConnectionTimeOut;
+    io_conn->connection_send_data_function    = SendConnectedData;
     io_conn->connection_receive_data_function = HandleReceivedIoConnectionData;
 
     GeneralConnectionConfiguration( io_conn );
 
-    originator_to_target_connection_type =
-        (io_conn->o_to_t_network_connection_parameter & 0x6000) >> 13;
+    originator_to_target_connection_type = io_conn->o_to_t_ncp.ConnectionType();
+    target_to_originator_connection_type = io_conn->t_to_o_ncp.ConnectionType();
 
-    target_to_originator_connection_type =
-        (io_conn->t_to_o_network_connection_parameter & 0x6000) >> 13;
-
-    if( originator_to_target_connection_type == 0
-     && target_to_originator_connection_type == 0 )
+    if( originator_to_target_connection_type == kIOConnTypeNull
+     && target_to_originator_connection_type == kIOConnTypeNull )
     {
         // this indicates a re-configuration of the connection; currently not
-        // supported and we should not come here as this is handled in the
+        // supported and we should not come here as this is trapped in the
         // forwardopen() function
     }
     else
@@ -181,7 +179,7 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
                 diff_size   = 0;
                 is_heartbeat = ( ( (CipByteArray*) attribute->data )->length == 0 );
 
-                if( (io_conn->transport_type_class_trigger & 0x0F) == 1 )
+                if( io_conn->transport_trigger.Class() == kConnectionTransportClass1 )
                 {
                     // class 1 connection
                     data_size   -= 2; // remove 16-bit sequence count length
@@ -247,7 +245,7 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
                 diff_size   = 0;
                 is_heartbeat = ( ( (CipByteArray*) attribute->data )->length == 0 );
 
-                if( (io_conn->transport_type_class_trigger & 0x0F) == 1 )
+                if( io_conn->transport_trigger.Class() == kConnectionTransportClass1 )
                 {
                     // class 1 connection
                     data_size   -= 2; // remove 16-bit sequence count length
@@ -308,7 +306,8 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
 
     AddNewActiveConnection( io_conn );
 
-    CheckIoConnectionEvent( io_conn->conn_path.connection_point[0],
+    CheckIoConnectionEvent(
+            io_conn->conn_path.connection_point[0],
             io_conn->conn_path.connection_point[1],
             kIoConnectionEventOpened );
 
@@ -461,7 +460,7 @@ EipStatus OpenProducingMulticastConnection( CipConn* conn, CipCommonPacketFormat
         j = 1;
     }
 
-    if( kConnectionTypeIoExclusiveOwner == conn->instance_type )
+    if( kConnInstanceTypeIoExclusiveOwner == conn->instance_type )
     {
         /* exclusive owners take the socket and further manage the connection
          * especially in the case of time outs.
@@ -647,18 +646,14 @@ void CloseIoConnection( CipConn* conn )
             conn->conn_path.connection_point[1],
             kIoConnectionEventClosed );
 
-    if( (kConnectionTypeIoExclusiveOwner == conn->instance_type)
-        || (kConnectionTypeIoInputOnly == conn->instance_type) )
+    if( conn->instance_type == kConnInstanceTypeIoExclusiveOwner
+     || conn->instance_type == kConnInstanceTypeIoInputOnly )
     {
-        if( ( kRoutingTypeMulticastConnection
-              == (conn->t_to_o_network_connection_parameter
-                  & kRoutingTypeMulticastConnection) )
-            && (kEipInvalidSocket
-                != conn->socket[kUdpCommuncationDirectionProducing]) )
+        if( conn->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
+         && conn->socket[kUdpCommuncationDirectionProducing] != kEipInvalidSocket )
         {
             CipConn* next_non_control_master_connection =
-                GetNextNonControlMasterConnection(
-                        conn->conn_path.connection_point[1] );
+                GetNextNonControlMasterConnection( conn->conn_path.connection_point[1] );
 
             if( NULL != next_non_control_master_connection )
             {
@@ -685,7 +680,7 @@ void CloseIoConnection( CipConn* conn )
             {
                 CloseAllConnectionsForInputWithSameType(
                         conn->conn_path.connection_point[1],
-                        kConnectionTypeIoListenOnly );
+                        kConnInstanceTypeIoListenOnly );
             }
         }
     }
@@ -702,28 +697,25 @@ void HandleIoConnectionTimeOut( CipConn* conn )
             conn->conn_path.connection_point[1],
             kIoConnectionEventTimedOut );
 
-    if( kRoutingTypeMulticastConnection
-        == (conn->t_to_o_network_connection_parameter & kRoutingTypeMulticastConnection) )
+    if( conn->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast )
     {
         switch( conn->instance_type )
         {
-        case kConnectionTypeIoExclusiveOwner:
+        case kConnInstanceTypeIoExclusiveOwner:
             CloseAllConnectionsForInputWithSameType(
                     conn->conn_path.connection_point[1],
-                    kConnectionTypeIoInputOnly );
+                    kConnInstanceTypeIoInputOnly );
             CloseAllConnectionsForInputWithSameType(
                     conn->conn_path.connection_point[1],
-                    kConnectionTypeIoListenOnly );
+                    kConnInstanceTypeIoListenOnly );
             break;
 
-        case kConnectionTypeIoInputOnly:
-
+        case kConnInstanceTypeIoInputOnly:
             if( kEipInvalidSocket
                 != conn->socket[kUdpCommuncationDirectionProducing] ) // we are the controlling input only connection find a new controller
             {
                 next_non_control_master_connection =
-                    GetNextNonControlMasterConnection(
-                            conn->conn_path.connection_point[1] );
+                    GetNextNonControlMasterConnection( conn->conn_path.connection_point[1] );
 
                 if( NULL != next_non_control_master_connection )
                 {
@@ -741,7 +733,7 @@ void HandleIoConnectionTimeOut( CipConn* conn )
                 {
                     CloseAllConnectionsForInputWithSameType(
                             conn->conn_path.connection_point[1],
-                            kConnectionTypeIoListenOnly );
+                            kConnInstanceTypeIoListenOnly );
                 }
             }
 
@@ -780,7 +772,7 @@ EipStatus SendConnectedData( CipConn* conn )
     cpfd->item_count = 2;
 
     // use Sequenced Address Items if not Connection Class 0
-    if( (conn->transport_type_class_trigger & 0x0F) != 0 )
+    if( conn->transport_trigger.Class() != kConnectionTransportClass0 )
     {
         cpfd->address_item.type_id = kCipItemIdSequencedAddressItem;
         cpfd->address_item.length  = 8;
@@ -817,8 +809,7 @@ EipStatus SendConnectedData( CipConn* conn )
     cpfd->address_info_item[0].type_id = 0;
     cpfd->address_info_item[1].type_id = 0;
 
-    reply_length = AssembleIOMessage( cpfd,
-            &g_message_data_reply_buffer[0] );
+    reply_length = cpfd->AssembleIOMessage( &g_message_data_reply_buffer[0] );
 
     message_data_reply_buffer = &g_message_data_reply_buffer[reply_length - 2];
     cpfd->data_item.length =
@@ -829,7 +820,7 @@ EipStatus SendConnectedData( CipConn* conn )
         cpfd->data_item.length += 4;
     }
 
-    if( (conn->transport_type_class_trigger & 0x0F) == 1 )
+    if( conn->transport_trigger.Class() == kConnectionTransportClass1 )
     {
         cpfd->data_item.length += 2;
 
@@ -871,12 +862,11 @@ EipStatus HandleReceivedIoConnectionData( CipConn* conn,
         EipUint8* data, EipUint16 data_length )
 {
     // check class 1 sequence number
-    if( (conn->transport_type_class_trigger & 0x0F) == 1 )
+    if( conn->transport_trigger.Class() == kConnectionTransportClass1 )
     {
         EipUint16 sequence_buffer = GetIntFromMessage( &(data) );
 
-        if( SEQ_LEQ16( sequence_buffer,
-                    conn->sequence_count_consuming ) )
+        if( SEQ_LEQ16( sequence_buffer, conn->sequence_count_consuming ) )
         {
             return kEipStatusOk; // no new data for the assembly
         }
@@ -920,14 +910,11 @@ CipError OpenCommunicationChannels( CipConn* conn )
     // of the struct. This may change in the future
     CipCommonPacketFormatData* cpfd = &g_cpf;
 
-    int originator_to_target_connection_type =
-        (conn->o_to_t_network_connection_parameter & 0x6000) >> 13;
-
-    int target_to_originator_connection_type =
-        (conn->t_to_o_network_connection_parameter & 0x6000) >> 13;
+    int originator_to_target_connection_type = conn->o_to_t_ncp.ConnectionType();
+    int target_to_originator_connection_type = conn->t_to_o_ncp.ConnectionType();
 
     // open a connection "point to point" or "multicast" based on the ConnectionParameter
-    if( originator_to_target_connection_type == 1 ) //TODO: Fix magic number; Multicast consuming
+    if( originator_to_target_connection_type == kIOConnTypeMulticast ) //TODO: Fix magic number; Multicast consuming
     {
         if( OpenMulticastConnection( kUdpCommuncationDirectionConsuming,
                     conn, cpfd ) == kEipStatusError )
@@ -938,7 +925,7 @@ CipError OpenCommunicationChannels( CipConn* conn )
     }
 
     // TODO: Fix magic number; Point to Point consuming
-    else if( originator_to_target_connection_type == 2 )
+    else if( originator_to_target_connection_type == kIOConnTypePointToPoint )
     {
         if( OpenConsumingPointToPointConnection( conn, cpfd )
             == kEipStatusError )
@@ -949,7 +936,7 @@ CipError OpenCommunicationChannels( CipConn* conn )
     }
 
     // TODO: Fix magic number; Multicast producing
-    if( target_to_originator_connection_type == 1 )
+    if( target_to_originator_connection_type == kIOConnTypeMulticast )
     {
         if( OpenProducingMulticastConnection( conn, cpfd )
             == kEipStatusError )
@@ -960,7 +947,7 @@ CipError OpenCommunicationChannels( CipConn* conn )
     }
 
     // TODO: Fix magic number; Point to Point producing
-    else if( target_to_originator_connection_type == 2 )
+    else if( target_to_originator_connection_type == kIOConnTypePointToPoint )
     {
         if( OpenProducingPointToPointConnection( conn, cpfd )
             != kCipErrorSuccess )
@@ -987,3 +974,38 @@ void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList(
 
     RemoveFromActiveConnections( conn );
 }
+
+
+#if 0
+static int find_unique_free_id( const CipClass* aClass )
+{
+    CipInstances& instances = aClass->Instances();
+
+    int last_id = 0;
+    for( CipInstance::const_iterator it: instances )
+    {
+        // Is there a gap here?
+        if( (*it)->Id() > last_id + 1 )
+            break;
+
+        last_id = (*it)->Id();
+    }
+
+    return last_id + 1;
+}
+
+
+static EipStatus create( CipInstance* instance,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response )
+{
+    CipClass* clazz = GetCipClass( kCipConnectionManagerClassCode );
+
+    int id = find_unique_free_id( clazz );
+
+    CipConn* conn = new CipConn( id );
+
+    clazz->InstanceInsert( conn );
+}
+#endif
+

@@ -41,6 +41,8 @@ static CipInstance* createEthernetLinkInstance()
     i->AttributeInsert( 2, kCipDword,  kGetableSingleAndAll, GetAttrData, NULL, &g_ethernet_link.interface_flags );
     i->AttributeInsert( 3, kCip6Usint, kGetableSingleAndAll, GetAttrData, NULL, &g_ethernet_link.physical_address );
 
+    clazz->InstanceInsert( i );
+
     return i;
 }
 
@@ -66,7 +68,7 @@ EipStatus CipEthernetLinkInit()
 
         RegisterCipClass( clazz );
 
-        clazz->InstanceInsert( createEthernetLinkInstance() );
+        createEthernetLinkInstance();
     }
 
     return kEipStatusOk;

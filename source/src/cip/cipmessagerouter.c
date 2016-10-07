@@ -104,6 +104,8 @@ static CipInstance* createCipMessageRouterInstance()
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
+    clazz->InstanceInsert( i );
+
     return i;
 }
 
@@ -129,7 +131,7 @@ EipStatus CipMessageRouterInit()
         // delete the service which was established in CipClass constructor.
         delete clazz->ServiceRemove( kSetAttributeSingle );
 
-        clazz->InstanceInsert( createCipMessageRouterInstance() );
+        createCipMessageRouterInstance();
 
         // reserved for future use -> set to zero
         g_response.reserved = 0;
@@ -223,8 +225,6 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
 CipError CipMessageRouterRequest::InitRequest( EipUint8* aRequest, EipInt16 aCount )
 {
     service = *aRequest++;
-
-    // TODO: Fix for 16 bit path lengths (+1
 
     --aCount;
 

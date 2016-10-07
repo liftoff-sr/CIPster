@@ -267,6 +267,8 @@ static CipInstance* createTcpIpInterfaceInstance()
 
     i->AttributeInsert( 9, kCipAny, kGetableSingleAndAll, get_multicast_config, NULL, &g_multicast_configuration );
 
+    clazz->InstanceInsert( i );
+
     return i;
 }
 
@@ -285,7 +287,7 @@ EipStatus CipTcpIpInterfaceInit()
 
         RegisterCipClass( clazz );
 
-        clazz->InstanceInsert( createTcpIpInterfaceInstance() );
+        createTcpIpInterfaceInstance();
     }
 
     return kEipStatusOk;

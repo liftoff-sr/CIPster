@@ -101,14 +101,12 @@ class AssemblyInstance : public CipInstance
 {
 public:
     AssemblyInstance( EipUint16 aInstanceId ) :
-        CipInstance( aInstanceId ),
-        type( kConnectionTypeExplicit )
+        CipInstance( aInstanceId )
     {
     }
 
 //protected:
     CipByteArray    byte_array;
-    ConnectionType  type;
 };
 
 
@@ -138,8 +136,6 @@ CipInstance* CreateAssemblyInstance( EipUint32 instance_id, EipByte* data,
     // Attribute 4 Number of bytes in Attribute 3
     i->AttributeInsert( 4, kCipUint, kGetableSingle, &i->byte_array.length );
 
-    // This is a public function, we should not expect caller to insert this
-    // instance into its proper public CIP class "Assembly", so do it here.
     clazz->InstanceInsert( i );
 
     return i;

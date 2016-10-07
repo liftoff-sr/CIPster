@@ -112,11 +112,11 @@ static CipConn* getListenOnlyConnection( CipConn* cip_conn, EipUint16* extended_
 {
     CipConn* listen_only_connection = NULL;
 
-    if( kRoutingTypeMulticastConnection !=
-        (cip_conn->t_to_o_network_connection_parameter & kRoutingTypeMulticastConnection) )
+    if( cip_conn->t_to_o_ncp.ConnectionType() != kIOConnTypeMulticast )
     {
         // a listen only connection has to be a multicast connection.
         *extended_error = kConnectionManagerStatusCodeNonListenOnlyConnectionNotOpened;
+
         // maybe not the best error message however there is no suitable definition in the cip spec
         return NULL;
     }
@@ -231,19 +231,19 @@ CipConn* GetIoConnectionForConnectionData( CipConn* cip_conn,  EipUint16* extend
                     }
                     else
                     {
-                        cip_conn->instance_type = kConnectionTypeIoListenOnly;
+                        cip_conn->instance_type = kConnInstanceTypeIoListenOnly;
                     }
                 }
             }
             else
             {
-                cip_conn->instance_type = kConnectionTypeIoInputOnly;
+                cip_conn->instance_type = kConnInstanceTypeIoInputOnly;
             }
         }
     }
     else
     {
-        cip_conn->instance_type = kConnectionTypeIoExclusiveOwner;
+        cip_conn->instance_type = kConnInstanceTypeIoExclusiveOwner;
     }
 
     if( io_connection )
@@ -261,13 +261,12 @@ CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
 
     while( producer_multicast_connection )
     {
-        if( (kConnectionTypeIoExclusiveOwner == producer_multicast_connection->instance_type)
-            || (kConnectionTypeIoInputOnly   == producer_multicast_connection->instance_type) )
+        if( producer_multicast_connection->instance_type == kConnInstanceTypeIoExclusiveOwner
+         || producer_multicast_connection->instance_type == kConnInstanceTypeIoInputOnly )
         {
-            if( (input_point == producer_multicast_connection->conn_path.connection_point[1])
-                && ( kRoutingTypeMulticastConnection ==
-                    (producer_multicast_connection->t_to_o_network_connection_parameter & kRoutingTypeMulticastConnection) )
-                && (kEipInvalidSocket != producer_multicast_connection->socket[kUdpCommuncationDirectionProducing]) )
+            if( input_point == producer_multicast_connection->conn_path.connection_point[1]
+                && producer_multicast_connection->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
+                && kEipInvalidSocket != producer_multicast_connection->socket[kUdpCommuncationDirectionProducing] )
             {
                 // we have a connection that produces the same input assembly,
                 // is a multicast producer and manages the connection.
@@ -289,13 +288,12 @@ CipConn* GetNextNonControlMasterConnection( EipUint32 input_point )
 
     while( next_non_control_master_connection )
     {
-        if( (kConnectionTypeIoExclusiveOwner == next_non_control_master_connection->instance_type)
-            || (kConnectionTypeIoInputOnly   == next_non_control_master_connection->instance_type) )
+        if( next_non_control_master_connection->instance_type == kConnInstanceTypeIoExclusiveOwner
+         || next_non_control_master_connection->instance_type == kConnInstanceTypeIoInputOnly )
         {
-            if( (input_point == next_non_control_master_connection->conn_path.connection_point[1])
-                && ( kRoutingTypeMulticastConnection ==
-                    (next_non_control_master_connection->t_to_o_network_connection_parameter & kRoutingTypeMulticastConnection) )
-                && (kEipInvalidSocket == next_non_control_master_connection->socket[kUdpCommuncationDirectionProducing]) )
+            if( input_point == next_non_control_master_connection->conn_path.connection_point[1]
+             && next_non_control_master_connection->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
+             && next_non_control_master_connection->socket[kUdpCommuncationDirectionProducing] == kEipInvalidSocket )
             {
                 // we have a connection that produces the same input assembly,
                 // is a multicast producer and does not manages the connection.
@@ -311,7 +309,7 @@ CipConn* GetNextNonControlMasterConnection( EipUint32 input_point )
 }
 
 
-void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,  ConnectionType instance_type )
+void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,  ConnInstanceType instance_type )
 {
     CipConn* connection = g_active_connection_list;
     CipConn* connection_to_delete;

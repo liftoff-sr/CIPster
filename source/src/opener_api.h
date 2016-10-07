@@ -284,7 +284,7 @@ typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* cip_conn,
         EipUint16 data_length );
 
 /** @ingroup CIP_API
- * @brief register open functions for an specific object.
+ * @brief register open functions for a specific object.
  *
  * With this function any object can be enabled to be a target for forward
  * open/close request.
