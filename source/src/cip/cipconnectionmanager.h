@@ -10,6 +10,9 @@
 #include "opener_api.h"
 #include "typedefs.h"
 #include "ciptypes.h"
+#include "cipepath.h"
+#include "cipmessagerouter.h"
+
 
 /**
  * enum IOConnType
@@ -267,10 +270,9 @@ struct CipConn
 
     /**/
     WatchdogTimeoutAction watchdog_timeout_action;
-    EipUint16   produced_connection_path_length;
-    CipEpath    produced_connection_path;
-    EipUint16   consumed_connection_path_length;
-    CipEpath    consumed_connection_path;
+
+    CipAppPath  produced_connection_path;
+    CipAppPath  consumed_connection_path;
 
     /* conditional
      *  UINT16 ProductionInhibitTime;
@@ -292,9 +294,6 @@ struct CipConn
 
     TransportTrigger    transport_trigger;          ///< TransportClass_trigger
 
-    EipUint8    connection_path_size;
-
-    CipElectronicKey    electronic_key;
     CipConnectionPath   conn_path;                  ///< padded EPATH
 
     LinkObject          link_object;
@@ -357,6 +356,23 @@ struct CipConn
     EipUint16   correct_originator_to_target_size;
     EipUint16   correct_target_to_originator_size;
 };
+
+
+struct CipUnconnectedSendParameter
+{
+    EipByte         priority;
+    EipUint8        timeout_ticks;
+    EipUint16       message_request_size;
+
+    CipMessageRouterRequest     message_request;
+    CipMessageRouterResponse*   message_response;
+
+    EipUint8        reserved;
+    // CipRoutePath    route_path;      CipPortSegment?
+    void*           data;
+};
+
+
 
 //* @brief Connection Manager class code
 static const int kCipConnectionManagerClassCode = 0x06;

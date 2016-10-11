@@ -18,7 +18,6 @@
 #include "opener_user_conf.h"
 #include "ciperror.h"
 
-
 /**
  * Enum SegmentType
  * is the set of bits 7-5 in the Segment Type/Format byte
@@ -77,9 +76,9 @@ enum CipDataType
     kCipDint = 0xC4,        ///< 32-bit signed integer
     kCipLint = 0xC5,        ///< 64-bit signed integer
     kCipUsint = 0xC6,       ///< 8-bit unsignedeger
-    kCipUint = 0xC7,        ///< 16-bit unsignedeger
-    kCipUdint = 0xC8,       ///< 32-bit unsignedeger
-    kCipUlint = 0xC9,       ///< 64-bit unsignedeger
+    kCipUint = 0xC7,        ///< 16-bit unsigned
+    kCipUdint = 0xC8,       ///< 32-bit unsigned
+    kCipUlint = 0xC9,       ///< 64-bit unsigned
     kCipReal = 0xCA,        ///< Single precision floating point
     kCipLreal = 0xCB,       ///< Double precision floating point
     kCipStime = 0xCC,       ///< Synchronous time information*, type of DINT
@@ -99,7 +98,7 @@ enum CipDataType
     kCipShortString = 0xDA, /**< Character string, 1 byte per character, 1 byte
                              *  length indicator */
     kCipTime = 0xDB,        ///< Duration in milli-seconds; range of DINT
-    kCipEpath = 0xDC,       ///< CIP path segments
+//    kCipEpath = 0xDC,       ///< CIP path segments
     kCipEngUnit = 0xDD,     ///< Engineering Units
     kCipStringI = 0xDE,     ///< International Character String
 
@@ -230,65 +229,14 @@ struct CipString
 
 
 /**
- * Struct CipEPath
- */
-struct CipEpath
-{
-    EipUint8    path_size;          ///< count of 16-bit words in serialized path
-    EipUint32   class_id;           ///< Class ID of the linked object
-    EipUint32   instance_number;    ///< Requested Instance Number of the linked object
-    EipUint32   attribute_number;   ///< Requested Attribute Number of the linked object
-    EipUint32   connection_point;
-
-    void Clear()
-    {
-        path_size = 0;
-        class_id = 0;
-        instance_number = 0;
-        attribute_number = 0;
-        connection_point = 0;
-    }
-};
-
-
-struct CipPortSegment
-{
-    int port;                       ///< if == -1, means not used
-    std::vector<EipUint8>   link_address;
-
-    CipPortSegment() :
-        port(-1)
-    {}
-};
-
-
-/**
  * Struct CipConnectionPath
  */
 struct CipConnectionPath
 {
-    EipUint8        path_size;          ///< Size of the Path in 16-bit words
-    // TODO: Fix, should be UINT (EIP_UINT16)
-
-    EipUint32       class_id;           ///< Class ID of the linked object
-    EipUint32       connection_point[3];// TODO:  Why array length 3?
-    CipPortSegment  port_segment;
+    EipUint32       class_id;               ///< Class ID of the linked object
+    EipUint32       connection_point[3];
 };
 
-
-/**
- * Struct CipKeyData
- * represents the key data format of the electronic key segment
- */
-struct CipKeyData
-{
-    CipUint     vendor_id;          ///< Vendor ID
-    CipUint     device_type;        ///< Device Type
-    CipUint     product_code;       ///< Product Code
-    CipByte     major_revision;     /**< Major Revision and Compatibility (Bit 0-6 = Major
-                                     *  Revision) Bit 7 = Compatibility */
-    CipUsint    minor_revision;     ///< Minor Revision
-};
 
 
 struct CipRevision
@@ -298,66 +246,14 @@ struct CipRevision
 };
 
 
-/**
- * Struct CipElectronicKey
- */
-struct CipElectronicKey
-{
-    CipUsint    key_format;    /**< Key Format 0-3 reserved, 4 = see Key Format Table,
-                                *  5-255 = Reserved */
-    CipKeyData  key_data;       /**< Depends on key format used, usually Key Format 4 as
-                                 *  specified in CIP Specification, Volume 1*/
-};
-
-
-/**
- * Struct CipMessageRouterRequest
- */
-struct CipMessageRouterRequest
-{
-    CipUsint    service;
-    CipEpath    request_path;
-    EipInt16    data_length;
-    CipOctet*   data;
-
-    /**
-     * Function InitRequest.
-     * parses the UCMM header consisting of: service, IOI size, IOI, data into a request structure
-     * @param aRequest the message data received
-     * @param aCount number of bytes in the message
-     * @param request pointer to structure of MRRequest data item.
-     * @return status  0 .. success
-     *                 -1 .. error
-     */
-    CipError InitRequest( EipUint8* aRequest, EipInt16 aCount );
-};
-
-
 #define MAX_SIZE_OF_ADD_STATUS      2    // for now we support extended status codes up to 2 16bit values there is mostly only one 16bit value used
 
-/** @brief CIP Message Router Response
- *
- */
-struct CipMessageRouterResponse
-{
-    CipUsint reply_service;                                 /**< Reply service code, the requested service code +
-                                                             *  0x80 */
-    CipOctet reserved;                                      ///< Reserved; Shall be zero
-    CipUsint general_status;                                /**< One of the General Status codes listed in CIP
-                                                             *  Specification Volume 1, Appendix B */
-    CipUsint size_of_additional_status;                     /**< Number of additional 16 bit words in
-                                                             *  Additional Status Array */
-    EipUint16 additional_status[MAX_SIZE_OF_ADD_STATUS];    /**< Array of 16 bit words; Additional status;
-                                                             *  If SizeOfAdditionalStatus is 0. there is no
-                                                             *  Additional Status */
-    EipInt16    data_length;                                   // TODO: Check if this is correct
-    CipOctet*   data;                                         /**< Array of octet; Response data per object definition from
-                                                             *  request */
-};
 
 class CipInstance;
 class CipAttribute;
 class CipClass;
+struct CipMessageRouterRequest;
+struct CipMessageRouterResponse;
 
 
 /** @ingroup CIP_API
@@ -782,20 +678,6 @@ struct CipTcpIpNetworkInterfaceConfiguration
     CipString   domain_name;
 };
 
-
-struct CipUnconnectedSendParameter
-{
-    EipByte         priority;
-    EipUint8        timeout_ticks;
-    EipUint16       message_request_size;
-
-    CipMessageRouterRequest     message_request;
-    CipMessageRouterResponse*   message_response;
-
-    EipUint8        reserved;
-    // CipRoutePath    route_path;      CipPortSegment?
-    void*           data;
-};
 
 /* these are used for creating the getAttributeAll masks
  *  TODO there might be a way simplifying this using __VARARGS__ in #define */

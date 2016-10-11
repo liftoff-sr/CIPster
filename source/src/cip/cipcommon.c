@@ -54,7 +54,6 @@ EipUint8 g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
 const EipUint16 kCipUintZero = 0;
 
 // private functions
-int EncodeEPath( CipEpath* epath, EipUint8** message );
 
 void CipStackInit( EipUint16 unique_connection_id )
 {
@@ -110,39 +109,26 @@ EipStatus NotifyClass( CipClass* cip_class,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    unsigned instance_id = request->request_path.instance_number;
+    CipInstance*    instance;
+    unsigned        instance_id;
+    CipService*     service;
 
-    CipInstance* instance = cip_class->Instance( instance_id );
-
-    if( instance )
+    if( !request->request_path.HasInstance() )
     {
-        CIPSTER_TRACE_INFO(
-            "%s: targeting instance %d of class %s\n",
-            __func__,
-            instance_id,
-            instance_id ? instance->owning_class->ClassName().c_str() :
-                          ((CipClass*)instance)->ClassName().c_str()
-            );
+        CIPSTER_TRACE_WARN( "%s: no instance specified\n", __func__ );
 
-        CipService* service = cip_class->Service( request->service );
+        // If instance not found, return an error reply.
+        // According to the test tool this should be the correct error flag
+        // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
+        response->general_status = kCipErrorPathDestinationUnknown;
 
-        if( service )
-        {
-            CIPSTER_TRACE_INFO( "%s: calling service '%s'\n", __func__, service->ServiceName().c_str() );
-            CIPSTER_ASSERT( service->service_function );
-
-            // call the service, and return what it returns
-            return service->service_function( instance, request, response );
-        }
-
-        CIPSTER_TRACE_WARN( "%s: service 0x%x not supported\n",
-                __func__,
-                request->service );
-
-        // if no services or service not found, return an error reply
-        response->general_status = kCipErrorServiceNotSupported;
+        goto exit;
     }
-    else
+
+    instance_id = request->request_path.GetInstance();
+
+    instance = cip_class->Instance( instance_id );
+    if( !instance )
     {
         CIPSTER_TRACE_WARN( "%s: instance %d does not exist\n", __func__, instance_id );
 
@@ -150,10 +136,40 @@ EipStatus NotifyClass( CipClass* cip_class,
         // According to the test tool this should be the correct error flag
         // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
         response->general_status = kCipErrorPathDestinationUnknown;
+
+        goto exit;
     }
+
+    CIPSTER_TRACE_INFO(
+        "%s: targeting instance %d of class %s\n",
+        __func__,
+        instance_id,
+        instance_id ? instance->owning_class->ClassName().c_str() :
+                      ((CipClass*)instance)->ClassName().c_str()
+        );
+
+    service = cip_class->Service( request->service );
+    if( service )
+    {
+        CIPSTER_TRACE_INFO( "%s: calling service '%s'\n",
+            __func__, service->ServiceName().c_str() );
+
+        CIPSTER_ASSERT( service->service_function );
+
+        // call the service, and return what it returns
+        return service->service_function( instance, request, response );
+    }
+
+    CIPSTER_TRACE_WARN( "%s: service 0x%02x not supported\n",
+            __func__,
+            request->service );
+
+    // if no services or service not found, return an error reply
+    response->general_status = kCipErrorServiceNotSupported;
 
     // handle error replies, general_status was set above.
 
+exit:
     response->size_of_additional_status = 0;
     response->data_length = 0;
     response->reply_service = 0x80 | request->service;
@@ -731,7 +747,7 @@ EipStatus GetAttributeSingle( CipInstance* instance,
         get_mask = kGetableSingle;
     }
 
-    CipAttribute* attribute = instance->Attribute( request->request_path.attribute_number );
+    CipAttribute* attribute = instance->Attribute( request->request_path.GetAttribute() );
 
     if( attribute )
     {
@@ -743,7 +759,7 @@ EipStatus GetAttributeSingle( CipInstance* instance,
             CIPSTER_TRACE_INFO(
                 "%s: attribute:%d  class:'%s'  instance:%d\n",
                 __func__,
-                request->request_path.attribute_number,
+                request->request_path.GetAttribute(),
                 instance->Id() == 0 ? ((CipClass*)instance)->ClassName().c_str() :
                                         instance->owning_class->ClassName().c_str(),
                 instance->Id()
@@ -774,7 +790,7 @@ EipStatus SetAttributeSingle( CipInstance* instance,
     response->data_length = 0;
     response->reply_service = 0x80 | request->service;
 
-    CipAttribute* attribute = instance->Attribute( request->request_path.attribute_number );
+    CipAttribute* attribute = instance->Attribute( request->request_path.GetAttribute() );
 
     if( attribute )
     {
@@ -783,7 +799,7 @@ EipStatus SetAttributeSingle( CipInstance* instance,
             CIPSTER_TRACE_INFO(
                 "%s: attribute:%d  class:'%s'  instance:%d\n",
                 __func__,
-                request->request_path.attribute_number,
+                request->request_path.GetAttribute(),
                 instance->Id() == 0 ? ((CipClass*)instance)->ClassName().c_str() :
                                         instance->owning_class->ClassName().c_str(),
                 instance->Id()
@@ -905,10 +921,6 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         break;
 
     case kCipTime:
-        break;
-
-    case kCipEpath:
-        counter = EncodeEPath( (CipEpath*) data, message );
         break;
 
     case kCipEngUnit:
@@ -1129,7 +1141,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
                 // only return attributes that are flagged as being part of GetAttributeAll
                 if( attribute_id < 32 && (get_mask & (1 << attribute_id)) )
                 {
-                    request->request_path.attribute_number = attribute_id;
+                    request->request_path.SetAttribute( attribute_id );
 
                     EipStatus result = service->service_function( instance, request, response );
 
@@ -1155,132 +1167,3 @@ EipStatus GetAttributeAll( CipInstance* instance,
         return kEipStatusOk;
     }
 }
-
-
-int EncodeEPath( CipEpath* epath, EipUint8** message )
-{
-    unsigned    length = epath->path_size;
-    EipUint8*   p = *message;
-
-    AddIntToMessage( epath->path_size, &p );
-
-    if( epath->class_id < 256 )
-    {
-        *p++ = 0x20;   // 8 Bit Class Id
-        *p++ = (EipUint8) epath->class_id;
-        length -= 1;
-    }
-    else
-    {
-        *p++ = 0x21;   // 16 Bit Class Id
-        *p++ = 0;      // pad byte
-        AddIntToMessage( epath->class_id, &p );
-        length -= 2;
-    }
-
-    if( length > 0 )
-    {
-        if( epath->instance_number < 256 )
-        {
-            *p++ = 0x24;   // 8 Bit Instance Id
-            *p++ = (EipUint8) epath->instance_number;
-            length -= 1;
-        }
-        else
-        {
-            *p++ = 0x25;   // 16 Bit Instance Id
-            *p++ = 0;      // pad byte
-            AddIntToMessage( epath->instance_number, &p );
-            length -= 2;
-        }
-
-        if( length > 0 )
-        {
-            if( epath->attribute_number < 256 )
-            {
-                *p++ = 0x30;   // 8 Bit Attribute Id
-                *p++ = (EipUint8) epath->attribute_number;
-                length -= 1;
-            }
-            else
-            {
-                *p++ = 0x31;   // 16 Bit Attribute Id
-                *p++ = 0;      // pad byte
-                AddIntToMessage( epath->attribute_number, &p );
-                length -= 2;
-            }
-        }
-    }
-
-    *message = p;
-
-    // path size is in 16 bit chunks according to the specification
-    return 2 + epath->path_size * 2;
-}
-
-
-int DecodePaddedEPath( CipEpath* epath, EipUint8** message )
-{
-    EipUint8*   p = *message;
-    int         count = *p++;
-
-    epath->Clear();
-    epath->path_size = count;
-
-    for( int i = 0;  i < count;  ++i )
-    {
-        int first = *p++;
-
-        int seg_type = 0xfc & first;
-        int format   = 0x03 & first;
-
-        CipUdint   value;
-
-        if( format == 0 )
-            value = *p++;
-        else if( format == 1 )
-        {
-            ++p;
-            value = GetIntFromMessage( &p );
-        }
-        else if( format == 2 )
-        {
-            ++p;
-            value = GetDintFromMessage( &p );
-        }
-        else
-        {
-            CIPSTER_TRACE_ERR( "%s: unexpected format in logical segment\n", __func__ );
-            value = 0;
-        }
-
-        switch( seg_type )
-        {
-        case kLogicalSegmentTypeClassId:
-            epath->class_id = value;
-            break;
-
-        case kLogicalSegmentTypeInstanceId:
-            epath->instance_number = value;
-            break;
-
-        case kLogicalSegmentTypeAttributeId:
-            epath->attribute_number = value;
-            break;
-
-        case kLogicalSegmentTypeConnectionPoint:
-            epath->connection_point = value;
-            break;
-
-        default:
-            CIPSTER_TRACE_ERR( "%s: unexpected EPATH logical segment %02x\n", __func__, first );
-        }
-    }
-
-    int ret = p - *message;
-
-    *message = p;
-
-    return ret;
-}
-

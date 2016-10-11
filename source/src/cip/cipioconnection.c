@@ -66,8 +66,9 @@ EipUint32 g_run_idle_state;    //*< buffer for holding the run idle information.
 //*** Implementation ***
 int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
 {
-    int originator_to_target_connection_type;
-    int target_to_originator_connection_type;
+    IOConnType o_to_t_type;
+    IOConnType t_to_o_type;
+
     int eip_status = kEipStatusOk;
 
     CipAttribute* attribute;
@@ -121,11 +122,11 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
 
     GeneralConnectionConfiguration( io_conn );
 
-    originator_to_target_connection_type = io_conn->o_to_t_ncp.ConnectionType();
-    target_to_originator_connection_type = io_conn->t_to_o_ncp.ConnectionType();
+    o_to_t_type = io_conn->o_to_t_ncp.ConnectionType();
+    t_to_o_type = io_conn->t_to_o_ncp.ConnectionType();
 
-    if( originator_to_target_connection_type == kIOConnTypeNull
-     && target_to_originator_connection_type == kIOConnTypeNull )
+    if( o_to_t_type == kIOConnTypeNull
+     && t_to_o_type == kIOConnTypeNull )
     {
         // this indicates a re-configuration of the connection; currently not
         // supported and we should not come here as this is trapped in the
@@ -138,19 +139,16 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
         int diff_size;
         int is_heartbeat;
 
-        if( (originator_to_target_connection_type != 0)
-            && (target_to_originator_connection_type != 0) )
+        if( o_to_t_type != kIOConnTypeNull && t_to_o_type != kIOConnTypeNull )
         {
             // we have a producing and consuming connection
             producing_index = 1;
         }
 
         io_conn->consuming_instance = 0;
-        io_conn->consumed_connection_path_length = 0;
         io_conn->producing_instance = 0;
-        io_conn->produced_connection_path_length = 0;
 
-        if( originator_to_target_connection_type != 0 ) // setup consumer side
+        if( o_to_t_type != kIOConnTypeNull )    // setup consumer side
         {
             int instance_id = io_conn->conn_path.connection_point[0];
 
@@ -161,14 +159,10 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
             {
                 io_conn->consuming_instance = instance;
 
-                io_conn->consumed_connection_path_length = 6;
-                io_conn->consumed_connection_path.path_size = 6;
-
-                io_conn->consumed_connection_path.class_id = io_conn->conn_path.class_id;
-
-                io_conn->consumed_connection_path.instance_number = instance_id;
-
-                io_conn->consumed_connection_path.attribute_number = 3;
+                io_conn->produced_connection_path.Clear();
+                io_conn->consumed_connection_path.SetClass( io_conn->conn_path.class_id );
+                io_conn->consumed_connection_path.SetInstance( instance_id );
+                io_conn->consumed_connection_path.SetAttribute( 3 );
 
                 attribute = instance->Attribute( 3 );
 
@@ -219,7 +213,7 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
             }
         }
 
-        if( target_to_originator_connection_type != 0 )     // setup producer side
+        if( t_to_o_type != kIOConnTypeNull )     // setup producer side
         {
             instance = assembly_class->Instance( io_conn->conn_path.connection_point[producing_index] );
 
@@ -227,14 +221,13 @@ int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
             {
                 io_conn->producing_instance = instance;
 
-                io_conn->produced_connection_path_length = 6;
-                io_conn->produced_connection_path.path_size = 6;
-                io_conn->produced_connection_path.class_id  = io_conn->conn_path.class_id;
+                io_conn->produced_connection_path.Clear();
 
-                io_conn->produced_connection_path.instance_number =
-                    io_conn->conn_path.connection_point[producing_index];
+                io_conn->produced_connection_path.SetClass( io_conn->conn_path.class_id );
 
-                io_conn->produced_connection_path.attribute_number = 3;
+                io_conn->produced_connection_path.SetInstance(
+                    io_conn->conn_path.connection_point[producing_index] );
+                io_conn->produced_connection_path.SetAttribute( 3 );
 
                 attribute = instance->Attribute( 3 );
 
@@ -910,11 +903,11 @@ CipError OpenCommunicationChannels( CipConn* conn )
     // of the struct. This may change in the future
     CipCommonPacketFormatData* cpfd = &g_cpf;
 
-    int originator_to_target_connection_type = conn->o_to_t_ncp.ConnectionType();
-    int target_to_originator_connection_type = conn->t_to_o_ncp.ConnectionType();
+    IOConnType o_to_t_type = conn->o_to_t_ncp.ConnectionType();
+    IOConnType t_to_o_type = conn->t_to_o_ncp.ConnectionType();
 
     // open a connection "point to point" or "multicast" based on the ConnectionParameter
-    if( originator_to_target_connection_type == kIOConnTypeMulticast ) //TODO: Fix magic number; Multicast consuming
+    if( o_to_t_type == kIOConnTypeMulticast ) //TODO: Fix magic number; Multicast consuming
     {
         if( OpenMulticastConnection( kUdpCommuncationDirectionConsuming,
                     conn, cpfd ) == kEipStatusError )
@@ -924,33 +917,27 @@ CipError OpenCommunicationChannels( CipConn* conn )
         }
     }
 
-    // TODO: Fix magic number; Point to Point consuming
-    else if( originator_to_target_connection_type == kIOConnTypePointToPoint )
+    else if( o_to_t_type == kIOConnTypePointToPoint )
     {
-        if( OpenConsumingPointToPointConnection( conn, cpfd )
-            == kEipStatusError )
+        if( OpenConsumingPointToPointConnection( conn, cpfd ) == kEipStatusError )
         {
             CIPSTER_TRACE_ERR( "error in PointToPoint consuming connection\n" );
             return kCipErrorConnectionFailure;
         }
     }
 
-    // TODO: Fix magic number; Multicast producing
-    if( target_to_originator_connection_type == kIOConnTypeMulticast )
+    if( t_to_o_type == kIOConnTypeMulticast )
     {
-        if( OpenProducingMulticastConnection( conn, cpfd )
-            == kEipStatusError )
+        if( OpenProducingMulticastConnection( conn, cpfd ) == kEipStatusError )
         {
             CIPSTER_TRACE_ERR( "error in OpenMulticast Connection\n" );
             return kCipErrorConnectionFailure;
         }
     }
 
-    // TODO: Fix magic number; Point to Point producing
-    else if( target_to_originator_connection_type == kIOConnTypePointToPoint )
+    else if( t_to_o_type == kIOConnTypePointToPoint )
     {
-        if( OpenProducingPointToPointConnection( conn, cpfd )
-            != kCipErrorSuccess )
+        if( OpenProducingPointToPointConnection( conn, cpfd ) != kCipErrorSuccess )
         {
             CIPSTER_TRACE_ERR( "error in PointToPoint producing connection\n" );
             return kCipErrorConnectionFailure;
@@ -961,8 +948,7 @@ CipError OpenCommunicationChannels( CipConn* conn )
 }
 
 
-void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList(
-        CipConn* conn )
+void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList( CipConn* conn )
 {
     IApp_CloseSocket_udp( conn->socket[kUdpCommuncationDirectionConsuming] );
 

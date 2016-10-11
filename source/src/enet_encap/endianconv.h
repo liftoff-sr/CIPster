@@ -21,19 +21,19 @@ enum OpenerEndianess
 
 
 /** @ingroup ENCAP
- *   @brief Reads EIP_UINT8 from *buffer and converts little endian to host.
- *   @param buffer pointer where data should be reed.
- *   @return EIP_UINT8 data value
- */
-EipUint8 GetSintFromMessage( EipUint8** buffer );
-
-/** @ingroup ENCAP
  * Function GetIntFromMessage
  * returns a 16Bit integer from the network buffer, and moves pointer beyond the 16 bit value
  * @param buffer Pointer to the network buffer array. This pointer will be incremented by 2!
  * @return Extracted 16 bit integer value
  */
-EipUint16 GetIntFromMessage( EipUint8** buffer );
+inline EipUint16 GetIntFromMessage( EipUint8** buffer )
+{
+    EipUint8*   p = *buffer;
+    EipUint16   data = p[0] | p[1] << 8;
+
+    *buffer += 2;
+    return data;
+}
 
 /** @ingroup ENCAP
  * Function GetDintFromMessage
@@ -41,7 +41,15 @@ EipUint16 GetIntFromMessage( EipUint8** buffer );
  * @param buffer pointer to the network buffer array. This pointer will be incremented by 4!
  * @return Extracted 32 bit integer value
  */
-EipUint32 GetDintFromMessage( EipUint8** buffer );
+inline EipUint32 GetDintFromMessage( EipUint8** buffer )
+{
+    EipUint8* p = *buffer;
+    EipUint32 data = p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
+
+    *buffer += 4;
+    return data;
+}
+
 
 /** @ingroup ENCAP
  * Function AddSintToMessage

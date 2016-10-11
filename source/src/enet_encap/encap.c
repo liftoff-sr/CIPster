@@ -28,7 +28,9 @@ extern CipTcpIpNetworkInterfaceConfiguration interface_configuration_;
 
 const int kSupportedProtocolVersion = 1;                    //*< Supported Encapsulation protocol version
 
-const int kEncapsulationHeaderOptionsFlag = 0x00;           //*< Mask of which options are supported as of the current CIP specs no other option value as 0 should be supported.
+/// Mask of which options are supported; as of the current CIP specs no other
+/// option value than 0 should be supported.
+const int kEncapsulationHeaderOptionsFlag = 0x00;
 
 const int kEncapsulationHeaderSessionHandlePosition = 4;    //*< the position of the session handle within the encapsulation header
 

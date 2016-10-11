@@ -22,14 +22,6 @@ static CipDword configuration_capability_ = 0x04 | 0x20;   //*< #2  This is a de
 
 static CipDword configuration_control_ = 0;                //*< #3  This is a TCP/IP object attribute. For now it is always zero and is not used for anything.
 
-static CipEpath physical_link_object_ =                    //*< #4
-{
-    2,                               //*< EIP_UINT16 (UINT) PathSize in 16 Bit chunks
-    CIP_ETHERNETLINK_CLASS_CODE,     //*< EIP_UINT16 ClassID
-    1,                               //*< EIP_UINT16 InstanceNr
-    0                                //*< EIP_UINT16 AttributNr (not used as this is the EPATH the EthernetLink object)
-};
-
 
 CipTcpIpNetworkInterfaceConfiguration interface_configuration_ =    //*< #5 IP, network mask, gateway, name server 1 & 2, domain name
 {
@@ -67,6 +59,34 @@ MulticastAddressConfiguration g_multicast_configuration =
 };
 
 //************* Functions ***************************************
+
+static EipStatus get_attr_4( CipAttribute* attribute,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response )
+{
+    EipStatus status = kEipStatusOkSend;
+    EipByte* message = response->data;
+
+    response->data_length = 0;
+    response->reply_service = 0x80 | request->service;
+
+    response->general_status = kCipErrorSuccess;
+    response->size_of_additional_status = 0;
+
+    CipWord instance_seg = (attribute->Instance()->Id() << 8) | kLogicalSegmentTypeInstanceId;
+
+    CipWord epath[3] = {
+        2,
+        (CIP_ETHERNETLINK_CLASS_CODE << 8) | kLogicalSegmentTypeClassId,  // ClassID
+        instance_seg,
+    };
+
+    response->data_length += EncodeData( kCipUint, epath + 0, &message );
+    response->data_length += EncodeData( kCipUint, epath + 1, &message );
+    response->data_length += EncodeData( kCipUint, epath + 2, &message );
+
+    return status;
+}
 
 
 // Attribute 9 can not be easily handled with the default mechanism
@@ -120,53 +140,6 @@ static EipStatus get_attr_7( CipAttribute* attribute,
 
     return kEipStatusOkSend;
 }
-
-
-#if 0
-EipStatus GetAttributeAllTcpIpInterface( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response )
-{
-    EipUint8*   start = response->data;       // snapshot initial
-    EipUint32   get_mask = instance->owning_class->get_attribute_all_mask;
-
-    const CipInstance::CipAttributes& attributes = instance->Attributes();
-
-    for( CipInstance::CipAttributes::const_iterator it = attributes.begin();
-            it != attributes.end(); ++it )
-    {
-        int attribute_id = (*it)->Id();
-
-        // only return attributes that are flagged as being part of GetAttributeAll
-        if( attribute_id < 32 && (get_mask & (1 << attribute_id)) )
-        {
-            request->request_path.attribute_number = attribute_id;
-
-            if( 8 == attribute_id )
-            {
-                // insert 6 zeros for the required empty safety network number
-                // according to Table 5-3.10
-                memset( response->data, 0, 6 );
-                response->data += 6;
-            }
-
-            if( kEipStatusOkSend != GetAttributeSingleTcpIpInterface(
-                    instance, request, response ) )
-            {
-                response->data = start;
-                return kEipStatusError;
-            }
-
-            response->data += response->data_length;
-        }
-    }
-
-    response->data_length = response->data - start;
-    response->data = start;
-
-    return kEipStatusOkSend;
-}
-#endif
 
 
 EipStatus ConfigureNetworkInterface( const char* ip_address,
@@ -253,7 +226,7 @@ static CipInstance* createTcpIpInterfaceInstance()
 
     i->AttributeInsert( 3, kCipDword, kGetableSingleAndAll, &configuration_control_ );
 
-    i->AttributeInsert( 4, kCipEpath, kGetableSingleAndAll, &physical_link_object_ );
+    i->AttributeInsert( 4, kCipAny, kGetableSingleAndAll, get_attr_4, NULL );
 
     i->AttributeInsert( 5, kCipUdintUdintUdintUdintUdintString, kGetableSingleAndAll, &interface_configuration_ );
 

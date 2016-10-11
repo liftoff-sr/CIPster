@@ -68,15 +68,4 @@ EipStatus GetAttributeAll( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response );
 
-/**
- * Function DecodePaddedEPath
- * decodes a padded EPath
- *
- *  @param epath EPath to the receiving element
- *  @param message CIP Message to decode
- *  @return Number of decoded bytes
- */
-int DecodePaddedEPath( CipEpath* epath, EipUint8** message );
-
-
 #endif    // CIPSTER_CIPCOMMON_H_

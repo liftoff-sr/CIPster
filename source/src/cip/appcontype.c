@@ -3,10 +3,13 @@
  * All rights reserved.
  *
  ******************************************************************************/
+
+
+#include <string.h>
+
 #include "appcontype.h"
 #include "cipconnectionmanager.h"
 #include "opener_api.h"
-#include <string.h>
 
 
 

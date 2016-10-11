@@ -21,36 +21,6 @@ OpenerEndianess g_opener_platform_endianess = kOpenerEndianessUnknown;
 
 // THESE ROUTINES MODIFY THE BUFFER POINTER
 
-EipUint8 GetSintFromMessage( EipUint8** buffer )
-{
-    unsigned char* p = (unsigned char*) *buffer;
-    EipUint8 data = p[0];
-
-    *buffer += 1;
-    return data;
-}
-
-
-EipUint16 GetIntFromMessage( EipUint8** buffer )
-{
-    unsigned char* p = (unsigned char*) *buffer;
-    EipUint16 data = p[0] | p[1] << 8;
-
-    *buffer += 2;
-    return data;
-}
-
-
-EipUint32 GetDintFromMessage( EipUint8** buffer )
-{
-    unsigned char* p = (unsigned char*) *buffer;
-    EipUint32 data = p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
-
-    *buffer += 4;
-    return data;
-}
-
-
 int AddSintToMessage( EipUint8 data, EipUint8** buffer )
 {
     unsigned char* p = (unsigned char*) *buffer;

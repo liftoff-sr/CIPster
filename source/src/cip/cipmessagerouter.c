@@ -167,13 +167,15 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
     else
     {
         // Forward request to appropriate Object if it is registered.
-        CipClass*   clazz = GetCipClass( g_request.request_path.class_id );
+        CipClass*   clazz = GetCipClass( g_request.request_path.GetClass() );
 
         if( !clazz )
         {
             CIPSTER_TRACE_ERR(
-                    "notifyMR: sending CIP_ERROR_OBJECT_DOES_NOT_EXIST reply, class id 0x%x is not registered\n",
-                    (unsigned) g_request.request_path.class_id );
+                "%s: CIP_ERROR_OBJECT_DOES_NOT_EXIST reply, class:0x%02x not registered\n",
+                __func__,
+                g_request.request_path.GetClass()
+                );
 
             // According to the test tool this should be the correct error flag
             // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
@@ -224,19 +226,23 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
 
 CipError CipMessageRouterRequest::InitRequest( EipUint8* aRequest, EipInt16 aCount )
 {
+    EipUint8* start = aRequest;
+
     service = *aRequest++;
 
-    --aCount;
+    int byte_count = *aRequest++ * 2;
 
-    int number_of_decoded_bytes = DecodePaddedEPath( &request_path, &aRequest );
+    int result = request_path.DeserializePadded( aRequest, aRequest + byte_count );
 
-    if( number_of_decoded_bytes < 0 )
+    if( result < 0 )
     {
         return kCipErrorPathSegmentError;
     }
 
+    aRequest += result;
     data = aRequest;
-    data_length = aCount - number_of_decoded_bytes;
+
+    data_length = aCount - (aRequest - start);
 
     if( data_length < 0 )
         return kCipErrorPathSizeInvalid;

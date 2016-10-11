@@ -564,7 +564,7 @@ EipStatus HandleDataOnTcpSocket( int socket )
         if( remaining_bytes != 0 )
         {
             CIPSTER_TRACE_WARN(
-                    "%s: received packet was to long: %d Bytes left!\n",
+                    "%s: received packet was too long: %d Bytes left!\n",
                     __func__, remaining_bytes );
         }
 

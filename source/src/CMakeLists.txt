@@ -7,6 +7,7 @@ set( CIP_SRCS
     cip/cipclass3connection.c
     cip/cipcommon.c
     cip/cipconnectionmanager.c
+    cip/cipepath.c
     cip/cipethernetlink.c
     cip/cipidentity.c
     cip/cipioconnection.c
