@@ -151,17 +151,41 @@ public:
         pbits |= 1 << CONN_PT;
     }
 
-    bool HasClass() const;
-    bool HasInstance() const;
-    bool HasAttribute() const;
-    bool HasConnPt() const;
+    bool HasClass() const               { return pbits & (1<<CLASS); }
+    bool HasInstance() const            { return pbits & (1<<INSTANCE); }
+    bool HasAttribute() const           { return pbits & (1<<ATTRIBUTE); }
+    bool HasConnPt() const              { return pbits & (1<<CONN_PT); }
 
-    int GetClass() const;
-    int GetInstance() const;
-    int GetAttribute() const;
-    int GetConnPt() const;
+
+    // Do not call these without first either Set()ing them or DeserializePadded() first.
+
+    int GetClass() const
+    {
+        CIPSTER_ASSERT( HasClass() );
+        return stuff[CLASS];
+    }
+
+    int GetInstance() const
+    {
+        CIPSTER_ASSERT( HasInstance() );
+        return stuff[INSTANCE];
+    }
+
+    int GetAttribute() const
+    {
+        CIPSTER_ASSERT( HasAttribute() );
+        return stuff[ATTRIBUTE];
+    }
+
+    int GetConnPt() const
+    {
+        CIPSTER_ASSERT( HasConnPt() );
+        return stuff[CONN_PT];
+    }
 
 private:
+
+    void inherit( int aStart );
 
     CipAppPath*    hierarchical_parent;
 
@@ -175,11 +199,6 @@ private:
     };
 
     int     stuff[STUFF_COUNT];
-
-    bool hasClass() const               { return pbits & (1<<CLASS); }
-    bool hasInstance() const            { return pbits & (1<<INSTANCE); }
-    bool hasAttribute() const           { return pbits & (1<<ATTRIBUTE); }
-    bool hasConnPt() const              { return pbits & (1<<CONN_PT); }
 };
 
 

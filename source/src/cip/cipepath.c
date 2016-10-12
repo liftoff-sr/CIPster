@@ -9,100 +9,6 @@
 #include "endianconv.h"
 
 
-bool CipAppPath::HasClass() const
-{
-    // test the local object for the field, if it is not present, then ask for
-    // it in hierarchical_parent if present.
-    return hasClass() || (hierarchical_parent && hierarchical_parent->HasClass());
-}
-
-
-bool CipAppPath::HasInstance() const
-{
-    return hasInstance() || (hierarchical_parent && hierarchical_parent->HasInstance());
-}
-
-
-bool CipAppPath::HasAttribute() const
-{
-    return hasAttribute() || (hierarchical_parent && hierarchical_parent->HasAttribute());
-}
-
-
-bool CipAppPath::HasConnPt() const
-{
-    return hasConnPt() || (hierarchical_parent && hierarchical_parent->HasConnPt());
-}
-
-
-int CipAppPath::GetClass() const
-{
-    // Caller has a bug? Don't call Get*() without calling Has*() first.
-    CIPSTER_ASSERT( HasClass() );
-
-    if( hasClass() )
-        return stuff[CLASS];
-    else if( hierarchical_parent )
-        return hierarchical_parent->GetClass();
-    else
-    {
-        CIPSTER_TRACE_INFO( "%s called without prior HasClass() verification.\n", __func__ );
-        return 0;
-    }
-}
-
-
-int CipAppPath::GetInstance() const
-{
-    // Caller has a bug? Don't call Get*() without calling Has*() first.
-    CIPSTER_ASSERT( HasInstance() );
-
-    if( hasInstance() )
-        return stuff[INSTANCE];
-    else if( hierarchical_parent )
-        return hierarchical_parent->GetInstance();
-    else
-    {
-        CIPSTER_TRACE_INFO( "%s called without prior HasInstance() verification.\n", __func__ );
-        return 0;
-    }
-}
-
-
-int CipAppPath::GetAttribute() const
-{
-    // Caller has a bug? Don't call Get*() without calling Has*() first.
-    CIPSTER_ASSERT( HasAttribute() );
-
-    if( hasAttribute() )
-        return stuff[ATTRIBUTE];
-    else if( hierarchical_parent )
-        return hierarchical_parent->GetAttribute();
-    else
-    {
-        CIPSTER_TRACE_INFO( "%s called without prior HasAttribute() verification.\n", __func__ );
-        return 0;
-    }
-}
-
-
-int CipAppPath::GetConnPt() const
-{
-    // Caller has a bug? Don't call Get*() without calling Has*() first.
-    CIPSTER_ASSERT( HasConnPt() );
-
-    if( hasConnPt() )
-        return stuff[CONN_PT];
-    else if( hierarchical_parent )
-        return hierarchical_parent->GetConnPt();
-    else
-    {
-        CIPSTER_TRACE_INFO( "%s called without prior HasConnPoint() verification.\n", __func__ );
-        return 0;
-    }
-}
-
-
 int CipAppPath::SerializePadded( EipByte* aDst, EipByte* aLimit )
 {
     EipByte*   p = aDst;
@@ -184,7 +90,6 @@ int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
     EipByte*    p = aSrc;
     Stuff       last_member = STUFF_COUNT;      // exit loop when higher member
                                                 // is seen, C-1.6 of Vol1_3.19
-
     Clear();
 
     while( p < aLimit )
@@ -244,9 +149,28 @@ int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
     }
 
 exit:
-    int ret = p - aSrc;
 
-    return ret;
+    int byte_count = p - aSrc;
+
+    if( byte_count && hierarchical_parent )
+        inherit( last_member + 1 );
+
+    return byte_count;
+}
+
+
+void CipAppPath::inherit( int aStart )
+{
+    CIPSTER_ASSERT( hierarchical_parent );
+
+    for( int i=aStart;  i < STUFF_COUNT;  ++i )
+    {
+        if( !( pbits & (1<<i) ) && ( hierarchical_parent->pbits & (1<<i) ) )
+        {
+            stuff[i] = hierarchical_parent->stuff[i];
+            pbits |= (1<<i);
+        }
+    }
 }
 
 

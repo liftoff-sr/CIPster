@@ -296,7 +296,7 @@ static EipUint8 parseConnectionPath( CipConn* conn,
 
     CipSimpleDataSegment    data_seg;
 
-    // there can be 1-3 application paths in a connection path
+    // There can be 1-3 application_paths in a connection_path
     if( message < limit )
     {
         result = app_path1.DeserializePadded( message, limit );
@@ -310,7 +310,6 @@ static EipUint8 parseConnectionPath( CipConn* conn,
         message += result;
     }
 
-    // there can be 2 application paths in a connection path
     if( message < limit )
     {
         result = app_path2.DeserializePadded( message, limit );

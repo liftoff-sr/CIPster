@@ -143,39 +143,35 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
 
 /**
  * @brief Creates Common Packet Format structure out of data.
- * @param data Pointer to data which need to be structured.
+ * @param aSrc data which needs to be structured.
  * @param data_length	Length of data in pa_Data.
  * @param common_packet_format_data	Pointer to structure of CPF data item.
  *
  *   @return kEipStatusOk .. success
  *         kEipStatusError .. error
  */
-EipStatus CipCommonPacketFormatData::Init( EipUint8* data, int data_length )
+EipStatus CipCommonPacketFormatData::Init( EipByte* aSrc, int data_length )
 {
+    EipByte*    data = aSrc;
+
     address_info_item[0].type_id = 0;
     address_info_item[1].type_id = 0;
 
-    int length_count = 0;
-
     item_count = GetIntFromMessage( &data );
-    length_count += 2;
 
     if( item_count >= 1 )
     {
         address_item.type_id = GetIntFromMessage( &data );
         address_item.length  = GetIntFromMessage( &data );
-        length_count += 4;
 
         if( address_item.length >= 4 )
         {
             address_item.data.connection_identifier = GetDintFromMessage( &data );
-            length_count += 4;
         }
 
         if( address_item.length == 8 )
         {
             address_item.data.sequence_number = GetDintFromMessage( &data );
-            length_count += 4;
         }
     }
 
@@ -185,13 +181,11 @@ EipStatus CipCommonPacketFormatData::Init( EipUint8* data, int data_length )
         data_item.length     = GetIntFromMessage( &data );
         data_item.data = data;
         data += data_item.length;
-        length_count += 4 + data_item.length;
     }
 
     for( int j = 0; j < item_count - 2; j++ )   // TODO there needs to be a limit check here???
     {
         address_info_item[j].type_id = GetIntFromMessage( &data );
-        length_count += 2;
 
         if( address_info_item[j].type_id == kCipItemIdSocketAddressInfoOriginatorToTarget ||
             address_info_item[j].type_id == kCipItemIdSocketAddressInfoTargetToOriginator )
@@ -206,8 +200,6 @@ EipStatus CipCommonPacketFormatData::Init( EipUint8* data, int data_length )
             {
                 address_info_item[j].nasin_zero[i] = *data++;
             }
-
-            length_count += 18;
         }
         else // no sockaddr item found
         {
@@ -227,14 +219,16 @@ EipStatus CipCommonPacketFormatData::Init( EipUint8* data, int data_length )
         }
     }
 
-    if( length_count == data_length ) // length of data is equal to length of Addr and length of Data
+    int byte_count = data - aSrc;
+
+    if( byte_count == data_length ) // length of data is equal to length of Addr and length of Data
     {
         return kEipStatusOk;
     }
     else
     {
         CIPSTER_TRACE_WARN(
-                "something is wrong with the length in Message Router @ CreateCommonPacketFormatStructure\n" );
+                "%s: something is wrong with the length in Message Router\n", __func__ );
 
         if( item_count > 2 )
         {
