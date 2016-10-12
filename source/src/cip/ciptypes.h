@@ -111,8 +111,6 @@ enum CipDataType
     kCip6Usint = 0xA2,                          ///< Struct for MAC Address (six USINTs)
     kCipMemberList  = 0xA3,                     ///<
     kCipByteArray   = 0xA4,                     ///<
-    kInternalUint6  = 0xF0                      /**< bogus hack, for port class attribute 9, TODO
-                                                 *  figure out the right way to handle it */
 };
 
 

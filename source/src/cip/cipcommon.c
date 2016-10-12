@@ -834,7 +834,7 @@ EipStatus SetAttributeSingle( CipInstance* instance,
 
 int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
 {
-    int counter = 0;
+    EipByte*    p = *message;
 
     switch( cip_type )
     // check the data type of attribute
@@ -843,24 +843,20 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipSint:
     case kCipUsint:
     case kCipByte:
-        **message = *(EipUint8*) data;
-        ++(*message);
-        counter = 1;
+        *p++ = *(EipUint8*) data;
         break;
 
     case kCipInt:
     case kCipUint:
     case kCipWord:
-        AddIntToMessage( *(EipUint16*) data, message );
-        counter = 2;
+        AddIntToMessage( *(EipUint16*) data, &p );
         break;
 
     case kCipDint:
     case kCipUdint:
     case kCipDword:
     case kCipReal:
-        AddDintToMessage( *(EipUint32*) data, message );
-        counter = 4;
+        AddDintToMessage( *(EipUint32*) data, &p );
         break;
 
 #ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
@@ -868,8 +864,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipUlint:
     case kCipLword:
     case kCipLreal:
-        AddLintToMessage( *(EipUint64*) data, message );
-        counter = 8;
+        AddLintToMessage( *(EipUint64*) data, &p );
         break;
 #endif
 
@@ -883,18 +878,13 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         {
             CipString* string = (CipString*) data;
 
-            AddIntToMessage( *(EipUint16*) &string->length, message );
-            memcpy( *message, string->string, string->length );
-            *message += string->length;
+            AddIntToMessage( *(EipUint16*) &string->length, &p );
+            memcpy( p, string->string, string->length );
+            p += string->length;
 
-            counter = string->length + 2; // we have a two byte length field
-
-            if( counter & 1 )
+            if( (p - *message) & 1 )
             {
-                // we have an odd byte count
-                **message = 0;
-                ++(*message);
-                counter++;
+                *p++ = 0;       // pad to even byte count
             }
         }
         break;
@@ -910,13 +900,10 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         {
             CipShortString* short_string = (CipShortString*) data;
 
-            **message = short_string->length;
-            ++(*message);
+            *p++ = short_string->length;
 
-            memcpy( *message, short_string->string, short_string->length );
-            *message += short_string->length;
-
-            counter = short_string->length + 1;
+            memcpy( p, short_string->string, short_string->length );
+            p += short_string->length;
         }
         break;
 
@@ -930,11 +917,8 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         {
             CipRevision* revision = (CipRevision*) data;
 
-            **message = revision->major_revision;
-            ++(*message);
-            **message = revision->minor_revision;
-            ++(*message);
-            counter = 2;
+            *p++ = revision->major_revision;
+            *p++ = revision->minor_revision;
         }
         break;
 
@@ -944,28 +928,24 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
             CipTcpIpNetworkInterfaceConfiguration* tcp_ip_network_interface_configuration =
                 (CipTcpIpNetworkInterfaceConfiguration*) data;
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->ip_address ), message );
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->ip_address ), &p );
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->network_mask ), message );
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->network_mask ), &p );
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->gateway ), message );
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->gateway ), &p );
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->name_server ), message );
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->name_server ), &p );
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->name_server_2 ), message );
+            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->name_server_2 ), &p );
 
-            counter = 20;
-
-            counter += EncodeData( kCipString, &tcp_ip_network_interface_configuration->domain_name,
-                                message );
+            p += EncodeData( kCipString, &tcp_ip_network_interface_configuration->domain_name, &p );
         }
         break;
 
     case kCip6Usint:
         {
-            EipUint8* p = (EipUint8*) data;
-            memcpy( *message, p, 6 );
-            counter = 6;
+            memcpy( p, data, 6 );
+            p += 6;
         }
         break;
 
@@ -978,23 +958,8 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
             CipByteArray* cip_byte_array = (CipByteArray*) data;
 
             // the array length is not encoded for CipByteArray.
-            memcpy( *message, cip_byte_array->data, cip_byte_array->length );
-            *message += cip_byte_array->length;
-            counter = cip_byte_array->length;
-        }
-        break;
-
-    case kInternalUint6:    // TODO for port class attribute 9, hopefully we can find a better way to do this
-        {
-            EipUint16* internal_uint16_6 = (EipUint16*) data;
-
-            AddIntToMessage( internal_uint16_6[0], message );
-            AddIntToMessage( internal_uint16_6[1], message );
-            AddIntToMessage( internal_uint16_6[2], message );
-            AddIntToMessage( internal_uint16_6[3], message );
-            AddIntToMessage( internal_uint16_6[4], message );
-            AddIntToMessage( internal_uint16_6[5], message );
-            counter = 12;
+            memcpy( p, cip_byte_array->data, cip_byte_array->length );
+            p += cip_byte_array->length;
         }
         break;
 
@@ -1002,13 +967,17 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         break;
     }
 
-    return counter;
+    int byte_count = p - *message;
+
+    *message += byte_count;
+
+    return byte_count;
 }
 
 
 int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
 {
-    int decode_byte_count = -1;
+    EipByte* p = *message;
 
     // check the data type of attribute
     switch( cip_type )
@@ -1017,33 +986,26 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipSint:
     case kCipUsint:
     case kCipByte:
-        *(EipUint8*) data = **message;
-        ++(*message);
-        decode_byte_count = 1;
+        *(EipUint8*) data = *p++;
         break;
 
     case kCipInt:
     case kCipUint:
     case kCipWord:
-        *(EipUint16*) data = GetIntFromMessage( message );
-        decode_byte_count = 2;
+        *(EipUint16*) data = GetIntFromMessage( &p );
         break;
 
     case kCipDint:
     case kCipUdint:
     case kCipDword:
-        *(EipUint32*) data = GetDintFromMessage( message );
-        decode_byte_count = 4;
+        *(EipUint32*) data = GetDintFromMessage( &p );
         break;
 
 #ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
     case kCipLint:
     case kCipUlint:
     case kCipLword:
-        {
-            *(EipUint64*) data = GetLintFromMessage( message );
-            decode_byte_count = 8;
-        }
+        *(EipUint64*) data = GetLintFromMessage( &p );
         break;
 #endif
 
@@ -1056,26 +1018,20 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
             // in advance and set in advance by caller.  And the data field
             // must point to a buffer large enough for this.
             CipByteArray* byte_array = (CipByteArray*) data;
-            memcpy( byte_array->data, *message, byte_array->length );
-            decode_byte_count = byte_array->length;   // no length field
+            memcpy( byte_array->data, p, byte_array->length );
+            p += byte_array->length;   // no length field
         }
         break;
 
     case kCipString:
         {
             CipString* string = (CipString*) data;
-            string->length = GetIntFromMessage( message );
-            memcpy( string->string, *message, string->length );
-            *message += string->length;
+            string->length = GetIntFromMessage( &p );
+            memcpy( string->string, p, string->length );
+            p += string->length;
 
-            decode_byte_count = string->length + 2; // 2 byte length field
-
-            if( decode_byte_count & 1 )
-            {
-                // we have an odd byte count
-                ++(*message);
-                decode_byte_count++;
-            }
+            if( (p - *message) & 1 )
+                *p++ = 0;   // pad to even byte count
         }
         break;
 
@@ -1083,21 +1039,22 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
         {
             CipShortString* short_string = (CipShortString*) data;
 
-            short_string->length = **message;
-            ++(*message);
+            short_string->length = *p++;
 
-            memcpy( short_string->string, *message, short_string->length );
-            *message += short_string->length;
-
-            decode_byte_count = short_string->length + 1;
+            memcpy( short_string->string, p, short_string->length );
+            p += short_string->length;
         }
         break;
 
     default:
-        break;
+        return -1;
     }
 
-    return decode_byte_count;
+    int byte_count = p - *message;
+
+    *message += byte_count;
+
+    return byte_count;
 }
 
 

@@ -73,17 +73,18 @@ static EipStatus get_attr_4( CipAttribute* attribute,
     response->general_status = kCipErrorSuccess;
     response->size_of_additional_status = 0;
 
-    CipWord instance_seg = (attribute->Instance()->Id() << 8) | kLogicalSegmentTypeInstanceId;
+    CipAppPath app_path;
 
-    CipWord epath[3] = {
-        2,
-        (CIP_ETHERNETLINK_CLASS_CODE << 8) | kLogicalSegmentTypeClassId,  // ClassID
-        instance_seg,
-    };
+    app_path.SetClass( CIP_ETHERNETLINK_CLASS_CODE );
+    app_path.SetInstance( attribute->Instance()->Id() );
 
-    response->data_length += EncodeData( kCipUint, epath + 0, &message );
-    response->data_length += EncodeData( kCipUint, epath + 1, &message );
-    response->data_length += EncodeData( kCipUint, epath + 2, &message );
+    int result = app_path.SerializePadded( message+2, message+2+12 );
+
+    AddIntToMessage( result/2, &message );  // word count as 16 bits
+
+    message += result;
+
+    response->data_length += message - response->data;
 
     return status;
 }
@@ -135,6 +136,26 @@ static EipStatus get_attr_7( CipAttribute* attribute,
     // according to Table 5-4.15
     memset( response->data, 0, 6 );
     response->data_length += 6;
+
+    response->general_status = kCipErrorSuccess;
+
+    return kEipStatusOkSend;
+}
+
+
+static EipStatus set_attr_13( CipAttribute* attribute,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response )
+{
+    response->general_status = kCipErrorSuccess;
+
+    int instance_id = attribute->Instance()->Id();
+
+    EipByte* p = request->data;
+
+    int inactivity_timeout = GetIntFromMessage( &p );
+
+    //TODO put it in the instance
 
     response->general_status = kCipErrorSuccess;
 
@@ -239,6 +260,8 @@ static CipInstance* createTcpIpInterfaceInstance()
     i->AttributeInsert( 8, kCipUsint, kSetAndGetAble, &g_time_to_live_value );
 
     i->AttributeInsert( 9, kCipAny, kGetableSingleAndAll, get_multicast_config, NULL, &g_multicast_configuration );
+
+    i->AttributeInsert( 13, kCipAny, kSetable, NULL, set_attr_13 );
 
     clazz->InstanceInsert( i );
 

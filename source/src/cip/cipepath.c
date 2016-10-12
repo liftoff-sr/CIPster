@@ -322,8 +322,6 @@ int CipPortSegmentGroup::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
 
             case 0x43:
                 ++p;
-
-                // convert milliseconds to microseconds
                 pit_msecs = *p++;
                 pbits |= (1<<PIT_MSECS);
                 break;
@@ -346,8 +344,8 @@ int CipPortSegmentGroup::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
                 }
                 else
                 {
-                    CIPSTER_TRACE_ERR( "%s: unknown electronic key format: %d\n", __func__, key_format );
-                    p += num_words * 2;
+                    CIPSTER_TRACE_ERR( "%s: unknown PIT_USECS format: %d\n", __func__, num_words );
+                    return aSrc - (p - 1);    // return negative byte offset of error
                 }
                 break;
 
@@ -358,7 +356,6 @@ int CipPortSegmentGroup::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
     }
 
 exit:
-
     return p - aSrc;
 }
 
