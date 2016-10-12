@@ -117,9 +117,7 @@ EipStatus NotifyClass( CipClass* cip_class,
     {
         CIPSTER_TRACE_WARN( "%s: no instance specified\n", __func__ );
 
-        // If instance not found, return an error reply.
-        // According to the test tool this should be the correct error flag
-        // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
+        // instance_id was not in the request
         response->general_status = kCipErrorPathDestinationUnknown;
 
         goto exit;
@@ -247,7 +245,6 @@ EipStatus SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, Cip
     response->size_of_additional_status = 0;
     response->reply_service = 0x80 | request->service;
 
-#if 1
     EipByte* message = request->data;
 
     int out_count = DecodeData( attr->type, attr->data, &message );
@@ -264,15 +261,6 @@ EipStatus SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, Cip
     }
     else
         return kEipStatusError;
-
-#else
-
-    response->general_status = kCipErrorAttributeNotSetable;
-
-    response->data_length = 0;
-    return kEipStatusOkSend;
-
-#endif
 }
 
 
@@ -507,7 +495,7 @@ CipClass::CipClass(
     get_attribute_all_mask( a_get_all_class_attributes_mask )
 {
     /*
-        A metaClass is a class that holds the class attributes and services.
+        A metaClass is a class that holds the class services.
         CIP can talk to an instance, therefore an instance has a pointer to
         its class. CIP can talk to a class, therefore a class struct is a
         subclass of the instance struct, and contains a pointer to a
@@ -551,7 +539,7 @@ CipClass::~CipClass()
     while( services.size() )
     {
 #if 0
-        if( class_name == "TCP/IP interface" )
+        if( class_name == "TCP/IP Interface" )
         {
             ShowServices();
         }
@@ -584,7 +572,9 @@ bool CipClass::InstanceInsert( CipInstance* aInstance )
 {
     if( aInstance->owning_class )
     {
-        CIPSTER_TRACE_ERR( "%s: aInstance id:%d is already owned\n", __func__, aInstance->Id() );
+        CIPSTER_TRACE_ERR( "%s: aInstance id:%d is already owned\n",
+            __func__, aInstance->Id() );
+
         return false;
     }
 

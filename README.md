@@ -1,4 +1,9 @@
-# CIPster Version 1.0
+# CIPster Ethernet/IP Stack in C++
+
+## Developer's Mailing List:
+
+Colaborative discussion is here: https://www.freelists.org/list/cipster
+
 
 ## Welcome to CIPster!
 
@@ -19,7 +24,6 @@ project does not require copyright assignment, so the resulting code is under
 a license to its licensees, and the licensors are its multiple contributors.
 Should a question about ownership arise, the git version control system has a
 full record of who did what.
-
 
 ## Requirements:
 
