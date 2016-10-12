@@ -16,6 +16,7 @@
 #include "ciptcpipinterface.h"
 #include "cipethernetlink.h"
 #include "cipconnectionmanager.h"
+#include "cipconnection.h"
 #include "endianconv.h"
 #include "encap.h"
 #include "ciperror.h"
@@ -75,6 +76,9 @@ void CipStackInit( EipUint16 unique_connection_id )
     CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
     eip_status = ConnectionManagerInit( unique_connection_id );
+    CIPSTER_ASSERT( kEipStatusOk == eip_status );
+
+    eip_status = ConnectionClassInit();
     CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
     eip_status = CipAssemblyInitialize();
@@ -549,6 +553,23 @@ CipClass::~CipClass()
 
         services.erase( services.begin() );
     }
+}
+
+
+int CipClass::find_unique_free_id() const
+{
+    int last_id = 0;
+
+    for( CipInstances::const_iterator it = instances.begin(); it != instances.end(); ++it )
+    {
+        // Is there a gap here?
+        if( (*it)->Id() > last_id + 1 )
+            break;
+
+        last_id = (*it)->Id();
+    }
+
+    return last_id + 1;
 }
 
 

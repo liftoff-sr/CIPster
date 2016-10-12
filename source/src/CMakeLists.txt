@@ -6,11 +6,11 @@ set( CIP_SRCS
     cip/cipassembly.c
     cip/cipclass3connection.c
     cip/cipcommon.c
+    cip/cipconnection.c
     cip/cipconnectionmanager.c
     cip/cipepath.c
     cip/cipethernetlink.c
     cip/cipidentity.c
-    cip/cipioconnection.c
     cip/cipmessagerouter.c
     cip/ciptcpipinterface.c
     )

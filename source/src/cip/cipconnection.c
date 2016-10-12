@@ -6,7 +6,7 @@
 
 #include <string.h>
 
-#include "cipioconnection.h"
+#include "cipconnection.h"
 
 #include "cipconnectionmanager.h"
 #include "cipassembly.h"
@@ -38,6 +38,21 @@ CipError OpenProducingPointToPointConnection( CipConn* conn,
 
 EipUint16 HandleConfigData( CipClass* assembly_class,
         CipConn* conn );
+
+
+CipConnectionClass::CipConnectionClass() :
+    CipClass(
+        kConnectionClassId,
+        "Connection",
+        (1<<7)|(1<<6) /* |(1<<5)|(1<<4)|(1<<3)|(1<<2) */ | (1<<1),
+        MASK3( 7, 6, 1 ),           // class getAttributeAll mask
+        0,                          // instance getAttributeAll mask
+        1                           // revision
+        )
+{
+}
+
+
 
 /* Regularly close the IO connection. If it is an exclusive owner or input only
  * connection and in charge of the connection a new owner will be searched
@@ -962,25 +977,24 @@ void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList( CipConn* conn
 }
 
 
-#if 0
-static int find_unique_free_id( const CipClass* aClass )
+EipStatus ConnectionClassInit()
 {
-    CipInstances& instances = aClass->Instances();
-
-    int last_id = 0;
-    for( CipInstance::const_iterator it: instances )
+    if( !GetCipClass( kCipConnectionManagerClassCode ) )
     {
-        // Is there a gap here?
-        if( (*it)->Id() > last_id + 1 )
-            break;
+        CipClass* clazz = new CipConnectionClass();
 
-        last_id = (*it)->Id();
+        RegisterCipClass( clazz );
+
+        // There are no attributes in instance of this class yet, so nothing to set.
+        delete clazz->ServiceRemove( kSetAttributeSingle );
     }
 
-    return last_id + 1;
+    return kEipStatusOk;
 }
 
 
+
+#if 0
 static EipStatus create( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
@@ -994,4 +1008,6 @@ static EipStatus create( CipInstance* instance,
     clazz->InstanceInsert( conn );
 }
 #endif
+
+
 

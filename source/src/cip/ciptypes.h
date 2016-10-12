@@ -657,6 +657,8 @@ protected:
         }
     }
 
+    int find_unique_free_id() const;
+
 private:
     CipClass( CipClass& );                  // private because not implemented
 };

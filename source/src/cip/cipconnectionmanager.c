@@ -17,7 +17,7 @@
 #include "cipidentity.h"
 #include "trace.h"
 #include "cipclass3connection.h"
-#include "cipioconnection.h"
+#include "cipconnection.h"
 #include "cipassembly.h"
 #include "cpf.h"
 #include "appcontype.h"
@@ -1278,7 +1278,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
 
     temp = parseConnectionPath( &s_dummy_conn, request, &connection_status );
 
-    if( kEipStatusOk != temp )
+    if( temp != kEipStatusOk )
     {
         CIPSTER_TRACE_INFO( "%s: unable to parse connection path\n", __func__ );
 
@@ -1303,7 +1303,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         connection_status = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
     }
 
-    if( kEipStatusOk != temp )
+    if( temp != kEipStatusOk )
     {
         CIPSTER_TRACE_INFO( "%s: open_connection_function() failed. ret:%d\n", __func__, temp );
 
@@ -1358,7 +1358,7 @@ static EipStatus forwardClose( CipInstance* instance,
     request->data += 2; // ignore Priority/Time_tick and Time-out_ticks
 
     EipUint16 connection_serial_number = GetIntFromMessage( &request->data );
-    EipUint16 originator_vendor_id = GetIntFromMessage( &request->data );
+    EipUint16 originator_vendor_id     = GetIntFromMessage( &request->data );
     EipUint32 originator_serial_number = GetDintFromMessage( &request->data );
 
     CIPSTER_TRACE_INFO( "ForwardClose: ConnSerNo %d\n", connection_serial_number );
@@ -1371,7 +1371,7 @@ static EipStatus forwardClose( CipInstance* instance,
          || active->state == kConnectionStateTimedOut )
         {
             if( (active->connection_serial_number == connection_serial_number)
-             && (active->originator_vendor_id == originator_vendor_id)
+             && (active->originator_vendor_id     == originator_vendor_id)
              && (active->originator_serial_number == originator_serial_number) )
             {
                 // found the corresponding connection object -> close it
