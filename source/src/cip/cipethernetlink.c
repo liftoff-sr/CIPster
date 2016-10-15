@@ -33,7 +33,7 @@ void ConfigureMacAddress( const EipUint8* mac_address )
 
 static CipInstance* createEthernetLinkInstance()
 {
-    CipClass*   clazz = GetCipClass( CIP_ETHERNETLINK_CLASS_CODE );
+    CipClass*   clazz = GetCipClass( kCipEthernetLinkClassCode );
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
@@ -49,7 +49,7 @@ static CipInstance* createEthernetLinkInstance()
 
 EipStatus CipEthernetLinkInit()
 {
-    if( !GetCipClass( CIP_ETHERNETLINK_CLASS_CODE ) )
+    if( !GetCipClass( kCipEthernetLinkClassCode ) )
     {
         // set attributes to initial values
         g_ethernet_link.interface_speed = 100;
@@ -58,7 +58,7 @@ EipStatus CipEthernetLinkInit()
         // TODO in future it should be checked if link is active
         g_ethernet_link.interface_flags = 0xF;
 
-        CipClass* clazz = new CipClass( CIP_ETHERNETLINK_CLASS_CODE,
+        CipClass* clazz = new CipClass( kCipEthernetLinkClassCode,
               "Ethernet Link",
               (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
               0xffffffff,               // class getAttributeAll mask

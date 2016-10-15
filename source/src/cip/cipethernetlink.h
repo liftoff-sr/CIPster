@@ -9,11 +9,10 @@
 #include "typedefs.h"
 #include "ciptypes.h"
 
-#define CIP_ETHERNETLINK_CLASS_CODE 0xF6
 
 // public functions
 /** @brief Initialize the Ethernet Link Objects data
  */
-EipStatus CipEthernetLinkInit(void);
+EipStatus CipEthernetLinkInit();
 
 #endif // CIPSTER_CIPETHERNETLINK_H_

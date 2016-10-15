@@ -76,10 +76,6 @@ struct CipUnconnectedSendParameter
 };
 
 
-
-//* @brief Connection Manager class code
-static const int kCipConnectionManagerClassCode = 0x06;
-
 // public functions
 
 /** @brief Initialize the data of the connection manager object

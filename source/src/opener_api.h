@@ -94,7 +94,7 @@ void ShutdownCipStack();
  * @return pointer to CIP Object
  *          0 if object is not present in the stack
  */
-CipClass* GetCipClass( EipUint32 class_id );
+CipClass* GetCipClass( int class_id );
 
 
 /** @ingroup CIP_API
@@ -288,12 +288,12 @@ typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* cip_conn,
  *
  * With this function any object can be enabled to be a target for forward
  * open/close request.
- * @param class_id The class ID
+ * @param aClassId The class ID to register
  * @param open_connection_function   pointer to the function handling the open
  * process
  * @return EIP_OK on success
  */
-EipStatus AddConnectableObject( EipUint32 class_id,
+EipStatus AddConnectableClass( int aClassId,
         OpenConnectionFunction open_connection_function );
 
 /** @ingroup CIP_API
@@ -309,10 +309,10 @@ EipStatus AddConnectableObject( EipUint32 class_id,
  * @param configuration_assembly_id ID of the configuration point to be used for
  * this connection
  */
-void ConfigureExclusiveOwnerConnectionPoint( unsigned connection_number,
-        unsigned output_assembly_id,
-        unsigned input_assembly_id,
-        unsigned configuration_assembly_id );
+void ConfigureExclusiveOwnerConnectionPoint( int connection_number,
+        int output_assembly_id,
+        int input_assembly_id,
+        int configuration_assembly_id );
 
 /** @ingroup CIP_API
  * @brief Configures the connection point for an input only connection.
@@ -327,10 +327,10 @@ void ConfigureExclusiveOwnerConnectionPoint( unsigned connection_number,
  * @param configuration_assembly_id ID of the configuration point to be used for
  * this connection
  */
-void ConfigureInputOnlyConnectionPoint( unsigned connection_number,
-        unsigned output_assembly_id,
-        unsigned input_assembly_id,
-        unsigned configuration_assembly_id );
+void ConfigureInputOnlyConnectionPoint( int connection_number,
+        int output_assembly_id,
+        int input_assembly_id,
+        int configuration_assembly_id );
 
 /** \ingroup CIP_API
  * \brief Configures the connection point for a listen only connection.
@@ -345,10 +345,10 @@ void ConfigureInputOnlyConnectionPoint( unsigned connection_number,
  * @param configuration_assembly_id ID of the configuration point to be used for
  * this connection
  */
-void ConfigureListenOnlyConnectionPoint( unsigned connection_number,
-        unsigned output_assembly_id,
-        unsigned input_assembly_id,
-        unsigned configuration_assembly_id );
+void ConfigureListenOnlyConnectionPoint( int connection_number,
+        int output_assembly_id,
+        int input_assembly_id,
+        int configuration_assembly_id );
 
 /** @ingroup CIP_API
  * @brief Notify the encapsulation layer that an explicit message has been

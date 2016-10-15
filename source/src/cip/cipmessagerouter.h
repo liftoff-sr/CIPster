@@ -10,8 +10,6 @@
 #include "ciptypes.h"
 #include "cipepath.h"
 
-static const int kCipMessageRouterClassCode = 0x02;
-
 
 /**
  * Struct CipMessageRouterRequest

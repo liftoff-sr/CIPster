@@ -366,7 +366,7 @@ EipStatus NetworkHandlerProcessOnce()
 
         for( int socket = 0; socket <= highest_socket_handle; socket++ )
         {
-            if( true == CheckSocketSet( socket ) )
+            if( CheckSocketSet( socket ) )
             {
                 // if it is still checked it is a TCP receive
                 if( kEipStatusError == HandleDataOnTcpSocket( socket ) ) // if error
@@ -624,7 +624,7 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
     CIPSTER_TRACE_INFO( "networkhandler: UDP socket %d\n", new_socket );
 
     // check if it is sending or receiving
-    if( communication_direction == kUdpCommuncationDirectionConsuming )
+    if( communication_direction == kUdpConsuming )
     {
         int option_value = 1;
 
@@ -666,7 +666,7 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
         }
     }
 
-    if( (communication_direction == kUdpCommuncationDirectionConsuming)
+    if( (communication_direction == kUdpConsuming)
         || (0 == socket_data->sin_addr.s_addr) )
     {
         // we have a peer to peer producer or a consuming connection
@@ -959,14 +959,12 @@ void CheckAndHandleConsumingUdpSockets()
         */
         iter = iter->next_cip_conn;
 
-        if( (-1 != conn->socket[kUdpCommuncationDirectionConsuming])
-            && ( true == CheckSocketSet(
-                         conn->socket[kUdpCommuncationDirectionConsuming] ) ) )
+        if( -1 != conn->consuming_socket  &&  CheckSocketSet( conn->consuming_socket )  )
         {
             from_address_length = sizeof(from_address);
 
             int received_size = recvfrom(
-                    conn->socket[kUdpCommuncationDirectionConsuming],
+                    conn->consuming_socket,
                     s_packet, sizeof(s_packet), 0,
                     (struct sockaddr*) &from_address, &from_address_length );
 

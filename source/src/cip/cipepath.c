@@ -1,12 +1,71 @@
 /*******************************************************************************
  * Copyright (c) 2016, SoftPLC Corportion.
  *
- * All rights reserved.
  *
  ******************************************************************************/
 
+#include <string.h>
+
+#include "opener_api.h"
 #include "cipepath.h"
 #include "endianconv.h"
+
+
+CipAppPath& CipAppPath::operator = ( const CipAppPath& other )
+{
+    pbits = other.pbits;
+
+    memcpy( stuff, other.stuff, sizeof( stuff ) );
+}
+
+
+bool CipAppPath::operator == ( const CipAppPath& other ) const
+{
+    if( pbits != other.pbits )
+        return false;
+
+    if( HasClass() && stuff[CLASS] != other.stuff[CLASS] )
+        return false;
+
+    if( HasInstance() && stuff[INSTANCE] != other.stuff[INSTANCE] )
+        return false;
+
+    if( HasAttribute() && stuff[ATTRIBUTE] != other.stuff[ATTRIBUTE] )
+        return false;
+
+    if( HasConnPt() && stuff[CONN_PT] != other.stuff[CONN_PT] )
+        return false;
+
+    return true;
+}
+
+
+CipClass* CipAppPath::Class() const
+{
+    return GetCipClass( GetClass() );
+}
+
+
+CipInstance* CipAppPath::Instance() const
+{
+    CipClass* clazz = GetCipClass( GetClass() );
+    if( clazz )
+    {
+        return clazz->Instance( GetInstanceOrConnPt() );
+    }
+    return NULL;
+}
+
+
+CipAttribute* CipAppPath::Attribute( int aAttrId ) const
+{
+    CipInstance* instance = Instance();
+    if( instance )
+    {
+        return instance->Attribute( aAttrId );
+    }
+    return NULL;
+}
 
 
 int CipAppPath::SerializePadded( EipByte* aDst, EipByte* aLimit )
@@ -85,7 +144,7 @@ int CipAppPath::SerializePadded( EipByte* aDst, EipByte* aLimit )
 }
 
 
-int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
+int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* aPreviousToInheritFrom )
 {
     EipByte*    p = aSrc;
     Stuff       last_member = STUFF_COUNT;      // exit loop when higher member
@@ -152,22 +211,22 @@ exit:
 
     int byte_count = p - aSrc;
 
-    if( byte_count && hierarchical_parent )
-        inherit( last_member + 1 );
+    if( byte_count && aPreviousToInheritFrom )
+        inherit( last_member + 1, aPreviousToInheritFrom );
 
     return byte_count;
 }
 
 
-void CipAppPath::inherit( int aStart )
+void CipAppPath::inherit( int aStart, CipAppPath* aPreviousToInheritFrom )
 {
-    CIPSTER_ASSERT( hierarchical_parent );
+    CIPSTER_ASSERT( aPreviousToInheritFrom );
 
     for( int i=aStart;  i < STUFF_COUNT;  ++i )
     {
-        if( !( pbits & (1<<i) ) && ( hierarchical_parent->pbits & (1<<i) ) )
+        if( !( pbits & (1<<i) ) && ( aPreviousToInheritFrom->pbits & (1<<i) ) )
         {
-            stuff[i] = hierarchical_parent->stuff[i];
+            stuff[i] = aPreviousToInheritFrom->stuff[i];
             pbits |= (1<<i);
         }
     }

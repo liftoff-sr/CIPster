@@ -94,8 +94,7 @@ public:
 class CipAppPath : public SegmentGroup
 {
 public:
-    CipAppPath( CipAppPath* aHierarchicalParent = NULL ) :
-        hierarchical_parent( aHierarchicalParent )
+    CipAppPath()
     {
     }
 
@@ -115,7 +114,7 @@ public:
      *  available input bytes may not have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
      */
-    int DeserializePadded( EipByte* aSrc, EipByte* aLimit );
+    int DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* aPreviousToInheritFrom = NULL );
 
     /**
      * Function SerializePadded
@@ -156,38 +155,61 @@ public:
     bool HasAttribute() const           { return pbits & (1<<ATTRIBUTE); }
     bool HasConnPt() const              { return pbits & (1<<CONN_PT); }
 
+    bool IsSufficient() const
+    {
+        if( GetClass() == kCipAssemblyClassCode )
+            return HasClass() && (HasInstance() || HasConnPt());
+        else
+            return HasClass() && HasInstance();
+    }
 
     // Do not call these without first either Set()ing them or DeserializePadded() first.
 
     int GetClass() const
     {
-        CIPSTER_ASSERT( HasClass() );
-        return stuff[CLASS];
+        return HasClass() ? stuff[CLASS] : 0;
     }
 
     int GetInstance() const
     {
-        CIPSTER_ASSERT( HasInstance() );
-        return stuff[INSTANCE];
+        return HasInstance() ? stuff[INSTANCE] : 0;
     }
 
     int GetAttribute() const
     {
-        CIPSTER_ASSERT( HasAttribute() );
-        return stuff[ATTRIBUTE];
+        return HasAttribute() ? stuff[ATTRIBUTE] : 0;
     }
 
     int GetConnPt() const
     {
-        CIPSTER_ASSERT( HasConnPt() );
-        return stuff[CONN_PT];
+        return HasConnPt() ? stuff[CONN_PT] : 0;
     }
+
+    /// Hide the ugli-ness pertaining to the Assembly class app_path
+    int GetInstanceOrConnPt() const
+    {
+        if( GetClass() == kCipAssemblyClassCode )
+        {
+            return HasInstance() ? GetInstance() : GetConnPt();
+        }
+        else
+            return GetInstance();
+    }
+
+    CipClass* Class() const;
+
+    CipInstance* Instance() const;
+
+    CipAttribute* Attribute( int aAttrId ) const;
+
+    bool operator == ( const CipAppPath& other ) const;
+
+    CipAppPath& operator = ( const CipAppPath& other );
+
 
 private:
 
-    void inherit( int aStart );
-
-    CipAppPath*    hierarchical_parent;
+    void inherit( int aStart, CipAppPath* from );
 
     enum Stuff
     {

@@ -26,15 +26,15 @@ EipStatus ApplicationInitialization()
 {
     // create 3 assembly object instances
     // INPUT
-    CreateAssemblyInstance( DEMO_APP_INPUT_ASSEMBLY_NUM, &g_assembly_data064[0],
+    CreateAssemblyInstance( DEMO_APP_INPUT_ASSEMBLY_NUM, g_assembly_data064,
             sizeof(g_assembly_data064) );
 
     // OUTPUT
-    CreateAssemblyInstance( DEMO_APP_OUTPUT_ASSEMBLY_NUM, &g_assembly_data096[0],
+    CreateAssemblyInstance( DEMO_APP_OUTPUT_ASSEMBLY_NUM, g_assembly_data096,
             sizeof(g_assembly_data096) );
 
     // CONFIG
-    CreateAssemblyInstance( DEMO_APP_CONFIG_ASSEMBLY_NUM, &g_assembly_data097[0],
+    CreateAssemblyInstance( DEMO_APP_CONFIG_ASSEMBLY_NUM, g_assembly_data097,
             sizeof(g_assembly_data097) );
 
     // Heart-beat output assembly for Input only connections
@@ -50,10 +50,12 @@ EipStatus ApplicationInitialization()
     ConfigureExclusiveOwnerConnectionPoint( 0, DEMO_APP_OUTPUT_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             DEMO_APP_CONFIG_ASSEMBLY_NUM );
+
     ConfigureInputOnlyConnectionPoint( 0,
             DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             DEMO_APP_CONFIG_ASSEMBLY_NUM );
+
     ConfigureListenOnlyConnectionPoint( 0,
             DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,

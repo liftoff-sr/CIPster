@@ -8,56 +8,12 @@
 
 #include "cipclass3connection.h"
 
-CipConn* GetFreeExplicitConnection();
-
-// *** Global variables ***
 
 /// @brief Array of the available explicit connections
-CipConn g_explicit_connections[CIPSTER_CIP_NUM_EXPLICIT_CONNS];
-
-// *** Implementation ***
-int EstablishClass3Connection( CipConn* cip_conn,
-        EipUint16* extended_error )
-{
-    int eip_status = kEipStatusOk;
-    EipUint32 produced_connection_id_buffer;
-
-    // TODO add check for transport type trigger
-    // if (0x03 == (g_stDummyCipConn.TransportTypeClassTrigger & 0x03))
-
-    CipConn* explicit_connection = GetFreeExplicitConnection();
-
-    if( NULL == explicit_connection )
-    {
-        eip_status = kCipErrorConnectionFailure;
-        *extended_error =
-            kConnectionManagerStatusCodeErrorNoMoreConnectionsAvailable;
-    }
-    else
-    {
-        CopyConnectionData( explicit_connection, cip_conn );
-
-        produced_connection_id_buffer = explicit_connection->produced_connection_id;
-        GeneralConnectionConfiguration( explicit_connection );
-        explicit_connection->produced_connection_id = produced_connection_id_buffer;
-        explicit_connection->instance_type = kConnInstanceTypeExplicit;
-        explicit_connection->socket[0] = explicit_connection->socket[1] =
-                                             kEipInvalidSocket;
-        // set the connection call backs
-        explicit_connection->connection_close_function =
-            RemoveFromActiveConnections;
-        // explicit connection have to be closed on time out
-        explicit_connection->connection_timeout_function =
-            RemoveFromActiveConnections;
-
-        AddNewActiveConnection( explicit_connection );
-    }
-
-    return eip_status;
-}
+static CipConn g_explicit_connections[CIPSTER_CIP_NUM_EXPLICIT_CONNS];
 
 
-CipConn* GetFreeExplicitConnection( void )
+static CipConn* getFreeExplicitConnection()
 {
     for( int i = 0; i < CIPSTER_CIP_NUM_EXPLICIT_CONNS; i++ )
     {
@@ -66,6 +22,50 @@ CipConn* GetFreeExplicitConnection( void )
     }
 
     return NULL;
+}
+
+
+// *** Implementation ***
+int EstablishClass3Connection( CipConn* cip_conn, EipUint16* extended_error )
+{
+    int eip_status = kEipStatusOk;
+    EipUint32 produced_connection_id_buffer;
+
+    // TODO add check for transport type trigger
+    // if (0x03 == (g_stDummyCipConn.TransportTypeClassTrigger & 0x03))
+
+    CipConn* explicit_connection = getFreeExplicitConnection();
+
+    if( !explicit_connection )
+    {
+        eip_status = kCipErrorConnectionFailure;
+
+        *extended_error = kConnectionManagerStatusCodeErrorNoMoreConnectionsAvailable;
+    }
+    else
+    {
+        CopyConnectionData( explicit_connection, cip_conn );
+
+        produced_connection_id_buffer = explicit_connection->produced_connection_id;
+
+        GeneralConnectionConfiguration( explicit_connection );
+
+        explicit_connection->produced_connection_id = produced_connection_id_buffer;
+        explicit_connection->instance_type = kConnInstanceTypeExplicit;
+
+        explicit_connection->consuming_socket = kEipInvalidSocket;
+        explicit_connection->producing_socket = kEipInvalidSocket;
+
+        // set the connection call backs
+        explicit_connection->connection_close_function = RemoveFromActiveConnections;
+
+        // explicit connection have to be closed on time out
+        explicit_connection->connection_timeout_function = RemoveFromActiveConnections;
+
+        AddNewActiveConnection( explicit_connection );
+    }
+
+    return eip_status;
 }
 
 

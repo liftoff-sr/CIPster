@@ -75,7 +75,7 @@ static EipStatus get_attr_4( CipAttribute* attribute,
 
     CipAppPath app_path;
 
-    app_path.SetClass( CIP_ETHERNETLINK_CLASS_CODE );
+    app_path.SetClass( kCipEthernetLinkClassCode );
     app_path.SetInstance( attribute->Instance()->Id() );
 
     int result = app_path.SerializePadded( message+2, message+2+12 );

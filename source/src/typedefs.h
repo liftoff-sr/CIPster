@@ -99,12 +99,8 @@ enum EipStatus
  */
 enum UdpCommuncationDirection
 {
-    kUdpCommuncationDirectionConsuming  = 0,    ///< Consuming direction; receiver
-    kUdpCommuncationDirectionProducing  = 1     ///< Producing direction; sender
+    kUdpConsuming  = 0,    ///< Consuming direction; receiver
+    kUdpProducing  = 1     ///< Producing direction; sender
 };
-
-#ifndef __cplusplus
- #include <stdbool.h>
-#endif // __cplusplus
 
 #endif // CIPSTER_TYPEDEFS_H_

@@ -89,7 +89,7 @@ EipStatus RegisterCipClass( CipClass* cip_class )
 }
 
 
-CipClass* GetCipClass( EipUint32 class_id )
+CipClass* GetCipClass( int class_id )
 {
     return g_class_registry.FindClass( class_id );
 }

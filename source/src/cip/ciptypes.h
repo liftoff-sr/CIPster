@@ -18,6 +18,19 @@
 #include "opener_user_conf.h"
 #include "ciperror.h"
 
+//* @brief Assembly Class Code
+enum ClassIds
+{
+    kIdentityClassCode = 0x01,
+    kCipMessageRouterClassCode = 0x02,
+    kCipAssemblyClassCode = 0x04,
+    kConnectionClassId = 0x05,
+    kCipConnectionManagerClassCode = 0x06,
+    kCipTcpIpInterfaceClassCode = 0xF5,
+    kCipEthernetLinkClassCode = 0xF6,
+};
+
+
 /**
  * Enum SegmentType
  * is the set of bits 7-5 in the Segment Type/Format byte
@@ -224,17 +237,6 @@ struct CipString
     EipUint16   length;     ///< Length of the String (16 bit value)
     EipByte*    string;     ///< Pointer to the string data
 };
-
-
-/**
- * Struct CipConnectionPath
- */
-struct CipConnectionPath
-{
-    EipUint32       class_id;               ///< Class ID of the linked object
-    EipUint32       connection_point[3];
-};
-
 
 
 struct CipRevision

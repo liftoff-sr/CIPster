@@ -44,8 +44,6 @@
 #include "cipepath.h"
 
 
-const int kConnectionClassId = 0x05;
-
 EipStatus ConnectionClassInit();
 
 
@@ -101,7 +99,7 @@ public:
         bits( 0 )
     {}
 
-    int RedundantOwner() const
+    bool RedundantOwner() const
     {
         return not_large ? ((bits>>15)&1) : ((bits>>31)&1);
     }
@@ -109,6 +107,11 @@ public:
     IOConnType ConnectionType() const
     {
         return not_large ? IOConnType((bits>>13)&3) : IOConnType((bits>>29)&3);
+    }
+
+    bool IsNull() const
+    {
+        return ConnectionType() == kIOConnTypeNull;
     }
 
     int Priority() const
@@ -224,6 +227,23 @@ struct LinkObject
 
 
 /**
+ * Struct CipConnPath
+ * holds data deserialized from the connection_path portion of a
+ * forward_open service request.
+ */
+struct CipConnPath
+{
+    // They arrive in this order when all are present:
+
+    CipAppPath  config_path;
+    CipAppPath  consuming_path;     ///< consumption from my perspective, output from network's perspective
+    CipAppPath  producing_path;     ///< production from my perspective, input from network's perspective
+
+    CipSimpleDataSegment    data_seg;
+};
+
+
+/**
  * Struct CipConn
  * holds the data needed for handling connections. This data is strongly related to
  * the connection object defined in the CIP-specification.
@@ -240,6 +260,9 @@ public:
 struct CipConn
 {
 #endif
+
+    int parseConnectionPath( CipMessageRouterRequest* request, EipUint16* extended_error );
+
     ConnectionState     state;
     ConnInstanceType    instance_type;
 
@@ -248,19 +271,24 @@ struct CipConn
      *  EipUint16 DeviceNetConsumedConnectionID;
      */
     EipByte     device_net_initial_comm_characteristcs;
+
     EipUint16   produced_connection_size;
     EipUint16   consumed_connection_size;
+
     EipUint16   expected_packet_rate;
 
-    //conditional
+    // conditional
     EipUint32   produced_connection_id;
     EipUint32   consumed_connection_id;
 
-    /**/
-    WatchdogTimeoutAction watchdog_timeout_action;
+    LinkObject      link_object;
 
-    CipAppPath  produced_connection_path;
-    CipAppPath  consumed_connection_path;
+    int consuming_socket;
+    int producing_socket;
+
+    int mgmnt_class;
+
+    WatchdogTimeoutAction watchdog_timeout_action;
 
     /* conditional
      *  UINT16 ProductionInhibitTime;
@@ -282,17 +310,11 @@ struct CipConn
 
     TransportTrigger    transport_trigger;          ///< TransportClass_trigger
 
-    CipConnectionPath   conn_path;                  ///< padded EPATH
+    CipConnPath     conn_path;
 
-    LinkObject          link_object;
-
-    CipInstance* consuming_instance;
-
-    // S_CIP_CM_Object *p_stConsumingCMObject;
-
-    CipInstance* producing_instance;
-
-    // S_CIP_CM_Object *p_stProducingCMObject;
+    CipInstance*    consuming_instance;             ///< corresponds to conn_path.consuming_path
+    CipInstance*    producing_instance;             ///< corresponds to conn_path.producing_path
+    CipInstance*    config_instance;                ///< corresponds to conn_path.config_path
 
     EipUint32 eip_level_sequence_count_producing;   /* the EIP level sequence Count
                                                      *  for Class 0/1
@@ -328,9 +350,6 @@ struct CipConn
                                              *  established the connection. needed
                                              *  for scanning if the right packet is
                                              *  arriving */
-
-    int socket[2];                          // socket handles, indexed by kConsuming or kProducing
-
     // pointers to connection handling functions
     ConnectionCloseFunction         connection_close_function;
     ConnectionTimeoutFunction       connection_timeout_function;
@@ -393,8 +412,5 @@ public:
 
 };
 
-
-extern EipUint8* g_config_data_buffer;
-extern unsigned g_config_data_length;
 
 #endif // CIPIOCONNECTION_H_
