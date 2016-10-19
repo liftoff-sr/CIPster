@@ -112,7 +112,7 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
                     if( return_value != kEipStatusError )
                     {
                         g_cpf.address_item.data.connection_identifier =
-                            conn->produced_connection_id;
+                            conn->producing_connection_id;
 
                         return_value = g_cpf.AssembleLinearMessage( &g_response, reply_buffer );
                     }

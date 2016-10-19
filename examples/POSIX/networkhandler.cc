@@ -957,7 +957,7 @@ void CheckAndHandleConsumingUdpSockets()
         /*  do this at the beginning as the close function may can
             make the entry invalid
         */
-        iter = iter->next_cip_conn;
+        iter = iter->next;
 
         if( -1 != conn->consuming_socket  &&  CheckSocketSet( conn->consuming_socket )  )
         {

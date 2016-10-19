@@ -150,10 +150,26 @@ public:
         pbits |= 1 << CONN_PT;
     }
 
+    void SetMember( int aMember )
+    {
+        stuff[MEMBER] = aMember;
+        pbits |= 1 << MEMBER;
+    }
+
+    bool SetSymbol( const char* aSymbol );
+
     bool HasClass() const               { return pbits & (1<<CLASS); }
     bool HasInstance() const            { return pbits & (1<<INSTANCE); }
     bool HasAttribute() const           { return pbits & (1<<ATTRIBUTE); }
     bool HasConnPt() const              { return pbits & (1<<CONN_PT); }
+    bool HasSymbol() const              { return pbits & (1<<TAG); }
+    bool HasMember() const              { return pbits & (1<<MEMBER); }
+
+    bool HasLogical() const
+    {
+        return HasClass();
+        // return pbits & ((1<<CLASS)|(1<<INSTANCE)|(1<<ATTRIBUTE));
+    }
 
     bool IsSufficient() const
     {
@@ -196,6 +212,14 @@ public:
             return GetInstance();
     }
 
+    /// Return the ASCII symbol, or "" if none.  Will never exceed strlen() == 31.
+    const char* GetSymbol() const;
+
+    int GetMember() const
+    {
+        return HasMember() ? stuff[MEMBER] : 0;
+    }
+
     CipClass* Class() const;
 
     CipInstance* Instance() const;
@@ -209,10 +233,10 @@ public:
 
 private:
 
-    void inherit( int aStart, CipAppPath* from );
-
     enum Stuff
     {
+        MEMBER,
+        TAG,
         CONN_PT,
         ATTRIBUTE,
         INSTANCE,
@@ -221,6 +245,13 @@ private:
     };
 
     int     stuff[STUFF_COUNT];
+
+    char    tag[32];    // only 31 byte ASCII tags are supported
+
+    int deserialize_symbolic( EipByte* aSrc, EipByte* aLimit );
+    int deserialize_logical( EipByte* aSrc, Stuff aField, int aFormat );
+
+    void inherit( int aStart, CipAppPath* from );
 };
 
 

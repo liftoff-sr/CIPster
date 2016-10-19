@@ -4,7 +4,6 @@ opener_common_includes()
 set( CIP_SRCS
     cip/appcontype.c
     cip/cipassembly.c
-    cip/cipclass3connection.c
     cip/cipcommon.c
     cip/cipconnection.c
     cip/cipconnectionmanager.c

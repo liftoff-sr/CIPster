@@ -65,10 +65,13 @@ enum CapabilityFlags
     kCapabilityFlagsCipUdpClass0or1 = 0x0100
 };
 
-#define ENCAP_NUMBER_OF_SUPPORTED_DELAYED_ENCAP_MESSAGES    2 //*< According to EIP spec at least 2 delayed message requests should be supported
 
-#define ENCAP_MAX_DELAYED_ENCAP_MESSAGE_SIZE                ( ENCAPSULATION_HEADER_LENGTH + 39 + \
-                                                              sizeof(CIPSTER_DEVICE_NAME) )                   // currently we only have the size of an encapsulation message
+/// According to EIP spec at least 2 delayed message requests should be supported
+#define ENCAP_NUMBER_OF_SUPPORTED_DELAYED_ENCAP_MESSAGES    2
+
+// currently we only have the size of an encapsulation message
+#define ENCAP_MAX_DELAYED_ENCAP_MESSAGE_SIZE   \
+    ( ENCAPSULATION_HEADER_LENGTH + 39 + sizeof(CIPSTER_DEVICE_NAME) )
 
 // Encapsulation layer data
 
@@ -379,23 +382,23 @@ void HandleReceivedListIdentityCommandUdp( int socket,
     {
         delayed_message_buffer->socket = socket;
 
-        memcpy( (&delayed_message_buffer->receiver), from_address,
+        memcpy( &delayed_message_buffer->receiver, from_address,
                 sizeof(struct sockaddr_in) );
 
         DetermineDelayTime( receive_data->buf_start,
                 delayed_message_buffer );
 
-        memcpy( &(delayed_message_buffer->message[0]),
+        memcpy( delayed_message_buffer->message,
                 receive_data->buf_start,
                 ENCAPSULATION_HEADER_LENGTH );
 
         delayed_message_buffer->message_size = EncapsulateListIdentyResponseMessage(
-                &(delayed_message_buffer->message[ENCAPSULATION_HEADER_LENGTH]) );
+                delayed_message_buffer->message + ENCAPSULATION_HEADER_LENGTH );
 
         EipUint8* buf = delayed_message_buffer->message + 2;
 
-        AddIntToMessage( delayed_message_buffer->message_size,
-                &buf );
+        AddIntToMessage( delayed_message_buffer->message_size, &buf );
+
         delayed_message_buffer->message_size += ENCAPSULATION_HEADER_LENGTH;
     }
 }
@@ -609,24 +612,26 @@ EipStatus HandleReceivedSendUnitDataCommand( EncapsulationData* receive_data )
  */
 EipStatus HandleReceivedSendRequestResponseDataCommand( EncapsulationData* receive_data )
 {
-    EipInt16 send_size;
     EipStatus return_value = kEipStatusOkSend;
 
     if( receive_data->data_length >= 6 )
     {
         // Command specific data UDINT .. Interface Handle, UINT .. Timeout, CPF packets
         // don't use the data yet
+#if 0
         GetDintFromMessage( &receive_data->buf_pos );   // skip over null interface handle
         GetIntFromMessage( &receive_data->buf_pos );    // skip over unused timeout value
-
+#else
+        receive_data->buf_pos += 6;
+#endif
         receive_data->data_length -= 6;                 // the rest is in CPF format
 
         // see if the EIP session is registered
         if( kSessionStatusValid == CheckRegisteredSessions( receive_data ) )
         {
-            send_size = NotifyCommonPacketFormat(
+            int send_size = NotifyCommonPacketFormat(
                             receive_data,
-                            &receive_data->buf_start[ENCAPSULATION_HEADER_LENGTH] );
+                            receive_data->buf_start + ENCAPSULATION_HEADER_LENGTH );
 
             if( send_size >= 0 ) // need to send reply
             {
@@ -668,20 +673,27 @@ int GetFreeSessionIndex()
 }
 
 
-EipInt16 EncapsulationData::Init( EipUint8* receive_buffer, int receive_buffer_length )
+int EncapsulationData::Init( EipByte* aBuf, int aByteCount )
 {
-    buf_start = receive_buffer;
-    command_code = GetIntFromMessage( &receive_buffer );
-    data_length = GetIntFromMessage( &receive_buffer );
-    session_handle = GetDintFromMessage( &receive_buffer );
-    status = GetDintFromMessage( &receive_buffer );
+    EipByte* p = aBuf;
 
-    receive_buffer += kSenderContextSize;
+    buf_start = aBuf;
 
-    options = GetDintFromMessage( &receive_buffer );
-    buf_pos = receive_buffer;
+    command_code = GetIntFromMessage( &p );
+    data_length  = GetIntFromMessage( &p );
 
-    return receive_buffer_length - ENCAPSULATION_HEADER_LENGTH - data_length;
+    session_handle = GetDintFromMessage( &p );
+
+    status = GetDintFromMessage( &p );
+
+    p += kSenderContextSize;
+
+    options = GetDintFromMessage( &p );
+    buf_pos = p;
+
+    CIPSTER_ASSERT( p - aBuf == ENCAPSULATION_HEADER_LENGTH );
+
+    return aByteCount - ENCAPSULATION_HEADER_LENGTH - data_length;
 }
 
 

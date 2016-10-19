@@ -34,14 +34,6 @@
 #define CIPSTER_DEVICE_NAME              "amphibius goodie"
 
 
-/** @brief Define the number of objects that may be used in connections
- *
- *  This number needs only to consider additional objects. Connections to
- *  the connection manager object as well as to the assembly object are supported
- *  in any case.
- */
-#define CIPSTER_CIP_NUM_APPLICATION_SPECIFIC_CONNECTABLE_OBJECTS 1
-
 /** @brief Define the number of supported explicit connections.
  *  According to ODVA's PUB 70 this number should be greater than 6.
  */

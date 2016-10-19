@@ -39,19 +39,19 @@ struct CipMessageRouterRequest
  */
 struct CipMessageRouterResponse
 {
-    CipUsint reply_service;                                 /**< Reply service code, the requested service code +
-                                                             *  0x80 */
-    CipOctet reserved;                                      ///< Reserved; Shall be zero
-    CipUsint general_status;                                /**< One of the General Status codes listed in CIP
-                                                             *  Specification Volume 1, Appendix B */
-    CipUsint size_of_additional_status;                     /**< Number of additional 16 bit words in
-                                                             *  Additional Status Array */
-    EipUint16 additional_status[MAX_SIZE_OF_ADD_STATUS];    /**< Array of 16 bit words; Additional status;
-                                                             *  If SizeOfAdditionalStatus is 0. there is no
-                                                             *  Additional Status */
-    EipInt16    data_length;                                   // TODO: Check if this is correct
-    CipOctet*   data;                                         /**< Array of octet; Response data per object definition from
-                                                             *  request */
+    CipUsint reply_service;                 ///< Reply service code, the requested service code + 0x80
+    CipOctet reserved;                      ///< Reserved; Shall be zero
+
+    CipUsint general_status;                ///< One of the General Status codes listed in CIP
+                                            ///< Specification Volume 1, Appendix B
+
+    CipUsint size_of_additional_status;     ///< Number of additional 16 bit words in Additional Status Array
+
+    EipUint16 additional_status[NUM_ADD_STATUS];    ///< Array of 16 bit words; Additional status;
+                                                    ///< If SizeOfAdditionalStatus is 0. there is no
+                                                    ///< Additional Status
+    int         data_length;
+    CipOctet*   data;               ///< Array of octet; Response data per object definition from request
 };
 
 
@@ -67,7 +67,7 @@ extern CipMessageRouterResponse g_response;
 /** @brief Initialize the data structures of the message router
  *  @return kEipStatusOk if class was initialized, otherwise kEipStatusError
  */
-EipStatus CipMessageRouterInit(void);
+EipStatus CipMessageRouterInit();
 
 /** @brief Free all data allocated by the classes created in the CIP stack
  */

@@ -23,7 +23,7 @@ void InitializeIoConnectionData();
  *          data given in pa_pstConnData.
  *        - on error: NULL
  */
-CipConn* GetIoConnectionForConnectionData( CipConn* cip_conn, EipUint16* extended_error );
+CipConn* GetIoConnectionForConnectionData( CipConn* cip_conn, ConnectionManagerStatusCode* extended_error );
 
 /** @brief Check if there exists already an exclusive owner or listen only connection
  *         which produces the input assembly.
@@ -57,7 +57,7 @@ void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,
  * For I/O connections the sockets will be freed. The sockets for explicit
  * connections are handled by the encapsulation layer, and freed there.
  */
-void CloseAllConnections( void );
+void CloseAllConnections();
 
 /** @brief Check if there is an established connection that uses the same
  * config point.

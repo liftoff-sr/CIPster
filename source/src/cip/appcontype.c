@@ -48,7 +48,7 @@ static InputOnlyConnection g_input_only[CIPSTER_CIP_NUM_INPUT_ONLY_CONNS];
 static ListenOnlyConnection g_listen_only[CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS];
 
 
-static CipConn* getExclusiveOwnerConnection( CipConn* aConn, EipUint16* extended_error )
+static CipConn* getExclusiveOwnerConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
 {
     CipConn* exclusive_owner_connection = NULL;
 
@@ -76,7 +76,7 @@ static CipConn* getExclusiveOwnerConnection( CipConn* aConn, EipUint16* extended
 }
 
 
-static CipConn* getInputOnlyConnection( CipConn* aConn, EipUint16* extended_error )
+static CipConn* getInputOnlyConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
 {
     CipConn* input_only_connection = NULL;
 
@@ -114,7 +114,7 @@ static CipConn* getInputOnlyConnection( CipConn* aConn, EipUint16* extended_erro
 }
 
 
-static CipConn* getListenOnlyConnection( CipConn* aConn, EipUint16* extended_error )
+static CipConn* getListenOnlyConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
 {
     CipConn* listen_only_connection = NULL;
 
@@ -209,15 +209,15 @@ void ConfigureListenOnlyConnectionPoint( int connection_number,
 }
 
 
-CipConn* GetIoConnectionForConnectionData( CipConn* aConn,  EipUint16* extended_error )
+CipConn* GetIoConnectionForConnectionData( CipConn* aConn,  ConnectionManagerStatusCode* extended_error )
 {
-    *extended_error = 0;
+    *extended_error = kConnectionManagerStatusCodeSuccess;
 
     CipConn* io_connection = getExclusiveOwnerConnection( aConn, extended_error );
 
     if( !io_connection )
     {
-        if( 0 == *extended_error )
+        if( kConnectionManagerStatusCodeSuccess == *extended_error )
         {
             // we found no connection and don't have an error so try input only next
             io_connection = getInputOnlyConnection( aConn, extended_error );
@@ -281,7 +281,7 @@ CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
         }
 
         producer_multicast_connection = producer_multicast_connection
-                                        ->next_cip_conn;
+                                        ->next;
     }
 
     return producer_multicast_connection;
@@ -308,7 +308,7 @@ CipConn* GetNextNonControlMasterConnection( EipUint32 input_point )
         }
 
         next_non_control_master_connection = next_non_control_master_connection
-                                             ->next_cip_conn;
+                                             ->next;
     }
 
     return next_non_control_master_connection;
@@ -326,7 +326,7 @@ void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,  ConnInstan
             && (input_point == connection->conn_path.producing_path.GetInstanceOrConnPt()) )
         {
             connection_to_delete = connection;
-            connection = connection->next_cip_conn;
+            connection = connection->next;
 
             CheckIoConnectionEvent(
                     connection_to_delete->conn_path.consuming_path.GetInstanceOrConnPt(),
@@ -339,7 +339,7 @@ void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,  ConnInstan
         }
         else
         {
-            connection = connection->next_cip_conn;
+            connection = connection->next;
         }
     }
 }
@@ -372,7 +372,7 @@ bool ConnectionWithSameConfigPointExists( EipUint32 config_point )
             break;
         }
 
-        connection = connection->next_cip_conn;
+        connection = connection->next;
     }
 
     return NULL != connection;

@@ -44,7 +44,7 @@
 #include "cipepath.h"
 
 
-EipStatus ConnectionClassInit();
+EipStatus ConnectionClassInit( EipUint16 unique_connection_id );
 
 
 //* @brief States of a connection
@@ -261,7 +261,7 @@ struct CipConn
 {
 #endif
 
-    int parseConnectionPath( CipMessageRouterRequest* request, EipUint16* extended_error );
+    CipError parseConnectionPath( CipMessageRouterRequest* request, ConnectionManagerStatusCode* extended_error );
 
     ConnectionState     state;
     ConnInstanceType    instance_type;
@@ -272,14 +272,14 @@ struct CipConn
      */
     EipByte     device_net_initial_comm_characteristcs;
 
-    EipUint16   produced_connection_size;
-    EipUint16   consumed_connection_size;
+    EipUint16   producing_connection_size;
+    EipUint16   consuming_connection_size;
 
     EipUint16   expected_packet_rate;
 
     // conditional
-    EipUint32   produced_connection_id;
-    EipUint32   consumed_connection_id;
+    EipUint32   producing_connection_id;
+    EipUint32   consuming_connection_id;
 
     LinkObject      link_object;
 
@@ -356,9 +356,9 @@ struct CipConn
     ConnectionSendDataFunction      connection_send_data_function;
     ConnectionReceiveDataFunction   connection_receive_data_function;
 
-    // pointers to be used in the active connection list
-    CipConn*    next_cip_conn;
-    CipConn*    first_cip_conn;
+    // used in the active connection list
+    CipConn*    next;
+    CipConn*    first;
 
     EipUint16   correct_originator_to_target_size;
     EipUint16   correct_target_to_originator_size;
@@ -366,21 +366,8 @@ struct CipConn
 
 
 /**
- * Function EstablishIoConnction
- * sets up all data in order to establish an IO connection
- *
- * This function can be called after all data has been parsed from the forward open request
- * @param aConn the connection object structure holding the parsed data from the forward open request
- * @param extended_error the extended error code in case an error happened
- * @return general status on the establishment
- *    - EIP_OK ... on success
- *    - On an error the general status code to be put into the response
- */
-int EstablishIoConnction( CipConn* aConn,  EipUint16* extended_error );
-
-/**
  * Function OpenCommunicationChannels
- * takese the data given in the connection object structure and opens
+ * takes the data given in the connection object structure and opens
  * the necessary communication channels
  *
  * This function will use the g_stCPFDataItem!
@@ -400,6 +387,20 @@ CipError OpenCommunicationChannels( CipConn* aConn );
  */
 void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList( CipConn* cip_conn );
 
+/** Copy the given connection data from pa_pstSrc to pa_pstDst
+ */
+inline void CopyConnectionData( CipConn* aDst, CipConn* aSrc )
+{
+    *aDst = *aSrc;
+}
+
+/** @brief Generate the ConnectionIDs and set the general configuration
+ * parameter in the given connection object.
+ *
+ * @param cip_conn pointer to the connection object that should be set
+ * up.
+ */
+void GeneralConnectionConfiguration( CipConn* cip_conn );
 
 /**
  * Class CipConnection
@@ -409,7 +410,7 @@ class CipConnectionClass : public CipClass
 {
 public:
     CipConnectionClass();
-
+    CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );    // override
 };
 
 

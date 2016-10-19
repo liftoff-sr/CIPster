@@ -14,32 +14,6 @@
 #include "cipconnection.h"
 
 
-//* @brief Connection Manager Error codes
-enum ConnectionManagerStatusCode
-{
-    kConnectionManagerStatusCodeSuccess = 0x00,
-    kConnectionManagerStatusCodeErrorConnectionInUse = 0x0100,
-    kConnectionManagerStatusCodeErrorTransportTriggerNotSupported = 0x0103,
-    kConnectionManagerStatusCodeErrorOwnershipConflict = 0x0106,
-    kConnectionManagerStatusCodeErrorConnectionNotFoundAtTargetApplication = 0x0107,
-    kConnectionManagerStatusCodeErrorInvalidOToTConnectionType  = 0x123,
-    kConnectionManagerStatusCodeErrorInvalidTToOConnectionType  = 0x124,
-    kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize  = 0x127,
-    kConnectionManagerStatusCodeErrorInvalidTToOConnectionSize  = 0x128,
-    kConnectionManagerStatusCodeErrorNoMoreConnectionsAvailable = 0x0113,
-    kConnectionManagerStatusCodeErrorVendorIdOrProductcodeError = 0x0114,
-    kConnectionManagerStatusCodeErrorDeviceTypeError    = 0x0115,
-    kConnectionManagerStatusCodeErrorRevisionMismatch   = 0x0116,
-    kConnectionManagerStatusCodeInvalidConfigurationApplicationPath = 0x0129,
-    kConnectionManagerStatusCodeInvalidConsumingApllicationPath     = 0x012A,
-    kConnectionManagerStatusCodeInvalidProducingApplicationPath     = 0x012B,
-    kConnectionManagerStatusCodeInconsistentApplicationPathCombo    = 0x012F,
-    kConnectionManagerStatusCodeNonListenOnlyConnectionNotOpened    = 0x0119,
-    kConnectionManagerStatusCodeErrorParameterErrorInUnconnectedSendService = 0x0205,
-    kConnectionManagerStatusCodeErrorInvalidSegmentTypeInPath   = 0x0315,
-    kConnectionManagerStatusCodeTargetObjectOutOfConnections    = 0x011A
-};
-
 
 /** @brief macros for comparing sequence numbers according to CIP spec vol
  * 2 3-4.2 for int type variables
@@ -80,7 +54,7 @@ struct CipUnconnectedSendParameter
 
 /** @brief Initialize the data of the connection manager object
  */
-EipStatus ConnectionManagerInit( EipUint16 unique_connection_id );
+EipStatus ConnectionManagerInit();
 
 /** @brief Get a connected object dependent on requested ConnectionID.
  *
@@ -100,14 +74,6 @@ CipConn* GetConnectedObject( EipUint32 connection_id );
 CipConn* GetConnectedOutputAssembly( EipUint32 output_assembly_id );
 
 
-/** Copy the given connection data from pa_pstSrc to pa_pstDst
- */
-inline void CopyConnectionData( CipConn* aDst, CipConn* aSrc )
-{
-    *aDst = *aSrc;
-}
-
-
 /** @brief Close the given connection
  *
  * This function will take the data form the connection and correctly closes the
@@ -121,14 +87,6 @@ bool IsConnectedInputAssembly( EipUint32 aInstanceId );
 
 // TODO: Missing documentation
 bool IsConnectedOutputAssembly( EipUint32 aInstanceId );
-
-/** @brief Generate the ConnectionIDs and set the general configuration
- * parameter in the given connection object.
- *
- * @param cip_conn pointer to the connection object that should be set
- * up.
- */
-void GeneralConnectionConfiguration( CipConn* cip_conn );
 
 /** @brief Insert the given connection object to the list of currently active
  *  and managed connections.

@@ -41,9 +41,9 @@ CipError OpenProducingPointToPointConnection( CipConn* conn,
         CipCommonPacketFormatData* cpfd );
 
 
-static int handleConfigData( CipConn* conn )
+static ConnectionManagerStatusCode handleConfigData( CipConn* conn )
 {
-    int result = 0;
+    ConnectionManagerStatusCode result = kConnectionManagerStatusCodeSuccess;
 
     CipInstance* instance = conn->config_instance;
 
@@ -74,6 +74,86 @@ static int handleConfigData( CipConn* conn )
 
     return result;
 }
+
+
+/// @brief Holds the connection ID's "incarnation ID" in the upper 16 bits
+static EipUint32 g_incarnation_id;
+
+
+/** @brief Generate a new connection Id utilizing the Incarnation Id as
+ * described in the EIP specs.
+ *
+ * A unique connectionID is formed from the boot-time-specified "incarnation ID"
+ * and the per-new-connection-incremented connection number/counter.
+ * @return new connection id
+ */
+static EipUint32 getConnectionId()
+{
+    static EipUint32 connection_id = 18;
+
+    connection_id++;
+    return g_incarnation_id | (connection_id & 0x0000FFFF);
+}
+
+
+void GeneralConnectionConfiguration( CipConn* conn )
+{
+    if( conn->o_to_t_ncp.ConnectionType() == kIOConnTypePointToPoint )
+    {
+        // if we have a point to point connection for the O to T direction
+        // the target shall choose the connection ID.
+        conn->consuming_connection_id = getConnectionId();
+    }
+
+    if( conn->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast )
+    {
+        // if we have a multi-cast connection for the T to O direction the
+        // target shall choose the connection ID.
+        conn->producing_connection_id = getConnectionId();
+    }
+
+    conn->eip_level_sequence_count_producing = 0;
+    conn->sequence_count_producing = 0;
+    conn->eip_level_sequence_count_consuming = 0;
+    conn->sequence_count_consuming = 0;
+
+    conn->watchdog_timeout_action = kWatchdogTimeoutActionAutoDelete;  // the default for all connections on EIP
+
+    conn->expected_packet_rate = 0;                                    // default value
+
+    if( !conn->transport_trigger.IsServer() )  // Client Type Connection requested
+    {
+        conn->expected_packet_rate = (EipUint16) ( (conn->t_to_o_requested_packet_interval) / 1000 );
+
+        /* As soon as we are ready we should produce the connection. With the 0
+         * here we will produce with the next timer tick
+         * which should be sufficient.
+         */
+        conn->transmission_trigger_timer = 0;
+    }
+    else
+    {
+        // Server Type Connection requested
+        conn->expected_packet_rate = (EipUint16) ( (conn->o_to_t_requested_packet_interval) / 1000 );
+    }
+
+    conn->production_inhibit_timer = conn->production_inhibit_time = 0;
+
+    // setup the preconsuption timer: max(ConnectionTimeoutMultiplier * EpectetedPacketRate, 10s)
+    conn->inactivity_watchdog_timer =
+        ( ( ( (conn->o_to_t_requested_packet_interval) / 1000 )
+            << (2 + conn->connection_timeout_multiplier) ) > 10000 ) ?
+        ( ( (conn->o_to_t_requested_packet_interval) / 1000 )
+          << (2 + conn->connection_timeout_multiplier) ) :
+        10000;
+
+    CIPSTER_TRACE_INFO( "%s: inactivity_watchdog_timer:%u\n", __func__,
+            conn->inactivity_watchdog_timer );
+
+    conn->consuming_connection_size = conn->o_to_t_ncp.ConnectionSize();
+    conn->producing_connection_size = conn->t_to_o_ncp.ConnectionSize();
+}
+
 
 
 /* Regularly close the IO connection. If it is an exclusive owner or input only
@@ -174,7 +254,7 @@ static EipStatus sendConnectedData( CipConn* conn )
     }
 
     cpfd->address_item.data.connection_identifier =
-        conn->produced_connection_id;
+        conn->producing_connection_id;
 
     cpfd->data_item.type_id = kCipItemIdConnectedDataItem;
 
@@ -345,197 +425,6 @@ static void handleIoConnectionTimeOut( CipConn* conn )
 }
 
 
-CipConnectionClass::CipConnectionClass() :
-    CipClass(
-        kConnectionClassId,
-        "Connection",
-        (1<<7)|(1<<6) /* |(1<<5)|(1<<4)|(1<<3)|(1<<2) */ | (1<<1),
-        MASK3( 7, 6, 1 ),           // class getAttributeAll mask
-        0,                          // instance getAttributeAll mask
-        1                           // revision
-        )
-{
-}
-
-
-//*** Implementation ***
-int EstablishIoConnction( CipConn* conn, EipUint16* extended_error )
-{
-    IOConnType o_to_t;
-    IOConnType t_to_o;
-
-    int eip_status = kEipStatusOk;
-
-    // currently we allow I/O connections only to assembly objects
-
-    CipConn* io_conn = GetIoConnectionForConnectionData( conn, extended_error );
-
-    if( !io_conn )
-    {
-        CIPSTER_TRACE_ERR( "%s: GetIoConnectionForConnectionData() returned NULL\n", __func__ );
-        return kCipErrorConnectionFailure;
-    }
-
-    // Both Change of State and Cyclic triggers use the Transmission Trigger Timer
-    // according to Vol1_3.19_3-4.4.3.7.
-
-    if( io_conn->transport_trigger.Trigger() != kConnectionTriggerTypeCyclic )
-    {
-        // trigger is not cyclic, it is Change of State here.
-
-        if( 256 == io_conn->production_inhibit_time )
-        {
-            // there was no PIT segment in the connection path, set PIT to one fourth of RPI
-            io_conn->production_inhibit_time =
-                ( (EipUint16) (io_conn->t_to_o_requested_packet_interval)
-                  / 4000 );
-        }
-        else
-        {
-            // if production inhibit time has been provided it needs to be smaller than the RPI
-            if( io_conn->production_inhibit_time
-                > ( (EipUint16) ( (io_conn->t_to_o_requested_packet_interval) / 1000 ) ) )
-            {
-                // see section C-1.4.3.3
-                *extended_error = 0x111;    //*< RPI not supported. Extended Error code deprecated
-                return kCipErrorConnectionFailure;
-            }
-        }
-    }
-
-    // set the connection call backs
-    io_conn->connection_close_function        = closeIoConnection;
-    io_conn->connection_timeout_function      = handleIoConnectionTimeOut;
-    io_conn->connection_send_data_function    = sendConnectedData;
-    io_conn->connection_receive_data_function = handleReceivedIoConnectionData;
-
-    GeneralConnectionConfiguration( io_conn );
-
-    o_to_t = io_conn->o_to_t_ncp.ConnectionType();
-    t_to_o = io_conn->t_to_o_ncp.ConnectionType();
-
-    int     data_size;
-    int     diff_size;
-    bool    is_heartbeat;
-
-    if( o_to_t != kIOConnTypeNull )    // setup consumer side
-    {
-        CIPSTER_ASSERT( io_conn->consuming_instance );
-
-        io_conn->conn_path.consuming_path.SetAttribute( 3 );
-
-        CipAttribute* attribute = io_conn->consuming_instance->Attribute( 3 );
-
-        // an assembly object should always have an attribute 3
-        CIPSTER_ASSERT( attribute );
-
-        data_size    = io_conn->consumed_connection_size;
-        diff_size    = 0;
-        is_heartbeat = ( ( (CipByteArray*) attribute->data )->length == 0 );
-
-        if( io_conn->transport_trigger.Class() == kConnectionTransportClass1 )
-        {
-            // class 1 connection
-            data_size -= 2; // remove 16-bit sequence count length
-            diff_size += 2;
-        }
-
-        if( kOpenerConsumedDataHasRunIdleHeader && data_size > 0
-            && !is_heartbeat )    // only have a run idle header if it is not a heartbeat connection
-        {
-            data_size -= 4;       // remove the 4 bytes needed for run/idle header
-            diff_size += 4;
-        }
-
-        if( ( (CipByteArray*) attribute->data )->length != data_size )
-        {
-            // wrong connection size
-            conn->correct_originator_to_target_size =
-                ( (CipByteArray*) attribute->data )->length + diff_size;
-
-            *extended_error =
-                kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize;
-
-            CIPSTER_TRACE_INFO( "%s: byte_array length != data_size\n", __func__ );
-            return kCipErrorConnectionFailure;
-        }
-    }
-
-    if( t_to_o != kIOConnTypeNull )     // setup producer side
-    {
-        CIPSTER_ASSERT( io_conn->producing_instance );
-
-        io_conn->conn_path.producing_path.SetAttribute( 3 );
-
-        CipAttribute* attribute = io_conn->producing_instance->Attribute( 3 );
-
-        // an assembly object should always have an attribute 3
-        CIPSTER_ASSERT( attribute );
-
-        data_size    = io_conn->produced_connection_size;
-        diff_size    = 0;
-        is_heartbeat = ( ( (CipByteArray*) attribute->data )->length == 0 );
-
-        if( io_conn->transport_trigger.Class() == kConnectionTransportClass1 )
-        {
-            // class 1 connection
-            data_size -= 2; // remove 16-bit sequence count length
-            diff_size += 2;
-        }
-
-        if( kOpenerProducedDataHasRunIdleHeader && data_size > 0
-            && !is_heartbeat )  // only have a run idle header if it is not a heartbeat connection
-        {
-            data_size -= 4;   // remove the 4 bytes needed for run/idle header
-            diff_size += 4;
-        }
-
-        if( ( (CipByteArray*) attribute->data )->length != data_size )
-        {
-            //wrong connection size
-            conn->correct_target_to_originator_size =
-                ( (CipByteArray*) attribute->data )->length + diff_size;
-
-            *extended_error = kConnectionManagerStatusCodeErrorInvalidTToOConnectionSize;
-
-            CIPSTER_TRACE_INFO( "%s: bytearray length != data_size\n", __func__ );
-            return kCipErrorConnectionFailure;
-        }
-    }
-
-    // If config data is present in forward_open request
-    if( io_conn->conn_path.data_seg.HasAny() )
-    {
-        *extended_error = handleConfigData( io_conn );
-
-        if( 0 != *extended_error )
-        {
-            CIPSTER_TRACE_INFO( "%s: extended_error != 0\n", __func__ );
-            return kCipErrorConnectionFailure;
-        }
-    }
-
-    eip_status = OpenCommunicationChannels( io_conn );
-
-    if( kEipStatusOk != eip_status )
-    {
-        *extended_error = 0;    // TODO find out the correct extended error code
-
-        CIPSTER_TRACE_ERR( "%s: OpenCommunicationChannels failed\n", __func__ );
-        return eip_status;
-    }
-
-    AddNewActiveConnection( io_conn );
-
-    CheckIoConnectionEvent(
-            io_conn->conn_path.consuming_path.GetInstanceOrConnPt(),
-            io_conn->conn_path.producing_path.GetInstanceOrConnPt(),
-            kIoConnectionEventOpened );
-
-    return eip_status;
-}
-
-
 /*   @brief Open a Point2Point connection dependent on pa_direction.
  *   @param cip_conn Pointer to registered Object in ConnectionManager.
  *   @param cpfd Index of the connection object
@@ -653,7 +542,7 @@ EipStatus OpenProducingMulticastConnection( CipConn* conn, CipCommonPacketFormat
     else
     {
         // inform our originator about the correct connection id
-        conn->produced_connection_id = existing_conn->produced_connection_id;
+        conn->producing_connection_id = existing_conn->producing_connection_id;
     }
 
     // we have a connection reuse the data and the socket
@@ -866,7 +755,196 @@ void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList( CipConn* conn
 }
 
 
-EipStatus ConnectionClassInit()
+CipConnectionClass::CipConnectionClass() :
+    CipClass(
+        kConnectionClassId,
+        "Connection",
+        (1<<7)|(1<<6) /* |(1<<5)|(1<<4)|(1<<3)|(1<<2) */ | (1<<1),
+        MASK3( 7, 6, 1 ),           // class getAttributeAll mask
+        0,                          // instance getAttributeAll mask
+        1                           // revision
+        )
+{
+    // There are no attributes in instance of this class yet, so nothing to set.
+    ServiceRemove( kSetAttributeSingle );
+}
+
+
+CipError CipConnectionClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+{
+    IOConnType o_to_t;
+    IOConnType t_to_o;
+
+    // currently we allow I/O connections only to assembly objects
+
+    CipConn* io_conn = GetIoConnectionForConnectionData( aConn, extended_error );
+
+    if( !io_conn )
+    {
+        CIPSTER_TRACE_ERR( "%s: GetIoConnectionForConnectionData() returned NULL\n", __func__ );
+        return kCipErrorConnectionFailure;
+    }
+
+    // Both Change of State and Cyclic triggers use the Transmission Trigger Timer
+    // according to Vol1_3.19_3-4.4.3.7.
+
+    if( io_conn->transport_trigger.Trigger() != kConnectionTriggerTypeCyclic )
+    {
+        // trigger is not cyclic, it is Change of State here.
+
+        if( 256 == io_conn->production_inhibit_time )
+        {
+            // there was no PIT segment in the connection path, set PIT to one fourth of RPI
+            io_conn->production_inhibit_time =
+                ( (EipUint16) (io_conn->t_to_o_requested_packet_interval)
+                  / 4000 );
+        }
+        else
+        {
+            // if production inhibit time has been provided it needs to be smaller than the RPI
+            if( io_conn->production_inhibit_time
+                > ( (EipUint16) ( (io_conn->t_to_o_requested_packet_interval) / 1000 ) ) )
+            {
+                // see section C-1.4.3.3
+                *extended_error = kConnectionManagerStatusCodeErrorPITGreaterThanRPI;
+                return kCipErrorConnectionFailure;
+            }
+        }
+    }
+
+    // set the connection call backs
+    io_conn->connection_close_function        = closeIoConnection;
+    io_conn->connection_timeout_function      = handleIoConnectionTimeOut;
+    io_conn->connection_send_data_function    = sendConnectedData;
+    io_conn->connection_receive_data_function = handleReceivedIoConnectionData;
+
+    GeneralConnectionConfiguration( io_conn );
+
+    o_to_t = io_conn->o_to_t_ncp.ConnectionType();
+    t_to_o = io_conn->t_to_o_ncp.ConnectionType();
+
+    int     data_size;
+    int     diff_size;
+    bool    is_heartbeat;
+
+    if( o_to_t != kIOConnTypeNull )    // setup consumer side
+    {
+        CIPSTER_ASSERT( io_conn->consuming_instance );
+
+        io_conn->conn_path.consuming_path.SetAttribute( 3 );
+
+        CipAttribute* attribute = io_conn->consuming_instance->Attribute( 3 );
+
+        // an assembly object should always have an attribute 3
+        CIPSTER_ASSERT( attribute );
+
+        data_size    = io_conn->consuming_connection_size;
+        diff_size    = 0;
+        is_heartbeat = ( ( (CipByteArray*) attribute->data )->length == 0 );
+
+        if( io_conn->transport_trigger.Class() == kConnectionTransportClass1 )
+        {
+            // class 1 connection
+            data_size -= 2; // remove 16-bit sequence count length
+            diff_size += 2;
+        }
+
+        if( kOpenerConsumedDataHasRunIdleHeader && data_size > 0
+            && !is_heartbeat )    // only have a run idle header if it is not a heartbeat connection
+        {
+            data_size -= 4;       // remove the 4 bytes needed for run/idle header
+            diff_size += 4;
+        }
+
+        if( ( (CipByteArray*) attribute->data )->length != data_size )
+        {
+            // wrong connection size
+            aConn->correct_originator_to_target_size =
+                ( (CipByteArray*) attribute->data )->length + diff_size;
+
+            *extended_error = kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize;
+
+            CIPSTER_TRACE_INFO( "%s: byte_array length != data_size\n", __func__ );
+            return kCipErrorConnectionFailure;
+        }
+    }
+
+    if( t_to_o != kIOConnTypeNull )     // setup producer side
+    {
+        CIPSTER_ASSERT( io_conn->producing_instance );
+
+        io_conn->conn_path.producing_path.SetAttribute( 3 );
+
+        CipAttribute* attribute = io_conn->producing_instance->Attribute( 3 );
+
+        // an assembly object should always have an attribute 3
+        CIPSTER_ASSERT( attribute );
+
+        data_size    = io_conn->producing_connection_size;
+        diff_size    = 0;
+        is_heartbeat = ( ( (CipByteArray*) attribute->data )->length == 0 );
+
+        if( io_conn->transport_trigger.Class() == kConnectionTransportClass1 )
+        {
+            // class 1 connection
+            data_size -= 2; // remove 16-bit sequence count length
+            diff_size += 2;
+        }
+
+        if( kOpenerProducedDataHasRunIdleHeader && data_size > 0
+            && !is_heartbeat )  // only have a run idle header if it is not a heartbeat connection
+        {
+            data_size -= 4;   // remove the 4 bytes needed for run/idle header
+            diff_size += 4;
+        }
+
+        if( ( (CipByteArray*) attribute->data )->length != data_size )
+        {
+            //wrong connection size
+            aConn->correct_target_to_originator_size =
+                ( (CipByteArray*) attribute->data )->length + diff_size;
+
+            *extended_error = kConnectionManagerStatusCodeErrorInvalidTToOConnectionSize;
+
+            CIPSTER_TRACE_INFO( "%s: bytearray length != data_size\n", __func__ );
+            return kCipErrorConnectionFailure;
+        }
+    }
+
+    // If config data is present in forward_open request
+    if( io_conn->conn_path.data_seg.HasAny() )
+    {
+        *extended_error = handleConfigData( io_conn );
+
+        if( kConnectionManagerStatusCodeSuccess != *extended_error )
+        {
+            CIPSTER_TRACE_INFO( "%s: extended_error != 0\n", __func__ );
+            return kCipErrorConnectionFailure;
+        }
+    }
+
+    CipError result = OpenCommunicationChannels( io_conn );
+
+    if( result != kCipErrorSuccess )
+    {
+        *extended_error = kConnectionManagerStatusCodeSuccess;
+
+        CIPSTER_TRACE_ERR( "%s: OpenCommunicationChannels failed\n", __func__ );
+        return result;
+    }
+
+    AddNewActiveConnection( io_conn );
+
+    CheckIoConnectionEvent(
+            io_conn->conn_path.consuming_path.GetInstanceOrConnPt(),
+            io_conn->conn_path.producing_path.GetInstanceOrConnPt(),
+            kIoConnectionEventOpened );
+
+    return result;
+}
+
+
+EipStatus ConnectionClassInit( EipUint16 unique_connection_id )
 {
     if( !GetCipClass( kCipConnectionManagerClassCode ) )
     {
@@ -874,8 +952,7 @@ EipStatus ConnectionClassInit()
 
         RegisterCipClass( clazz );
 
-        // There are no attributes in instance of this class yet, so nothing to set.
-        delete clazz->ServiceRemove( kSetAttributeSingle );
+        g_incarnation_id = ( (EipUint32) unique_connection_id ) << 16;
     }
 
     return kEipStatusOk;

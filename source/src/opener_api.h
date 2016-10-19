@@ -14,6 +14,8 @@
 #include "cip/ciperror.h"
 #include "opener_user_conf.h"
 
+
+
 /**  @defgroup CIP_API CIPster User interface
  * @brief This is the public interface of the CIPster. It provides all function
  * needed to implement an EtherNet/IP enabled slave-device.
@@ -107,85 +109,6 @@ EipStatus RegisterCipClass( CipClass* aClass );
 
 
 /** @ingroup CIP_API
- * @brief Get a pointer to an instance
- *
- * @param cip_class pointer to the object the instance belongs to
- * @param instance_number number of the instance to retrieve
- * @return pointer to CIP Instance
- *          0 if instance is not in the object
- */
-inline CipInstance* GetCipInstance( CipClass* cip_class, EipUint32 instance_number )
-{
-    return cip_class->Instance( instance_number );
-}
-
-
-/** @ingroup CIP_API
- * @brief Get a pointer to an instance's attribute
- *
- * As instances and objects are selfsimilar this function can also be used
- * to retrieve the attribute of an object.
- * @param intance pointer to the instance the attribute belongs to
- * @param attribute_id number of the attribute to retrieve
- * @return pointer to attribute
- *          0 if instance is not in the object
- */
-inline CipAttribute* GetCipAttribute( CipInstance* instance,  EipUint16 attribute_id )
-{
-    return instance->Attribute( attribute_id );
-}
-
-
-/** @ingroup CIP_API
- * @brief Allocate memory for new CIP Class and attributes
- *
- * The new CIP class will be registered at the stack to be able
- * for receiving explicit messages.
- *
- * @param class_id class ID of the new class
- * @param get_attribute_all_mask mask of which attributes are included in the
- *  class getAttributeAll.
- * If the mask is 0 the getAttributeAll service will not be added as class
- * service
- * @param instance_attributes_get_attributes_all_mask  mask of which attributes
- * are included in the instance getAttributeAll
- * If the mask is 0 the getAttributeAll service will not be added as class
- * service
- * @param number_of_instances number of initial instances to create
- * @param class_name  class name (for debugging class structure)
- * @param class_revision class revision
- * @return pointer to new class object
- *     0 on error
- */
-CipClass* CreateCipClass( EipUint32 class_id,
-        EipUint32 class_attributes_get_attribute_all_mask,
-        EipUint32 instance_attributes_get_attributes_all_mask,
-        int number_of_instances,
-        const char* class_name,
-        EipUint16 class_revision );
-
-/** @ingroup CIP_API
- * @brief Insert a service into a #CipClass
- *
- *  Note that services are stored in an array pointer in the class object
- *  the service array is not expandable if you insert a service that has
- *  already been defined, the previous service will be replaced
- *
- * @param aClass which CIP class to add service to
- * @param service_code service code of service to be inserted.
- * @param service_function pointer to function which represents the service.
- * @param service_name name of the service
- * @return CipService* - new service or NULL if service_code was not unique.
- */
-inline CipService* InsertService( CipClass* aClass, EipUint8 service_id,
-        CipServiceFunction service_function, const char* service_name )
-{
-    return aClass->ServiceInsert( service_id, service_function, service_name );
-}
-
-
-
-/** @ingroup CIP_API
  * @brief Produce the data according to CIP encoding onto the message buffer.
  *
  * This function may be used in own services for sending data back to the
@@ -235,18 +158,6 @@ CipInstance* CreateAssemblyInstance( EipUint32 instance_number, EipByte* data,
 struct CipConn;
 
 /** @ingroup CIP_API
- * @brief Function prototype for handling the opening of connections
- *
- * @param cip_conn The connection object which is opening the
- * connection
- * @param extended_error_code The returned error code of the connection object
- *
- * @return CIP error code
- */
-typedef int (* OpenConnectionFunction)( CipConn* cip_conn,
-        EipUint16* extended_error_code );
-
-/** @ingroup CIP_API
  * @brief Function prototype for handling the closing of connections
  *
  * @param cip_conn The connection object which is closing the
@@ -282,19 +193,6 @@ typedef EipStatus (* ConnectionSendDataFunction)( CipConn* cip_conn );
 typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* cip_conn,
         EipUint8* data,
         EipUint16 data_length );
-
-/** @ingroup CIP_API
- * @brief register open functions for a specific object.
- *
- * With this function any object can be enabled to be a target for forward
- * open/close request.
- * @param aClassId The class ID to register
- * @param open_connection_function   pointer to the function handling the open
- * process
- * @return EIP_OK on success
- */
-EipStatus AddConnectableClass( int aClassId,
-        OpenConnectionFunction open_connection_function );
 
 /** @ingroup CIP_API
  * @brief Configures the connection point for an exclusive owner connection.
@@ -630,8 +528,8 @@ EipStatus SendUdpData( struct sockaddr_in* socket_data, int socket, EipUint8* da
 void CloseSocket( int socket );
 
 
-void    IApp_CloseSocket_udp( int socket_handle );
-void    IApp_CloseSocket_tcp( int socket_handle );
+void IApp_CloseSocket_udp( int socket_handle );
+void IApp_CloseSocket_tcp( int socket_handle );
 
 
 /** @mainpage CIPster - Open Source EtherNet/IP(TM) Communication Stack

@@ -5,10 +5,13 @@
  ******************************************************************************/
 
 #include <unordered_map>
+#include <string.h>
 
 #include "opener_api.h"
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
+#include "cipconnectionmanager.h"
+#include "cipconnection.h"
 #include "endianconv.h"
 #include "ciperror.h"
 #include "trace.h"
@@ -16,6 +19,8 @@
 CipMessageRouterRequest     g_request;
 CipMessageRouterResponse    g_response;
 
+/// @brief Array of the available explicit connections
+static CipConn g_explicit_connections[CIPSTER_CIP_NUM_EXPLICIT_CONNS];
 
 /**
  * Class CipClassRegistry
@@ -98,6 +103,96 @@ CipClass* GetCipClass( int class_id )
 
 //-----------------------------------------------------------------------------
 
+class CipMessageRouterClass : public CipClass
+{
+public:
+    CipMessageRouterClass();
+    CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );    // override
+};
+
+
+CipMessageRouterClass::CipMessageRouterClass() :
+    CipClass( kCipMessageRouterClassCode,
+                "Message Router",  // class name
+                (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
+                0,                  // class getAttributeAll mask
+                0,                  // instance getAttributeAll mask
+                1                   // revision
+                )
+{
+    // CIP_Vol_1 3.19 section 5A-3.3 shows that Message Router class has no
+    // SetAttributeSingle.
+    // Also, conformance test tool does not like SetAttributeSingle on this class,
+    // delete the service which was established in CipClass constructor.
+    delete ServiceRemove( kSetAttributeSingle );
+
+    // reserved for future use -> set to zero
+    g_response.reserved = 0;
+
+    // set reply buffer, using a fixed buffer (about 100 bytes)
+    g_response.data = g_message_data_reply_buffer;
+
+    //TODO this is bad, use a CipConn constructor instead.
+    memset( g_explicit_connections, 0, sizeof g_explicit_connections );
+}
+
+
+static CipConn* getFreeExplicitConnection()
+{
+    for( int i = 0; i < CIPSTER_CIP_NUM_EXPLICIT_CONNS; i++ )
+    {
+        if( g_explicit_connections[i].state == kConnectionStateNonExistent )
+            return &g_explicit_connections[i];
+    }
+
+    return NULL;
+}
+
+
+CipError CipMessageRouterClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+{
+    CipError ret = kCipErrorSuccess;
+
+    EipUint32 producing_connection_id_buffer;
+
+    // TODO add check for transport type trigger
+    // if (0x03 == (g_stDummyCipConn.TransportTypeClassTrigger & 0x03))
+
+    CipConn* explicit_connection = getFreeExplicitConnection();
+
+    if( !explicit_connection )
+    {
+        ret = kCipErrorConnectionFailure;
+
+        *extended_error = kConnectionManagerStatusCodeErrorNoMoreConnectionsAvailable;
+    }
+    else
+    {
+        CopyConnectionData( explicit_connection, aConn );
+
+        producing_connection_id_buffer = explicit_connection->producing_connection_id;
+
+        GeneralConnectionConfiguration( explicit_connection );
+
+        explicit_connection->producing_connection_id = producing_connection_id_buffer;
+        explicit_connection->instance_type = kConnInstanceTypeExplicit;
+
+        explicit_connection->consuming_socket = kEipInvalidSocket;
+        explicit_connection->producing_socket = kEipInvalidSocket;
+
+        // set the connection call backs
+        explicit_connection->connection_close_function = RemoveFromActiveConnections;
+
+        // explicit connection have to be closed on time out
+        explicit_connection->connection_timeout_function = RemoveFromActiveConnections;
+
+        AddNewActiveConnection( explicit_connection );
+    }
+
+    return ret;
+}
+
+
 static CipInstance* createCipMessageRouterInstance()
 {
     CipClass* clazz = GetCipClass( kCipMessageRouterClassCode );
@@ -115,29 +210,11 @@ EipStatus CipMessageRouterInit()
     // may not already be registered.
     if( !GetCipClass( kCipMessageRouterClassCode ) )
     {
-        CipClass* clazz = new CipClass( kCipMessageRouterClassCode,
-                "Message Router",  // class name
-                (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
-                0,                  // class getAttributeAll mask
-                0,                  // instance getAttributeAll mask
-                1                   // revision
-                );
+        CipClass* clazz = new CipMessageRouterClass();
 
         RegisterCipClass( clazz );
 
-        // CIP_Vol_1 3.19 section 5A-3.3 shows that Message Router class has no
-        // SetAttributeSingle.
-        // Also, conformance test tool does not like SetAttributeSingle on this class,
-        // delete the service which was established in CipClass constructor.
-        delete clazz->ServiceRemove( kSetAttributeSingle );
-
         createCipMessageRouterInstance();
-
-        // reserved for future use -> set to zero
-        g_response.reserved = 0;
-
-        // set reply buffer, using a fixed buffer (about 100 bytes)
-        g_response.data = g_message_data_reply_buffer;
     }
 
     return kEipStatusOk;
@@ -153,21 +230,35 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
 
     CIPSTER_TRACE_INFO( "notifyMR: routing unconnected message\n" );
 
-    EipByte nStatus = g_request.InitRequest( data, data_length );
+    CipError result = g_request.InitRequest( data, data_length );
 
-    if( nStatus != kCipErrorSuccess )
+    if( result != kCipErrorSuccess )
     {
         CIPSTER_TRACE_ERR( "notifyMR: error from createMRRequeststructure\n" );
-        g_response.general_status = nStatus;
+        g_response.general_status = result;
         g_response.size_of_additional_status = 0;
         g_response.reserved = 0;
         g_response.data_length = 0;
         g_response.reply_service = 0x80 | g_request.service;
     }
+
     else
     {
         // Forward request to appropriate Object if it is registered.
-        CipClass*   clazz = GetCipClass( g_request.request_path.GetClass() );
+        CipClass*   clazz = NULL;
+
+        if( g_request.request_path.HasLogical() )
+            clazz = GetCipClass( g_request.request_path.GetClass() );
+        else if( g_request.request_path.HasSymbol() )
+        {
+            // per Rockwell Automation Publication 1756-PM020D-EN-P - June 2016:
+            // Symbol Class Id is 0x6b.  Forward this request to that class.
+            // This is not implemented in core stack, but can be added by
+            // an application using this CIPster stack using simple
+            // RegisterCipClass( CipClass* aClass );  In such a case I suppose instances
+            // of this class might be tags.
+            clazz = GetCipClass( 0x6b );
+        }
 
         if( !clazz )
         {
@@ -234,7 +325,7 @@ CipError CipMessageRouterRequest::InitRequest( EipUint8* aRequest, EipInt16 aCou
 
     int result = request_path.DeserializePadded( aRequest, aRequest + byte_count );
 
-    if( result < 0 )
+    if( result <= 0 )
     {
         return kCipErrorPathSegmentError;
     }

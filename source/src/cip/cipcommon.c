@@ -75,10 +75,10 @@ void CipStackInit( EipUint16 unique_connection_id )
     eip_status = CipEthernetLinkInit();
     CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
-    eip_status = ConnectionManagerInit( unique_connection_id );
+    eip_status = ConnectionManagerInit();
     CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
-    eip_status = ConnectionClassInit();
+    eip_status = ConnectionClassInit( unique_connection_id );
     CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
     eip_status = CipAssemblyInitialize();
@@ -553,6 +553,14 @@ CipClass::~CipClass()
 
         services.erase( services.begin() );
     }
+}
+
+
+CipError CipClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+{
+    CIPSTER_TRACE_INFO( "%s: NOT implemented for class '%s'\n", __func__, ClassName().c_str() );
+    *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
+    return kCipErrorConnectionFailure;
 }
 
 

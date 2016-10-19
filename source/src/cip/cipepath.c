@@ -11,11 +11,43 @@
 #include "endianconv.h"
 
 
+//* @brief Enum containing values which kind of logical segment is encoded
+enum LogicalSegmentType
+{
+    kLogicalSegmentTypeClassId         = 0x00 + kSegmentTypeLogical,    ///< Class ID
+    kLogicalSegmentTypeInstanceId      = 0x04 + kSegmentTypeLogical,    ///< Instance ID
+    kLogicalSegmentTypeMemberId        = 0x08 + kSegmentTypeLogical,    ///< Member ID
+    kLogicalSegmentTypeConnectionPoint = 0x0C + kSegmentTypeLogical,    ///< Connection Point
+    kLogicalSegmentTypeAttributeId     = 0x10 + kSegmentTypeLogical,    ///< Attribute ID
+    kLogicalSegmentTypeSpecial         = 0x14 + kSegmentTypeLogical,    ///< Special
+    kLogicalSegmentTypeService         = 0x18 + kSegmentTypeLogical,    ///< Service ID
+    kLogicalSegmentTypeExtendedLogical = 0x1C + kSegmentTypeLogical,    ///< Extended Logical
+};
+
+
+enum NetworkSegmentSubType
+{
+    kProductionTimeInhibitTimeNetworkSegment = 0x43 ///< production inhibit time network segment
+};
+
+
+enum DataSegmentType
+{
+    kDataSegmentTypeSimpleDataMessage         = kSegmentTypeData + 0x00,
+    kDataSegmentTypeAnsiExtendedSymbolMessage = kSegmentTypeData + 0x11
+};
+
+
+
 CipAppPath& CipAppPath::operator = ( const CipAppPath& other )
 {
     pbits = other.pbits;
 
-    memcpy( stuff, other.stuff, sizeof( stuff ) );
+    if( HasLogical() )
+        memcpy( stuff, other.stuff, sizeof stuff );
+
+    if( HasSymbol() )
+        memcpy( tag, other.tag, sizeof tag );
 }
 
 
@@ -36,7 +68,29 @@ bool CipAppPath::operator == ( const CipAppPath& other ) const
     if( HasConnPt() && stuff[CONN_PT] != other.stuff[CONN_PT] )
         return false;
 
+    if( HasSymbol() && strcmp( tag, other.tag ) )
+        return false;
+
     return true;
+}
+
+
+bool CipAppPath::SetSymbol( const char* aSymbol )
+{
+    int slen = strlen( aSymbol );
+    if( slen > (int) sizeof(tag) - 1 )
+        return false;
+    strcpy( tag, aSymbol );
+
+    pbits |= (1<<TAG);
+
+    return true;
+}
+
+
+const char* CipAppPath::GetSymbol() const
+{
+    return HasSymbol() ? tag : "";
 }
 
 
@@ -68,151 +122,254 @@ CipAttribute* CipAppPath::Attribute( int aAttrId ) const
 }
 
 
+static EipByte* serialize( EipByte* p, int seg_type, unsigned aValue )
+{
+    if( aValue < 256 )
+    {
+        *p++ = seg_type;
+        *p++ = aValue;
+    }
+    else if( aValue < 65536 )
+    {
+        *p++ = seg_type | 1;
+        AddIntToMessage( aValue, &p );
+    }
+    else
+    {
+        *p++ = seg_type | 2;
+        AddDintToMessage( aValue, &p );
+    }
+    return p;
+}
+
+
 int CipAppPath::SerializePadded( EipByte* aDst, EipByte* aLimit )
 {
     EipByte*   p = aDst;
 
-    if( HasClass() )
+    if( HasSymbol() )
     {
-        int class_id = GetClass();
+        if( p < aLimit )
+        {
+            int tag_count = strlen( tag );
 
-        if( class_id < 256 )
-        {
-            *p++ = 0x20;   // 8 Bit Class Id
-            *p++ = (EipByte) class_id;
+            *p++ = kDataSegmentTypeAnsiExtendedSymbolMessage;
+            *p++ = tag_count;
+
+            for( int i = 0; i < tag_count;  ++i )
+                *p++ = tag[i];
+
+            if( (p - aDst) & 1 )
+                *p++ = 0;               // output possible pad byte
         }
-        else
-        {
-            *p++ = 0x20 | 1;
-            *p++ = 0;      // pad byte
-            AddIntToMessage( class_id, &p );
-        }
+
+        if( p < aLimit && HasConnPt() )
+            p = serialize( p, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
+
+        if( p < aLimit && HasMember() )
+            p = serialize( p, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
     }
 
-    if( HasInstance() )
+    else    // is logical
     {
-        int instance_id = GetInstance();
+        if( p < aLimit && HasClass() )
+            p = serialize( p, kLogicalSegmentTypeClassId, GetClass() );
 
-        if( instance_id < 256 )
-        {
-            *p++ = 0x24;
-            *p++ = (EipByte) instance_id;
-        }
-        else
-        {
-            *p++ = 0x24 | 1;
-            *p++ = 0;
-            AddIntToMessage( instance_id, &p );
-        }
-    }
+        if( p < aLimit && HasInstance() )
+            p = serialize( p, kLogicalSegmentTypeInstanceId, GetInstance() );
 
-    if( HasAttribute() )
-    {
-        int attr_id = GetAttribute();
+        if( p < aLimit && HasAttribute() )
+            p = serialize( p, kLogicalSegmentTypeAttributeId, GetAttribute() );
 
-        if( attr_id < 256 )
-        {
-            *p++ = 0x30;
-            *p++ = (EipByte) attr_id;
-        }
-        else
-        {
-            *p++ = 0x30 | 1;
-            *p++ = 0;
-            AddIntToMessage( attr_id, &p );
-        }
-    }
-
-    if( HasConnPt() )
-    {
-        int cn_pt = GetConnPt();
-
-        if( cn_pt < 256 )
-        {
-            *p++ = 0x2c;
-            *p++ = (EipByte) cn_pt;
-        }
-        else
-        {
-            *p++ = 0x2c | 1;
-            *p++ = 0;
-            AddIntToMessage( cn_pt, &p );
-        }
+        if( p < aLimit && HasConnPt() )
+            p = serialize( p, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
     }
 
     return p - aDst;
 }
 
 
-int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* aPreviousToInheritFrom )
+inline int CipAppPath::deserialize_logical( EipByte* aSrc, CipAppPath::Stuff aField, int aFormat )
 {
-    EipByte*    p = aSrc;
-    Stuff       last_member = STUFF_COUNT;      // exit loop when higher member
-                                                // is seen, C-1.6 of Vol1_3.19
-    Clear();
+    CIPSTER_ASSERT( aFormat >= 0 && aFormat <= 2 );
+    CIPSTER_ASSERT( aField==MEMBER || aField==CONN_PT || aField==ATTRIBUTE ||
+        aField==INSTANCE || aField==CLASS );
 
-    while( p < aLimit )
+    EipByte* p = aSrc;
+
+    int value;
+
+    if( aFormat == 0 )
+        value = *p++;
+    else if( aFormat == 1 )
+    {
+        ++p;
+        value = GetIntFromMessage( &p );
+    }
+    else if( aFormat == 2 )
+    {
+        ++p;
+        value = GetDintFromMessage( &p );
+    }
+
+    stuff[aField] = value;
+    pbits |= 1 << aField;
+
+    return p - aSrc;
+}
+
+
+inline int CipAppPath::deserialize_symbolic( EipByte* aSrc, EipByte* aLimit )
+{
+    EipByte* p = aSrc;
+
+    if( p < aLimit )
     {
         int first = *p;
 
-        int seg_type = 0xfc & first;
-        int format   = 0x03 & first;
-
-        Stuff   next;
-
-        switch( seg_type )
+        if( first == kDataSegmentTypeAnsiExtendedSymbolMessage )
         {
-        case kLogicalSegmentTypeClassId:            next = CLASS;       break;
-        case kLogicalSegmentTypeInstanceId:         next = INSTANCE;    break;
-        case kLogicalSegmentTypeAttributeId:        next = ATTRIBUTE;   break;
-        case kLogicalSegmentTypeConnectionPoint:    next = CONN_PT;     break;
+            ++p;     // ate first
 
-        default:
-            // C-1.6 of Vol1_3.19; is an expected termination point, not an error.
-            goto exit;
+            int byte_count = *p++;
+
+            if( byte_count >= (int) sizeof(tag) )
+                byte_count = sizeof(tag) - 1;
+
+            int i = 0;
+            while( i < byte_count )
+                tag[i++] = *p++;
+
+            tag[i] = 0;
+
+            if( (p - aSrc) & 1 )
+                ++p;                // consume pad byte if any
+
+            pbits |= (1<<TAG);
         }
 
-        if( next >= last_member )
+        else if( (first & 0xe0) == kSegmentTypeSymbolic )   // Symbolic Segment
         {
-            // C-1.6 of Vol1_3.19; is an expected termination point, not an error.
-            goto exit;
+            int symbol_size = first & 0x1f; // cannot exceed 31 which is max of nul terminated 'tag'
+
+            if( symbol_size == 0 )
+            {
+                CIPSTER_TRACE_ERR( "%s: saw unsupported 'extended' Symbolic Segment\n", __func__ );
+                goto exit;
+            }
+
+            ++p;    // ate first
+
+            int i = 0;
+            while( i < symbol_size )
+                tag[i++] = *p++;
+
+            tag[i] = 0;
+
+            if( (p - aSrc) & 1 )
+                ++p;                // skip pad byte if any
+
+            pbits |= (1<<TAG);
         }
-
-        ++p;        // ate first
-
-        int value;
-
-        if( format == 0 )
-            value = *p++;
-        else if( format == 1 )
-        {
-            ++p;
-            value = GetIntFromMessage( &p );
-        }
-        else if( format == 2 )
-        {
-            ++p;
-            value = GetDintFromMessage( &p );
-        }
-        else
-        {
-            CIPSTER_TRACE_ERR( "%s: unexpected format in logical segment\n", __func__ );
-            value = 0;
-        }
-
-        // a contrived Set*() mimic:
-        stuff[next] = value;
-        pbits |= (1 << next);
-
-        last_member = next;
     }
 
 exit:
+    return p - aSrc;
+}
 
+
+int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* aPreviousToInheritFrom )
+{
+    EipByte*    p = aSrc;
+                                                // is seen, C-1.6 of Vol1_3.19
+    Clear();
+
+    int result = deserialize_symbolic( p, aLimit );
+
+    if( result > 0 )
+    {
+        p += result;
+
+        if( p < aLimit )
+        {
+            int first = *p;
+
+            // Grammar in C.1.5 shows we can have Connection_Point optionally here:
+            if( (first & 0xfc) == kLogicalSegmentTypeConnectionPoint )
+            {
+                ++p;
+                p += deserialize_logical( p, CONN_PT, first & 3 );
+            }
+        }
+
+        if( p < aLimit )
+        {
+            int first = *p;
+
+            /*
+
+                Grammar in C.1.5 shows we can have member_specification optionally here.
+
+                member id is the "element id" found in A-B publication
+                "Logix5000 Data Access" (Rockwell Automation Publication
+                1756-PM020D-EN-P - June 2016) and is expected only in the
+                context of a symbolic address accoring to that document.
+
+            */
+            if( (first & 0xfc) == kLogicalSegmentTypeMemberId )
+            {
+
+                ++p;
+                p += deserialize_logical( p, MEMBER, first & 3 );
+            }
+        }
+    }
+
+    else    // check for logical rather than symbolic
+    {
+        Stuff   last_member = STUFF_COUNT;      // exit loop when higher member
+
+        while( p < aLimit )
+        {
+            int first = *p;
+
+            int seg_type = 0xfc & first;
+            int format   = 0x03 & first;
+
+            Stuff   next;
+
+            switch( seg_type )
+            {
+            case kLogicalSegmentTypeClassId:            next = CLASS;       break;
+            case kLogicalSegmentTypeInstanceId:         next = INSTANCE;    break;
+            case kLogicalSegmentTypeAttributeId:        next = ATTRIBUTE;   break;
+            case kLogicalSegmentTypeConnectionPoint:    next = CONN_PT;     break;
+
+            default:
+                // C-1.6 of Vol1_3.19; is an expected termination point, not an error.
+                goto logical_exit;
+            }
+
+            if( next >= last_member )
+            {
+                // C-1.6 of Vol1_3.19; is an expected termination point, not an error.
+                goto logical_exit;
+            }
+
+            ++p;  // ate first
+
+            p += deserialize_logical( p, next, format );
+
+            last_member = next;
+        }
+
+logical_exit:
+        if( p > aSrc && aPreviousToInheritFrom )
+            inherit( last_member + 1, aPreviousToInheritFrom );
+    }
+
+exit:
     int byte_count = p - aSrc;
-
-    if( byte_count && aPreviousToInheritFrom )
-        inherit( last_member + 1, aPreviousToInheritFrom );
 
     return byte_count;
 }
@@ -351,7 +508,7 @@ int CipSimpleDataSegment::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
 
     int first = *p++;
 
-    if( first == kSegmentTypeData )
+    if( first == kDataSegmentTypeSimpleDataMessage )
     {
         int word_count = *p++;
 

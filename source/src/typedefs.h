@@ -82,15 +82,17 @@ static const int kEipInvalidSocket = -1;
  *
  */
 
+
 /** @brief EIP stack status enum
  *
  */
 enum EipStatus
 {
-    kEipStatusOk = 0,           ///< Stack is ok
-    kEipStatusOkSend    = 1,    ///< Stack is ok, after send
-    kEipStatusError     = -1    ///< Stack is in error
+    kEipStatusOk      = 0,  ///< Stack is ok
+    kEipStatusOkSend  = 1,  ///< Stack is ok, after send
+    kEipStatusError   = -1  ///< Stack is in error
 };
+
 
 /** @brief Communication direction of an UDP socket; consuming is receiver,
  * producing is sender

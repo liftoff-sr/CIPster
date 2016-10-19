@@ -48,31 +48,31 @@ enum SegmentType
     kSegmentTypeSegmentTypeReserved = 0xE0
 };
 
-
-//* @brief Enum containing values which kind of logical segment is encoded
-enum LogicalSegmentType
+//* @brief Connection Manager Error codes
+enum ConnectionManagerStatusCode
 {
-    kLogicalSegmentTypeClassId         = 0x00 + kSegmentTypeLogical,    ///< Class ID
-    kLogicalSegmentTypeInstanceId      = 0x04 + kSegmentTypeLogical,    ///< Instance ID
-    kLogicalSegmentTypeMemberId        = 0x08 + kSegmentTypeLogical,    ///< Member ID
-    kLogicalSegmentTypeConnectionPoint = 0x0C + kSegmentTypeLogical,    ///< Connection Point
-    kLogicalSegmentTypeAttributeId     = 0x10 + kSegmentTypeLogical,    ///< Attribute ID
-    kLogicalSegmentTypeSpecial         = 0x14 + kSegmentTypeLogical,    ///< Special
-    kLogicalSegmentTypeService         = 0x18 + kSegmentTypeLogical,    ///< Service ID
-    kLogicalSegmentTypeExtendedLogical = 0x1C + kSegmentTypeLogical,    ///< Extended Logical
-};
-
-
-enum NetworkSegmentSubType
-{
-    kProductionTimeInhibitTimeNetworkSegment = 0x43 ///< production inhibit time network segment
-};
-
-
-enum DataSegmentType
-{
-    kDataSegmentTypeSimpleDataMessage = kSegmentTypeData + 0x00,
-    kDataSegmentTypeAnsiExtendedSymbolMessage = kSegmentTypeData + 0x11
+    kConnectionManagerStatusCodeSuccess = 0x00,
+    kConnectionManagerStatusCodeErrorConnectionInUse = 0x0100,
+    kConnectionManagerStatusCodeErrorTransportTriggerNotSupported = 0x0103,
+    kConnectionManagerStatusCodeErrorOwnershipConflict = 0x0106,
+    kConnectionManagerStatusCodeErrorConnectionNotFoundAtTargetApplication = 0x0107,
+    kConnectionManagerStatusCodeErrorInvalidOToTConnectionType  = 0x123,
+    kConnectionManagerStatusCodeErrorInvalidTToOConnectionType  = 0x124,
+    kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize  = 0x127,
+    kConnectionManagerStatusCodeErrorInvalidTToOConnectionSize  = 0x128,
+    kConnectionManagerStatusCodeErrorNoMoreConnectionsAvailable = 0x0113,
+    kConnectionManagerStatusCodeErrorVendorIdOrProductcodeError = 0x0114,
+    kConnectionManagerStatusCodeErrorDeviceTypeError    = 0x0115,
+    kConnectionManagerStatusCodeErrorRevisionMismatch   = 0x0116,
+    kConnectionManagerStatusCodeErrorPITGreaterThanRPI  = 0x011b,
+    kConnectionManagerStatusCodeInvalidConfigurationApplicationPath = 0x0129,
+    kConnectionManagerStatusCodeInvalidConsumingApllicationPath     = 0x012A,
+    kConnectionManagerStatusCodeInvalidProducingApplicationPath     = 0x012B,
+    kConnectionManagerStatusCodeInconsistentApplicationPathCombo    = 0x012F,
+    kConnectionManagerStatusCodeNonListenOnlyConnectionNotOpened    = 0x0119,
+    kConnectionManagerStatusCodeErrorParameterErrorInUnconnectedSendService = 0x0205,
+    kConnectionManagerStatusCodeErrorInvalidSegmentTypeInPath   = 0x0315,
+    kConnectionManagerStatusCodeTargetObjectOutOfConnections    = 0x011A
 };
 
 
@@ -160,10 +160,10 @@ enum CIPServiceCode
     // End CIP common services
 
     // Start CIP object-specific services
-    kForwardOpen = 0x54,
-    kLargeForwardOpen = 0x5b,
     kForwardClose = 0x4E,
     kUnconnectedSend = 0x52,
+    kForwardOpen = 0x54,
+    kLargeForwardOpen = 0x5b,
     kGetConnectionOwner = 0x5A
     // End CIP object-specific services
 };
@@ -246,7 +246,9 @@ struct CipRevision
 };
 
 
-#define MAX_SIZE_OF_ADD_STATUS      2    // for now we support extended status codes up to 2 16bit values there is mostly only one 16bit value used
+/// For now we support extended status codes up to 2 16bit values.
+/// There is mostly only one 16bit value used
+#define NUM_ADD_STATUS      2
 
 
 class CipInstance;
@@ -254,6 +256,7 @@ class CipAttribute;
 class CipClass;
 struct CipMessageRouterRequest;
 struct CipMessageRouterResponse;
+struct CipConn;
 
 
 /** @ingroup CIP_API
@@ -609,6 +612,18 @@ public:
     EipUint32   get_attribute_all_mask;     /**< mask indicating which attributes are
                                               *  returned by getAttributeAll*/
 
+    /**
+     * Function OpenConnection
+     * should be overridden in derived classes which DO handle open connections.
+     * These include "Message Router" and "Assembly" classes at this time, but
+     * user defined CipClasses can also override this function.
+     *
+     * @param aConn The connection object which is opening the connection
+     *
+     * @param extended_error_code The returned error code of the connection object
+     * @return CIPError
+     */
+    virtual     CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );
 
 protected:
 
