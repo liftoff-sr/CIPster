@@ -295,7 +295,7 @@ class CipAttribute
 
 public:
     CipAttribute(
-            EipUint16   aAttributeId,
+            int         aAttributeId,
             EipUint8    aType,
             EipUint8    aFlags,
 
@@ -308,9 +308,9 @@ public:
 
     virtual ~CipAttribute();
 
-    EipUint16   Id() const              { return attribute_id; }
+    int     Id() const                  { return attribute_id; }
 
-    EipUint16   attribute_id;
+    int         attribute_id;
     EipUint8    type;
     EipUint8    attribute_flags;         /**<   0 => getable_all,
                                                 1 => getable_single;
@@ -376,11 +376,11 @@ class CipInstance
 public:
     typedef std::vector<CipAttribute*>      CipAttributes;
 
-    CipInstance( EipUint32 aInstanceId );
+    CipInstance( int aInstanceId );
 
     virtual ~CipInstance();
 
-    EipUint32   Id() const { return instance_id; }
+    int   Id() const { return instance_id; }
 
     /**
      * Function AttributeInsert
@@ -420,10 +420,10 @@ public:
         return attributes;
     }
 
-    EipUint32       instance_id;    ///< this instance's number (unique within the class)
+    int             instance_id;    ///< this instance's number (unique within the class)
     CipClass*       owning_class;   ///< class the instance belongs to or NULL if none.
 
-    EipUint16       highest_inst_attr_id;    ///< highest attribute_id for this instance
+    int             highest_inst_attr_id;    ///< highest attribute_id for this instance
 
 protected:
     CipAttributes       attributes;     ///< sorted pointer array to CipAttribute, unique to this instance
@@ -479,7 +479,7 @@ public:
 
     virtual ~CipService() {}
 
-    EipUint8  Id() const                    { return service_id; }
+    int  Id() const                         { return service_id; }
 
     const std::string& ServiceName() const  { return service_name; }
 
@@ -487,7 +487,7 @@ public:
 
 protected:
     std::string service_name;               ///< name of the service
-    EipUint8    service_id;                 ///< service number
+    int         service_id;                 ///< service number
 };
 
 
@@ -594,23 +594,27 @@ public:
     CipInstance* Instance( EipUint32 instance_id ) const;
 
     /// Return a read only collection of CipInstances.
-    const CipInstances& Instances() const
-    {
-        return instances;
-    }
+    const CipInstances& Instances() const   { return instances; }
 
     const std::string& ClassName() const    { return class_name; }
 
-    EipUint32   class_id;                   ///< class ID
-    EipUint16   revision;                   ///< class revision
-    EipUint16   highest_attr_id;            /**< highest defined attribute number
+    int ClassId() const                     { return class_id; }
+
+    int         revision;                   ///< class revision
+    int         highest_attr_id;            /**< highest defined attribute number
                                              *  (attribute numbers are not necessarily
                                              *  consecutive)*/
 
-    EipUint16   highest_inst_id;            ///< highest defined instance number, not necessarily consecutive
+    int         highest_inst_id;            ///< highest defined instance number, not necessarily consecutive
 
     EipUint32   get_attribute_all_mask;     /**< mask indicating which attributes are
                                               *  returned by getAttributeAll*/
+
+    /**
+     * Function FindUniqueFreeId
+     * returns the first unused instance Id.
+     */
+    int FindUniqueFreeId() const;
 
     /**
      * Function OpenConnection
@@ -626,6 +630,8 @@ public:
     virtual     CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );
 
 protected:
+
+    int         class_id;                   ///< class ID
 
     std::string class_name;                 ///< class name
 
@@ -673,8 +679,6 @@ protected:
             CIPSTER_TRACE_INFO( "id:%d\n", (*it)->Id() );
         }
     }
-
-    int find_unique_free_id() const;
 
 private:
     CipClass( CipClass& );                  // private because not implemented

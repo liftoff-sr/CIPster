@@ -42,8 +42,8 @@ static EipUint8 s_packet[1200];
 
 #define MAX_NO_OF_TCP_SOCKETS 10
 
-typedef long MilliSeconds;
-typedef unsigned long long MicroSeconds;
+// typedef unsigned long long MicroSeconds;
+typedef unsigned MicroSeconds;
 
 static fd_set master_set;
 static fd_set read_set;
@@ -57,8 +57,8 @@ static int highest_socket_handle;
  */
 static int g_current_active_tcp_socket;
 
-static MilliSeconds g_actual_time;
-static MilliSeconds g_last_time;
+static MicroSeconds g_actual_time_usecs;
+static MicroSeconds g_last_time_usecs;
 
 void CheckAndHandleUdpUnicastSocket();
 
@@ -107,31 +107,41 @@ const std::string strerrno()
 }
 
 
-static MicroSeconds getMicroSeconds()
+static struct QPC_Init
+{
+    // Call QueryPerformanceFrequency only once during program loading, i.e. static construction.
+    QPC_Init()
+    {
+        LARGE_INTEGER lfrequency;
+
+        frequency = lfrequency.QuadPart;
+
+        QueryPerformanceFrequency( &lfrequency );
+    }
+
+    unsigned long long frequency;
+
+} clock;
+
+
+static MicroSeconds GetMicroSeconds()
 {
     LARGE_INTEGER performance_counter;
-    LARGE_INTEGER lPerformanceFrequency;
 
     QueryPerformanceCounter(&performance_counter);
-    QueryPerformanceFrequency(&lPerformanceFrequency);
 
-    return (MicroSeconds) (performance_counter.QuadPart * 1000000LL / lPerformanceFrequency.QuadPart);
-}
-
-static MilliSeconds GetMilliSeconds()
-{
-    return (MilliSeconds) ( getMicroSeconds() / 1000ULL );
+    return (MicroSeconds) (performance_counter.QuadPart * 1000000LL / clock.frequency );
 }
 
 
-typedef struct
+struct NetworkStatus
 {
     int tcp_listener;
     int udp_unicast_listener;
     int udp_local_broadcast_listener;
     int udp_global_broadcast_listener;
-    MilliSeconds elapsed_time;
-} NetworkStatus;
+    MicroSeconds elapsed_time_usecs;
+};
 
 
 static NetworkStatus g_sockets;
@@ -345,8 +355,8 @@ EipStatus NetworkHandlerInitialize()
         g_sockets.udp_global_broadcast_listener
         );
 
-    g_last_time = GetMilliSeconds();    // initialize time keeping
-    g_sockets.elapsed_time = 0;
+    g_last_time_usecs = GetMicroSeconds();    // initialize time keeping
+    g_sockets.elapsed_time_usecs = 0;
 
     return kEipStatusOk;
 
@@ -406,18 +416,18 @@ EipStatus NetworkHandlerProcessOnce()
         }
     }
 
-    g_actual_time = GetMilliSeconds();
-    g_sockets.elapsed_time += g_actual_time - g_last_time;
-    g_last_time = g_actual_time;
+    g_actual_time_usecs = GetMicroSeconds();
+    g_sockets.elapsed_time_usecs += g_actual_time_usecs - g_last_time_usecs;
+    g_last_time_usecs = g_actual_time_usecs;
 
     /*  check if we had been not able to update the connection manager for
         several CIPSTER_TIMER_TICK.
         This should compensate the jitter of the windows timer
     */
-    while( g_sockets.elapsed_time >= kOpenerTimerTickInMilliSeconds )
+    while( g_sockets.elapsed_time_usecs >= kOpenerTimerTickInMicroSeconds )
     {
         ManageConnections();
-        g_sockets.elapsed_time -= kOpenerTimerTickInMilliSeconds;
+        g_sockets.elapsed_time_usecs -= kOpenerTimerTickInMicroSeconds;
     }
 
     return kEipStatusOk;

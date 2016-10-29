@@ -12,6 +12,8 @@
 #include "typedefs.h"
 #include "cip/ciptypes.h"
 #include "cip/ciperror.h"
+#include "cip/cipmessagerouter.h"
+#include "enet_encap/endianconv.h"
 #include "opener_user_conf.h"
 
 
@@ -152,10 +154,9 @@ int DecodeData( EipUint8 cip_data_type, void* cip_data, EipUint8** cip_message )
  * The notification on received configuration data is handled with the
  * IApp_after_receive function.
  */
-CipInstance* CreateAssemblyInstance( EipUint32 instance_number, EipByte* data,
-        EipUint16 data_length );
+CipInstance* CreateAssemblyInstance( int instance_number, EipByte* data, int data_length );
 
-struct CipConn;
+class CipConn;
 
 /** @ingroup CIP_API
  * @brief Function prototype for handling the closing of connections
@@ -314,7 +315,7 @@ EipStatus ManageConnections();
  * This will issue the production of the specified connection at the next
  * possible occasion. Depending on the values for the RPI and the production
  * inhibit timer. The application is informed via the
- * EIP_BOOL8 BeforeAssemblyDataSend(S_CIP_Instance *pa_pstInstance)
+ * bool BeforeAssemblyDataSend( CipInstance* aInstance )
  * callback function when the production will happen. This function should only
  * be invoked from void HandleApplication(void).
  *
@@ -408,7 +409,7 @@ EipStatus AfterAssemblyDataReceived( CipInstance* instance );
  * object will be sent.
  *
  * Within this function the user can update the data of the assembly object
- * before it gets sent. The application can inform the application if data has
+ * before it gets sent. The application can inform the stack if data has
  * changed.
  * @param aInstance is the assembly instance that should send data.
  * @return data has changed:

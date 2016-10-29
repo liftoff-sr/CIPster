@@ -30,7 +30,9 @@ struct MulticastAddressConfiguration
 };
 
 // global public variables
-extern CipUsint g_time_to_live_value;                           ///< Time-to-live value for IP multicast packets. Default is 1; Minimum is 1; Maximum is 255
+
+/// Time-to-live value for IP multicast packets. Default is 1; Minimum is 1; Maximum is 255
+extern CipUsint g_time_to_live_value;
 
 extern MulticastAddressConfiguration g_multicast_configuration; ///< Multicast configuration
 

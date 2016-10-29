@@ -190,11 +190,17 @@ EipStatus CipIdentityInit()
     {
         CipClass* clazz = new CipClass( kIdentityClassCode,
                 "Identity",                     // class name
-                (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
+
+                // conformance tool wants no instance count attribute in the class, omit no. 3
+                (1<<7)|(1<<6)|(1<<5)|(1<<4)| /* (1<<3)| */ (1<<2)|(1<<1),
                 MASK4( 1, 2, 6, 7 ),            // class getAttributeAll mask		CIP spec 5-2.3.2
                 MASK7( 1, 2, 3, 4, 5, 6, 7 ),   // instance getAttributeAll mask	CIP spec 5-2.3.2
                 1                               // class revision
                 );
+
+        // All attributes are read only, and the conformance tool wants error code
+        // 0x08 not 0x14
+        delete clazz->ServiceRemove( kSetAttributeSingle );
 
         RegisterCipClass( clazz );
 

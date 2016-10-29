@@ -171,9 +171,10 @@ EipStatus ConfigureNetworkInterface( const char* ip_address,
     interface_configuration_.network_mask = inet_addr( subnet_mask );
     interface_configuration_.gateway = inet_addr( gateway );
 
-    // calculate the CIP multicast address. The multicast address is calculated, not input
+    // Calculate the CIP multicast address. The multicast address is calculated, not input.
+    // See CIP spec Vol2 3-5.3 for multicast address algorithm.
     EipUint32 host_id = ntohl( interface_configuration_.ip_address )
-                        & ~ntohl( interface_configuration_.network_mask ); // see CIP spec 3-5.3 for multicast address algorithm
+                        & ~ntohl( interface_configuration_.network_mask );
     host_id -= 1;
     host_id &= 0x3ff;
 

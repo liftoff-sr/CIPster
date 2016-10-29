@@ -40,6 +40,10 @@ protected:
 };
 
 
+/**
+ * Class CipSimpleDataSegment
+ * holds a single data segment or is empty.
+ */
 class CipSimpleDataSegment : public SegmentGroup
 {
 public:
@@ -150,10 +154,22 @@ public:
         pbits |= 1 << CONN_PT;
     }
 
-    void SetMember( int aMember )
+    void SetMember1( int aMember )
     {
-        stuff[MEMBER] = aMember;
-        pbits |= 1 << MEMBER;
+        stuff[MEMBER1] = aMember;
+        pbits |= 1 << MEMBER1;
+    }
+
+    void SetMember2( int aMember )
+    {
+        stuff[MEMBER2] = aMember;
+        pbits |= 1 << MEMBER2;
+    }
+
+    void SetMember3( int aMember )
+    {
+        stuff[MEMBER3] = aMember;
+        pbits |= 1 << MEMBER3;
     }
 
     bool SetSymbol( const char* aSymbol );
@@ -163,7 +179,9 @@ public:
     bool HasAttribute() const           { return pbits & (1<<ATTRIBUTE); }
     bool HasConnPt() const              { return pbits & (1<<CONN_PT); }
     bool HasSymbol() const              { return pbits & (1<<TAG); }
-    bool HasMember() const              { return pbits & (1<<MEMBER); }
+    bool HasMember1() const             { return pbits & (1<<MEMBER1); }
+    bool HasMember2() const             { return pbits & (1<<MEMBER2); }
+    bool HasMember3() const             { return pbits & (1<<MEMBER3); }
 
     bool HasLogical() const
     {
@@ -215,9 +233,19 @@ public:
     /// Return the ASCII symbol, or "" if none.  Will never exceed strlen() == 31.
     const char* GetSymbol() const;
 
-    int GetMember() const
+    int GetMember1() const
     {
-        return HasMember() ? stuff[MEMBER] : 0;
+        return HasMember1() ? stuff[MEMBER1] : 0;
+    }
+
+    int GetMember2() const
+    {
+        return HasMember2() ? stuff[MEMBER2] : 0;
+    }
+
+    int GetMember3() const
+    {
+        return HasMember3() ? stuff[MEMBER3] : 0;
     }
 
     CipClass* Class() const;
@@ -230,23 +258,29 @@ public:
 
     CipAppPath& operator = ( const CipAppPath& other );
 
+    const std::string Format() const;
 
 private:
 
     enum Stuff
     {
-        MEMBER,
-        TAG,
         CONN_PT,
         ATTRIBUTE,
         INSTANCE,
         CLASS,
-        STUFF_COUNT,
+        LOGICAL_END,
+
+        MEMBER1 = LOGICAL_END,  // up to 3 dimensions for array indices max.
+        MEMBER2,
+        MEMBER3,
+        TAG,
+
+        STUFF_COUNT = TAG,  // TAG is not in stuff[], but rather in tag[]
     };
 
     int     stuff[STUFF_COUNT];
 
-    char    tag[32];    // only 31 byte ASCII tags are supported
+    char    tag[42];
 
     int deserialize_symbolic( EipByte* aSrc, EipByte* aLimit );
     int deserialize_logical( EipByte* aSrc, Stuff aField, int aFormat );
@@ -348,8 +382,9 @@ public:
 
     bool HasPortSeg() const             { return pbits & (1<<PORT); }
 
-    bool HasPIT_USECS() const           { return pbits & (1<<PIT_USECS); }
-    bool HasPIT_MSECS() const           { return pbits & (1<<PIT_MSECS); }
+    bool HasPIT_USecs() const           { return pbits & (1<<PIT_USECS); }
+    bool HasPIT_MSecs() const           { return pbits & (1<<PIT_MSECS); }
+    bool HasPIT() const                 { return pbits & ((1<<PIT_USECS) | (1<<PIT_MSECS)); }
     bool HasKey() const                 { return pbits & (1<<KEY); }
 
 
@@ -359,13 +394,28 @@ public:
         pbits |= 1 << PORT;
     }
 
+    unsigned GetPIT_USecs() const       { return HasPIT() ? pit_usecs : 0; }
+
+    void SetPIT_USecs( unsigned aUSECS )
+    {
+        pbits |= (1 << PIT_USECS);
+        pit_usecs = aUSECS;
+    }
+
+    void SetPIT_MSecs( unsigned aMSECS )
+    {
+        pbits |= (1 << PIT_MSECS);
+        pit_usecs = aMSECS * 1000;
+    }
+
     // stuff we might expect in a CipPortSegmentGroup, pbits tells what we got
     CipElectronicKeySegment key;
-    unsigned                pit_usecs;
-    unsigned                pit_msecs;
     CipPortSegment          port;
 
 protected:
+
+    unsigned                pit_usecs;
+
     enum Stuff
     {
         //INVALID = -1,

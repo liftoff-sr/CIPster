@@ -9,8 +9,6 @@
 
 #include "appcontype.h"
 #include "cipconnectionmanager.h"
-#include "opener_api.h"
-
 
 
 /// @brief External globals needed from connectionmanager.c

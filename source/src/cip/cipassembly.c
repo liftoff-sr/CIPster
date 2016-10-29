@@ -9,7 +9,7 @@
 #include "cipassembly.h"
 
 #include "cipcommon.h"
-#include "opener_api.h"
+//#include "opener_api.h"
 #include "trace.h"
 #include "cipconnectionmanager.h"
 
@@ -25,6 +25,8 @@ static EipStatus getAttrAssemblyData( CipAttribute* attr,
 
         return GetAttrData( attr, request, response );
     }
+
+    return kEipStatusOkSend;
 }
 
 
@@ -110,8 +112,7 @@ public:
 };
 
 
-CipInstance* CreateAssemblyInstance( EipUint32 instance_id, EipByte* data,
-        EipUint16 data_length )
+CipInstance* CreateAssemblyInstance( int instance_id, EipByte* data, int data_length )
 {
     CipClass* clazz = GetCipClass( kCipAssemblyClassCode );
 
@@ -142,17 +143,35 @@ CipInstance* CreateAssemblyInstance( EipUint32 instance_id, EipByte* data,
 }
 
 
+class CipAssemblyClass : public CipClass
+{
+public:
+    CipAssemblyClass() :
+        CipClass( kCipAssemblyClassCode,
+            "Assembly",     // aClassName
+            (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
+            0,              // assembly class has no get_attribute_all service
+            0,              // assembly instance has no get_attribute_all service
+            2               // aRevision, according to the CIP spec currently this has to be 2
+            )
+    {
+    }
+
+    CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error ); // override
+};
+
+
+CipError CipAssemblyClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+{
+    return CipConnectionClass::OpenIO( aConn, extended_error );
+}
+
+
 EipStatus CipAssemblyInitialize()
 {
     if( !GetCipClass( kCipAssemblyClassCode ) )
     {
-        CipClass* clazz = new CipClass( kCipAssemblyClassCode,
-                "Assembly",     // aClassName
-                (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
-                0,              // assembly class has no get_attribute_all service
-                0,              // assembly instance has no get_attribute_all service
-                2               // aRevision, according to the CIP spec currently this has to be 2
-                );
+        CipClass* clazz = new CipAssemblyClass();
 
         RegisterCipClass( clazz );
     }
@@ -165,7 +184,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
         EipUint8* data,
         EipUint16 data_length )
 {
-    CIPSTER_ASSERT( instance->owning_class->Id() == kCipAssemblyClassCode );
+    CIPSTER_ASSERT( instance->owning_class->ClassId() == kCipAssemblyClassCode );
 
     // empty path (path size = 0) need to be checked and taken care of in future
 

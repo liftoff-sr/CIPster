@@ -22,13 +22,15 @@ void LeaveStack( int signal );
 // ***************************************************************************
 /** @brief Flag indicating if the stack should end its execution
  */
-int g_end_stack = 0;
+volatile bool g_end_stack;
 
 // ****************************************************************************
 int main( int argc, char* argv[] )
 {
-    EipUint8 my_mac_address[6];
-    EipUint16 unique_connection_id;
+    int ret = 0;
+
+    EipUint8    my_mac_address[6];
+    EipUint16   unique_connection_id;
 
     if( argc != 12 )
     {
@@ -37,7 +39,8 @@ int main( int argc, char* argv[] )
         printf( "%s ipaddress subnetmask gateway domainname hostaddress macaddress\n", argv[0] );
         printf( "e.g.\n" );
         printf( "    %s 192.168.0.2 255.255.255.0 192.168.0.1 test.com testdevice 00 15 C5 BF D0 87\n", argv[0] );
-        exit( 0 );
+        ret = 1;
+        goto exit;
     }
     else
     {
@@ -66,38 +69,49 @@ int main( int argc, char* argv[] )
     // Setup the CIP Layer
     CipStackInit( unique_connection_id );
 
-    // Setup Network Handles
-    if( kEipStatusOk == NetworkHandlerInitialize() )
+    if( ApplicationInitialization() != kEipStatusOk )
     {
-        g_end_stack = 0;
-
-#ifndef _WIN32
-        // register for closing signals so that we can trigger the stack to end
-        signal( SIGHUP, LeaveStack );
-        signal( SIGINT, LeaveStack );
-#endif
-
-        printf( "running...\n" );
-
-        // The event loop. Put other processing you need done continually in here
-        while( 1 != g_end_stack )
-        {
-            if( kEipStatusOk != NetworkHandlerProcessOnce() )
-            {
-                break;
-            }
-        }
-
-        printf( "\ncleaning up and ending...\n" );
-
-        // clean up network state
-        NetworkHandlerFinish();
+        fprintf( stderr, "Unable to initialize Assembly instances\n" );
+        ret = 2;
+        goto shutdown;
     }
 
+    // Setup Network Handles
+    if( NetworkHandlerInitialize() != kEipStatusOk )
+    {
+        fprintf( stderr, "Unable to initialize NetworkHandlers\n" );
+        ret = 3;
+        goto shutdown;
+    }
+
+#ifndef _WIN32
+    // register for closing signals so that we can trigger the stack to end
+    signal( SIGHUP, LeaveStack );
+    signal( SIGINT, LeaveStack );
+#endif
+
+    printf( "running...\n" );
+
+    // The event loop. Put other processing you need done continually in here
+    while( !g_end_stack )
+    {
+        if( kEipStatusOk != NetworkHandlerProcessOnce() )
+        {
+            break;
+        }
+    }
+
+    printf( "\ncleaning up and ending...\n" );
+
+    // clean up network state
+    NetworkHandlerFinish();
+
+shutdown:
     // close remaining sessions and connections, cleanup used data
     ShutdownCipStack();
 
-    return -1;
+exit:
+    return ret;
 }
 
 
@@ -107,5 +121,5 @@ void LeaveStack( int signal )
 
     CIPSTER_TRACE_STATE( "got signal\n" );
 
-    g_end_stack = 1;
+    g_end_stack = true;
 }

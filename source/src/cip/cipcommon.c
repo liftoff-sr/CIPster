@@ -117,7 +117,15 @@ EipStatus NotifyClass( CipClass* cip_class,
     unsigned        instance_id;
     CipService*     service;
 
-    if( !request->request_path.HasInstance() )
+    if( request->request_path.HasSymbol() )
+    {
+        instance_id = 0;   // talk to class 06b instance 0
+    }
+    else if( request->request_path.HasInstance() )
+    {
+        instance_id = request->request_path.GetInstance();
+    }
+    else
     {
         CIPSTER_TRACE_WARN( "%s: no instance specified\n", __func__ );
 
@@ -126,8 +134,6 @@ EipStatus NotifyClass( CipClass* cip_class,
 
         goto exit;
     }
-
-    instance_id = request->request_path.GetInstance();
 
     instance = cip_class->Instance( instance_id );
     if( !instance )
@@ -182,7 +188,7 @@ exit:
 //-----<CipAttrube>-------------------------------------------------------
 
 CipAttribute::CipAttribute(
-        EipUint16   aAttributeId,
+        int         aAttributeId,
         EipUint8    aType,
         EipUint8    aFlags,
 
@@ -270,7 +276,7 @@ EipStatus SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, Cip
 
 //-----<CipInstance>------------------------------------------------------
 
-CipInstance::CipInstance( EipUint32 aInstanceId ) :
+CipInstance::CipInstance( int aInstanceId ) :
     instance_id( aInstanceId ),
     owning_class( 0 ),           // NULL (not owned) until I am inserted into a CipClass
     highest_inst_attr_id( 0 )
@@ -293,6 +299,7 @@ CipInstance::~CipInstance()
         delete attributes[i];
     attributes.clear();
 }
+
 
 bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 {
@@ -564,7 +571,7 @@ CipError CipClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* 
 }
 
 
-int CipClass::find_unique_free_id() const
+int CipClass::FindUniqueFreeId() const
 {
     int last_id = 0;
 
@@ -944,20 +951,20 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
     case kCipUdintUdintUdintUdintUdintString:
         {
             // TCP/IP attribute 5
-            CipTcpIpNetworkInterfaceConfiguration* tcp_ip_network_interface_configuration =
+            CipTcpIpNetworkInterfaceConfiguration* tcp_data =
                 (CipTcpIpNetworkInterfaceConfiguration*) data;
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->ip_address ), &p );
+            AddDintToMessage( ntohl( tcp_data->ip_address ), &p );
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->network_mask ), &p );
+            AddDintToMessage( ntohl( tcp_data->network_mask ), &p );
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->gateway ), &p );
+            AddDintToMessage( ntohl( tcp_data->gateway ), &p );
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->name_server ), &p );
+            AddDintToMessage( ntohl( tcp_data->name_server ), &p );
 
-            AddDintToMessage( ntohl( tcp_ip_network_interface_configuration->name_server_2 ), &p );
+            AddDintToMessage( ntohl( tcp_data->name_server_2 ), &p );
 
-            p += EncodeData( kCipString, &tcp_ip_network_interface_configuration->domain_name, &p );
+            p += EncodeData( kCipString, &tcp_data->domain_name, &p );
         }
         break;
 

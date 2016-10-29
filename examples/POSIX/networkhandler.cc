@@ -30,12 +30,12 @@ extern CipConn* g_active_connection_list;
  *  This buffer size will be used for any received message.
  *  The same buffer is used for the replied explicit message.
  */
-static EipUint8 s_packet[1200];
+static EipByte s_packet[1200];
 
 
 #define MAX_NO_OF_TCP_SOCKETS 10
 
-typedef unsigned  MilliSeconds;
+typedef unsigned  MicroSeconds;
 
 static fd_set master_set;
 static fd_set read_set;
@@ -49,8 +49,8 @@ static int highest_socket_handle;
  */
 static int g_current_active_tcp_socket;
 
-static MilliSeconds g_actual_time;
-static MilliSeconds g_last_time;
+static MicroSeconds g_actual_time_usecs;
+static MicroSeconds g_last_time_usecs;
 
 void CheckAndHandleUdpUnicastSocket();
 
@@ -89,31 +89,30 @@ const std::string strerrno()
 {
     char    buf[256];
 
-    strerror_r( errno, buf, sizeof buf );
-
-    return buf;
+    return strerror_r( errno, buf, sizeof buf );
 }
 
 
-unsigned GetMilliSeconds()
+MicroSeconds GetMicroSeconds()
 {
     struct timespec	now;
 
     clock_gettime( CLOCK_MONOTONIC, &now );
 
-    unsigned msecs = ((unsigned)now.tv_nsec)/(1000*1000) + now.tv_sec * 1000;
-    return msecs;
+    MicroSeconds usecs = ((MicroSeconds)now.tv_nsec)/1000 + (MicroSeconds)now.tv_sec * 1000 * 1000;
+
+    return usecs;
 }
 
 
-typedef struct
+struct NetworkStatus
 {
     int tcp_listener;
     int udp_unicast_listener;
     int udp_local_broadcast_listener;
     int udp_global_broadcast_listener;
-    MilliSeconds elapsed_time;
-} NetworkStatus;
+    MicroSeconds elapsed_time_usecs;
+};
 
 
 static NetworkStatus g_sockets;
@@ -317,8 +316,8 @@ EipStatus NetworkHandlerInitialize()
         g_sockets.udp_global_broadcast_listener
         );
 
-    g_last_time = GetMilliSeconds();    // initialize time keeping
-    g_sockets.elapsed_time = 0;
+    g_last_time_usecs = GetMicroSeconds();    // initialize time keeping
+    g_sockets.elapsed_time_usecs = 0;
 
     return kEipStatusOk;
 
@@ -378,18 +377,18 @@ EipStatus NetworkHandlerProcessOnce()
         }
     }
 
-    g_actual_time = GetMilliSeconds();
-    g_sockets.elapsed_time += g_actual_time - g_last_time;
-    g_last_time = g_actual_time;
+    g_actual_time_usecs = GetMicroSeconds();
+    g_sockets.elapsed_time_usecs += g_actual_time_usecs - g_last_time_usecs;
+    g_last_time_usecs = g_actual_time_usecs;
 
     /*  check if we had been not able to update the connection manager for
         several CIPSTER_TIMER_TICK.
         This should compensate the jitter of the windows timer
     */
-    while( g_sockets.elapsed_time >= kOpenerTimerTickInMilliSeconds )
+    while( g_sockets.elapsed_time_usecs >= kOpenerTimerTickInMicroSeconds )
     {
         ManageConnections();
-        g_sockets.elapsed_time -= kOpenerTimerTickInMilliSeconds;
+        g_sockets.elapsed_time_usecs -= kOpenerTimerTickInMicroSeconds;
     }
 
     return kEipStatusOk;
@@ -430,7 +429,7 @@ bool CheckSocketSet( int socket )
 }
 
 
-EipStatus SendUdpData( struct sockaddr_in* address, int socket, EipUint8* data,
+EipStatus SendUdpData( struct sockaddr_in* address, int socket, EipByte* data,
         EipUint16 data_length )
 {
     int sent_count = sendto( socket, (char*) data, data_length, 0,
@@ -459,6 +458,44 @@ EipStatus SendUdpData( struct sockaddr_in* address, int socket, EipUint8* data,
 }
 
 
+static void dump( const char* aPrompt, EipByte* aBytes, int aCount )
+{
+    int len = printf( "%s:", aPrompt );
+
+    for( int i = 0; i < aCount;  ++i )
+    {
+        if( i && !( i % 16 ) )
+            printf( "\n%*s", len, "" );
+
+        printf( " %02x", aBytes[i] );
+    }
+
+    printf( "\n" );
+}
+
+
+static int ensuredRead(  int sock, EipByte* where, int count )
+{
+    int i;
+    int numRead;
+
+    for( i=0;  i < count;  i += numRead )
+    {
+        numRead = recv( sock, where+i, count - i, 0 );
+        if( numRead == 0 )
+            break;
+
+        else if( numRead == -1 )
+        {
+            i = -1;
+            break;
+        }
+    }
+
+    return i;
+}
+
+
 EipStatus HandleDataOnTcpSocket( int socket )
 {
     /* We will handle just one EIP packet here the rest is done by the select
@@ -468,7 +505,7 @@ EipStatus HandleDataOnTcpSocket( int socket )
      *  fit*/
 
     // Check how many data is here -- read the first four bytes from the connection
-    int num_read = recv( socket, s_packet, 4, 0 );
+    int num_read = ensuredRead( socket, s_packet, 4 );
 
     // TODO we may have to set the socket to a non blocking socket
 
@@ -485,7 +522,7 @@ EipStatus HandleDataOnTcpSocket( int socket )
         return kEipStatusError;
     }
 
-    EipUint8* read_buffer = &s_packet[2];    // here is EIP's data length
+    EipByte* read_buffer = &s_packet[2];    // here is EIP's data length
 
     unsigned packetz = GetIntFromMessage( &read_buffer ) + ENCAPSULATION_HEADER_LENGTH - 4;
     // -4 is for the 4 bytes we have already read
@@ -501,8 +538,11 @@ EipStatus HandleDataOnTcpSocket( int socket )
 
         int readz = sizeof(s_packet);
 
-        do {
-            num_read = recv( socket, &s_packet[0], readz, 0 );
+        unsigned total_read = 0;
+
+        while( total_read < packetz )
+        {
+            num_read = ensuredRead( socket, &s_packet[0], readz );
 
             if( num_read == 0 ) // got error or connection closed by client
             {
@@ -518,18 +558,20 @@ EipStatus HandleDataOnTcpSocket( int socket )
                 return kEipStatusError;
             }
 
-            packetz -= num_read;
+            dump( "bigTCP", s_packet, num_read );
 
-            if( packetz != 0 && packetz < sizeof(s_packet) )
+            total_read += num_read;
+
+            if( packetz - total_read < sizeof(s_packet) )
             {
-                readz = packetz;
+                readz = packetz - total_read;
             }
-        } while( packetz );
+        }
 
         return kEipStatusOk;
     }
 
-    num_read = recv( socket, &s_packet[4], packetz, 0 );
+    num_read = ensuredRead( socket, &s_packet[4], packetz );
 
     if( num_read == 0 ) // got error or connection closed by client
     {
@@ -548,6 +590,8 @@ EipStatus HandleDataOnTcpSocket( int socket )
     {
         // we got the right amount of data
         packetz += 4;
+
+        dump( "rTCP", s_packet, num_read + 4 );
 
         // TODO handle partial packets
         CIPSTER_TRACE_INFO( "Data received on tcp:\n" );
@@ -591,6 +635,8 @@ EipStatus HandleDataOnTcpSocket( int socket )
          * However with typical packet sizes of EIP this should't be a big issue.
          */
         //TODO handle fragmented packets
+
+        CIPSTER_TRACE_ERR( "%s: TCP read problem\n", __func__ );
     }
 
     return kEipStatusError;
@@ -759,7 +805,7 @@ void CheckAndHandleUdpLocalBroadcastSocket()
     socklen_t from_address_length;
 
     // see if this is an unsolicited inbound UDP message
-    if( true == CheckSocketSet( g_sockets.udp_local_broadcast_listener ) )
+    if( CheckSocketSet( g_sockets.udp_local_broadcast_listener ) )
     {
         from_address_length = sizeof(from_address);
 
@@ -783,7 +829,7 @@ void CheckAndHandleUdpLocalBroadcastSocket()
 
         CIPSTER_TRACE_INFO( "Data received on UDP:\n" );
 
-        EipUint8* receive_buffer = &s_packet[0];
+        EipByte* receive_buffer = &s_packet[0];
         int remaining_bytes = 0;
 
         do {
@@ -846,7 +892,7 @@ void CheckAndHandleUdpGlobalBroadcastSocket()
 
         CIPSTER_TRACE_INFO( "Data received on global broadcast UDP:\n" );
 
-        EipUint8* receive_buffer = &s_packet[0];
+        EipByte* receive_buffer = &s_packet[0];
         int remaining_bytes = 0;
 
         do {
@@ -909,7 +955,7 @@ void CheckAndHandleUdpUnicastSocket()
 
         CIPSTER_TRACE_INFO( "Data received on UDP unicast:\n" );
 
-        EipUint8* receive_buffer = &s_packet[0];
+        EipByte* receive_buffer = &s_packet[0];
         int remaining_bytes = 0;
 
         do {
@@ -954,12 +1000,10 @@ void CheckAndHandleConsumingUdpSockets()
     {
         CipConn* conn = iter;
 
-        /*  do this at the beginning as the close function may can
-            make the entry invalid
-        */
+        // do this at the beginning as the close function can make the entry invalid
         iter = iter->next;
 
-        if( -1 != conn->consuming_socket  &&  CheckSocketSet( conn->consuming_socket )  )
+        if( conn->consuming_socket != -1  &&  CheckSocketSet( conn->consuming_socket ) )
         {
             from_address_length = sizeof(from_address);
 

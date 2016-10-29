@@ -44,14 +44,14 @@
  *  void configureExclusiveOwnerConnectionPoint(unsigned pa_unConnNum, unsigned pa_unOutputAssembly, unsigned pa_unInputAssembly, unsigned pa_unConfigAssembly)
  *
  */
-#define CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS 1
+#define CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS 5
 
 /** @brief  Define the number of supported input only connections.
  *  Each of these connections has to be configured with the function
  *  void configureInputOnlyConnectionPoint(unsigned pa_unConnNum, unsigned pa_unOutputAssembly, unsigned pa_unInputAssembly, unsigned pa_unConfigAssembly)
  *
  */
-#define CIPSTER_CIP_NUM_INPUT_ONLY_CONNS 1
+#define CIPSTER_CIP_NUM_INPUT_ONLY_CONNS 5
 
 /** @brief Define the number of supported input only connections per connection path
  */
@@ -62,7 +62,7 @@
  *  void configureListenOnlyConnectionPoint(unsigned pa_unConnNum, unsigned pa_unOutputAssembly, unsigned pa_unInputAssembly, unsigned pa_unConfigAssembly)
  *
  */
-#define CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS 1
+#define CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS 5
 
 /** @brief Define the number of supported Listen only connections per connection path
  */
@@ -79,9 +79,9 @@
  */
 #define CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS 20
 
-/** @brief  The time in ms of the timer used in this implementations
+/** @brief  The time in usecs of the timer used in this implementations
  */
-static const int kOpenerTimerTickInMilliSeconds = 10;
+static const unsigned kOpenerTimerTickInMicroSeconds = 10000;
 
 /** @brief Define if RUN IDLE data is sent with consumed data
  */

@@ -56,13 +56,25 @@ struct CipUnconnectedSendParameter
  */
 EipStatus ConnectionManagerInit();
 
-/** @brief Get a connected object dependent on requested ConnectionID.
+/**
+ * Function GetConnectionByConsumingId
+ * returns a connection that has a matching consuming_connection id.
  *
- *   @param connection_id  requested @var connection_id of opened connection
- *   @return pointer to connected Object
- *           0 .. connection not present in device
+ *   @param aConnectionId is a consuming connection id to find.
+ *   @return CipConn* - the opened connection instance.
+ *           NULL .. open connection not present
  */
-CipConn* GetConnectedObject( EipUint32 connection_id );
+CipConn* GetConnectionByConsumingId( int aConnectionId );
+
+/**
+ * Function GetConnectionByProducingId
+ * returns a connection that has a matching producing_connection id.
+ *
+ *   @param aConnectionId is a producing connection id to find.
+ *   @return CipConn* - the opened connection instance.
+ *           NULL .. open connection not present
+ */
+CipConn* GetConnectionByProducingId( int aConnectionId );
 
 /**  Get a connection object for a given output assembly.
  *

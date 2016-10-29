@@ -235,11 +235,24 @@ struct CipConnPath
 {
     // They arrive in this order when all are present:
 
+    CipPortSegmentGroup     port_segs;
+
     CipAppPath  config_path;
     CipAppPath  consuming_path;     ///< consumption from my perspective, output from network's perspective
     CipAppPath  producing_path;     ///< production from my perspective, input from network's perspective
 
     CipSimpleDataSegment    data_seg;
+
+    const std::string Format() const;
+
+    void Clear()
+    {
+        port_segs.Clear();
+        config_path.Clear();
+        consuming_path.Clear();
+        producing_path.Clear();
+        data_seg.Clear();
+    }
 };
 
 
@@ -257,9 +270,14 @@ public:
         CipInstance( aId )
     {}
 #else
-struct CipConn
+class CipConn
 {
+public:
+
+
 #endif
+
+    void Clear();
 
     CipError parseConnectionPath( CipMessageRouterRequest* request, ConnectionManagerStatusCode* extended_error );
 
@@ -275,7 +293,16 @@ struct CipConn
     EipUint16   producing_connection_size;
     EipUint16   consuming_connection_size;
 
-    EipUint16   expected_packet_rate;
+    EipUint32   GetExpectedPacketRateUSecs() const
+    {
+        return expected_packet_rate_usecs;
+    }
+
+    void SetExpectedPacketRateUSecs( EipUint32 aRateUSecs )
+    {
+        CIPSTER_TRACE_INFO( "%s( %d )\n", __func__, aRateUSecs );
+        expected_packet_rate_usecs = aRateUSecs;
+    }
 
     // conditional
     EipUint32   producing_connection_id;
@@ -299,14 +326,13 @@ struct CipConn
     EipUint16   connection_serial_number;
     EipUint16   originator_vendor_id;
     EipUint32   originator_serial_number;
-    EipUint16   connection_timeout_multiplier;
-    EipUint32   o_to_t_requested_packet_interval;
+    EipUint8    connection_timeout_multiplier;
 
-    NetCnParams o_to_t_ncp;
-
-    EipUint32   t_to_o_requested_packet_interval;
+    EipUint32   t_to_o_RPI_usecs;                         ///< usecs
+    EipUint32   o_to_t_RPI_usecs;                         ///< usecs
 
     NetCnParams t_to_o_ncp;
+    NetCnParams o_to_t_ncp;
 
     TransportTrigger    transport_trigger;          ///< TransportClass_trigger
 
@@ -327,23 +353,40 @@ struct CipConn
                                                      *  different
                                                      *  value than SequenceCountProducing */
 
+    bool eip_level_sequence_count_consuming_first;  ///< true up until first received frame.
+
     EipUint16 sequence_count_producing;             /* sequence Count for Class 1 Producing
                                                      *  Connections */
     EipUint16 sequence_count_consuming;             /* sequence Count for Class 1 Producing
                                                      *  Connections */
 
-    EipInt32    transmission_trigger_timer;
-    EipInt32    inactivity_watchdog_timer;
+    EipInt32    transmission_trigger_timer_usecs;   // signed 32 bits, in usecs
+    EipInt32    inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
 
-    /** @brief Minimal time between the production of two application triggered
+    /**
+     * Function GetProductionInhibitTimeUSecs
+     * returns the minimal time between the production of two application triggered
      * or change of state triggered I/O connection messages
      */
-    EipUint16 production_inhibit_time;
+    EipUint32 GetPIT_USecs() const
+    {
+        return conn_path.port_segs.GetPIT_USecs();
+    }
+
+    bool HasPIT() const
+    {
+        return conn_path.port_segs.HasPIT();
+    }
+
+    void SetPIT_USecs( EipUint32 aUSECS )
+    {
+        conn_path.port_segs.SetPIT_USecs( aUSECS );
+    }
 
     /** @brief Timer for the production inhibition of application triggered or
      * change-of-state I/O connections.
      */
-    EipInt32 production_inhibit_timer;
+    EipInt32 production_inhibit_timer_usecs;
 
     struct sockaddr_in  remote_address;     // socket address for produce
     struct sockaddr_in  originator_address; /* the address of the originator that
@@ -362,6 +405,9 @@ struct CipConn
 
     EipUint16   correct_originator_to_target_size;
     EipUint16   correct_target_to_originator_size;
+
+private:
+    EipUint32   expected_packet_rate_usecs;
 };
 
 
@@ -402,6 +448,7 @@ inline void CopyConnectionData( CipConn* aDst, CipConn* aSrc )
  */
 void GeneralConnectionConfiguration( CipConn* cip_conn );
 
+
 /**
  * Class CipConnection
  * wants to be class_id = 0x05 according to the CIP spec.
@@ -410,8 +457,10 @@ class CipConnectionClass : public CipClass
 {
 public:
     CipConnectionClass();
-    CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );    // override
+
+    static CipError OpenIO( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );
 };
+
 
 
 #endif // CIPIOCONNECTION_H_

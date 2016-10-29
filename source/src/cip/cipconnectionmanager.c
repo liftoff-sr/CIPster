@@ -268,19 +268,13 @@ CipError CipConn::parseConnectionPath( CipMessageRouterRequest* request, Connect
     CipInstance* instance2;     // corresponds to app_path2
     CipInstance* instance3;     // corresponds to app_path3
 
-    CipPortSegmentGroup port_segs;
 
-    // default unused paths to 0 (Invalid), maybe change below.
-    conn_path.config_path.Clear();
-    conn_path.consuming_path.Clear();
-    conn_path.producing_path.Clear();
+    // clear all CipAppPaths and later assign those seen below
+    conn_path.Clear();
 
     config_instance    = 0;
     consuming_instance = 0;
     producing_instance = 0;
-
-    // with 256 we mark that we haven't got a PIT segment
-    production_inhibit_time = 256;
 
     if( g_kForwardOpenHeaderLength + byte_count < request->data_length )
     {
@@ -296,7 +290,7 @@ CipError CipConn::parseConnectionPath( CipMessageRouterRequest* request, Connect
 
     if( message < limit )
     {
-        result = port_segs.DeserializePadded( message, limit );
+        result = conn_path.port_segs.DeserializePadded( message, limit );
 
         if( result < 0 )
         {
@@ -309,10 +303,11 @@ CipError CipConn::parseConnectionPath( CipMessageRouterRequest* request, Connect
     // ignore the port segments if any obtained above
 
     // electronic key?
-    if( port_segs.HasKey() )
+    if( conn_path.port_segs.HasKey() )
     {
-        if( kEipStatusOk != checkElectronicKeyData( &port_segs.key, extended_error ) )
+        if( !checkElectronicKeyData( &conn_path.port_segs.key, extended_error ) )
         {
+            CIPSTER_TRACE_ERR( "%s: checkElectronicKeyData failed\n", __func__ );
             goto L_exit_error;
         }
     }
@@ -662,6 +657,11 @@ CipError CipConn::parseConnectionPath( CipMessageRouterRequest* request, Connect
         }
     }
 
+    CIPSTER_TRACE_INFO( "%s: forward_open conn_path: %s\n",
+        __func__,
+        conn_path.Format().c_str()
+        );
+
     // Save back the current position in the stream allowing followers to parse
     // anything that's still there
     request->data = message;
@@ -704,37 +704,65 @@ EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
     {
         // Check if connected address item or sequenced address item  received,
         // otherwise it is no connected message and should not be here.
-        if( (g_cpf.address_item.type_id == kCipItemIdConnectionAddress)
-         || (g_cpf.address_item.type_id == kCipItemIdSequencedAddressItem) )
+        if( g_cpf.address_item.type_id == kCipItemIdConnectionAddress
+         || g_cpf.address_item.type_id == kCipItemIdSequencedAddressItem )
         {
             // found connected address item or found sequenced address item
             // -> for now the sequence number will be ignored
 
             if( g_cpf.data_item.type_id == kCipItemIdConnectedDataItem ) // connected data item received
             {
-                CipConn* conn = GetConnectedObject( g_cpf.address_item.data.connection_identifier );
+                CipConn* conn = GetConnectionByConsumingId( g_cpf.address_item.data.connection_identifier );
 
                 if( !conn )
+                {
+                    CIPSTER_TRACE_INFO( "%s: no consuming connection for conn_id %d\n",
+                        __func__, g_cpf.address_item.data.connection_identifier
+                        );
                     return kEipStatusError;
+                }
+
+                CIPSTER_TRACE_INFO( "%s: got consuming connection for conn_id %d\n",
+                    __func__, g_cpf.address_item.data.connection_identifier
+                    );
+
+                CIPSTER_TRACE_INFO( "%s: c.s_addr=%08x  f.s_addr=%08x\n",
+                    __func__,
+                    conn->originator_address.sin_addr.s_addr,
+                    from_address->sin_addr.s_addr
+                    );
 
                 // only handle the data if it is coming from the originator
                 if( conn->originator_address.sin_addr.s_addr == from_address->sin_addr.s_addr )
                 {
-                    if( SEQ_GT32(
-                                g_cpf.address_item.data.sequence_number,
-                                conn->eip_level_sequence_count_consuming ) )
+                    CIPSTER_TRACE_INFO( "%s: g.sn=0x%08x  c.sn=0x%08x\n",
+                        __func__,
+                        g_cpf.address_item.data.sequence_number,
+                        conn->eip_level_sequence_count_consuming
+                        );
+
+                    // if this is the first received frame
+                    if( conn->eip_level_sequence_count_consuming_first )
+                    {
+                        // put our tracking count within a half cycle of the leader.  Without this
+                        // there are many scenarios where the SEQ_GT32 below won't evaluate as true.
+                        conn->eip_level_sequence_count_consuming = g_cpf.address_item.data.sequence_number - 1;
+                        conn->eip_level_sequence_count_consuming_first = false;
+                    }
+
+                    // only inform assembly object if the sequence counter is greater or equal, or
+                    if( SEQ_GT32( g_cpf.address_item.data.sequence_number,
+                                  conn->eip_level_sequence_count_consuming ) )
                     {
                         // reset the watchdog timer
-                        conn->inactivity_watchdog_timer =
-                            (conn->o_to_t_requested_packet_interval / 1000) << (2 + conn->connection_timeout_multiplier);
+                        conn->inactivity_watchdog_timer_usecs =
+                            conn->o_to_t_RPI_usecs << (2 + conn->connection_timeout_multiplier);
 
-                        CIPSTER_TRACE_INFO( "%s: reset inactivity_watchdog_timer:%u\n",
+                        CIPSTER_TRACE_INFO( "%s: reset inactivity_watchdog_timer_usecs:%u\n",
                             __func__,
-                            conn->inactivity_watchdog_timer );
+                            conn->inactivity_watchdog_timer_usecs );
 
-                        // only inform assembly object if the sequence counter is greater or equal
-                        conn->eip_level_sequence_count_consuming =
-                            g_cpf.address_item.data.sequence_number;
+                        conn->eip_level_sequence_count_consuming = g_cpf.address_item.data.sequence_number;
 
                         if( conn->connection_receive_data_function )
                         {
@@ -764,8 +792,7 @@ EipStatus ManageConnections()
     HandleApplication();
     ManageEncapsulationMessages();
 
-    for( CipConn* active = g_active_connection_list;  active;
-            active = active->next )
+    for( CipConn* active = g_active_connection_list;  active;  active = active->next )
     {
         if( active->state == kConnectionStateEstablished )
         {
@@ -775,9 +802,9 @@ EipStatus ManageConnections()
                 // All server connections have to maintain an inactivity watchdog timer
                 || active->transport_trigger.IsServer() )
             {
-                active->inactivity_watchdog_timer -= kOpenerTimerTickInMilliSeconds;
+                active->inactivity_watchdog_timer_usecs -= kOpenerTimerTickInMicroSeconds;
 
-                if( active->inactivity_watchdog_timer <= 0 )
+                if( active->inactivity_watchdog_timer_usecs <= 0 )
                 {
                     // we have a timed out connection: perform watchdog check
                     CIPSTER_TRACE_INFO(
@@ -797,7 +824,7 @@ EipStatus ManageConnections()
             if( active->state == kConnectionStateEstablished )
             {
                 // client connection
-                if( active->expected_packet_rate != 0 &&
+                if( active->GetExpectedPacketRateUSecs() != 0 &&
 
                     // only produce for the master connection
                     active->producing_socket != kEipInvalidSocket )
@@ -805,15 +832,15 @@ EipStatus ManageConnections()
                     if( active->transport_trigger.Trigger() != kConnectionTriggerTypeCyclic )
                     {
                         // non cyclic connections have to decrement production inhibit timer
-                        if( 0 <= active->production_inhibit_timer )
+                        if( 0 <= active->production_inhibit_timer_usecs )
                         {
-                            active->production_inhibit_timer -= kOpenerTimerTickInMilliSeconds;
+                            active->production_inhibit_timer_usecs -= kOpenerTimerTickInMicroSeconds;
                         }
                     }
 
-                    active->transmission_trigger_timer -= kOpenerTimerTickInMilliSeconds;
+                    active->transmission_trigger_timer_usecs -= kOpenerTimerTickInMicroSeconds;
 
-                    if( active->transmission_trigger_timer <= 0 ) // need to send package
+                    if( active->transmission_trigger_timer_usecs <= 0 ) // need to send package
                     {
                         CIPSTER_ASSERT( active->connection_send_data_function );
 
@@ -825,12 +852,12 @@ EipStatus ManageConnections()
                         }
 
                         // reload the timer value
-                        active->transmission_trigger_timer = active->expected_packet_rate;
+                        active->transmission_trigger_timer_usecs = active->GetExpectedPacketRateUSecs();
 
                         if( active->transport_trigger.Trigger() != kConnectionTriggerTypeCyclic )
                         {
                             // non cyclic connections have to reload the production inhibit timer
-                            active->production_inhibit_timer = active->production_inhibit_time;
+                            active->production_inhibit_timer_usecs = active->GetPIT_USecs();
                         }
                     }
                 }
@@ -843,10 +870,10 @@ EipStatus ManageConnections()
 
 
 /**
- * Function serializeForwardOpenResponse
+ * Function assembleForwardOpenResponse
  * serializes a response to a forward_open
  */
-static void serializeForwardOpenResponse( CipConn* aConn,
+static void assembleForwardOpenResponse( CipConn* aConn,
         CipMessageRouterResponse* response, CipError general_status,
         ConnectionManagerStatusCode extended_status )
 {
@@ -868,16 +895,6 @@ static void serializeForwardOpenResponse( CipConn* aConn,
 
         response->data_length = 26; // if there is no application specific data
         response->size_of_additional_status = 0;
-
-        if( cpfd->address_info_item[0].type_id != 0 )
-        {
-            cpfd->item_count = 3;
-
-            if( cpfd->address_info_item[1].type_id != 0 )
-            {
-                cpfd->item_count = 4; // there are two sockaddrinfo items to add
-            }
-        }
 
         AddDintToMessage( aConn->consuming_connection_id, &message );
         AddDintToMessage( aConn->producing_connection_id, &message );
@@ -932,8 +949,8 @@ static void serializeForwardOpenResponse( CipConn* aConn,
     if( general_status == kCipErrorSuccess )
     {
         // set the actual packet rate to requested packet rate
-        AddDintToMessage( aConn->o_to_t_requested_packet_interval, &message );
-        AddDintToMessage( aConn->t_to_o_requested_packet_interval, &message );
+        AddDintToMessage( aConn->o_to_t_RPI_usecs, &message );
+        AddDintToMessage( aConn->t_to_o_RPI_usecs, &message );
     }
 
     *message++ = 0;   // remaining path size - for routing devices relevant
@@ -994,7 +1011,7 @@ static EipStatus assembleForwardCloseResponse( EipUint16 connection_serial_numbe
 }
 
 
-CipConn* GetConnectedObject( EipUint32 connection_id )
+CipConn* GetConnectionByConsumingId( int aConnectionId )
 {
     CipConn* conn = g_active_connection_list;
 
@@ -1002,8 +1019,10 @@ CipConn* GetConnectedObject( EipUint32 connection_id )
     {
         if( conn->state == kConnectionStateEstablished )
         {
-            if( conn->consuming_connection_id == connection_id )
+            if( conn->consuming_connection_id == aConnectionId )
+            {
                 return conn;
+            }
         }
 
         conn = conn->next;
@@ -1011,6 +1030,29 @@ CipConn* GetConnectedObject( EipUint32 connection_id )
 
     return NULL;
 }
+
+
+#if 0  // not yet needed
+CipConn* GetConnectionByProducingId( int aConnectionId )
+{
+    CipConn* conn = g_active_connection_list;
+
+    while( conn )
+    {
+        if( conn->state == kConnectionStateEstablished )
+        {
+            if( conn->producing_connection_id == aConnectionId )
+            {
+                return conn;
+            }
+        }
+
+        conn = conn->next;
+    }
+
+    return NULL;
+}
+#endif
 
 
 CipConn* GetConnectedOutputAssembly( EipUint32 output_assembly_id )
@@ -1134,7 +1176,7 @@ EipStatus TriggerConnections( unsigned aOutputAssembly, unsigned aInputAssembly 
             if( conn->transport_trigger.Trigger() == kConnectionTriggerTypeApplication )
             {
                 // produce at the next allowed occurrence
-                conn->transmission_trigger_timer = conn->production_inhibit_timer;
+                conn->transmission_trigger_timer_usecs = conn->production_inhibit_timer_usecs;
                 nRetVal = kEipStatusOk;
             }
 
@@ -1202,7 +1244,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
                     "sending a CIP_CON_MGR_ERROR_CONNECTION_IN_USE response\n" );
         }
 
-        serializeForwardOpenResponse(
+        assembleForwardOpenResponse(
                 &dummy, response,
                 kCipErrorConnectionFailure,
                 kConnectionManagerStatusCodeErrorConnectionInUse );
@@ -1218,41 +1260,54 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     dummy.sequence_count_producing = 0; // set the sequence count to zero
 
     dummy.connection_timeout_multiplier = *request->data++;
+
+    if( dummy.connection_timeout_multiplier > 7 )
+    {
+        // 3-5.4.1.4
+       CIPSTER_TRACE_INFO( "%s: invalid connection timeout multiplier: %u\n",
+           __func__, dummy.connection_timeout_multiplier );
+
+        assembleForwardOpenResponse(
+                &dummy, response,
+                kCipErrorConnectionFailure,
+                kConnectionManagerStatusCodeErrorInvalidOToTConnectionType );
+
+        return kEipStatusOkSend;    // send reply
+    }
+
     request->data += 3; // skip over 3 reserved bytes.
 
-    // the requested packet interval parameter needs to be a multiple of
-    // TIMERTICK from the header file
     CIPSTER_TRACE_INFO(
-        "%s: ConConnID 0x%x, ProdConnID 0x%x, ConnSerNo %u\n",
+        "%s: ConConnID:0x%08x, ProdConnID:0x%08x, ConnSerNo:%u\n",
         __func__,
         dummy.consuming_connection_id,
         dummy.producing_connection_id,
         dummy.connection_serial_number
         );
 
-    dummy.o_to_t_requested_packet_interval = GetDintFromMessage( &request->data );
+    dummy.o_to_t_RPI_usecs = GetDintFromMessage( &request->data );
 
     if( isLarge )
         dummy.o_to_t_ncp.SetLarge( GetDintFromMessage( &request->data ) );
     else
         dummy.o_to_t_ncp.SetNotLarge( GetIntFromMessage( &request->data ) );
 
+    CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, dummy.o_to_t_RPI_usecs );
     CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, dummy.o_to_t_ncp.ConnectionSize() );
     CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, dummy.o_to_t_ncp.Priority() );
     CIPSTER_TRACE_INFO( "%s: o_to_t type:%d\n", __func__, dummy.o_to_t_ncp.ConnectionType() );
 
-    dummy.t_to_o_requested_packet_interval = GetDintFromMessage( &request->data );
+    dummy.t_to_o_RPI_usecs = GetDintFromMessage( &request->data );
 
-    EipUint32 temp = dummy.t_to_o_requested_packet_interval
-                         % (kOpenerTimerTickInMilliSeconds * 1000);
+    // The requested packet interval parameter needs to be a multiple of
+    // kOpenerTimerTickInMicroSeconds from the header file
+    EipUint32 temp = dummy.t_to_o_RPI_usecs % kOpenerTimerTickInMicroSeconds;
 
-    if( temp > 0 )
+    // round up to slower nearest integer multiple of our timer.
+    if( temp )
     {
-        dummy.t_to_o_requested_packet_interval =
-            (EipUint32) ( dummy.t_to_o_requested_packet_interval
-                          / (kOpenerTimerTickInMilliSeconds * 1000) )
-            * (kOpenerTimerTickInMilliSeconds * 1000)
-            + (kOpenerTimerTickInMilliSeconds * 1000);
+        dummy.t_to_o_RPI_usecs = (EipUint32) ( dummy.t_to_o_RPI_usecs / kOpenerTimerTickInMicroSeconds )
+            * kOpenerTimerTickInMicroSeconds + kOpenerTimerTickInMicroSeconds;
     }
 
     if( isLarge )
@@ -1265,7 +1320,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     {
         CIPSTER_TRACE_INFO( "%s: invalid O to T connection type\n", __func__ );
 
-        serializeForwardOpenResponse(
+        assembleForwardOpenResponse(
                 &dummy, response,
                 kCipErrorConnectionFailure,
                 kConnectionManagerStatusCodeErrorInvalidOToTConnectionType );
@@ -1277,7 +1332,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     {
         CIPSTER_TRACE_INFO( "%s: invalid T to O connection type\n", __func__ );
 
-        serializeForwardOpenResponse(
+        assembleForwardOpenResponse(
                 &dummy, response,
                 kCipErrorConnectionFailure,
                 kConnectionManagerStatusCodeErrorInvalidTToOConnectionType );
@@ -1293,7 +1348,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         CIPSTER_TRACE_INFO( "%s: trigger 0x%02x not supported\n",
             __func__, trigger );
 
-        serializeForwardOpenResponse(
+        assembleForwardOpenResponse(
                 &dummy, response,
                 kCipErrorConnectionFailure,
                 kConnectionManagerStatusCodeErrorTransportTriggerNotSupported );
@@ -1309,7 +1364,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     {
         CIPSTER_TRACE_INFO( "%s: unable to parse connection path\n", __func__ );
 
-        serializeForwardOpenResponse( &dummy, response, result, connection_status );
+        assembleForwardOpenResponse( &dummy, response, result, connection_status );
 
         return kEipStatusOkSend;    // send reply
     }
@@ -1323,7 +1378,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         CIPSTER_TRACE_INFO( "%s: OpenConnection() failed. status:0x%x\n", __func__, connection_status );
 
         // in case of error the dummy objects holds all necessary information
-        serializeForwardOpenResponse( &dummy, response, result, connection_status );
+        assembleForwardOpenResponse( &dummy, response, result, connection_status );
 
         return kEipStatusOkSend;    // send reply
     }
@@ -1332,7 +1387,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         CIPSTER_TRACE_INFO( "%s: OpenConnection() succeeded\n", __func__ );
 
         // in case of success, g_active_connection_list points to the new connection
-        serializeForwardOpenResponse( g_active_connection_list,
+        assembleForwardOpenResponse( g_active_connection_list,
                 response, kCipErrorSuccess, kConnectionManagerStatusCodeSuccess );
 
         return kEipStatusOkSend;    // send reply
@@ -1367,9 +1422,8 @@ static EipStatus forwardClose( CipInstance* instance,
 
     CipConn* active = g_active_connection_list;
 
-    // set AddressInfo Items to invalid TypeID to prevent assembleLinearMsg to read them
-    g_cpf.address_info_item[0].type_id   = 0;
-    g_cpf.address_info_item[1].type_id   = 0;
+    // prevent assembleLinearMsg from serializing socket addresses
+    g_cpf.ClearTx();
 
     request->data += 2; // ignore Priority/Time_tick and Time-out_ticks
 

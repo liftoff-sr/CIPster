@@ -5,6 +5,7 @@
  ******************************************************************************/
 
 #include <string.h>
+#include <stdarg.h>
 
 #include "opener_api.h"
 #include "cipepath.h"
@@ -166,8 +167,20 @@ int CipAppPath::SerializePadded( EipByte* aDst, EipByte* aLimit )
         if( p < aLimit && HasConnPt() )
             p = serialize( p, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
 
-        if( p < aLimit && HasMember() )
-            p = serialize( p, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
+        if( p < aLimit && HasMember1() )
+        {
+            p = serialize( p, kLogicalSegmentTypeMemberId, GetMember1() );
+
+            if( p < aLimit && HasMember2() )
+            {
+                p = serialize( p, kLogicalSegmentTypeMemberId, GetMember2() );
+
+                if( p < aLimit && HasMember3() )
+                {
+                    p = serialize( p, kLogicalSegmentTypeMemberId, GetMember3() );
+                }
+            }
+        }
     }
 
     else    // is logical
@@ -192,8 +205,8 @@ int CipAppPath::SerializePadded( EipByte* aDst, EipByte* aLimit )
 inline int CipAppPath::deserialize_logical( EipByte* aSrc, CipAppPath::Stuff aField, int aFormat )
 {
     CIPSTER_ASSERT( aFormat >= 0 && aFormat <= 2 );
-    CIPSTER_ASSERT( aField==MEMBER || aField==CONN_PT || aField==ATTRIBUTE ||
-        aField==INSTANCE || aField==CLASS );
+    CIPSTER_ASSERT( aField==MEMBER1 || aField==MEMBER2 || aField==MEMBER3 ||
+        aField==CONN_PT || aField==ATTRIBUTE || aField==INSTANCE || aField==CLASS );
 
     EipByte* p = aSrc;
 
@@ -233,8 +246,10 @@ inline int CipAppPath::deserialize_symbolic( EipByte* aSrc, EipByte* aLimit )
 
             int byte_count = *p++;
 
-            if( byte_count >= (int) sizeof(tag) )
-                byte_count = sizeof(tag) - 1;
+            if( byte_count > (int) sizeof(tag)-1 )
+            {
+                return -1;
+            }
 
             int i = 0;
             while( i < byte_count )
@@ -250,12 +265,14 @@ inline int CipAppPath::deserialize_symbolic( EipByte* aSrc, EipByte* aLimit )
 
         else if( (first & 0xe0) == kSegmentTypeSymbolic )   // Symbolic Segment
         {
-            int symbol_size = first & 0x1f; // cannot exceed 31 which is max of nul terminated 'tag'
+            // cannot exceed 31 which is less than max of nul terminated 'this->tag'
+            int symbol_size = first & 0x1f;
 
             if( symbol_size == 0 )
             {
                 CIPSTER_TRACE_ERR( "%s: saw unsupported 'extended' Symbolic Segment\n", __func__ );
-                goto exit;
+
+                return -1;
             }
 
             ++p;    // ate first
@@ -273,7 +290,6 @@ inline int CipAppPath::deserialize_symbolic( EipByte* aSrc, EipByte* aLimit )
         }
     }
 
-exit:
     return p - aSrc;
 }
 
@@ -285,6 +301,9 @@ int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* a
     Clear();
 
     int result = deserialize_symbolic( p, aLimit );
+
+    if( result < 0 )
+        return result;
 
     if( result > 0 )
     {
@@ -306,28 +325,35 @@ int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* a
         {
             int first = *p;
 
-            /*
+            Stuff   last_member;
 
-                Grammar in C.1.5 shows we can have member_specification optionally here.
-
-                member id is the "element id" found in A-B publication
-                "Logix5000 Data Access" (Rockwell Automation Publication
-                1756-PM020D-EN-P - June 2016) and is expected only in the
-                context of a symbolic address accoring to that document.
-
-            */
-            if( (first & 0xfc) == kLogicalSegmentTypeMemberId )
+            for( last_member = MEMBER1;  last_member <= MEMBER3; last_member = Stuff(last_member +1) )
             {
+                /*
 
-                ++p;
-                p += deserialize_logical( p, MEMBER, first & 3 );
+                    Grammar in C.1.5 shows we can have member_specification optionally here.
+
+                    member id is the "element id" found in A-B publication
+                    "Logix5000 Data Access" (Rockwell Automation Publication
+                    1756-PM020D-EN-P - June 2016) and is expected only in the
+                    context of a symbolic address accoring to that document.
+
+                */
+                if( (first & 0xfc) == kLogicalSegmentTypeMemberId )
+                {
+
+                    ++p;
+                    p += deserialize_logical( p, last_member, first & 3 );
+                }
+                else
+                    break;
             }
         }
     }
 
     else    // check for logical rather than symbolic
     {
-        Stuff   last_member = STUFF_COUNT;      // exit loop when higher member
+        Stuff   last_member = LOGICAL_END;      // exit loop when higher member
 
         while( p < aLimit )
         {
@@ -375,11 +401,84 @@ exit:
 }
 
 
+static int vprint( std::string* result, const char* format, va_list ap )
+{
+    char    msg[512];
+
+    size_t  len = vsnprintf( msg, sizeof(msg), format, ap );
+
+    if( len < sizeof(msg) )     // the output fit into msg
+    {
+        result->append( msg, msg + len );
+    }
+
+    return len;
+}
+
+
+std::string Sprintf( const char* aFormat, ... )
+{
+    std::string ret;
+    va_list     args;
+
+    va_start( args, aFormat );
+    int ignore = vprint( &ret, aFormat, args );
+    (void) ignore;
+    va_end( args );
+
+    return ret;
+}
+
+
+const std::string CipAppPath::Format() const
+{
+    std::string ret;
+
+    if( HasClass() )
+    {
+        ret += "Class:";
+        ret += Sprintf( "%d", GetClass() );
+
+        if( HasInstance() )
+        {
+            ret += " Instance:";
+            ret += Sprintf( "%d", GetInstance() );
+        }
+
+        if( HasConnPt() )
+        {
+            ret += " ConnPt:";
+            ret += Sprintf( "%d", GetConnPt() );
+        }
+    }
+    else if( HasSymbol() )
+    {
+        ret += "Tag:";
+        ret += tag;
+
+        if( HasMember1() )
+        {
+            ret += Sprintf( "[%d]", GetMember1() );
+
+            if( HasMember2() )
+            {
+                ret += Sprintf( "[%d]", GetMember2() );
+
+                if( HasMember3() )
+                    ret += Sprintf( "[%d]", GetMember3() );
+            }
+        }
+    }
+
+    return ret;
+}
+
+
 void CipAppPath::inherit( int aStart, CipAppPath* aPreviousToInheritFrom )
 {
     CIPSTER_ASSERT( aPreviousToInheritFrom );
 
-    for( int i=aStart;  i < STUFF_COUNT;  ++i )
+    for( int i=aStart;  i < LOGICAL_END;  ++i )
     {
         if( !( pbits & (1<<i) ) && ( aPreviousToInheritFrom->pbits & (1<<i) ) )
         {
@@ -421,6 +520,7 @@ static void parsePortSegment( CipPortSegment* aSegment, EipUint8** aMessage )
 int CipPortSegmentGroup::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
 {
     EipByte*    p = aSrc;
+    EipUint32   value;
 
     Clear();
 
@@ -462,8 +562,8 @@ int CipPortSegmentGroup::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
 
             case 0x43:
                 ++p;
-                pit_msecs = *p++;
-                pbits |= (1<<PIT_MSECS);
+                value = *p++;
+                SetPIT_MSecs( value );  // convert to usecs
                 break;
 
             case 0x51:
@@ -474,19 +574,18 @@ int CipPortSegmentGroup::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
 
                 if( num_words == 1 )
                 {
-                    pit_usecs = GetIntFromMessage( &p );
-                    pbits |= (1<<PIT_USECS);
+                    value = GetIntFromMessage( &p );
                 }
                 else if( num_words == 2 )
                 {
-                    pit_usecs = GetDintFromMessage( &p );
-                    pbits |= (1<<PIT_USECS);
+                    value = GetDintFromMessage( &p );
                 }
                 else
                 {
                     CIPSTER_TRACE_ERR( "%s: unknown PIT_USECS format: %d\n", __func__, num_words );
                     return aSrc - (p - 1);    // return negative byte offset of error
                 }
+                SetPIT_USecs( value );
                 break;
 
             default:

@@ -26,14 +26,15 @@ enum OpenerEndianess
  * @param buffer Pointer to the network buffer array. This pointer will be incremented by 2!
  * @return Extracted 16 bit integer value
  */
-inline EipUint16 GetIntFromMessage( EipUint8** buffer )
+inline EipUint16 GetIntFromMessage( EipByte** buffer )
 {
-    EipUint8*   p = *buffer;
+    EipByte*   p = *buffer;
     EipUint16   data = p[0] | p[1] << 8;
 
     *buffer += 2;
     return data;
 }
+
 
 /** @ingroup ENCAP
  * Function GetDintFromMessage
@@ -41,10 +42,30 @@ inline EipUint16 GetIntFromMessage( EipUint8** buffer )
  * @param buffer pointer to the network buffer array. This pointer will be incremented by 4!
  * @return Extracted 32 bit integer value
  */
-inline EipUint32 GetDintFromMessage( EipUint8** buffer )
+inline EipUint32 GetDintFromMessage( EipByte** buffer )
 {
-    EipUint8* p = *buffer;
+    EipByte* p = *buffer;
     EipUint32 data = p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
+
+    *buffer += 4;
+    return data;
+}
+
+
+inline EipUint16 GetIntFromMessageBE( EipByte** buffer )
+{
+    EipByte*   p = *buffer;
+    EipUint16   data = p[1] | p[0] << 8;
+
+    *buffer += 2;
+    return data;
+}
+
+
+inline EipUint32 GetDintFromMessageBE( EipByte** buffer )
+{
+    EipByte* p = *buffer;
+    EipUint32 data = p[3] | p[2] << 8 | p[1] << 16 | p[0] << 24;
 
     *buffer += 4;
     return data;
@@ -57,7 +78,7 @@ inline EipUint32 GetDintFromMessage( EipUint8** buffer )
  * @param data value to be written
  * @param buffer pointer where data should be written.
  */
-int AddSintToMessage( EipUint8 data, EipUint8** buffer );
+int AddSintToMessage( EipUint8 data, EipByte** buffer );
 
 /** @ingroup ENCAP
  * Function AddIntToMessage
@@ -67,7 +88,10 @@ int AddSintToMessage( EipUint8 data, EipUint8** buffer );
  *
  * @return Length in bytes of the encoded message
  */
-int AddIntToMessage( EipUint16 data, EipUint8** buffer );
+int AddIntToMessage( EipUint16 data, EipByte** buffer );
+
+int AddIntToMessageBE( EipUint16 data, EipByte** buffer );
+
 
 /** @ingroup ENCAP
  * Function AddDintToMessage
@@ -77,7 +101,9 @@ int AddIntToMessage( EipUint16 data, EipUint8** buffer );
  *
  * @return Length in bytes of the encoded message
  */
-int AddDintToMessage( EipUint32 data, EipUint8** buffer );
+int AddDintToMessage( EipUint32 data, EipByte** buffer );
+
+int AddDintToMessageBE( EipUint32 data, EipByte** buffer );
 
 #ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
 
@@ -87,7 +113,7 @@ int AddDintToMessage( EipUint32 data, EipUint8** buffer );
  * @param buffer pointer to pointer to bytes
  * @return EipUint64
  */
-EipUint64 GetLintFromMessage( EipUint8** buffer );
+EipUint64 GetLintFromMessage( EipByte** buffer );
 
 /** @ingroup ENCAP
  * Functgoin AddLintToMessage
@@ -97,7 +123,7 @@ EipUint64 GetLintFromMessage( EipUint8** buffer );
  *
  * @return int - 8
  */
-int AddLintToMessage( EipUint64 pa_unData, EipUint8** buffer );
+int AddLintToMessage( EipUint64 pa_unData, EipByte** buffer );
 
 #endif
 

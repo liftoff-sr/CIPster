@@ -25,10 +25,12 @@ static CipConn g_explicit_connections[CIPSTER_CIP_NUM_EXPLICIT_CONNS];
 /**
  * Class CipClassRegistry
  * is a container for the defined CipClass()es, which in turn hold all
- * the CipInstance()s.
+ * the CipInstance()s.  This container takes ownership of the CipClasses.
+ * (Ownership means having the obligation to delete upon destruction.)
  */
 class CipClassRegistry
 {
+    // hashtable from C++ std library.
     typedef std::unordered_map< int, CipClass* >    ClassHash;
 
 public:
@@ -49,7 +51,7 @@ public:
      */
     bool RegisterClass( CipClass* aClass )
     {
-        ClassHash::value_type e( aClass->class_id, aClass );
+        ClassHash::value_type e( aClass->ClassId(), aClass );
 
         std::pair< ClassHash::iterator, bool > r = container.insert( e );
 

@@ -105,4 +105,7 @@ enum UdpCommuncationDirection
     kUdpProducing  = 1     ///< Producing direction; sender
 };
 
+/// The count of elements in a single dimension array:
+#define DIM(x)          int( sizeof(x)/sizeof(x[0]) )
+
 #endif // CIPSTER_TYPEDEFS_H_

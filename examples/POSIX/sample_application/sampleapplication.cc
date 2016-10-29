@@ -17,10 +17,10 @@
 
 // global variables for demo application (4 assembly data fields)  ***********
 
-EipUint8    g_assembly_data064[32]; // Input
-EipUint8    g_assembly_data096[32]; // Output
-EipUint8    g_assembly_data097[10]; // Config
-EipUint8    g_assembly_data09A[32]; // Explicit
+EipUint8    g_assembly_data064[128]; // Input
+EipUint8    g_assembly_data096[128]; // Output
+EipUint8    g_assembly_data097[64]; // Config
+EipUint8    g_assembly_data09A[128]; // Explicit
 
 EipStatus ApplicationInitialization()
 {
@@ -47,9 +47,18 @@ EipStatus ApplicationInitialization()
     CreateAssemblyInstance( DEMO_APP_EXPLICT_ASSEMBLY_NUM, &g_assembly_data09A[0],
             sizeof(g_assembly_data09A) );
 
-    ConfigureExclusiveOwnerConnectionPoint( 0, DEMO_APP_OUTPUT_ASSEMBLY_NUM,
+    // Reserve some connection instances for the above assemblies:
+
+    ConfigureExclusiveOwnerConnectionPoint( 0,
+            DEMO_APP_OUTPUT_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             DEMO_APP_CONFIG_ASSEMBLY_NUM );
+
+    // Reserve a connection instance that can connect without a config_path
+    ConfigureExclusiveOwnerConnectionPoint( 1,
+            DEMO_APP_OUTPUT_ASSEMBLY_NUM,
+            DEMO_APP_INPUT_ASSEMBLY_NUM,
+            -1 );
 
     ConfigureInputOnlyConnectionPoint( 0,
             DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM,

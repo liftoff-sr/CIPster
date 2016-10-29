@@ -42,6 +42,17 @@ int AddIntToMessage( EipUint16 data, EipUint8** buffer )
 }
 
 
+int AddIntToMessageBE( EipUint16 data, EipUint8** buffer )
+{
+    unsigned char* p = (unsigned char*) *buffer;
+
+    p[1] = (unsigned char) data;
+    p[0] = (unsigned char) (data >> 8);
+    *buffer += 2;
+    return 2;
+}
+
+
 int AddDintToMessage( EipUint32 data, EipUint8** buffer )
 {
     unsigned char* p = (unsigned char*) *buffer;
@@ -50,6 +61,21 @@ int AddDintToMessage( EipUint32 data, EipUint8** buffer )
     p[1] = (unsigned char) (data >> 8);
     p[2] = (unsigned char) (data >> 16);
     p[3] = (unsigned char) (data >> 24);
+    *buffer += 4;
+
+    return 4;
+}
+
+
+int AddDintToMessageBE( EipUint32 data, EipUint8** buffer )
+{
+    unsigned char* p = (unsigned char*) *buffer;
+
+    p[3] = (unsigned char) data;
+    p[2] = (unsigned char) (data >> 8);
+    p[1] = (unsigned char) (data >> 16);
+    p[0] = (unsigned char) (data >> 24);
+
     *buffer += 4;
 
     return 4;

@@ -10,6 +10,7 @@
 #include "ciptypes.h"
 #include "encap.h"
 
+
 /** @ingroup ENCAP
  * @brief CPF is Common Packet Format
  * CPF packet := <number of items> {<items>}
@@ -60,24 +61,73 @@ struct DataItem
 
 struct SocketAddressInfoItem
 {
+    SocketAddressInfoItem( CipItemId aType, CipUdint aIP, int aPort );
+
+    SocketAddressInfoItem() :
+        type_id( 0 ),
+        length( 16 ),
+        sin_family( AF_INET ),
+        sin_port( 0 ),
+        sin_addr( 0 )
+    {
+        memset( nasin_zero, 0, sizeof nasin_zero );
+    }
+
     CipUint     type_id;
     CipUint     length;
     CipInt      sin_family;
     CipUint     sin_port;
     CipUdint    sin_addr;
     CipUsint    nasin_zero[8];
+
+    SocketAddressInfoItem& operator=( sockaddr_in& rhs )
+    {
+        sin_family  = rhs.sin_family;
+        sin_port    = ntohs( rhs.sin_port );
+        sin_addr    = ntohl( rhs.sin_addr.s_addr );
+    }
+
+    operator sockaddr_in ()
+    {
+        sockaddr_in lhs;
+
+        memset( &lhs, 0, sizeof lhs );
+
+        lhs.sin_family      = sin_family;
+        lhs.sin_port        = htons( sin_port );
+        lhs.sin_addr.s_addr = htonl( sin_addr );
+
+        return lhs;
+    }
 };
 
 
 // this one case of a CPF packet is supported:
 
-struct CipCommonPacketFormatData
+class CipCommonPacketFormatData
 {
-    EipUint16   item_count;
+public:
+    int         item_count;
     AddressItem address_item;
     DataItem    data_item;
 
-    SocketAddressInfoItem address_info_item[2];
+    void Clear()
+    {
+        item_count = 0;
+        rx_aii_count = 0;
+        tx_aii_count = 0;
+    }
+
+    void ClearTx()
+    {
+        tx_aii_count = 0;
+    }
+
+    void ClearRx()
+    {
+        rx_aii_count = 0;
+    }
+
 
     /** @ingroup ENCAP
      *  Create CPF structure out of the received data.
@@ -100,7 +150,6 @@ struct CipCommonPacketFormatData
      */
     int AssembleIOMessage( EipUint8* message );
 
-
     /** @ingroup ENCAP
      * Copy data from MRResponse struct and CPFDataItem into linear memory in message for transmission over in encapsulation.
      * @param  response	pointer to message router response which has to be aligned into linear memory.
@@ -110,6 +159,74 @@ struct CipCommonPacketFormatData
      *     EIP_ERROR .. error
      */
     int AssembleLinearMessage( CipMessageRouterResponse* response, EipUint8* message );
+
+    bool AppendRx( const SocketAddressInfoItem& aSocketAddressInfoItem )
+    {
+        if( rx_aii_count < DIM( rx_aii ) )
+        {
+            rx_aii[rx_aii_count++] = aSocketAddressInfoItem;
+            return true;
+        }
+        return false;
+    }
+
+    bool AppendTx( const SocketAddressInfoItem& aSocketAddressInfoItem )
+    {
+        if( tx_aii_count < DIM( tx_aii ) )
+        {
+            tx_aii[tx_aii_count++] = aSocketAddressInfoItem;
+            return true;
+        }
+        return false;
+    }
+
+    SocketAddressInfoItem* SearchRx( CipItemId aType )
+    {
+        for( int i=0; i<rx_aii_count;  ++i )
+        {
+            if( rx_aii[i].type_id == aType )
+                return &rx_aii[i];
+        }
+        return NULL;
+    }
+
+    SocketAddressInfoItem* SearchTx( CipItemId aType )
+    {
+        for( int i=0; i<tx_aii_count;  ++i )
+        {
+            if( tx_aii[i].type_id == aType )
+                return &tx_aii[i];
+        }
+        return NULL;
+    }
+
+    int RxSocketAddressInfoItemCount() const    { return rx_aii_count; }
+    int TxSocketAddressInfoItemCount() const    { return tx_aii_count; }
+
+    SocketAddressInfoItem* RxSocketAddressInfoItem( int aIndex )
+    {
+        if( aIndex < rx_aii_count )
+        {
+            return rx_aii + aIndex;
+        }
+        return NULL;
+    }
+
+    SocketAddressInfoItem* TxSocketAddressInfoItem( int aIndex )
+    {
+        if( aIndex < tx_aii_count )
+        {
+            return tx_aii + aIndex;
+        }
+        return NULL;
+    }
+
+private:
+    int rx_aii_count;
+    SocketAddressInfoItem rx_aii[2];
+
+    int tx_aii_count;
+    SocketAddressInfoItem tx_aii[2];
 };
 
 

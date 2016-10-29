@@ -17,8 +17,19 @@
 
 CipCommonPacketFormatData g_cpf;
 
+SocketAddressInfoItem::SocketAddressInfoItem( CipItemId aType, CipUdint aIP, int aPort ) :
+    type_id( aType ),
+    length( 16 ),
+    sin_family( AF_INET ),
+    sin_port( aPort ),
+    sin_addr( aIP )
+{
+    memset( nasin_zero, 0, sizeof nasin_zero );
+}
+
+
 int NotifyCommonPacketFormat( EncapsulationData* receive_data,
-        EipUint8* reply_buffer )
+        EipByte* reply_buffer )
 {
     int return_value = g_cpf.Init(
           receive_data->buf_pos,
@@ -70,7 +81,7 @@ int NotifyCommonPacketFormat( EncapsulationData* receive_data,
 
 
 int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
-        EipUint8* reply_buffer )
+        EipByte* reply_buffer )
 {
     int return_value = g_cpf.Init(
             received_data->buf_pos,
@@ -90,19 +101,20 @@ int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
         if( g_cpf.address_item.type_id == kCipItemIdConnectionAddress )
         {
             // ConnectedAddressItem item
-            CipConn* conn = GetConnectedObject( g_cpf.address_item.data.connection_identifier );
+            CipConn* conn = GetConnectionByConsumingId( g_cpf.address_item.data.connection_identifier );
 
             if( conn )
             {
                 // reset the watchdog timer
-                conn->inactivity_watchdog_timer = (conn->o_to_t_requested_packet_interval /1000) <<
-                                                        ( 2 + conn->connection_timeout_multiplier );
+                conn->inactivity_watchdog_timer_usecs =
+                    conn->o_to_t_RPI_usecs << ( 2 + conn->connection_timeout_multiplier );
 
                 // TODO check connection id  and sequence count
-                if( g_cpf.data_item.type_id
-                    == kCipItemIdConnectedDataItem ) // connected data item received
+                if( g_cpf.data_item.type_id == kCipItemIdConnectedDataItem )
                 {
-                    EipUint8* pnBuf = g_cpf.data_item.data;
+                    // connected data item received
+
+                    EipByte* pnBuf = g_cpf.data_item.data;
 
                     g_cpf.address_item.data.sequence_number =
                         (EipUint32) GetIntFromMessage( &pnBuf );
@@ -154,8 +166,7 @@ EipStatus CipCommonPacketFormatData::Init( EipByte* aSrc, int data_length )
 {
     EipByte*    data = aSrc;
 
-    address_info_item[0].type_id = 0;
-    address_info_item[1].type_id = 0;
+    Clear();
 
     item_count = GetIntFromMessage( &data );
 
@@ -177,62 +188,54 @@ EipStatus CipCommonPacketFormatData::Init( EipByte* aSrc, int data_length )
 
     if( item_count >= 2 )
     {
-        data_item.type_id    = GetIntFromMessage( &data );
-        data_item.length     = GetIntFromMessage( &data );
-        data_item.data = data;
+        data_item.type_id = GetIntFromMessage( &data );
+        data_item.length  = GetIntFromMessage( &data );
+        data_item.data    = data;
+
         data += data_item.length;
     }
 
-    for( int j = 0; j < item_count - 2; j++ )   // TODO there needs to be a limit check here???
+    for( int j = 0; j + 2 < item_count && j < 2;  ++j )
     {
-        address_info_item[j].type_id = GetIntFromMessage( &data );
+        int type_id = GetIntFromMessage( &data );
 
-        if( address_info_item[j].type_id == kCipItemIdSocketAddressInfoOriginatorToTarget ||
-            address_info_item[j].type_id == kCipItemIdSocketAddressInfoTargetToOriginator )
+        if( type_id == kCipItemIdSocketAddressInfoOriginatorToTarget ||
+            type_id == kCipItemIdSocketAddressInfoTargetToOriginator )
         {
-            address_info_item[j].length = GetIntFromMessage( &data );
+            SocketAddressInfoItem saii;
 
-            address_info_item[j].sin_family = GetIntFromMessage( &data );
-            address_info_item[j].sin_port = GetIntFromMessage( &data );
-            address_info_item[j].sin_addr = GetDintFromMessage( &data );
+            saii.type_id    = type_id;
+            saii.length     = GetIntFromMessage( &data );
+            saii.sin_family = GetIntFromMessageBE( &data );
+            saii.sin_port   = GetIntFromMessageBE( &data );
+            saii.sin_addr   = GetDintFromMessageBE( &data );
 
             for( int i = 0; i < 8; i++ )
             {
-                address_info_item[j].nasin_zero[i] = *data++;
+                saii.nasin_zero[i] = *data++;
             }
-        }
-        else // no sockaddr item found
-        {
-            address_info_item[j].type_id = 0; // mark as not set
-            data -= 2;
-        }
-    }
 
-    // set the addressInfoItems to not set if they were not received
-    if( item_count < 4 )
-    {
-        address_info_item[1].type_id = 0;
-
-        if( item_count < 3 )
+            AppendRx( saii );
+        }
+        else    // no sockaddr item, skip unknown item
         {
-            address_info_item[0].type_id = 0;
+            data += GetIntFromMessage( &data );
         }
     }
 
     int byte_count = data - aSrc;
 
-    if( byte_count == data_length ) // length of data is equal to length of Addr and length of Data
+    if( byte_count == data_length )
     {
         return kEipStatusOk;
     }
     else
     {
-        CIPSTER_TRACE_WARN(
-                "%s: something is wrong with the length in Message Router\n", __func__ );
+        CIPSTER_TRACE_WARN( "%s: unknown CPF item(s)\n", __func__ );
 
         if( item_count > 2 )
         {
-            // there is an optional packet in data stream which is not sockaddr item
+            // there is an optional CPF item in packet which is not sockaddr item
             return kEipStatusOk;
         }
         else // something with the length was wrong
@@ -243,292 +246,70 @@ EipStatus CipCommonPacketFormatData::Init( EipByte* aSrc, int data_length )
 }
 
 
-// null address item -> address length set to 0
-/**
- * Encodes a Null Address Item into the message frame
- * @param message The message frame
- * @param size The actual size of the message frame
- *
- * @return The new size of the message frame after encoding
- */
-int EncodeNullAddressItem( EipUint8** message, int size )
+static int encodeConnectedDataItemLength( CipMessageRouterResponse* response, EipByte** message )
 {
-    // null address item -> address length set to 0
-    size  += AddIntToMessage( kCipItemIdNullAddress, message );
-    size  += AddIntToMessage( 0, message );
-    return size;
+    return AddIntToMessage( response->data_length + 4 + 2 + (2 * response->size_of_additional_status),  message );
 }
 
 
-// connected data item -> address length set to 4 and copy ConnectionIdentifier
-/**
- * Encodes a Connected Address Item into the message frame
- * @param message The message frame
- * @param cpfd The Common Packet Format data structure from which the message is constructed
- * @param size The actual size of the message frame
- *
- * @return The new size of the message frame after encoding
- */
-int EncodeConnectedAddressItem( EipUint8** message,
-        CipCommonPacketFormatData* cpfd, int size )
+static int encodeExtendedStatus( CipMessageRouterResponse* response, EipByte** message )
 {
-    // connected data item -> address length set to 4 and copy ConnectionIdentifier
-    size    += AddIntToMessage( kCipItemIdConnectionAddress, message );
-    size    += AddIntToMessage( 4, message );
-    size    += AddDintToMessage( cpfd->address_item.data.connection_identifier, message );
-    return size;
+    EipByte* p = *message;
+
+    *p++ = response->size_of_additional_status;
+
+    for( int i = 0; i < response->size_of_additional_status;  ++i )
+        AddIntToMessage( response->additional_status[i], &p );
+
+    int byte_count = p - *message;
+
+    *message = p;
+
+    return byte_count;
 }
 
 
-// TODO: Add doxygen documentation
-// sequenced address item -> address length set to 8 and copy ConnectionIdentifier and SequenceNumber
-// sequence number?????
-int EncodeSequencedAddressItem( EipUint8** message,
-        CipCommonPacketFormatData* cpfd, int size )
-{
-    // sequenced address item -> address length set to 8 and copy ConnectionIdentifier and SequenceNumber
-    size += AddIntToMessage( kCipItemIdSequencedAddressItem, message );
-    size += AddIntToMessage( 8, message );
-    size += AddDintToMessage( cpfd->address_item.data.connection_identifier, message );
-    size += AddDintToMessage( cpfd->address_item.data.sequence_number, message );
-    return size;
-}
-
-
-/**
- * Adds the item count to the message frame
- *
- * @param cpfd The Common Packet Format data structure from which the message is constructed
- * @param message The message frame
- * @param size The actual size of the message frame
- *
- * @return The new size of the message frame after encoding
- */
-int EncodeItemCount( CipCommonPacketFormatData* cpfd,
-        EipUint8** message, int size )
-{
-    size += AddIntToMessage( cpfd->item_count, message ); // item count
-    return size;
-}
-
-
-/**
- * Adds the data item type to the message frame
- *
- * @param cpfd The Common Packet Format data structure from which the message is constructed
- * @param message The message frame
- * @param size The actual size of the message frame
- *
- * @return The new size of the message frame after encoding
- */
-int EncodeDataItemType( CipCommonPacketFormatData* cpfd,
-        EipUint8** message, int size )
-{
-    size += AddIntToMessage( cpfd->data_item.type_id, message );
-    return size;
-}
-
-
-/**
- * Adds the data item section length to the message frame
- *
- * @param cpfd The Common Packet Format data structure from which the message is constructed
- * @param message The message frame
- * @param size The actual size of the message frame
- *
- * @return The new size of the message frame after encoding
- */
-int EncodeDataItemLength( CipCommonPacketFormatData* cpfd,
-        EipUint8** message, int size )
-{
-    size += AddIntToMessage( cpfd->data_item.length, message );
-    return size;
-}
-
-
-/**
- * Adds the data items to the message frame
- *
- * @param cpfd The Common Packet Format data structure from which the message is constructed
- * @param message The message frame
- * @param size The actual size of the message frame
- *
- * @return The new size of the message frame after encoding
- */
-int EncodeDataItemData( CipCommonPacketFormatData* cpfd,
-        EipUint8** message, int size )
-{
-    for( int i = 0; i < cpfd->data_item.length; i++ )
-    {
-        size += AddSintToMessage( *(cpfd->data_item.data + i), message );
-    }
-
-    return size;
-}
-
-
-int EncodeConnectedDataItemLength( CipMessageRouterResponse* response,
-        EipUint8** message,
-        int size )
-{
-    size += AddIntToMessage(
-            (EipUint16) ( response->data_length + 4 + 2
-                          + (2 * response->size_of_additional_status) ),
-            message );
-    return size;
-}
-
-
-int EncodeSequenceNumber( int size, const CipCommonPacketFormatData* cpfd,
-        EipUint8** message )
-{
-    // 2 bytes
-    size += AddIntToMessage( (EipUint16) cpfd->address_item.data.sequence_number,
-                message );
-
-    return size;
-}
-
-
-int EncodeReplyService( int size, EipUint8** message,
-        CipMessageRouterResponse* response )
-{
-    size += AddSintToMessage( response->reply_service, message );
-    return size;
-}
-
-
-int EnocdeReservedFieldOfLengthByte( int size, EipUint8** message,
-        CipMessageRouterResponse* response )
-{
-    size += AddSintToMessage( response->reserved, message );
-    return size;
-}
-
-
-int EncodeGeneralStatus( int size, EipUint8** message,
-        CipMessageRouterResponse* response )
-{
-    size += AddSintToMessage( response->general_status, message );
-    return size;
-}
-
-
-int EncodeExtendedStatusLength( int size, EipUint8** message,
-        CipMessageRouterResponse* response )
-{
-    size += AddSintToMessage( response->size_of_additional_status,
-            message );
-    return size;
-}
-
-
-int EncodeExtendedStatusDataItems( int size, CipMessageRouterResponse* response,
-        EipUint8** message )
-{
-    for( int i = 0; i < response->size_of_additional_status; i++ )
-        size += AddIntToMessage( response->additional_status[i],
-                message );
-
-    return size;
-}
-
-
-int EncodeExtendedStatus( int size, EipUint8** message,
-        CipMessageRouterResponse* response )
-{
-    size    = EncodeExtendedStatusLength( size, message, response );
-    size    = EncodeExtendedStatusDataItems( size, response, message );
-
-    return size;
-}
-
-
-int EncodeUnconnectedDataItemLength( int size, CipMessageRouterResponse* response,
-        EipUint8** message )
+static int encodeUnconnectedDataItemLength( CipMessageRouterResponse* response, EipByte** message )
 {
     // Unconnected Item
-    size += AddIntToMessage( (EipUint16) ( response->data_length + 4
-                                + (2 * response->size_of_additional_status) ),
-                message );
-
-    return size;
+    return AddIntToMessage( response->data_length + 4 + (2 * response->size_of_additional_status), message );
 }
 
 
-int EncodeMessageRouterResponseData( int size, CipMessageRouterResponse* response,
-        EipUint8** message )
+int CipCommonPacketFormatData::AssembleLinearMessage( CipMessageRouterResponse* response, EipByte* aDst )
 {
-    for( int i = 0; i < response->data_length; i++ )
-    {
-        size += AddSintToMessage( (response->data)[i], &*message );
-    }
-
-    return size;
-}
-
-
-int EncodeSockaddrInfoItemTypeId( int size, int item_type,
-        CipCommonPacketFormatData* cpfd,
-        EipUint8** message )
-{
-    CIPSTER_ASSERT( item_type == 0 || item_type == 1 );
-
-    size += AddIntToMessage( cpfd->address_info_item[item_type].type_id,
-                message );
-
-    return size;
-}
-
-
-int EncodeSockaddrInfoLength( int size,
-        int j,
-        CipCommonPacketFormatData* cpfd,
-        EipUint8** message )
-{
-    size += AddIntToMessage( cpfd->address_info_item[j].length, message );
-    return size;
-}
-
-
-/** @brief Copy data from response struct and cpfd into linear memory in
- * pa_msg for transmission over in encapsulation.
- *
- * @param response	pointer to message router response which has to be aligned into linear memory.
- * @param cpfd pointer to CPF structure which has to be aligned into linear memory.
- * @param message		pointer to linear memory.
- *  @return length of reply in message in bytes
- *          -1 .. error
- */
-int CipCommonPacketFormatData::AssembleLinearMessage( CipMessageRouterResponse* response, EipUint8* message )
-{
-    int message_size = 0;
+    EipByte* p = aDst;
 
     if( response )
     {
         // add Interface Handle and Timeout = 0 -> only for SendRRData and SendUnitData necessary
-        AddDintToMessage( 0, &message );
-        AddIntToMessage( 0, &message );
-        message_size += 6;
+        AddDintToMessage( 0, &p );
+        AddIntToMessage( 0, &p );
     }
 
-    message_size = EncodeItemCount( this, &message, message_size );
+    AddIntToMessage( item_count + TxSocketAddressInfoItemCount(), &p );
 
     // process Address Item
     switch( address_item.type_id )
     {
     case kCipItemIdNullAddress:
-        message_size = EncodeNullAddressItem( &message, message_size );
+        AddIntToMessage( kCipItemIdNullAddress, &p );
+        AddIntToMessage( 0, &p );
         break;
 
     case kCipItemIdConnectionAddress:
-            message_size = EncodeConnectedAddressItem( &message,
-                                this, message_size );
+        // connected data item -> address length set to 4 and copy ConnectionIdentifier
+        AddIntToMessage( kCipItemIdConnectionAddress, &p );
+        AddIntToMessage( 4, &p );
+        AddDintToMessage( address_item.data.connection_identifier, &p );
         break;
 
     case kCipItemIdSequencedAddressItem:
-            message_size = EncodeSequencedAddressItem( &message,
-                                this, message_size );
+        // sequenced address item -> address length set to 8 and copy ConnectionIdentifier and SequenceNumber
+        AddIntToMessage( kCipItemIdSequencedAddressItem, &p );
+        AddIntToMessage( 8, &p );
+        AddDintToMessage( address_item.data.connection_identifier, &p );
+        AddDintToMessage( address_item.data.sequence_number, &p );
         break;
     }
 
@@ -538,48 +319,45 @@ int CipCommonPacketFormatData::AssembleLinearMessage( CipMessageRouterResponse* 
     {
         if( response )
         {
-            message_size = EncodeDataItemType( this, &message, message_size );
+            AddIntToMessage( data_item.type_id, &p );
 
             if( data_item.type_id == kCipItemIdConnectedDataItem ) // Connected Item
             {
-                message_size = EncodeConnectedDataItemLength( response,
-                        &message, message_size );
+                encodeConnectedDataItemLength( response, &p );
 
-                message_size = EncodeSequenceNumber( message_size,
-                        &g_cpf,
-                        &message );
+                // sequence number
+                AddIntToMessage( address_item.data.sequence_number, &p );
             }
             else // Unconnected Item
             {
-                message_size = EncodeUnconnectedDataItemLength( message_size,
-                        response,
-                        &message );
+                encodeUnconnectedDataItemLength( response, &p );
             }
 
             // write message router response into linear memory
-            message_size = EncodeReplyService( message_size, &message,
-                    response );
 
-            message_size = EnocdeReservedFieldOfLengthByte( message_size, &message,
-                    response );
+            AddSintToMessage( response->reply_service, &p );
 
-            message_size = EncodeGeneralStatus( message_size, &message,
-                    response );
+            *p++ = response->reserved;
 
-            message_size = EncodeExtendedStatus( message_size, &message,
-                    response );
+            *p++ = response->general_status;
 
-            message_size = EncodeMessageRouterResponseData( message_size,
-                    response,
-                    &message );
+            encodeExtendedStatus( response, &p );
+
+            for( int i = 0; i < response->data_length; ++i )
+            {
+                *p++ = response->data[i];
+            }
         }
         else // connected IO Message to send
         {
-            message_size = EncodeDataItemType( this, &message, message_size );
+            AddIntToMessage( data_item.type_id, &p );
 
-            message_size = EncodeDataItemLength( this, &message, message_size );
+            AddIntToMessage( data_item.length, &p );
 
-            message_size = EncodeDataItemData( this, &message, message_size );
+            for( int i = 0; i < data_item.length;  ++i )
+            {
+                *p++ = data_item.data[i];
+            }
         }
     }
 
@@ -589,37 +367,32 @@ int CipCommonPacketFormatData::AssembleLinearMessage( CipMessageRouterResponse* 
      * devices which depend on CPF items to appear in the order of their
      * ID number */
     for( int type = kCipItemIdSocketAddressInfoOriginatorToTarget;
-         type <= kCipItemIdSocketAddressInfoTargetToOriginator; type++ )
+         type <= kCipItemIdSocketAddressInfoTargetToOriginator;  ++type )
     {
-        for( int j = 0; j < 2; j++ )
+        SocketAddressInfoItem* saii = SearchTx( CipItemId(type) );
+
+        if( saii )
         {
-            if( address_info_item[j].type_id == type )
-            {
-                message_size = EncodeSockaddrInfoItemTypeId(
-                        message_size, j, this, &message );
+            AddIntToMessage( saii->type_id, &p );
 
-                message_size = EncodeSockaddrInfoLength( message_size, j,
-                        this,
-                        &message );
+            AddIntToMessage( saii->length, &p );
 
-                message_size += EncapsulateIpAddress(
-                        address_info_item[j].sin_port,
-                        address_info_item[j].sin_addr,
-                        &message );
+            AddIntToMessageBE( saii->sin_family, &p);
 
-                message_size += FillNextNMessageOctetsWithValueAndMoveToNextPosition(
-                        0, 8, &message );
-                break;
-            }
+            AddIntToMessageBE( saii->sin_port, &p );
+
+            AddDintToMessageBE( saii->sin_addr, &p );
+
+            memcpy( p, saii->nasin_zero, 8 );  p += 8;
         }
     }
 
-    return message_size;
+    return p - aDst;
 }
 
 
-int CipCommonPacketFormatData::AssembleIOMessage( EipUint8* message )
+int CipCommonPacketFormatData::AssembleIOMessage( EipByte* message )
 {
-    return AssembleLinearMessage( 0, g_message_data_reply_buffer );
+    return AssembleLinearMessage( NULL, g_message_data_reply_buffer );
 }
 

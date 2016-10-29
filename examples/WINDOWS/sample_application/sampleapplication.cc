@@ -51,6 +51,12 @@ EipStatus ApplicationInitialization()
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             DEMO_APP_CONFIG_ASSEMBLY_NUM );
 
+    // Reserve a connection instance that can connect without a config_path
+    ConfigureExclusiveOwnerConnectionPoint( 1,
+            DEMO_APP_OUTPUT_ASSEMBLY_NUM,
+            DEMO_APP_INPUT_ASSEMBLY_NUM,
+            -1 );
+
     ConfigureInputOnlyConnectionPoint( 0,
             DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
