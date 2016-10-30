@@ -7,7 +7,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "opener_api.h"
+#include "cipster_api.h"
 #include "cipepath.h"
 #include "endianconv.h"
 

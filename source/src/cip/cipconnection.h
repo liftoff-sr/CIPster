@@ -40,7 +40,7 @@
 #ifndef CIPIOCONNECTION_H_
 #define CIPIOCONNECTION_H_
 
-#include "opener_api.h"
+#include "cipster_api.h"
 #include "cipepath.h"
 
 

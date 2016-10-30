@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "cip_objects/cip_string_int.h"
-#include "opener_api.h"
+#include "cipster_api.h"
 
 // * Settings
 #define CIP_FILE_INCREMENTAL_BURN_NUMBER    100

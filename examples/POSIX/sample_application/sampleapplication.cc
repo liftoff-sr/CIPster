@@ -4,7 +4,7 @@
  *
  ******************************************************************************/
 
-#include "opener_api.h"
+#include "cipster_api.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -17,10 +17,11 @@
 
 // global variables for demo application (4 assembly data fields)  ***********
 
-EipUint8    g_assembly_data064[128]; // Input
-EipUint8    g_assembly_data096[128]; // Output
-EipUint8    g_assembly_data097[64]; // Config
-EipUint8    g_assembly_data09A[128]; // Explicit
+EipUint8    g_assembly_data064[128];    // Input
+EipUint8    g_assembly_data096[128];    // Output
+EipUint8    g_assembly_data097[64];     // Config
+EipUint8    g_assembly_data09A[128];    // Explicit
+
 
 EipStatus ApplicationInitialization()
 {
@@ -58,7 +59,7 @@ EipStatus ApplicationInitialization()
     ConfigureExclusiveOwnerConnectionPoint( 1,
             DEMO_APP_OUTPUT_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
-            -1 );
+            -1 );                           // config path may be omitted
 
     ConfigureInputOnlyConnectionPoint( 0,
             DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM,

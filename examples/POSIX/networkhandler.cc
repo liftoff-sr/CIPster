@@ -13,7 +13,7 @@
 
 #include "networkhandler.h"
 
-#include "opener_api.h"
+#include "cipster_api.h"
 #include "enet_encap/encap.h"
 #include "cip/cipconnectionmanager.h"
 #include "enet_encap/endianconv.h"

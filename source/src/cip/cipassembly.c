@@ -9,7 +9,7 @@
 #include "cipassembly.h"
 
 #include "cipcommon.h"
-//#include "opener_api.h"
+//#include "cipster_api.h"
 #include "trace.h"
 #include "cipconnectionmanager.h"
 

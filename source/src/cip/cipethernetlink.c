@@ -11,7 +11,7 @@
 #include "cipmessagerouter.h"
 #include "ciperror.h"
 #include "endianconv.h"
-#include "opener_api.h"
+#include "cipster_api.h"
 
 
 struct CipEthernetLinkObject

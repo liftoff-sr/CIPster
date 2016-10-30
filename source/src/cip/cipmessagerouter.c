@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <string.h>
 
-#include "opener_api.h"
+#include "cipster_api.h"
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
 #include "cipconnectionmanager.h"

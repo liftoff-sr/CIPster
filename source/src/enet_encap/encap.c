@@ -5,7 +5,7 @@
  ******************************************************************************/
 #include <string.h>
 #include <stdlib.h>
-#include "opener_api.h"
+#include "cipster_api.h"
 #include "cpf.h"
 #include "encap.h"
 #include "endianconv.h"

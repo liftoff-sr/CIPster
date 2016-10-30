@@ -14,7 +14,7 @@
 #include "cip/ciperror.h"
 #include "cip/cipmessagerouter.h"
 #include "enet_encap/endianconv.h"
-#include "opener_user_conf.h"
+#include "cipster_user_conf.h"
 
 
 
@@ -588,12 +588,12 @@ void IApp_CloseSocket_tcp( int socket_handle );
  * @page porting Porting CIPster
  * @section gen_config_section General Stack Configuration
  * The general stack properties have to be defined prior to building your
- * production. This is done by providing a file called opener_user_conf.h. An
+ * production. This is done by providing a file called cipster_user_conf.h. An
  * example file can be found in the src/ports/platform-pc directory. The
  * documentation of the example file for the necessary configuration options:
- * opener_user_conf.h
+ * cipster_user_conf.h
  *
- * @copydoc opener_user_conf.h
+ * @copydoc cipster_user_conf.h
  *
  * @section startup_sec Startup Sequence
  * During startup of your EtherNet/IP(TM) device the following steps have to be
@@ -681,7 +681,7 @@ void IApp_CloseSocket_tcp( int socket_handle );
  * In order to make CIPster more platform independent and in order to inform the
  * application on certain state changes and actions within the stack a set of
  * call-back functions is provided. These call-back functions are declared in
- * the file opener_api.h and have to be implemented by the application specific
+ * the file cipster_api.h and have to be implemented by the application specific
  * code. An overview and explanation of CIPster's call-back API may be found in
  * the module @ref CIP_CALLBACK_API.
  *

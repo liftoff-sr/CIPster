@@ -7,12 +7,12 @@
 
 #include "cipconnectionmanager.h"
 
-#include "opener_user_conf.h"
+#include "cipster_user_conf.h"
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
 #include "ciperror.h"
 #include "endianconv.h"
-#include "opener_api.h"
+#include "cipster_api.h"
 #include "encap.h"
 #include "cipidentity.h"
 #include "trace.h"

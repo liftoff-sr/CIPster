@@ -14,7 +14,7 @@
 #include "ciperror.h"
 #include "endianconv.h"
 #include "cipethernetlink.h"
-#include "opener_api.h"
+#include "cipster_api.h"
 
 static CipDword tcp_status_ = 0x1;                         //*< #1  TCP status with 1 we indicate that we got a valid configuration from DHCP or BOOTP
 

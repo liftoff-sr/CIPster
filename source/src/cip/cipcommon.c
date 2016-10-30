@@ -11,7 +11,7 @@
 #include "cipcommon.h"
 
 #include "trace.h"
-#include "opener_api.h"
+#include "cipster_api.h"
 #include "cipidentity.h"
 #include "ciptcpipinterface.h"
 #include "cipethernetlink.h"

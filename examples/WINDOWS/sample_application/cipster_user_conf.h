@@ -100,6 +100,11 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
 
 //#define PRINT_TRACE(args...)  fprintf(stderr,args);
 
+#endif
+
+
+#ifndef NDEBUG
+
 /** @brief A specialized assertion command that will log the assertion and block
  *  further execution in an while(1) loop.
  */
@@ -115,6 +120,7 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
 //#include <assert.h>
 //#include <stdio.h>
 //#define CIPSTER_ASSERT(assertion) assert(assertion)
+
 #else
 
 // for release builds execute the assertion, but don't test it
@@ -141,6 +147,6 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
  *  This buffer size will be used for any received message.
  *  The same buffer is used for the replied explicit message.
  */
-#define PC_CIPSTER_ETHERNET_BUFFER_SIZE 512
+#define PC_CIPSTER_ETHERNET_BUFFER_SIZE         1200
 
 #endif //CIPSTER_USER_CONF_H_

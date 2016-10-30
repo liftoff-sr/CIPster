@@ -7,7 +7,7 @@
 
 #include "cpf.h"
 
-#include "opener_api.h"
+#include "cipster_api.h"
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
 #include "endianconv.h"

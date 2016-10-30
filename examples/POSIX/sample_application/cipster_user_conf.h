@@ -6,7 +6,7 @@
 #ifndef CIPSTER_USER_CONF_H_
 #define CIPSTER_USER_CONF_H_
 
-/** @file opener_user_conf.h
+/** @file cipster_user_conf.h
  * @brief CIPster configuration setup
  *
  * This file contains the general application specific configuration for CIPster.
@@ -100,6 +100,11 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
 
 #define LOG_TRACE(...)  printf(__VA_ARGS__)
 
+#endif
+
+
+#ifndef NDEBUG
+
 /** @brief A specialized assertion command that will log the assertion and block
  *  further execution in an while(1) loop.
  */
@@ -115,6 +120,7 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
 //#include <assert.h>
 //#include <stdio.h>
 //#define CIPSTER_ASSERT(assertion) assert(assertion)
+
 #else
 
 // for release builds execute the assertion, but don't test it
@@ -134,6 +140,8 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
 
 #endif
 
+
+
 /** @brief The number of bytes used for the Ethernet message buffer on
  * the PC port. For different platforms it may makes sense to
  * have more than one buffer.
@@ -141,6 +149,6 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
  *  This buffer size will be used for any received message.
  *  The same buffer is used for the replied explicit message.
  */
-#define PC_CIPSTER_ETHERNET_BUFFER_SIZE 512
+#define PC_CIPSTER_ETHERNET_BUFFER_SIZE         1200
 
 #endif //CIPSTER_USER_CONF_H_

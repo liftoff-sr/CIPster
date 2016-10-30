@@ -6,8 +6,8 @@
 #ifndef CIPSTER_CIPCONNECTIONMANAGER_H_
 #define CIPSTER_CIPCONNECTIONMANAGER_H_
 
-#include "opener_user_conf.h"
-#include "opener_api.h"
+#include "cipster_user_conf.h"
+#include "cipster_api.h"
 #include "typedefs.h"
 #include "ciptypes.h"
 #include "cipmessagerouter.h"

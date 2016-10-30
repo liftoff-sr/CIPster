@@ -15,7 +15,7 @@
 
 #include "typedefs.h"
 #include "trace.h"
-#include "opener_user_conf.h"
+#include "cipster_user_conf.h"
 #include "ciperror.h"
 
 //* @brief Assembly Class Code
