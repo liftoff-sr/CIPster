@@ -376,6 +376,14 @@ int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* a
                 goto logical_exit;
             }
 
+            // The grammar shown in Vol1 C-1.5 shows that assembly_class_application_path
+            // is weird in that it can only take INSTANCE or CONN_PT not both.  So when we
+            // see these back to back, this is an app_path boundary.
+            if( GetClass() == 4 && last_member == INSTANCE && next == CONN_PT )
+            {
+                goto logical_exit;
+            }
+
             if( next >= last_member )
             {
                 // C-1.6 of Vol1_3.19; is an expected termination point, not an error.
