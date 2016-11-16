@@ -50,7 +50,7 @@ IterT vec_search( IterT begin, IterT end, T target )
 }
 
 // global public variables
-EipUint8 g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
+EipByte g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
 
 const EipUint16 kCipUintZero = 0;
 
@@ -217,7 +217,7 @@ CipAttribute::~CipAttribute()
 EipStatus GetAttrData( CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    EipByte* message = response->data;
+    EipByte* message = response->data.data();
 
     response->data_length = EncodeData( attr->type, attr->data, &message );
 
@@ -238,7 +238,7 @@ EipStatus GetInstanceCount( CipAttribute* attr, CipMessageRouterRequest* request
     {
         EipUint16 instance_count = clazz->Instances().size();
 
-        EipByte* message = response->data;
+        EipByte* message = response->data.data();
 
         response->data_length = EncodeData( attr->type, &instance_count, &message );
 
@@ -255,13 +255,12 @@ EipStatus SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, Cip
     response->size_of_additional_status = 0;
     response->reply_service = 0x80 | request->service;
 
-    EipByte* message = request->data;
+    const EipByte* message = request->data.data();
 
     int out_count = DecodeData( attr->type, attr->data, &message );
 
     if( out_count >= 0 )
     {
-        request->data_length -= out_count;
         request->data += out_count;
 
         response->general_status = kCipErrorSuccess;
@@ -349,7 +348,7 @@ bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 
 
 CipAttribute* CipInstance::AttributeInsert(
-        EipUint16       attribute_id,
+        int             attribute_id,
         EipUint8        cip_type,
         EipByte         cip_flags,
         AttributeFunc   aGetter,
@@ -377,7 +376,7 @@ CipAttribute* CipInstance::AttributeInsert(
 
 
 CipAttribute* CipInstance::AttributeInsert(
-        EipUint16       attribute_id,
+        int             attribute_id,
         EipUint8        cip_type,
         EipByte         cip_flags,
         void* data
@@ -647,7 +646,8 @@ bool CipClass::InstanceInsert( CipInstance* aInstance )
 }
 
 
-CipInstance* CipClass::InstanceInsert( EipUint32 instance_id )
+/*
+CipInstance* CipClass::InstanceInsert( int instance_id )
 {
     CipInstance* instance = new CipInstance( instance_id );
 
@@ -659,6 +659,7 @@ CipInstance* CipClass::InstanceInsert( EipUint32 instance_id )
 
     return instance;
 }
+*/
 
 
 CipInstance* CipClass::Instance( EipUint32 instance_id ) const
@@ -710,10 +711,10 @@ bool CipClass::ServiceInsert( CipService* aService )
 }
 
 
-CipService* CipClass::ServiceInsert( EipUint8 service_id,
-        CipServiceFunction service_function, const char* service_name )
+CipService* CipClass::ServiceInsert( int aServiceId,
+        CipServiceFunction aServiceFunction, const char* aServiceName )
 {
-    CipService* service = new CipService( service_name, service_id, service_function );
+    CipService* service = new CipService( aServiceName, aServiceId, aServiceFunction );
 
     if( !ServiceInsert( service ) )
     {
@@ -754,7 +755,7 @@ EipStatus GetAttributeSingle( CipInstance* instance,
     // Mask for filtering get-ability
     EipByte get_mask;
 
-    EipByte* message = response->data;
+    const EipByte* message = response->data.data();
 
     response->data_length = 0;
     response->reply_service = 0x80 | request->service;
@@ -795,14 +796,6 @@ EipStatus GetAttributeSingle( CipInstance* instance,
             attribute->Get( request, response );
         }
     }
-
-#if 0
-    else if( request->request_path.attribute_number == 0 )
-    {
-        // This abomination is wanted by the conformance test tool:
-        response->general_status = kCipErrorServiceNotSupported;
-    }
-#endif
 
     return kEipStatusOkSend;
 }
@@ -1001,9 +994,9 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
 }
 
 
-int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
+int DecodeData( EipUint8 cip_type, void* data, const EipUint8** message )
 {
-    EipByte* p = *message;
+    const EipByte* p = *message;
 
     // check the data type of attribute
     switch( cip_type )
@@ -1056,8 +1049,12 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
             memcpy( string->string, p, string->length );
             p += string->length;
 
+            // pad to even byte count ?
             if( (p - *message) & 1 )
-                *p++ = 0;   // pad to even byte count
+            {
+                string->string[string->length] = 0;
+                ++p;
+            }
         }
         break;
 
@@ -1088,14 +1085,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipUint8* start = response->data;
-
-    /*
-    if( instance->instance_id == 2 )
-    {
-        CIPSTER_TRACE_INFO( "GetAttributeAll: instance number 2\n" );
-    }
-    */
+    CipBufMutable start = response->data;
 
     CipService* service = instance->owning_class->Service( kGetAttributeSingle );
 
@@ -1138,7 +1128,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
                 }
             }
 
-            response->data_length = response->data - start;
+            response->data_length = response->data.data() - start.data();
             response->data = start;
         }
 

@@ -21,7 +21,11 @@
  * <data> := <the number of bytes specified by Length>
  */
 
-// * @brief Definition of Item ID numbers used for address and data items in CPF structures
+
+/**
+ * Enum CipItemId
+ * is the set of Item ID numbers used for address and data items in CPF structures
+ */
 enum CipItemId
 {
     kCipItemIdNullAddress = 0x0000,                             ///< Type: Address; Indicates that encapsulation routing is not needed.
@@ -38,6 +42,11 @@ enum CipItemId
 
 struct AddressData
 {
+    AddressData() :
+        connection_identifier( 0 ),
+        sequence_number( 0 )
+    {}
+
     EipUint32   connection_identifier;
     EipUint32   sequence_number;
 };
@@ -45,6 +54,11 @@ struct AddressData
 
 struct AddressItem
 {
+    AddressItem() :
+        type_id( 0 ),
+        length( 0 )
+    {}
+
     CipUint     type_id;
     CipUint     length;
     AddressData data;
@@ -53,9 +67,15 @@ struct AddressItem
 
 struct DataItem
 {
-    EipUint16   type_id;
-    EipUint16   length;
-    EipUint8*   data;
+    DataItem() :
+        type_id( 0 ),
+        length( 0 ),
+        data( 0 )
+    {}
+
+    EipUint16       type_id;
+    EipUint16       length;
+    const EipByte*  data;
 };
 
 
@@ -80,6 +100,7 @@ struct SocketAddressInfoItem
     CipUdint    sin_addr;
     CipUsint    nasin_zero[8];
 
+    /// assign from a sockaddr_in to this
     SocketAddressInfoItem& operator=( sockaddr_in& rhs )
     {
         sin_family  = rhs.sin_family;
@@ -87,6 +108,7 @@ struct SocketAddressInfoItem
         sin_addr    = ntohl( rhs.sin_addr.s_addr );
     }
 
+    /// convert this to a sockaddr_in
     operator sockaddr_in ()
     {
         sockaddr_in lhs;
@@ -102,14 +124,54 @@ struct SocketAddressInfoItem
 };
 
 
-// this one case of a CPF packet is supported:
 
 class CipCommonPacketFormatData
 {
 public:
-    int         item_count;
-    AddressItem address_item;
-    DataItem    data_item;
+
+    CipCommonPacketFormatData()
+    {
+        Clear();
+    }
+
+
+    /**
+     * Function DeserializeCPFD
+     * sets fields in this object from the provided serialized data.
+     * Create CPF structure out of the received data.
+     *
+     *  @param  aSrc serialized bytes which need to be structured.
+      *
+     *  @return int -
+     *     - >  0 : the number of bytes consumed
+     *     - <= 0 : the negative offset of the problem byte
+     */
+    int DeserializeCPFD( CipBufNonMutable aSrc );
+
+    /**
+     * Function SerializeForMRR
+     * serializes this object.
+     *
+     * @param  aResponse message router response or NULL if implicit response.
+     * @param  aDst destination byte buffer
+     * @return int - serialized byte count or -1 if error.
+     */
+    int SerializeCPFD( CipMessageRouterResponse* aResponse, CipBufMutable aDst );
+
+    /**
+     * Function SerializeForIO
+     * serializes this object into a byte array for transmission as an implicit message.
+     *
+     * @param  aDataItem is the CIP response payload to serialize.
+     * @param  aDst a byte buffer which is where to serialize this object
+     * @return int - count of serialized bytes, or -1 if error.
+     */
+    int SerializeForIO( CipBufMutable aDst )
+    {
+        return SerializeCPFD( NULL, aDst );
+    }
+
+    void SetItemCount( int aCount )         {  item_count = aCount; }
 
     void Clear()
     {
@@ -128,37 +190,18 @@ public:
         rx_aii_count = 0;
     }
 
-
-    /** @ingroup ENCAP
-     *  Create CPF structure out of the received data.
-     *  @param  data		pointer to data which need to be structured.
-     *  @param  data_length	length of data in pa_Data.
-     *  @param  common_packet_format_data	pointer to structure of CPF data item.
-     *  @return status
-     *         EIP_OK .. success
-     *         EIP_ERROR .. error
+    /**
+     * Function AddNullAddressItem
+     * adds a Null Address Item to this common packet format object.
      */
-    EipStatus Init( EipUint8* data, int data_length );
+    void AddNullAddressItem()
+    {
+        // Precondition: Null Address Item only valid in unconnected messages
+        CIPSTER_ASSERT( data_item.type_id == kCipItemIdUnconnectedDataItem );
 
-    /** @ingroup ENCAP
-     * Copy data from CPFDataItem into linear memory in message for transmission over in encapsulation.
-     * @param  response  pointer to message router response which has to be aligned into linear memory.
-     * @param  common_packet_format_data_item pointer to CPF structure which has to be aligned into linear memory.
-     * @param  message    pointer to linear memory.
-     * @return length of reply in pa_msg in bytes
-     *     EIP_ERROR .. error
-     */
-    int AssembleIOMessage( EipUint8* message );
-
-    /** @ingroup ENCAP
-     * Copy data from MRResponse struct and CPFDataItem into linear memory in message for transmission over in encapsulation.
-     * @param  response	pointer to message router response which has to be aligned into linear memory.
-     * @param  common_packet_format_data_item	pointer to CPF structure which has to be aligned into linear memory.
-     * @param  message		pointer to linear memory.
-     * @return length of reply in pa_msg in bytes
-     *     EIP_ERROR .. error
-     */
-    int AssembleLinearMessage( CipMessageRouterResponse* response, EipUint8* message );
+        address_item.type_id    = kCipItemIdNullAddress;
+        address_item.length     = 0;
+    }
 
     bool AppendRx( const SocketAddressInfoItem& aSocketAddressInfoItem )
     {
@@ -221,7 +264,22 @@ public:
         return NULL;
     }
 
+    CipBufNonMutable DataItemPayload() const
+    {
+        return CipBufNonMutable( data_item.data, data_item.length );
+    }
+
+    CipItemId DataItemType() const      { return CipItemId( data_item.type_id ); }
+    CipItemId AddressItemType() const   { return CipItemId( address_item.type_id ); }
+
+    // @todo make these private too
+    AddressItem address_item;
+    DataItem    data_item;
+
 private:
+
+    int         item_count;
+
     int rx_aii_count;
     SocketAddressInfoItem rx_aii[2];
 
@@ -230,35 +288,31 @@ private:
 };
 
 
-/** @ingroup ENCAP
- * Parse the CPF data from a received unconnected explicit message and
- * hand the data on to the message router
+/**
+ * Function NotifyCommonPacketFormat
+ * parses CPF data in @a aCommand and then hands the contained
+ * Unconnected Data Item or Connected Data Item
+ * on to the message router.  Upon return, a CPF header is placed into aReply and
+ * the payload reply generated by the message router is appended also into aReply.
  *
- * @param  received_data pointer to the encapsulation structure with the received message
- * @param  reply_buffer reply buffer
- * @return number of bytes to be sent back. < 0 if nothing should be sent
+ * @param  aCommand encapsulation structure with the received message
+ * @param  aReply where to put the reply and what its size limit is.
+ * @return int - number of bytes to be sent back. <= 0 if nothing should be sent and is the
+ *  the negative of one of the values in EncapsulationProtocolErrorCode.
  */
-int NotifyCommonPacketFormat( EncapsulationData* received_data,
-        EipUint8* reply_buffer );
+int NotifyCommonPacketFormat( CipBufNonMutable aCommand, CipBufMutable aReply );
 
-/** @ingroup ENCAP
- * Parse the CPF data from a received connected explicit message, check
- * the connection status, update any timers, and hand the data on to
+/**
+ * Function NotifyConnectedCommonPacketFormat
+ * parses the CPF data in @a aCommand which is a connected explicit message, checks
+ * the connection status, updates any timers, and hands the data on to
  * the message router
  *
- * @param  received_data pointer to the encapsulation structure with the received message
- * @param  reply_buffer reply buffer
- * @return number of bytes to be sent back. < 0 if nothing should be sent
+ * @param  aCommand encapsulation structure with the received message
+ * @param  aReply where to put the reply and what its size limit is.
+ * @return int - number of bytes to be sent back. <= 0 if nothing should be sent and is the
+ *  the negative of one of the values in EncapsulationProtocolErrorCode.
  */
-int NotifyConnectedCommonPacketFormat( EncapsulationData* received_data,
-        EipUint8* reply_buffer );
-
-
-/** @ingroup ENCAP
- * @brief Data storage for the any CPF data
- * Currently we are single threaded and need only one CPF at the time.
- * For future extensions towards multithreading maybe more CPF data items may be necessary
- */
-extern CipCommonPacketFormatData g_cpf;
+int NotifyConnectedCommonPacketFormat( CipBufNonMutable aCommand, CipBufMutable aReply );
 
 #endif    // CIPSTER_CPF_H_

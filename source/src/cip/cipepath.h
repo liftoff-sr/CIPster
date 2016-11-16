@@ -75,7 +75,7 @@ public:
      *  available input bytes may not have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
      */
-    int DeserializePadded( EipByte* aSrc, EipByte* aLimit );
+    int DeserializePadded( const EipByte* aSrc, const EipByte* aLimit );
 
     Words       words;
 };
@@ -118,7 +118,7 @@ public:
      *  available input bytes may not have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
      */
-    int DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* aPreviousToInheritFrom = NULL );
+    int DeserializePadded( const EipByte* aSrc, const EipByte* aLimit, CipAppPath* aPreviousToInheritFrom = NULL );
 
     /**
      * Function SerializePadded
@@ -264,8 +264,8 @@ private:
 
     enum Stuff
     {
-        CONN_PT,
         ATTRIBUTE,
+        CONN_PT,
         INSTANCE,
         CLASS,
         LOGICAL_END,
@@ -286,6 +286,8 @@ private:
     int deserialize_logical( EipByte* aSrc, Stuff aField, int aFormat );
 
     void inherit( int aStart, CipAppPath* from );
+
+    void inherit_assembly( int aStart, CipAppPath* from );
 };
 
 
@@ -368,7 +370,7 @@ public:
      *  available input bytes may not have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
      */
-    int DeserializePadded( EipByte* aSrc, EipByte* aLimit );
+    int DeserializePadded( const EipByte* aSrc, const EipByte* aLimit );
 
     /**
      * Function SerializePadded

@@ -17,7 +17,7 @@
 #include "trace.h"
 
 CipMessageRouterRequest     g_request;
-CipMessageRouterResponse    g_response;
+
 
 /// @brief Array of the available explicit connections
 static CipConn g_explicit_connections[CIPSTER_CIP_NUM_EXPLICIT_CONNS];
@@ -105,6 +105,21 @@ CipClass* GetCipClass( int class_id )
 
 //-----------------------------------------------------------------------------
 
+
+CipMessageRouterResponse std::vector<EipByte>     mmr_temp( CIPSTER_MESSAGE_DATA_REPLY_BUFFER );
+
+CipMessageRouterResponse::CipMessageRouterResponse() :
+    reply_service( 0 ),
+    reserved( 0 ),
+    general_status( 0 ),
+    size_of_additional_status( 0 ),
+    data( mmr_temp.data(), mmr_temp.size() ),
+    data_length( 0 )
+{
+    memset( additional_status, 0, sizeof additional_status );
+}
+
+
 class CipMessageRouterClass : public CipClass
 {
 public:
@@ -127,15 +142,6 @@ CipMessageRouterClass::CipMessageRouterClass() :
     // Also, conformance test tool does not like SetAttributeSingle on this class,
     // delete the service which was established in CipClass constructor.
     delete ServiceRemove( kSetAttributeSingle );
-
-    // reserved for future use -> set to zero
-    g_response.reserved = 0;
-
-    // set reply buffer, using a fixed buffer (about 100 bytes)
-    g_response.data = g_message_data_reply_buffer;
-
-    //TODO this is bad, use a CipConn constructor instead.
-    memset( g_explicit_connections, 0, sizeof g_explicit_connections );
 }
 
 
@@ -217,17 +223,26 @@ EipStatus CipMessageRouterInit()
         RegisterCipClass( clazz );
 
         createCipMessageRouterInstance();
+
+        // reserved for future use -> set to zero
+        g_response.reserved = 0;
+
+        g_response.data = g_message_data_reply_buffer;
+
+        /* done by "static construction" of CipConn instances now:
+        //TODO this is bad, use a CipConn constructor instead.
+        memset( g_explicit_connections, 0, sizeof g_explicit_connections );
+        */
     }
 
     return kEipStatusOk;
 }
 
 
-EipStatus NotifyMR( EipUint8* data, int data_length )
+EipStatus NotifyMR( EipByte* data, int data_length )
 {
     EipStatus   eip_status = kEipStatusOkSend;
 
-    // set reply buffer, using a fixed buffer (about 100 bytes)
     g_response.data = g_message_data_reply_buffer;
 
     CIPSTER_TRACE_INFO( "notifyMR: routing unconnected message\n" );
@@ -317,9 +332,9 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
 }
 
 
-CipError CipMessageRouterRequest::InitRequest( EipUint8* aRequest, EipInt16 aCount )
+CipError CipMessageRouterRequest::InitRequest( EipByte* aRequest, EipInt16 aCount )
 {
-    EipUint8* start = aRequest;
+    EipByte* start = aRequest;
 
     service = *aRequest++;
 

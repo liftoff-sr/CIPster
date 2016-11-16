@@ -278,8 +278,7 @@ CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
             }
         }
 
-        producer_multicast_connection = producer_multicast_connection
-                                        ->next;
+        producer_multicast_connection = producer_multicast_connection->next;
     }
 
     return producer_multicast_connection;
@@ -320,8 +319,8 @@ void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,  ConnInstan
 
     while( connection )
     {
-        if( (instance_type == connection->instance_type)
-            && (input_point == connection->conn_path.producing_path.GetInstanceOrConnPt()) )
+        if(  instance_type == connection->instance_type
+          && input_point   == connection->conn_path.producing_path.GetInstanceOrConnPt() )
         {
             connection_to_delete = connection;
             connection = connection->next;
@@ -379,9 +378,11 @@ bool ConnectionWithSameConfigPointExists( EipUint32 config_point )
 
 void InitializeIoConnectionData()
 {
+    /* now done by "static C++ construction"
     memset( g_exclusive_owner, 0, sizeof g_exclusive_owner );
 
     memset( g_input_only, 0, sizeof g_input_only );
 
     memset( g_listen_only, 0, sizeof g_listen_only );
+    */
 }

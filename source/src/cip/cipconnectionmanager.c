@@ -253,12 +253,12 @@ static CipInstance* check_path( const CipAppPath& aPath, ConnectionManagerStatus
  *    - kEipStatusOk on success
  *    - On an error the general status code to be put into the response
  */
-CipError CipConn::parseConnectionPath( CipMessageRouterRequest* request, ConnectionManagerStatusCode* extended_error )
+CipError CipConn::parseConnectionPath( CipBufNonMutable aPath, ConnectionManagerStatusCode* extended_error )
 {
-    int         byte_count = request->data[0] * 2;
-    EipUint8*   message = request->data + 1;
-    EipUint8*   limit   = message + byte_count;
-    int         result;
+    int        result;
+
+    const EipByte*  message = aPath.data();
+    const EipByte*  limit   = message + aPath.size();
 
     CipAppPath  app_path1;
     CipAppPath  app_path2;
@@ -276,17 +276,6 @@ CipError CipConn::parseConnectionPath( CipMessageRouterRequest* request, Connect
     consuming_instance = 0;
     producing_instance = 0;
 
-    if( g_kForwardOpenHeaderLength + byte_count < request->data_length )
-    {
-        // the received packet is larger than the data in the path
-        return kCipErrorTooMuchData;
-    }
-
-    if( g_kForwardOpenHeaderLength + byte_count > request->data_length )
-    {
-        // there is not enough data in received packet
-        return kCipErrorNotEnoughData;
-    }
 
     if( message < limit )
     {
@@ -662,9 +651,6 @@ CipError CipConn::parseConnectionPath( CipMessageRouterRequest* request, Connect
         conn_path.Format().c_str()
         );
 
-    // Save back the current position in the stream allowing followers to parse
-    // anything that's still there
-    request->data = message;
     return kCipErrorSuccess;
 
 L_exit_invalid:
@@ -677,26 +663,13 @@ L_exit_error:
 }
 
 
-/**
- * Adds a Null Address Item to the common data packet format data
- * @param cpfd The CPF data packet where the Null Address Item shall be added
- */
-void AddNullAddressItem( CipCommonPacketFormatData* cpfd )
-{
-    // Precondition: Null Address Item only valid in unconnected messages
-    assert( cpfd->data_item.type_id == kCipItemIdUnconnectedDataItem );
-
-    cpfd->address_item.type_id    = kCipItemIdNullAddress;
-    cpfd->address_item.length     = 0;
-}
-
-
-EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
-        struct sockaddr_in* from_address )
+EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, CipBufNonMutable aCommand )
 {
     CIPSTER_TRACE_INFO( "%s:\n", __func__ );
 
-    if( g_cpf.Init( data, data_length ) == kEipStatusError )
+    CipCommonPacketFormatData cpfd;
+
+    if( cpfd.DeserializeCPFD( aCommand ) == kEipStatusError )
     {
         return kEipStatusError;
     }
@@ -704,26 +677,26 @@ EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
     {
         // Check if connected address item or sequenced address item  received,
         // otherwise it is no connected message and should not be here.
-        if( g_cpf.address_item.type_id == kCipItemIdConnectionAddress
-         || g_cpf.address_item.type_id == kCipItemIdSequencedAddressItem )
+        if( cpfd.address_item.type_id == kCipItemIdConnectionAddress
+         || cpfd.address_item.type_id == kCipItemIdSequencedAddressItem )
         {
             // found connected address item or found sequenced address item
             // -> for now the sequence number will be ignored
 
-            if( g_cpf.data_item.type_id == kCipItemIdConnectedDataItem ) // connected data item received
+            if( cpfd.data_item.type_id == kCipItemIdConnectedDataItem ) // connected data item received
             {
-                CipConn* conn = GetConnectionByConsumingId( g_cpf.address_item.data.connection_identifier );
+                CipConn* conn = GetConnectionByConsumingId( cpfd.address_item.data.connection_identifier );
 
                 if( !conn )
                 {
                     CIPSTER_TRACE_INFO( "%s: no consuming connection for conn_id %d\n",
-                        __func__, g_cpf.address_item.data.connection_identifier
+                        __func__, cpfd.address_item.data.connection_identifier
                         );
                     return kEipStatusError;
                 }
 
                 CIPSTER_TRACE_INFO( "%s: got consuming connection for conn_id %d\n",
-                    __func__, g_cpf.address_item.data.connection_identifier
+                    __func__, cpfd.address_item.data.connection_identifier
                     );
 
                 CIPSTER_TRACE_INFO( "%s: c.s_addr=%08x  f.s_addr=%08x\n",
@@ -737,7 +710,7 @@ EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
                 {
                     CIPSTER_TRACE_INFO( "%s: g.sn=0x%08x  c.sn=0x%08x\n",
                         __func__,
-                        g_cpf.address_item.data.sequence_number,
+                        cpfd.address_item.data.sequence_number,
                         conn->eip_level_sequence_count_consuming
                         );
 
@@ -746,12 +719,12 @@ EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
                     {
                         // put our tracking count within a half cycle of the leader.  Without this
                         // there are many scenarios where the SEQ_GT32 below won't evaluate as true.
-                        conn->eip_level_sequence_count_consuming = g_cpf.address_item.data.sequence_number - 1;
+                        conn->eip_level_sequence_count_consuming = cpfd.address_item.data.sequence_number - 1;
                         conn->eip_level_sequence_count_consuming_first = false;
                     }
 
                     // only inform assembly object if the sequence counter is greater or equal, or
-                    if( SEQ_GT32( g_cpf.address_item.data.sequence_number,
+                    if( SEQ_GT32( cpfd.address_item.data.sequence_number,
                                   conn->eip_level_sequence_count_consuming ) )
                     {
                         // reset the watchdog timer
@@ -762,12 +735,12 @@ EipStatus HandleReceivedConnectedData( EipUint8* data, int data_length,
                             __func__,
                             conn->inactivity_watchdog_timer_usecs );
 
-                        conn->eip_level_sequence_count_consuming = g_cpf.address_item.data.sequence_number;
+                        conn->eip_level_sequence_count_consuming = cpfd.address_item.data.sequence_number;
 
                         if( conn->connection_receive_data_function )
                         {
-                            return conn->connection_receive_data_function(
-                                    conn, g_cpf.data_item.data, g_cpf.data_item.length );
+                            return conn->connection_receive_data_function( conn,
+                                CipBufNonMutable( cpfd.data_item.data, cpfd.data_item.length ) );
                         }
                     }
                 }
@@ -877,14 +850,15 @@ static void assembleForwardOpenResponse( CipConn* aConn,
         CipMessageRouterResponse* response, CipError general_status,
         ConnectionManagerStatusCode extended_status )
 {
-    CipCommonPacketFormatData* cpfd = &g_cpf;
+    CipCommonPacketFormatData cpfd;
 
-    EipByte* message = response->data;
+    EipByte* message = response->data.data();
+//    EipByte* limit   = message + reponse.data.size();
 
-    cpfd->item_count = 2;
-    cpfd->data_item.type_id = kCipItemIdUnconnectedDataItem;
+    cpfd.SetItemCount( 2 );
+    cpfd.data_item.type_id = kCipItemIdUnconnectedDataItem;
 
-    AddNullAddressItem( cpfd );
+    cpfd.AddNullAddressItem();
 
     response->reply_service  = 0x80 | kForwardOpen;
     response->general_status = general_status;
@@ -963,9 +937,6 @@ static void assembleForwardOpenResponse( CipConn* aConn,
  * creates FWDClose response dependent on status.
  *
  * @return EipStatus -
- *          0 .. no reply need to ne sent back
- *          1 .. need to send reply
- *         -1 .. error
  */
 static EipStatus assembleForwardCloseResponse( EipUint16 connection_serial_number,
         EipUint16 originatior_vendor_id,
@@ -974,14 +945,13 @@ static EipStatus assembleForwardCloseResponse( EipUint16 connection_serial_numbe
         CipMessageRouterResponse* response,
         EipUint16 extended_error_code )
 {
-    // write reply information in CPF struct dependent of pa_status
-    CipCommonPacketFormatData* cpfd = &g_cpf;
-    EipByte* message = response->data;
+    EipByte* out   = response->data.data();
+    EipByte* limit = out + response->data.size();
 
-    cpfd->item_count = 2;
-    cpfd->data_item.type_id = kCipItemIdUnconnectedDataItem;
+    cpfd.SetItemCount( 2 );
+    cpfd.data_item.type_id = kCipItemIdUnconnectedDataItem;
 
-    AddNullAddressItem( cpfd );
+    cpfd.AddNullAddressItem();
 
     AddIntToMessage( connection_serial_number, &message );
     AddIntToMessage( originatior_vendor_id, &message );
@@ -989,23 +959,23 @@ static EipStatus assembleForwardCloseResponse( EipUint16 connection_serial_numbe
 
     response->reply_service = 0x80 | request->service;
 
-    response->data_length = 10; // if there is no application specific data
-
     if( kConnectionManagerStatusCodeSuccess == extended_error_code )
     {
-        *message++ = 0; // no application data
+        *message++ = 0;         // no application data
         response->general_status = kCipErrorSuccess;
         response->size_of_additional_status = 0;
     }
     else
     {
-        *message++ = *request->data; // remaining path size
+        *message++ = *request->data.data();     // remaining path size
         response->general_status = kCipErrorConnectionFailure;
         response->additional_status[0] = extended_error_code;
         response->size_of_additional_status = 1;
     }
 
     *message++ = 0;         // reserved
+
+    response->data_length = 10;     // message has is no application specific data
 
     return kEipStatusOkSend;
 }
@@ -1213,21 +1183,24 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
 
     static CipConn dummy;
 
-    dummy.priority_timetick = *request->data++;
-    dummy.timeout_ticks = *request->data++;
+    const EipByte*  p = request->data.data();
+    const EipByte*  limit = p + request->data.size();
+
+    dummy.priority_timetick = *p++;
+    dummy.timeout_ticks = *p++;
 
     // O_to_T
-    dummy.consuming_connection_id   = GetDintFromMessage( &request->data );
+    dummy.consuming_connection_id   = GetDintFromMessage( &p );
 
     // T_to_O
-    dummy.producing_connection_id   = GetDintFromMessage( &request->data );
+    dummy.producing_connection_id   = GetDintFromMessage( &p );
 
     // The Connection Triad used in the Connection Manager specification relates
     // to the combination of Connection Serial Number, Originator Vendor ID and
     // Originator Serial Number parameters.
-    dummy.connection_serial_number = GetIntFromMessage( &request->data );
-    dummy.originator_vendor_id     = GetIntFromMessage( &request->data );
-    dummy.originator_serial_number = GetDintFromMessage( &request->data );
+    dummy.connection_serial_number = GetIntFromMessage( &p );
+    dummy.originator_vendor_id     = GetIntFromMessage( &p );
+    dummy.originator_serial_number = GetDintFromMessage( &p );
 
     // first check if we have already a connection with the given params
     if( findExistingMatchingConnection( &dummy ) )
@@ -1259,7 +1232,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
 
     dummy.sequence_count_producing = 0; // set the sequence count to zero
 
-    dummy.connection_timeout_multiplier = *request->data++;
+    dummy.connection_timeout_multiplier = *p++;
 
     if( dummy.connection_timeout_multiplier > 7 )
     {
@@ -1275,7 +1248,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         return kEipStatusOkSend;    // send reply
     }
 
-    request->data += 3; // skip over 3 reserved bytes.
+    p += 3;         // skip over 3 reserved bytes.
 
     CIPSTER_TRACE_INFO(
         "%s: ConConnID:0x%08x, ProdConnID:0x%08x, ConnSerNo:%u\n",
@@ -1285,19 +1258,19 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         dummy.connection_serial_number
         );
 
-    dummy.o_to_t_RPI_usecs = GetDintFromMessage( &request->data );
+    dummy.o_to_t_RPI_usecs = GetDintFromMessage( &p );
 
     if( isLarge )
-        dummy.o_to_t_ncp.SetLarge( GetDintFromMessage( &request->data ) );
+        dummy.o_to_t_ncp.SetLarge( GetDintFromMessage( &p ) );
     else
-        dummy.o_to_t_ncp.SetNotLarge( GetIntFromMessage( &request->data ) );
+        dummy.o_to_t_ncp.SetNotLarge( GetIntFromMessage( &p ) );
 
     CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, dummy.o_to_t_RPI_usecs );
     CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, dummy.o_to_t_ncp.ConnectionSize() );
     CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, dummy.o_to_t_ncp.Priority() );
     CIPSTER_TRACE_INFO( "%s: o_to_t type:%d\n", __func__, dummy.o_to_t_ncp.ConnectionType() );
 
-    dummy.t_to_o_RPI_usecs = GetDintFromMessage( &request->data );
+    dummy.t_to_o_RPI_usecs = GetDintFromMessage( &p );
 
     // The requested packet interval parameter needs to be a multiple of
     // kOpenerTimerTickInMicroSeconds from the header file
@@ -1311,9 +1284,9 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
     }
 
     if( isLarge )
-        dummy.t_to_o_ncp.SetLarge( GetDintFromMessage( &request->data ) );
+        dummy.t_to_o_ncp.SetLarge( GetDintFromMessage( &p ) );
     else
-        dummy.t_to_o_ncp.SetNotLarge( GetIntFromMessage( &request->data ) );
+        dummy.t_to_o_ncp.SetNotLarge( GetIntFromMessage( &p ) );
 
     // check if Network connection parameters are ok
     if( dummy.o_to_t_ncp.ConnectionType() == kIOConnTypeInvalid )
@@ -1340,7 +1313,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         return kEipStatusOkSend;    // send reply
     }
 
-    int trigger = *request->data++;
+    int trigger = *p++;
 
     // check for undocumented trigger bits
     if( 0x4c & trigger )
@@ -1358,15 +1331,28 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
 
     dummy.transport_trigger.Set( trigger );
 
-    CipError result = dummy.parseConnectionPath( request, &connection_status );
+    unsigned conn_path_byte_count = *p++ * 2;
+
+    if( g_kForwardOpenHeaderLength + conn_path_byte_count < request->data.size() )
+    {
+        assembleForwardOpenResponse( &dummy, response, kCipErrorTooMuchData, connection_status );
+        return kEipStatusOkSend;    // send reply
+    }
+
+    if( g_kForwardOpenHeaderLength + conn_path_byte_count > request->data.size() )
+    {
+        assembleForwardOpenResponse( &dummy, response, kCipErrorNotEnoughData, connection_status );
+        return kEipStatusOkSend;
+    }
+
+    CipError result = dummy.parseConnectionPath( request->data + (p - request->data.data()), &connection_status );
 
     if( result != kCipErrorSuccess )
     {
         CIPSTER_TRACE_INFO( "%s: unable to parse connection path\n", __func__ );
 
         assembleForwardOpenResponse( &dummy, response, result, connection_status );
-
-        return kEipStatusOkSend;    // send reply
+        return kEipStatusOkSend;
     }
 
     CipClass* clazz = GetCipClass( dummy.mgmnt_class );
@@ -1379,8 +1365,7 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
 
         // in case of error the dummy objects holds all necessary information
         assembleForwardOpenResponse( &dummy, response, result, connection_status );
-
-        return kEipStatusOkSend;    // send reply
+        return kEipStatusOkSend;
     }
     else
     {
@@ -1389,27 +1374,26 @@ static EipStatus forwardOpenCommon( CipInstance* instance,
         // in case of success, g_active_connection_list points to the new connection
         assembleForwardOpenResponse( g_active_connection_list,
                 response, kCipErrorSuccess, kConnectionManagerStatusCodeSuccess );
-
-        return kEipStatusOkSend;    // send reply
+        return kEipStatusOkSend;
     }
 }
 
 
-static EipStatus forwardOpen( CipInstance* instance,
+static EipStatus forward_open_service( CipInstance* instance,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     return forwardOpenCommon( instance, request, response, false );
 }
 
 
-static EipStatus largeForwardOpen( CipInstance* instance,
+static EipStatus large_forward_open_service( CipInstance* instance,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     return forwardOpenCommon( instance, request, response, true );
 }
 
 
-static EipStatus forwardClose( CipInstance* instance,
+static EipStatus forward_close_service( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
@@ -1421,9 +1405,6 @@ static EipStatus forwardClose( CipInstance* instance,
         kConnectionManagerStatusCodeErrorConnectionNotFoundAtTargetApplication;
 
     CipConn* active = g_active_connection_list;
-
-    // prevent assembleLinearMsg from serializing socket addresses
-    g_cpf.ClearTx();
 
     request->data += 2; // ignore Priority/Time_tick and Time-out_ticks
 
@@ -1440,9 +1421,9 @@ static EipStatus forwardClose( CipInstance* instance,
         if( active->state == kConnectionStateEstablished
          || active->state == kConnectionStateTimedOut )
         {
-            if( (active->connection_serial_number == connection_serial_number)
-             && (active->originator_vendor_id     == originator_vendor_id)
-             && (active->originator_serial_number == originator_serial_number) )
+            if( active->connection_serial_number == connection_serial_number
+             && active->originator_vendor_id     == originator_vendor_id
+             && active->originator_serial_number == originator_serial_number )
             {
                 // found the corresponding connection object -> close it
                 CIPSTER_ASSERT( active->connection_close_function );
@@ -1498,10 +1479,10 @@ CipConnMgrClass::CipConnMgrClass() :
     // There are no attributes in instance of this class yet, so nothing to set.
     delete ServiceRemove( kSetAttributeSingle );
 
-    ServiceInsert( kForwardOpen, forwardOpen, "ForwardOpen" );
-    ServiceInsert( kLargeForwardOpen, largeForwardOpen, "LargeForwardOpen" );
+    ServiceInsert( kForwardOpen, forward_open_service, "ForwardOpen" );
+    ServiceInsert( kLargeForwardOpen, large_forward_open_service, "LargeForwardOpen" );
 
-    ServiceInsert( kForwardClose, forwardClose, "ForwardClose" );
+    ServiceInsert( kForwardClose, forward_close_service, "ForwardClose" );
 
     InitializeIoConnectionData();
 }

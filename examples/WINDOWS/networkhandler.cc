@@ -37,7 +37,7 @@ extern CipConn* g_active_connection_list;
  *  This buffer size will be used for any received message.
  *  The same buffer is used for the replied explicit message.
  */
-static EipUint8 s_packet[1200];
+static EipByte s_packet[CIPSTER_ETHERNET_BUFFER_SIZE];
 
 
 #define MAX_NO_OF_TCP_SOCKETS 10
@@ -469,7 +469,7 @@ bool CheckSocketSet( int socket )
 
 
 EipStatus SendUdpData( struct sockaddr_in* address, int socket, EipUint8* data,
-        EipUint16 data_length )
+        int data_length )
 {
     int sent_count = sendto( socket, (char*) data, data_length, 0,
             (struct sockaddr*) address, sizeof(*address) );

@@ -26,9 +26,10 @@ enum OpenerEndianess
  * @param buffer Pointer to the network buffer array. This pointer will be incremented by 2!
  * @return Extracted 16 bit integer value
  */
-inline EipUint16 GetIntFromMessage( EipByte** buffer )
+inline EipUint16 GetIntFromMessage( const EipByte** buffer )
 {
-    EipByte*   p = *buffer;
+    const EipByte*  p = *buffer;
+
     EipUint16   data = p[0] | p[1] << 8;
 
     *buffer += 2;
@@ -42,9 +43,10 @@ inline EipUint16 GetIntFromMessage( EipByte** buffer )
  * @param buffer pointer to the network buffer array. This pointer will be incremented by 4!
  * @return Extracted 32 bit integer value
  */
-inline EipUint32 GetDintFromMessage( EipByte** buffer )
+inline EipUint32 GetDintFromMessage( const EipByte** buffer )
 {
-    EipByte* p = *buffer;
+    const EipByte* p = *buffer;
+
     EipUint32 data = p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
 
     *buffer += 4;
@@ -52,9 +54,10 @@ inline EipUint32 GetDintFromMessage( EipByte** buffer )
 }
 
 
-inline EipUint16 GetIntFromMessageBE( EipByte** buffer )
+inline EipUint16 GetIntFromMessageBE( const EipByte** buffer )
 {
-    EipByte*   p = *buffer;
+    const EipByte*   p = *buffer;
+
     EipUint16   data = p[1] | p[0] << 8;
 
     *buffer += 2;
@@ -62,9 +65,10 @@ inline EipUint16 GetIntFromMessageBE( EipByte** buffer )
 }
 
 
-inline EipUint32 GetDintFromMessageBE( EipByte** buffer )
+inline EipUint32 GetDintFromMessageBE( const EipByte** buffer )
 {
-    EipByte* p = *buffer;
+    const EipByte* p = *buffer;
+
     EipUint32 data = p[3] | p[2] << 8 | p[1] << 16 | p[0] << 24;
 
     *buffer += 4;

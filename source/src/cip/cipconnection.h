@@ -94,10 +94,16 @@ enum IOConnType
 class NetCnParams
 {
 public:
-    NetCnParams() :
-        not_large( true ),
-        bits( 0 )
-    {}
+    NetCnParams()
+    {
+        Clear();
+    }
+
+    void Clear()
+    {
+        not_large = true;
+        bits = 0;
+    }
 
     bool RedundantOwner() const
     {
@@ -167,9 +173,15 @@ enum ConnectionTransportClass
 class TransportTrigger
 {
 public:
-    TransportTrigger() :
-        bits( 0 )
-    {}
+    TransportTrigger()
+    {
+        Clear();
+    }
+
+    void Clear()
+    {
+        bits = 0;
+    }
 
     void Set( EipByte aByte )   { bits = aByte; }
 
@@ -277,9 +289,11 @@ public:
 
 #endif
 
+    CipConn();
+
     void Clear();
 
-    CipError parseConnectionPath( CipMessageRouterRequest* request, ConnectionManagerStatusCode* extended_error );
+    CipError parseConnectionPath( CipBufNonMutable aPath, ConnectionManagerStatusCode* extended_error );
 
     ConnectionState     state;
     ConnInstanceType    instance_type;
@@ -287,8 +301,9 @@ public:
     /* conditional
      *  EipUint16 DeviceNetProductedConnectionID;
      *  EipUint16 DeviceNetConsumedConnectionID;
-     */
     EipByte     device_net_initial_comm_characteristcs;
+     */
+
 
     EipUint16   producing_connection_size;
     EipUint16   consuming_connection_size;
@@ -388,8 +403,8 @@ public:
      */
     EipInt32 production_inhibit_timer_usecs;
 
-    struct sockaddr_in  remote_address;     // socket address for produce
-    struct sockaddr_in  originator_address; /* the address of the originator that
+    sockaddr_in  remote_address;            // socket address for produce
+    sockaddr_in  originator_address;        /* the address of the originator that
                                              *  established the connection. needed
                                              *  for scanning if the right packet is
                                              *  arriving */
@@ -424,14 +439,6 @@ private:
  */
 CipError OpenCommunicationChannels( CipConn* aConn );
 
-/**
- * Function CloseCommunicationChannelsAndRemoveFromActiveConnectionsList
- * closes the communication channels of the given connection and remove it
- * from the active connections list.
- *
- * @param cip_conn pointer to the connection object data
- */
-void CloseCommunicationChannelsAndRemoveFromActiveConnectionsList( CipConn* cip_conn );
 
 /** Copy the given connection data from pa_pstSrc to pa_pstDst
  */

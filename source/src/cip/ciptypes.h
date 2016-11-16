@@ -1,9 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- *
- * Conversion to C++ is Copyright (C) 2016, SoftPLC Corportion.
- *
- * All rights reserved.
+ * Copyright (C) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPTYPES_H_
@@ -246,9 +243,85 @@ struct CipRevision
 };
 
 
-/// For now we support extended status codes up to 2 16bit values.
-/// There is mostly only one 16bit value used
-#define NUM_ADD_STATUS      2
+
+class CipBufMutable
+{
+public:
+    CipBufMutable( CipByte* aStart, size_t aCount ) :
+        start( aStart ),
+        byte_count( aCount )
+    {}
+
+    CipBufMutable() :
+        start( 0 ), byte_count( 0 )
+    {}
+
+    CipByte*    data() const    { return start; }
+    size_t      size() const    { return byte_count; }
+
+    /// Move the start of the buffer by the specified number of bytes.
+    CipBufMutable& operator+=( size_t n )
+    {
+        size_t offset = n < byte_count ? n : byte_count;
+        start += offset;
+        byte_count -= offset;
+        return *this;
+    }
+
+    CipBufMutable operator+( size_t n )
+    {
+        CipBufMutable ret = *this;
+
+        ret += n;
+        return ret;
+    }
+
+protected:
+    CipByte*        start;
+    size_t          byte_count;
+};
+
+
+class CipBufNonMutable
+{
+public:
+    CipBufNonMutable() :
+        start( 0 ), byte_count( 0 )
+    {}
+
+    CipBufNonMutable( const CipByte* aStart, size_t aCount ) :
+        start( aStart ), byte_count( aCount )
+    {}
+
+    CipBufNonMutable( const CipBufMutable& m ):
+        start( m.data() ),
+        byte_count( m.size() )
+    {}
+
+    const CipByte*  data() const    { return start; }
+    size_t          size() const    { return byte_count; }
+
+    /// Move the start of the buffer by the specified number of bytes.
+    CipBufNonMutable& operator+=( size_t n )
+    {
+        size_t offset = n < byte_count ? n : byte_count;
+        start += offset;
+        byte_count -= offset;
+        return *this;
+    }
+
+    CipBufNonMutable operator+( size_t n )
+    {
+        CipBufNonMutable ret = *this;
+
+        ret += n;
+        return ret;
+    }
+
+protected:
+    const CipByte*  start;
+    size_t          byte_count;
+};
 
 
 class CipInstance;
@@ -395,13 +468,13 @@ public:
      */
     bool AttributeInsert( CipAttribute* aAttributes );
 
-    CipAttribute* AttributeInsert( EipUint16 attribute_id,
+    CipAttribute* AttributeInsert( int attribute_id,
         EipUint8        cip_type,
         EipByte         cip_flags,
         void*           data
         );
 
-    CipAttribute* AttributeInsert( EipUint16 attribute_id,
+    CipAttribute* AttributeInsert( int attribute_id,
         EipUint8        cip_type,
         EipByte         cip_flags,
         AttributeFunc   aGetter,
@@ -443,23 +516,24 @@ private:
 };
 
 
-/** @ingroup CIP_API
- *  @typedef  EIP_STATUS (*TCIPServiceFunc)( CipInstance *,
+/**
+ * Typedef EipStatus (*CipServiceFunc)( CipInstance *,
  *    CipMessageRouterRequest*, CipMessageRouterResponse*)
- *  @brief Signature definition for the implementation of CIP services.
+ * is the function type for the implementation of CIP services.
  *
- *  CIP services have to follow this signature in order to be handled correctly
+ * CIP services have to follow this signature in order to be handled correctly
  * by the stack.
- *  @param instance which was referenced in the service request
- *  @param request request data
- *  @param response storage for the response data, including a buffer for
- *      extended data
- *  @return EIP_OK_SEND if service could be executed successfully and a response
- * should be sent
+ *
+ * @param aInstance which was referenced in the service request
+ * @param aRequest holds "data" coming from client, and it includes a length.
+ * @param aResponse where to put the response, do it into member "data" which is length
+ *  defined.  Upon completions update data_length to how many bytes were filled in.
+ *
+ * @return EipStatus - EipOKSend if service could be executed successfully
+ *    and a response should be sent.
  */
-typedef EipStatus (* CipServiceFunction)( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response );
+typedef EipStatus (* CipServiceFunction)( CipInstance* aInstance,
+        CipMessageRouterRequest* aRequest, CipMessageRouterResponse* aResponse );
 
 
 /**
@@ -550,8 +624,8 @@ public:
      */
     bool ServiceInsert( CipService* aService );
 
-    CipService* ServiceInsert( EipUint8 service_id,
-        CipServiceFunction service_function, const char* service_name );
+    CipService* ServiceInsert( int aServiceId,
+        CipServiceFunction aServiceFunction, const char* aServiceName );
 
     /**
      * Function ServiceRemove
@@ -586,10 +660,10 @@ public:
 
     /**
      * Function InstanceInsert
-     * inserts a new instance into this class if the @a instance_id is unique.
+     * inserts a new instance into this class if the @a aInstanceId is unique.
      * @return CipInstance* - the new instance or NULL if failure.
+    CipInstance* InstanceInsert( int aInstanceId );
      */
-    CipInstance* InstanceInsert( EipUint32 instance_id );
 
     CipInstance* Instance( EipUint32 instance_id ) const;
 

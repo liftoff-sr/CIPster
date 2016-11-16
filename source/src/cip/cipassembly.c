@@ -43,12 +43,12 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
             CIPSTER_TRACE_WARN( "%s: received data for connected input assembly\n", __func__ );
             response->general_status = kCipErrorAttributeNotSetable;
         }
-        else if( request->data_length < byte_array->length )
+        else if( request->data.size() < byte_array->length )
         {
             CIPSTER_TRACE_INFO( "%s: not enough data received.\n", __func__ );
             response->general_status = kCipErrorNotEnoughData;
         }
-        else if( request->data_length > byte_array->length )
+        else if( request->data.size() > byte_array->length )
         {
             CIPSTER_TRACE_INFO( "%s: too much data received.\n", __func__ );
             response->general_status = kCipErrorTooMuchData;
@@ -58,11 +58,11 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
             CIPSTER_TRACE_INFO(
                 "%s: writing %d bytes to assembly_id: %d.\n",
                 __func__,
-                request->data_length,
+                (int) request->data.size(),
                 instance->Id()
                 );
 
-            memcpy( byte_array->data, request->data, byte_array->length );
+            memcpy( byte_array->data, request->data.data(), byte_array->length );
 
             if( AfterAssemblyDataReceived( instance ) != kEipStatusOk )
             {

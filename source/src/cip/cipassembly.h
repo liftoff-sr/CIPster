@@ -26,15 +26,12 @@ EipStatus CipAssemblyInitialize();
  *  The data will be copied into the assembly instance's attribute 3 and
  *  the application will be informed with the IApp_after_assembly_data_received function.
  *
- *  @param instance the assembly object instance for which the data was received
- *  @param data pointer to the data received
- *  @param data_length number of bytes received
+ *  @param aInstance the assembly instance for which the data was received
+ *  @param aInput the byte data received and its length
  *  @return
  *     - EIP_OK the received data was okay
  *     - EIP_ERROR the received data was wrong
  */
-EipStatus NotifyAssemblyConnectedDataReceived(CipInstance *instance,
-                                              EipUint8 *data,
-                                              EipUint16 data_length);
+EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* aInstance, CipBufNonMutable aInput );
 
 #endif // CIPSTER_CIPASSEMBLY_H_

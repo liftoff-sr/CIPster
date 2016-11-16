@@ -294,7 +294,7 @@ inline int CipAppPath::deserialize_symbolic( EipByte* aSrc, EipByte* aLimit )
 }
 
 
-int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* aPreviousToInheritFrom )
+int CipAppPath::DeserializePadded( const EipByte* aSrc, const EipByte* aLimit, CipAppPath* aPreviousToInheritFrom )
 {
     EipByte*    p = aSrc;
                                                 // is seen, C-1.6 of Vol1_3.19
@@ -399,7 +399,12 @@ int CipAppPath::DeserializePadded( EipByte* aSrc, EipByte* aLimit, CipAppPath* a
 
 logical_exit:
         if( p > aSrc && aPreviousToInheritFrom )
-            inherit( last_member + 1, aPreviousToInheritFrom );
+        {
+            if( aPreviousToInheritFrom->GetClass() == 4 )
+                inherit_assembly( last_member + 1, aPreviousToInheritFrom );
+            else
+                inherit( last_member + 1, aPreviousToInheritFrom );
+        }
     }
 
 exit:
@@ -497,6 +502,23 @@ void CipAppPath::inherit( int aStart, CipAppPath* aPreviousToInheritFrom )
 }
 
 
+void CipAppPath::inherit_assembly( int aStart, CipAppPath* aPreviousToInheritFrom )
+{
+    CIPSTER_ASSERT( aPreviousToInheritFrom );
+
+    for( int i=aStart;  i < LOGICAL_END;  ++i )
+    {
+        if( aStart == INSTANCE && i == INSTANCE )
+            continue;
+
+        if( !( pbits & (1<<i) ) && ( aPreviousToInheritFrom->pbits & (1<<i) ) )
+        {
+            stuff[i] = aPreviousToInheritFrom->stuff[i];
+            pbits |= (1<<i);
+        }
+    }
+}
+
 static void parsePortSegment( CipPortSegment* aSegment, EipUint8** aMessage )
 {
     EipUint8*   p = *aMessage;
@@ -525,7 +547,7 @@ static void parsePortSegment( CipPortSegment* aSegment, EipUint8** aMessage )
 }
 
 
-int CipPortSegmentGroup::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
+int CipPortSegmentGroup::DeserializePadded( const EipByte* aSrc, const EipByte* aLimit )
 {
     EipByte*    p = aSrc;
     EipUint32   value;
