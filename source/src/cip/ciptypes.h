@@ -250,6 +250,85 @@ struct CipRevision
 /// There is mostly only one 16bit value used
 #define NUM_ADD_STATUS      2
 
+class CipBufMutable
+{
+public:
+    CipBufMutable( CipByte* aStart, size_t aCount ) :
+        start( aStart ),
+        byte_count( aCount )
+    {}
+
+    CipBufMutable() :
+        start( 0 ), byte_count( 0 )
+    {}
+
+    CipByte*    data() const    { return start; }
+    size_t      size() const    { return byte_count; }
+
+    /// Move the start of the buffer by the specified number of bytes.
+    CipBufMutable& operator+=( size_t n )
+    {
+        size_t offset = n < byte_count ? n : byte_count;
+        start += offset;
+        byte_count -= offset;
+        return *this;
+    }
+
+    CipBufMutable operator+( size_t n )
+    {
+        CipBufMutable ret = *this;
+
+        ret += n;
+        return ret;
+    }
+
+protected:
+    CipByte*        start;
+    size_t          byte_count;
+};
+
+
+class CipBufNonMutable
+{
+public:
+    CipBufNonMutable() :
+        start( 0 ), byte_count( 0 )
+    {}
+
+    CipBufNonMutable( const CipByte* aStart, size_t aCount ) :
+        start( aStart ), byte_count( aCount )
+    {}
+
+    CipBufNonMutable( const CipBufMutable& m ):
+        start( m.data() ),
+        byte_count( m.size() )
+    {}
+
+    const CipByte*  data() const    { return start; }
+    size_t          size() const    { return byte_count; }
+
+    /// Move the start of the buffer by the specified number of bytes.
+    CipBufNonMutable& operator+=( size_t n )
+    {
+        size_t offset = n < byte_count ? n : byte_count;
+        start += offset;
+        byte_count -= offset;
+        return *this;
+    }
+
+    CipBufNonMutable operator+( size_t n )
+    {
+        CipBufNonMutable ret = *this;
+
+        ret += n;
+        return ret;
+    }
+
+protected:
+    const CipByte*  start;
+    size_t          byte_count;
+};
+
 
 class CipInstance;
 class CipAttribute;
