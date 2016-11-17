@@ -658,14 +658,7 @@ public:
      */
     bool InstanceInsert( CipInstance* aInstances );
 
-    /**
-     * Function InstanceInsert
-     * inserts a new instance into this class if the @a aInstanceId is unique.
-     * @return CipInstance* - the new instance or NULL if failure.
-    CipInstance* InstanceInsert( int aInstanceId );
-     */
-
-    CipInstance* Instance( EipUint32 instance_id ) const;
+    CipInstance* Instance( int aInstanceId ) const;
 
     /// Return a read only collection of CipInstances.
     const CipInstances& Instances() const   { return instances; }

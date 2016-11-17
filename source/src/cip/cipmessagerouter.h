@@ -54,16 +54,7 @@ public:
     CipBufMutable   data;                   ///< where to put CIP reply with data.size() limit
     int             data_length;            ///< how many bytes actually filled at data.data().
 
-    CipMessageRouterResponse() :
-        reply_service( 0 ),
-        reserved( 0 ),
-        general_status( 0 ),
-        size_of_additional_status( 0 ),
-        data( mmr_temp.data(), mmr_temp.size() ),
-        data_length( 0 )
-    {
-        memset( additional_status, 0, sizeof additional_status );
-    }
+    CipMessageRouterResponse();
 
     /// Return a CipBuf holding the serialized CIP response.
     CipBufNonMutable Payload() const
@@ -102,7 +93,7 @@ void DeleteAllClasses();
  *
  * @param aCommand CPFD data payload which is the CIP part.
  * @param aReply where to put the reply, must fill in
- *   CipMessageRouterResponse and its data CipBufMutable and data_length.  This is
+ *   CipMessageRouterResponse and its CipBufMutable 'data' and data_length.  This is
  *   how caller knows the length.
  * @return EipStatus
  */

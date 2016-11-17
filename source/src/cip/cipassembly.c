@@ -112,7 +112,7 @@ public:
 };
 
 
-CipInstance* CreateAssemblyInstance( int instance_id, EipByte* data, int data_length )
+CipInstance* CreateAssemblyInstance( int instance_id, CipBufMutable aBuffer )
 {
     CipClass* clazz = GetCipClass( kCipAssemblyClassCode );
 
@@ -128,8 +128,8 @@ CipInstance* CreateAssemblyInstance( int instance_id, EipByte* data, int data_le
 
     AssemblyInstance* i = new AssemblyInstance( instance_id );
 
-    i->byte_array.length = data_length;
-    i->byte_array.data   = data;
+    i->byte_array.length = aBuffer.size();
+    i->byte_array.data   = aBuffer.data();
 
     // Attribute 3 is the byte array transfer of the assembly data itself
     i->AttributeInsert( 3, kCipByteArray, kSetAndGetAble, getAttrAssemblyData, setAttrAssemblyData, &i->byte_array );
@@ -180,9 +180,7 @@ EipStatus CipAssemblyInitialize()
 }
 
 
-EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
-        EipUint8* data,
-        EipUint16 data_length )
+EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, CipBufNonMutable aBuffer )
 {
     CIPSTER_ASSERT( instance->owning_class->ClassId() == kCipAssemblyClassCode );
 
@@ -195,7 +193,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
     CipByteArray* byte_array = (CipByteArray*) attr3->data;
     CIPSTER_ASSERT( byte_array );
 
-    if( byte_array->length != data_length )
+    if( byte_array->length != aBuffer.size() )
     {
         CIPSTER_TRACE_ERR( "%s: wrong amount of data arrived for assembly object\n", __func__ );
         return kEipStatusError;
@@ -205,7 +203,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
     }
     else
     {
-        memcpy( byte_array->data, data, data_length );
+        memcpy( byte_array->data, aBuffer.data(), aBuffer.size() );
     }
 
     // notify application that new data arrived

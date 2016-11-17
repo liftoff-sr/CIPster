@@ -308,10 +308,10 @@ EipStatus ManageConnections();
  * inhibit timer. The application is informed via the
  * bool BeforeAssemblyDataSend( CipInstance* aInstance )
  * callback function when the production will happen. This function should only
- * be invoked from void HandleApplication(void).
+ * be invoked from void HandleApplication().
  *
  * The connection can only be triggered if the application is established and it
- * is of application application triggered type.
+ * is of application triggered type.
  *
  * @param output_assembly_id the output assembly connection point of the
  * connection
@@ -319,8 +319,7 @@ EipStatus ManageConnections();
  * connection
  * @return EIP_OK on success
  */
-EipStatus TriggerConnections( unsigned output_assembly_id,
-        unsigned input_assembly_id );
+EipStatus TriggerConnections( int output_assembly_id, int input_assembly_id );
 
 /** @ingroup CIP_API
  * @brief Inform the encapsulation layer that the remote host has closed the

@@ -90,10 +90,9 @@ CipConn* GetConnectedOutputAssembly( EipUint32 output_assembly_id );
  *
  * This function will take the data form the connection and correctly closes the
  * connection (e.g., open sockets)
- * @param cip_conn pointer to the connection object structure to be
- * closed
+ * @param aConn the connection to be closed
  */
-void CloseConnection( CipConn* cip_conn );
+void CloseConnection( CipConn* aConn );
 
 bool IsConnectedInputAssembly( EipUint32 aInstanceId );
 
@@ -107,11 +106,14 @@ bool IsConnectedOutputAssembly( EipUint32 aInstanceId );
  * will perform the supervision and handle the timing (e.g., timeout,
  * production inhibit, etc).
  *
- * @param cip_conn pointer to the connection object to be added.
+ * @param aConn the connection to be added.
  */
-void AddNewActiveConnection( CipConn* cip_conn );
+void AddNewActiveConnection( CipConn* aConn );
 
 // TODO: Missing documentation
-void RemoveFromActiveConnections( CipConn* cip_conn );
+void RemoveFromActiveConnections( CipConn* aConn );
+
+/// @brief External globals needed from connectionmanager.c
+extern CipConn* g_active_connection_list;
 
 #endif // CIPSTER_CIPCONNECTIONMANAGER_H_

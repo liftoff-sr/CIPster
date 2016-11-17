@@ -69,8 +69,8 @@ public:
      * @param aLimit points one past the last byte of the allowed range of serialized
      *   aSrc, this is an exclusive end.
      *
-     * @return int - Number of decoded bytes, or < 0 if error.  If negative, then
-     *  the absolute value of this result is the byte offset into the problem starting
+     * @return int - Number of decoded bytes, or < 0 if error.  If error, then
+     *  the absolute value of this result is the byte offset of the problem starting
      *  from aSrc at zero.  If positive, it is not an error, even though not all the
      *  available input bytes may not have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
@@ -282,8 +282,8 @@ private:
 
     char    tag[42];
 
-    int deserialize_symbolic( EipByte* aSrc, EipByte* aLimit );
-    int deserialize_logical( EipByte* aSrc, Stuff aField, int aFormat );
+    int deserialize_symbolic( const EipByte* aSrc, const EipByte* aLimit );
+    int deserialize_logical( const EipByte* aSrc, Stuff aField, int aFormat );
 
     void inherit( int aStart, CipAppPath* from );
 
@@ -364,8 +364,8 @@ public:
      * @param aLimit points one past the last byte of the allowed range of serialized
      *  aSrc, this is an exclusive end.
      *
-     * @return int - Number of decoded bytes, or < 0 if error.  If negative, then
-     *  the absolute value of this result is the byte offset into the problem starting
+     * @return int - Number of decoded bytes, or <= 0 if error.  If error, then
+     *  the absolute value of this result is the byte offset of the problem starting
      *  from aSrc at zero.  If positive, it is not an error, even though not all the
      *  available input bytes may not have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.

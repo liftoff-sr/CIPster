@@ -202,13 +202,13 @@ int CipAppPath::SerializePadded( EipByte* aDst, EipByte* aLimit )
 }
 
 
-inline int CipAppPath::deserialize_logical( EipByte* aSrc, CipAppPath::Stuff aField, int aFormat )
+inline int CipAppPath::deserialize_logical( const EipByte* aSrc, CipAppPath::Stuff aField, int aFormat )
 {
     CIPSTER_ASSERT( aFormat >= 0 && aFormat <= 2 );
     CIPSTER_ASSERT( aField==MEMBER1 || aField==MEMBER2 || aField==MEMBER3 ||
         aField==CONN_PT || aField==ATTRIBUTE || aField==INSTANCE || aField==CLASS );
 
-    EipByte* p = aSrc;
+    const EipByte* p = aSrc;
 
     int value;
 
@@ -232,9 +232,9 @@ inline int CipAppPath::deserialize_logical( EipByte* aSrc, CipAppPath::Stuff aFi
 }
 
 
-inline int CipAppPath::deserialize_symbolic( EipByte* aSrc, EipByte* aLimit )
+inline int CipAppPath::deserialize_symbolic( const EipByte* aSrc, const EipByte* aLimit )
 {
-    EipByte* p = aSrc;
+    const EipByte* p = aSrc;
 
     if( p < aLimit )
     {
@@ -296,7 +296,7 @@ inline int CipAppPath::deserialize_symbolic( EipByte* aSrc, EipByte* aLimit )
 
 int CipAppPath::DeserializePadded( const EipByte* aSrc, const EipByte* aLimit, CipAppPath* aPreviousToInheritFrom )
 {
-    EipByte*    p = aSrc;
+    const EipByte*  p = aSrc;
                                                 // is seen, C-1.6 of Vol1_3.19
     Clear();
 
@@ -519,9 +519,10 @@ void CipAppPath::inherit_assembly( int aStart, CipAppPath* aPreviousToInheritFro
     }
 }
 
-static void parsePortSegment( CipPortSegment* aSegment, EipUint8** aMessage )
+static void parsePortSegment( CipPortSegment* aSegment, const EipUint8** aMessage )
 {
-    EipUint8*   p = *aMessage;
+    const EipUint8* p = *aMessage;
+
     EipUint8    first = *p++;
 
     // p points to 2nd byte here.
@@ -549,7 +550,8 @@ static void parsePortSegment( CipPortSegment* aSegment, EipUint8** aMessage )
 
 int CipPortSegmentGroup::DeserializePadded( const EipByte* aSrc, const EipByte* aLimit )
 {
-    EipByte*    p = aSrc;
+    const EipByte*  p = aSrc;
+
     EipUint32   value;
 
     Clear();
@@ -629,9 +631,9 @@ exit:
 }
 
 
-int CipSimpleDataSegment::DeserializePadded( EipByte* aSrc, EipByte* aLimit )
+int CipSimpleDataSegment::DeserializePadded( const EipByte* aSrc, const EipByte* aLimit )
 {
-    EipByte*    p = aSrc;
+    const EipByte*  p = aSrc;
 
     Clear();
 

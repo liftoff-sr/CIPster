@@ -78,6 +78,11 @@ struct DelayedMsg
     sockaddr_in receiver;
     EipByte     message[ENCAP_MAX_DELAYED_ENCAP_MESSAGE_SIZE];
     unsigned    message_size;
+
+    CipBufNonMutable Payload() const
+    {
+        return CipBufNonMutable( message, message_size );
+    }
 };
 
 
@@ -492,7 +497,7 @@ int HandleReceivedExplictTcpData( int socket, CipBufNonMutable aCommand, CipBufM
                     );
 
                 if( result < 0 )
-                    ecnap.status = -result;
+                    encap.status = -result;
             }
             else    // received a packet with non registered session handle
             {
@@ -703,8 +708,7 @@ void ManageEncapsulationMessages()
                 // If delay is reached or passed, send the UDP message
                 SendUdpData( &g_delayed_messages[i].receiver,
                         g_delayed_messages[i].socket,
-                        g_delayed_messages[i].message,
-                        g_delayed_messages[i].message_size );
+                        g_delayed_messages[i].Payload() );
 
                 g_delayed_messages[i].socket = -1;
             }

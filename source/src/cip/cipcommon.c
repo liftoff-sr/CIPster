@@ -646,37 +646,21 @@ bool CipClass::InstanceInsert( CipInstance* aInstance )
 }
 
 
-/*
-CipInstance* CipClass::InstanceInsert( int instance_id )
+CipInstance* CipClass::Instance( int aInstanceId ) const
 {
-    CipInstance* instance = new CipInstance( instance_id );
-
-    if( !InstanceInsert( instance ) )
-    {
-        delete instance;
-        instance = NULL;        // return NULL on failure
-    }
-
-    return instance;
-}
-*/
-
-
-CipInstance* CipClass::Instance( EipUint32 instance_id ) const
-{
-    if( instance_id == 0 )
+    if( aInstanceId == 0 )
         return (CipInstance*)  this;        // cast away const-ness
 
     CipInstances::const_iterator  it;
 
     // binary search thru the vector of pointers looking for id
-    it = vec_search( instances.begin(), instances.end(), instance_id );
+    it = vec_search( instances.begin(), instances.end(), aInstanceId );
 
     if( it != instances.end() )
         return *it;
 
     CIPSTER_TRACE_WARN( "instance %d not in class '%s'\n",
-        instance_id, class_name.c_str() );
+        aInstanceId, class_name.c_str() );
 
     return NULL;
 }

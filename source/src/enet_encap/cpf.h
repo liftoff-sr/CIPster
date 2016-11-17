@@ -55,11 +55,11 @@ struct AddressData
 struct AddressItem
 {
     AddressItem() :
-        type_id( 0 ),
+        type_id( kCipItemIdNullAddress ),
         length( 0 )
     {}
 
-    CipUint     type_id;
+    CipItemId   type_id;
     CipUint     length;
     AddressData data;
 };
@@ -68,12 +68,12 @@ struct AddressItem
 struct DataItem
 {
     DataItem() :
-        type_id( 0 ),
+        type_id( kCipItemIdNullAddress ),
         length( 0 ),
         data( 0 )
     {}
 
-    EipUint16       type_id;
+    CipItemId       type_id;
     EipUint16       length;
     const EipByte*  data;
 };
@@ -84,7 +84,7 @@ struct SocketAddressInfoItem
     SocketAddressInfoItem( CipItemId aType, CipUdint aIP, int aPort );
 
     SocketAddressInfoItem() :
-        type_id( 0 ),
+        type_id( kCipItemIdNullAddress ),
         length( 16 ),
         sin_family( AF_INET ),
         sin_port( 0 ),
@@ -93,7 +93,7 @@ struct SocketAddressInfoItem
         memset( nasin_zero, 0, sizeof nasin_zero );
     }
 
-    CipUint     type_id;
+    CipItemId   type_id;
     CipUint     length;
     CipInt      sin_family;
     CipUint     sin_port;

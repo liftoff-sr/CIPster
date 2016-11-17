@@ -414,9 +414,9 @@ public:
     ConnectionSendDataFunction      connection_send_data_function;
     ConnectionReceiveDataFunction   connection_receive_data_function;
 
-    // used in the active connection list
+    // used in the active connection doubly linked list at g_active_connection_list
     CipConn*    next;
-    CipConn*    first;
+    CipConn*    prev;
 
     EipUint16   correct_originator_to_target_size;
     EipUint16   correct_target_to_originator_size;

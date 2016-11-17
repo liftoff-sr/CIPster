@@ -85,7 +85,7 @@ int NotifyConnectedCommonPacketFormat( CipBufNonMutable aCommand, CipBufMutable 
 
     // Check if ConnectedAddressItem received, otherwise it is no connected
     // message and should not be here
-    if( cpfd.AddressItemType() == kCipItemIdConnectionAddress )
+    if( cpfd.AddressItemType() != kCipItemIdConnectionAddress )
     {
         CIPSTER_TRACE_ERR(
                 "notifyConnectedCPF: got something besides the expected CIP_ITEM_ID_NULL\n" );
@@ -159,7 +159,7 @@ int CipCommonPacketFormatData::DeserializeCPFD( CipBufNonMutable aSrc )
         if( p + 4 > limit )
             goto error;
 
-        address_item.type_id = GetIntFromMessage( &p );
+        address_item.type_id = (CipItemId) GetIntFromMessage( &p );
         address_item.length  = GetIntFromMessage( &p );
 
         if( address_item.length >= 4 )
@@ -184,7 +184,7 @@ int CipCommonPacketFormatData::DeserializeCPFD( CipBufNonMutable aSrc )
         if( p + 4 > limit )
             goto error;
 
-        data_item.type_id = GetIntFromMessage( &p );
+        data_item.type_id = (CipItemId) GetIntFromMessage( &p );
         data_item.length  = GetIntFromMessage( &p );
 
         if( p + data_item.length > limit )
@@ -199,7 +199,7 @@ int CipCommonPacketFormatData::DeserializeCPFD( CipBufNonMutable aSrc )
         if( p + 2 > limit )
             goto error;
 
-        int type_id = GetIntFromMessage( &p );
+        CipItemId type_id = (CipItemId) GetIntFromMessage( &p );
 
         if( type_id == kCipItemIdSocketAddressInfoOriginatorToTarget ||
             type_id == kCipItemIdSocketAddressInfoTargetToOriginator )
@@ -299,7 +299,7 @@ int CipCommonPacketFormatData::SerializeCPFD( CipMessageRouterResponse* aRespons
     if( p + 2 > limit )
         goto error;
 
-    AddIntToMessage( item_count + TxSocketAddressInfoItemCount(), &p );
+    AddIntToMessage( item_count + TxSocketAddressInfoItemCount() - RxSocketAddressInfoItemCount(), &p );
 
     // process Address Item
     switch( address_item.type_id )

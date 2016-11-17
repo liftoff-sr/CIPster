@@ -85,7 +85,7 @@ void SetDeviceStatus( EipUint16 status )
  * @param response
  * @returns Currently always kEipOkSend is returned
  */
-static EipStatus reset( CipInstance* instance,
+static EipStatus reset_service( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
@@ -100,11 +100,12 @@ static EipStatus reset( CipInstance* instance,
 
     response->general_status = kCipErrorSuccess;
 
-    if( request->data_length == 1 )
+    if( request->data.size() == 1 )
     {
-        int value = request->data[0];
+        int value = request->data.data()[0];
 
-        CIPSTER_TRACE_INFO( "%s: request->data_length=%d value=%d\n", __func__, request->data_length, value );
+        CIPSTER_TRACE_INFO( "%s: request->data_length=%d value=%d\n",
+            __func__, (int) request->data.size(), value );
 
         switch( value )
         {
@@ -137,7 +138,7 @@ static EipStatus reset( CipInstance* instance,
             break;
         }
     }
-    else if( request->data_length == 0 )
+    else if( request->data.size() == 0 )
     {
         CIPSTER_TRACE_INFO( "%s: request->data_length=0\n", __func__ );
 
@@ -199,12 +200,12 @@ EipStatus CipIdentityInit()
                 );
 
         // All attributes are read only, and the conformance tool wants error code
-        // 0x08 not 0x14
+        // 0x08 not 0x14 when testing for SetAttributeSingle
         delete clazz->ServiceRemove( kSetAttributeSingle );
 
         RegisterCipClass( clazz );
 
-        clazz->ServiceInsert( kReset, &reset, "Reset" );
+        clazz->ServiceInsert( kReset, reset_service, "Reset" );
 
         createIdentityInstance();
     }

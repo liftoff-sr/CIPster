@@ -10,10 +10,6 @@
 #include "appcontype.h"
 #include "cipconnectionmanager.h"
 
-
-/// @brief External globals needed from connectionmanager.c
-extern CipConn* g_active_connection_list;
-
 struct ExclusiveOwnerConnection
 {
     int output_assembly;        ///< the O-to-T point for the connection
@@ -319,8 +315,8 @@ void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,  ConnInstan
 
     while( connection )
     {
-        if(  instance_type == connection->instance_type
-          && input_point   == connection->conn_path.producing_path.GetInstanceOrConnPt() )
+        if( instance_type == connection->instance_type &&
+            input_point   == connection->conn_path.producing_path.GetInstanceOrConnPt() )
         {
             connection_to_delete = connection;
             connection = connection->next;

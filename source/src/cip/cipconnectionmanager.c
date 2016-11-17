@@ -29,19 +29,13 @@ extern EipUint16    product_code_;
 extern CipRevision  revision_;
 
 
-bool table_init = true;
-
 /// Length in bytes of the forward open command specific data until the start
 /// of the connection path
 const int g_kForwardOpenHeaderLength = 36;
 
 
-/// Test for a logical segment type
-#define EQLOGICALSEGMENT( x, y )        ( ( (x) & 0xfc ) == (y) )
-
-
 /// List holding all currently active connections
-/*@null@*/ CipConn* g_active_connection_list = NULL;
+CipConn* g_active_connection_list;
 
 
 /**
@@ -101,9 +95,8 @@ static bool checkElectronicKeyData( CipElectronicKeySegment* key_data, Connectio
     *extended_status = kConnectionManagerStatusCodeSuccess;
 
     // Check VendorID and ProductCode, must match, or 0
-    if( ( (key_data->vendor_id != vendor_id_) && (key_data->vendor_id != 0) )
-        || ( (key_data->product_code != product_code_)
-             && (key_data->product_code != 0) ) )
+    if( ( key_data->vendor_id != vendor_id_  &&  key_data->vendor_id != 0 )
+     || ( key_data->product_code != product_code_  &&  key_data->product_code != 0 ) )
     {
         *extended_status = kConnectionManagerStatusCodeErrorVendorIdOrProductcodeError;
         return false;
@@ -113,7 +106,7 @@ static bool checkElectronicKeyData( CipElectronicKeySegment* key_data, Connectio
         // VendorID and ProductCode are correct
 
         // Check DeviceType, must match or 0
-        if( (key_data->device_type != device_type_) && (key_data->device_type != 0) )
+        if( key_data->device_type != device_type_  &&  key_data->device_type != 0 )
         {
             *extended_status = kConnectionManagerStatusCodeErrorDeviceTypeError;
             return false;
@@ -131,9 +124,8 @@ static bool checkElectronicKeyData( CipElectronicKeySegment* key_data, Connectio
                 }
 
                 // Check Major / Minor Revision, Major must match, Minor match or 0
-                if( (key_data->major_revision != revision_.major_revision)
-                    || ( (key_data->minor_revision != revision_.minor_revision)
-                         && (key_data->minor_revision != 0) ) )
+                if(  key_data->major_revision != revision_.major_revision ||
+                   ( key_data->minor_revision != revision_.minor_revision && key_data->minor_revision != 0 ) )
                 {
                     *extended_status = kConnectionManagerStatusCodeErrorRevisionMismatch;
                     return false;
@@ -144,9 +136,9 @@ static bool checkElectronicKeyData( CipElectronicKeySegment* key_data, Connectio
                 // Compatibility mode is set
 
                 // Major must match, Minor != 0 and <= MinorRevision
-                if( (key_data->major_revision == revision_.major_revision)
-                    && (key_data->minor_revision > 0)
-                    && (key_data->minor_revision <= revision_.minor_revision) )
+                if( key_data->major_revision == revision_.major_revision &&
+                    key_data->minor_revision > 0 &&
+                    key_data->minor_revision <= revision_.minor_revision )
                 {
                     return true;
                 }
@@ -212,31 +204,6 @@ static CipInstance* check_path( const CipAppPath& aPath, ConnectionManagerStatus
 }
 
 
-#if 0
-    else
-    {
-        *extended_error = kConnectionManagerStatusCodeInvalidConsumingApllicationPath;
-
-        CIPSTER_TRACE_INFO(
-            "%s: client asked for non-existent assembly class instance_id:%d\n",
-            __func__, instance_id
-            );
-
-        return kCipErrorConnectionFailure;
-    }
-
-        }
-        else
-        {
-            *extended_error = kConnectionManagerStatusCodeInvalidProducingApplicationPath;
-
-            CIPSTER_TRACE_INFO( "%s: 2 noinstance\n", __func__ );
-
-            return kCipErrorConnectionFailure;
-        }
-#endif
-
-
 /**
  * Function parseConnectionPath
  * parses the connection path of a forward open request.
@@ -288,8 +255,6 @@ CipError CipConn::parseConnectionPath( CipBufNonMutable aPath, ConnectionManager
 
         message += result;
     }
-
-    // ignore the port segments if any obtained above
 
     // electronic key?
     if( conn_path.port_segs.HasKey() )
@@ -359,8 +324,6 @@ CipError CipConn::parseConnectionPath( CipBufNonMutable aPath, ConnectionManager
         CIPSTER_TRACE_ERR( "%s: unknown extra segments in forward open connection path\n", __func__ );
         goto L_exit_invalid;
     }
-
-  //  handle the PIT segments if any.
 
     // We don't apply checking rules to the connection_path until done parsing it here.
 
@@ -638,8 +601,8 @@ CipError CipConn::parseConnectionPath( CipBufNonMutable aPath, ConnectionManager
     if( transport_trigger.Class() == kConnectionTransportClass3 )
     {
         // connection end point has to be the message router instance 1
-        if( conn_path.consuming_path.GetClass() != kCipMessageRouterClassCode
-         || conn_path.consuming_path.GetInstanceOrConnPt() != 1 )
+        if( conn_path.consuming_path.GetClass() != kCipMessageRouterClassCode ||
+            conn_path.consuming_path.GetInstanceOrConnPt() != 1 )
         {
             *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
             goto L_exit_error;
@@ -770,10 +733,10 @@ EipStatus ManageConnections()
         if( active->state == kConnectionStateEstablished )
         {
             // We have a consuming connection check inactivity watchdog timer.
-            if( active->consuming_instance
+            if( active->consuming_instance ||
 
                 // All server connections have to maintain an inactivity watchdog timer
-                || active->transport_trigger.IsServer() )
+                active->transport_trigger.IsServer() )
             {
                 active->inactivity_watchdog_timer_usecs -= kOpenerTimerTickInMicroSeconds;
 
@@ -932,55 +895,6 @@ static void assembleForwardOpenResponse( CipConn* aConn,
 }
 
 
-/**
- * Function assembleFWDCloseResponse
- * creates FWDClose response dependent on status.
- *
- * @return EipStatus -
- */
-static EipStatus assembleForwardCloseResponse( EipUint16 connection_serial_number,
-        EipUint16 originatior_vendor_id,
-        EipUint32 originator_serial_number,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response,
-        EipUint16 extended_error_code )
-{
-    EipByte* out   = response->data.data();
-    EipByte* limit = out + response->data.size();
-
-    cpfd.SetItemCount( 2 );
-    cpfd.data_item.type_id = kCipItemIdUnconnectedDataItem;
-
-    cpfd.AddNullAddressItem();
-
-    AddIntToMessage( connection_serial_number, &message );
-    AddIntToMessage( originatior_vendor_id, &message );
-    AddDintToMessage( originator_serial_number, &message );
-
-    response->reply_service = 0x80 | request->service;
-
-    if( kConnectionManagerStatusCodeSuccess == extended_error_code )
-    {
-        *message++ = 0;         // no application data
-        response->general_status = kCipErrorSuccess;
-        response->size_of_additional_status = 0;
-    }
-    else
-    {
-        *message++ = *request->data.data();     // remaining path size
-        response->general_status = kCipErrorConnectionFailure;
-        response->additional_status[0] = extended_error_code;
-        response->size_of_additional_status = 1;
-    }
-
-    *message++ = 0;         // reserved
-
-    response->data_length = 10;     // message has is no application specific data
-
-    return kEipStatusOkSend;
-}
-
-
 CipConn* GetConnectionByConsumingId( int aConnectionId )
 {
     CipConn* conn = g_active_connection_list;
@@ -1064,12 +978,12 @@ void CloseConnection( CipConn* conn )
 
 void AddNewActiveConnection( CipConn* conn )
 {
-    conn->first = NULL;
-    conn->next  = g_active_connection_list;
+    conn->prev = NULL;
+    conn->next = g_active_connection_list;
 
-    if( NULL != g_active_connection_list )
+    if( g_active_connection_list )
     {
-        g_active_connection_list->first = conn;
+        g_active_connection_list->prev = conn;
     }
 
     g_active_connection_list = conn;
@@ -1079,21 +993,21 @@ void AddNewActiveConnection( CipConn* conn )
 
 void RemoveFromActiveConnections( CipConn* conn )
 {
-    if( NULL != conn->first )
+    if( conn->prev )
     {
-        conn->first->next = conn->next;
+        conn->prev->next = conn->next;
     }
     else
     {
         g_active_connection_list = conn->next;
     }
 
-    if( NULL != conn->next )
+    if( conn->next )
     {
-        conn->next->first = conn->first;
+        conn->next->prev = conn->prev;
     }
 
-    conn->first = NULL;
+    conn->prev  = NULL;
     conn->next  = NULL;
     conn->state = kConnectionStateNonExistent;
 }
@@ -1132,7 +1046,7 @@ bool IsConnectedOutputAssembly( EipUint32 aInstanceId )
 }
 
 
-EipStatus TriggerConnections( unsigned aOutputAssembly, unsigned aInputAssembly )
+EipStatus TriggerConnections( int aOutputAssembly, int aInputAssembly )
 {
     EipStatus nRetVal = kEipStatusError;
 
@@ -1404,15 +1318,19 @@ static EipStatus forward_close_service( CipInstance* instance,
     ConnectionManagerStatusCode connection_status =
         kConnectionManagerStatusCodeErrorConnectionNotFoundAtTargetApplication;
 
-    CipConn* active = g_active_connection_list;
+    const EipByte* in = request->data.data();
+    const EipByte* ilimit = in + request->data.size();
 
-    request->data += 2; // ignore Priority/Time_tick and Time-out_ticks
+    in += 2;        // ignore Priority/Time_tick and Time-out_ticks
 
-    EipUint16 connection_serial_number = GetIntFromMessage( &request->data );
-    EipUint16 originator_vendor_id     = GetIntFromMessage( &request->data );
-    EipUint32 originator_serial_number = GetDintFromMessage( &request->data );
+    EipUint16 connection_serial_number = GetIntFromMessage( &in );
+    EipUint16 originator_vendor_id     = GetIntFromMessage( &in );
+    EipUint32 originator_serial_number = GetDintFromMessage( &in );
+    EipUint8  connection_path_size     = *in++;
 
     CIPSTER_TRACE_INFO( "ForwardClose: ConnSerNo %d\n", connection_serial_number );
+
+    CipConn* active = g_active_connection_list;
 
     while( active )
     {
@@ -1436,12 +1354,40 @@ static EipStatus forward_close_service( CipInstance* instance,
         active = active->next;
     }
 
-    return assembleForwardCloseResponse( connection_serial_number,
-            originator_vendor_id,
-            originator_serial_number,
-            request,
-            response,
-            connection_status );
+    EipByte* out    = response->data.data();
+    EipByte* olimit = out + response->data.size();
+
+#warning "why cpfd here?"
+
+    AddIntToMessage( connection_serial_number, &out );
+    AddIntToMessage( originator_vendor_id, &out );
+    AddDintToMessage( originator_serial_number, &out );
+
+    response->reply_service = 0x80 | request->service;
+
+    if( connection_status == kConnectionManagerStatusCodeSuccess )
+    {
+        // Vol1 Table 3-5.22
+        *out++ = 0;         // application data word count
+        response->general_status = kCipErrorSuccess;
+        response->size_of_additional_status = 0;
+
+        *out++ = 0;         // reserved
+    }
+    else
+    {
+        // Vol1 Table 3-5.23
+        *out++ = connection_path_size;
+        response->general_status = kCipErrorConnectionFailure;
+        response->additional_status[0] = connection_status;
+        response->size_of_additional_status = 1;
+
+        *out++ = 0;         // reserved
+    }
+
+    response->data_length = out - response->data.data();
+
+    return kEipStatusOkSend;
 }
 
 

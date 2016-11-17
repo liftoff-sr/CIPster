@@ -64,8 +64,8 @@ static EipStatus get_attr_4( CipAttribute* attribute,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipStatus status = kEipStatusOkSend;
-    EipByte* message = response->data;
+    EipStatus   status = kEipStatusOkSend;
+    EipByte*    out = response->data.data();
 
     response->data_length = 0;
     response->reply_service = 0x80 | request->service;
@@ -78,13 +78,13 @@ static EipStatus get_attr_4( CipAttribute* attribute,
     app_path.SetClass( kCipEthernetLinkClassCode );
     app_path.SetInstance( attribute->Instance()->Id() );
 
-    int result = app_path.SerializePadded( message+2, message+2+12 );
+    int result = app_path.SerializePadded( out+2, out+2+12 );
 
-    AddIntToMessage( result/2, &message );  // word count as 16 bits
+    AddIntToMessage( result/2, &out );  // word count as 16 bits
 
-    message += result;
+    out += result;
 
-    response->data_length += message - response->data;
+    response->data_length += out - response->data.data();
 
     return status;
 }
@@ -96,33 +96,32 @@ static EipStatus get_multicast_config( CipAttribute* attribute,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipStatus status = kEipStatusOkSend;
-    EipByte* message = response->data;
+    EipStatus   status = kEipStatusOkSend;
+    EipByte*    out = response->data.data();
 
-    response->data_length = 0;
     response->reply_service = 0x80 | request->service;
 
     response->general_status = kCipErrorSuccess;
     response->size_of_additional_status = 0;
 
     response->data_length += EncodeData(
-            kCipUsint, &g_multicast_configuration.alloc_control, &message );
+            kCipUsint, &g_multicast_configuration.alloc_control, &out );
 
     response->data_length += EncodeData(
             kCipUsint, &g_multicast_configuration.reserved_shall_be_zero,
-            &message );
+            &out );
 
     response->data_length += EncodeData(
             kCipUint,
             &g_multicast_configuration.number_of_allocated_multicast_addresses,
-            &message );
+            &out );
 
     EipUint32 multicast_address = ntohl(
             g_multicast_configuration.starting_multicast_address );
 
     response->data_length += EncodeData( kCipUdint,
             &multicast_address,
-            &message );
+            &out );
 
     return status;
 }
@@ -134,7 +133,7 @@ static EipStatus get_attr_7( CipAttribute* attribute,
 {
     // insert 6 zeros for the required empty safety network number
     // according to Table 5-4.15
-    memset( response->data, 0, 6 );
+    memset( response->data.data(), 0, 6 );
     response->data_length += 6;
 
     response->general_status = kCipErrorSuccess;
@@ -151,7 +150,7 @@ static EipStatus set_attr_13( CipAttribute* attribute,
 
     int instance_id = attribute->Instance()->Id();
 
-    EipByte* p = request->data;
+    const EipByte* p = request->data.data();
 
     int inactivity_timeout = GetIntFromMessage( &p );
 

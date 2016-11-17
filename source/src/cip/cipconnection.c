@@ -185,7 +185,7 @@ void CipConn::Clear()
     connection_receive_data_function = NULL;
 
     next = NULL;
-    first = NULL;
+    prev = NULL;
 
     correct_originator_to_target_size = 0;
     correct_target_to_originator_size = 0;
@@ -320,6 +320,8 @@ static void closeIoConnection( CipConn* aConn )
  */
 static EipStatus sendConnectedData( CipConn* aConn )
 {
+    EipStatus result;
+
     /*
         TODO think of adding an own send buffer to each connection object in
         order to pre-setup the whole message on connection opening and just
@@ -367,15 +369,16 @@ static EipStatus sendConnectedData( CipConn* aConn )
     // set AddressInfo Items to invalid Type
     cpfd.ClearTx();
 
-    CipBufMutable output( g_message_data_reply_buffer, sizeof g_message_data_reply_buffer );
+    CipBufMutable out_buf( g_message_data_reply_buffer, sizeof g_message_data_reply_buffer );
 
-    int reply_length = cpfd.SerializeForIO( output );
+    int reply_length = cpfd.SerializeForIO( out_buf );
 
     if( reply_length == -1 )
     {
     }
 
-    EipByte*   message = &g_message_data_reply_buffer[reply_length - 2];
+    EipByte*    out   = out_buf.data() + reply_length - 2;
+    EipByte*    limit = out_buf.data() + out_buf.size();
 
     cpfd.data_item.length = attr3_byte_array->length;
 
@@ -388,34 +391,39 @@ static EipStatus sendConnectedData( CipConn* aConn )
     {
         cpfd.data_item.length += 2;
 
-        AddIntToMessage( cpfd.data_item.length, &message );
+        AddIntToMessage( cpfd.data_item.length, &out );
 
-        AddIntToMessage( aConn->sequence_count_producing, &message );
+        AddIntToMessage( aConn->sequence_count_producing, &out );
     }
     else
     {
-        AddIntToMessage( cpfd.data_item.length, &message );
+        AddIntToMessage( cpfd.data_item.length, &out );
     }
 
     if( kOpenerProducedDataHasRunIdleHeader )
     {
-        AddDintToMessage( g_run_idle_state, &message );
+        AddDintToMessage( g_run_idle_state, &out );
     }
 
-    // @todo verify this is not a buffer overrun.
+    // verify this is not a buffer overrun.
+    if( out + attr3_byte_array->length > limit )
+        goto L_error;
 
-    memcpy( message, attr3_byte_array->data,
+    memcpy( out, attr3_byte_array->data,
             attr3_byte_array->length );
 
     reply_length += cpfd.data_item.length;
 
-    EipStatus result = SendUdpData(
+    result = SendUdpData(
             &aConn->remote_address,
             aConn->producing_socket,
             CipBufNonMutable( g_message_data_reply_buffer, reply_length )
             );
 
     return result;
+
+L_error:
+    return kEipStatusError;
 }
 
 
