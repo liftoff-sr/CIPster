@@ -1,6 +1,5 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
  *
  ******************************************************************************/
 #include <string.h>
@@ -10,7 +9,7 @@
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
 #include "ciperror.h"
-#include "endianconv.h"
+#include "byte_bufs.h"
 #include "cipster_api.h"
 
 
@@ -60,10 +59,10 @@ EipStatus CipEthernetLinkInit()
 
         CipClass* clazz = new CipClass( kCipEthernetLinkClassCode,
               "Ethernet Link",
-              (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
-              0xffffffff,               // class getAttributeAll mask
-              0xffffffff,               // instance getAttributeAll mask
-              1                         // version
+              MASK7(1,2,3,4,5,6,7), // common class attributes mask
+              0xffffffff,           // class getAttributeAll mask
+              0xffffffff,           // instance getAttributeAll mask
+              1                     // version
               );
 
         RegisterCipClass( clazz );

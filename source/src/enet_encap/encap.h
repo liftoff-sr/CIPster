@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (C) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_ENCAP_H_
@@ -36,24 +36,6 @@ enum EncapsulationProtocolErrorCode
     kEncapsulationProtocolInvalidSessionHandle = 0x0064,
     kEncapsulationProtocolInvalidLength = 0x0065,
     kEncapsulationProtocolUnsupportedProtocol = 0x0069
-};
-
-
-struct ListServices
-{
-    ListServices( int aId, int aVersion, int aFlags, const char* aName ):
-        id( aId ),
-        byte_count( sizeof(*this) ),
-        protocol_version( aVersion ),
-        capability_flags( aFlags ),
-        name_of_service( aName )
-    {}
-
-    EipUint16   id;
-    EipUint16   byte_count;
-    EipUint16   protocol_version;
-    EipUint16   capability_flags;
-    std::string name_of_service;
 };
 
 

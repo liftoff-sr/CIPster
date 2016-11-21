@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPASSEMBLY_H_
@@ -32,6 +32,6 @@ EipStatus CipAssemblyInitialize();
  *     - EIP_OK the received data was okay
  *     - EIP_ERROR the received data was wrong
  */
-EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* aInstance, CipBufNonMutable aInput );
+EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* aInstance, BufReader aInput );
 
 #endif // CIPSTER_CIPASSEMBLY_H_

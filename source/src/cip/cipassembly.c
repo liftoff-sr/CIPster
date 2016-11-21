@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 
@@ -112,7 +112,7 @@ public:
 };
 
 
-CipInstance* CreateAssemblyInstance( int instance_id, CipBufMutable aBuffer )
+CipInstance* CreateAssemblyInstance( int instance_id, BufWriter aBuffer )
 {
     CipClass* clazz = GetCipClass( kCipAssemblyClassCode );
 
@@ -148,22 +148,23 @@ class CipAssemblyClass : public CipClass
 public:
     CipAssemblyClass() :
         CipClass( kCipAssemblyClassCode,
-            "Assembly",     // aClassName
-            (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
-            0,              // assembly class has no get_attribute_all service
-            0,              // assembly instance has no get_attribute_all service
-            2               // aRevision, according to the CIP spec currently this has to be 2
+            "Assembly",
+            MASK7( 1,2,3,4,5,6,7 ), // common class attributes mask
+            0,                      // assembly class has no get_attribute_all service
+            0,                      // assembly instance has no get_attribute_all service
+            2                       // aRevision, according to the CIP spec currently this has to be 2
             )
     {
     }
 
-    CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error ); // override
+    CipError OpenConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error ); // override
 };
 
 
-CipError CipAssemblyClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipError CipAssemblyClass::OpenConnection( CipConn* aConn,
+    CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
 {
-    return CipConnectionClass::OpenIO( aConn, extended_error );
+    return CipConnectionClass::OpenIO( aConn, cpfd, extended_error );
 }
 
 
@@ -180,7 +181,7 @@ EipStatus CipAssemblyInitialize()
 }
 
 
-EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, CipBufNonMutable aBuffer )
+EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, BufReader aBuffer )
 {
     CIPSTER_ASSERT( instance->owning_class->ClassId() == kCipAssemblyClassCode );
 

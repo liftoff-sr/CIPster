@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #include <stdio.h>
@@ -8,22 +8,15 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#ifdef _WIN32           // _WIN32 is defined for win64 and win32 under mingw
  #include <winsock2.h>
  #include <windows.h>
  #include <ws2tcpip.h>
-#else
- #include <unistd.h>
- #include <sys/time.h>
- #include <time.h>
-#endif
 
 #include "networkhandler.h"
 
 #include "cipster_api.h"
 #include "enet_encap/encap.h"
 #include "cip/cipconnectionmanager.h"
-#include "enet_encap/endianconv.h"
 #include "trace.h"
 #include "cip/ciptcpipinterface.h"
 
@@ -40,7 +33,7 @@ extern CipConn* g_active_connection_list;
 static EipByte s_packet[CIPSTER_ETHERNET_BUFFER_SIZE];
 
 
-#define MAX_NO_OF_TCP_SOCKETS 10
+#define MAX_NO_OF_TCP_SOCKETS           10
 
 // typedef unsigned long long MicroSeconds;
 typedef unsigned MicroSeconds;
@@ -148,14 +141,12 @@ static NetworkStatus g_sockets;
 
 EipStatus NetworkHandlerInitialize()
 {
-#ifdef _WIN32
     WORD    wVersionRequested;
     WSADATA wsaData;
 
     wVersionRequested = MAKEWORD(2, 2);
 
     WSAStartup( wVersionRequested, &wsaData );
-#endif
 
 
     static const int one = 1;
@@ -273,8 +264,8 @@ EipStatus NetworkHandlerInitialize()
     memset( &address, 0, sizeof( address ) );
     address.sin_family = AF_INET;
     address.sin_port   = htons( kOpenerEthernetPort );
-    address.sin_addr.s_addr = interface_configuration_.ip_address
-                            | ~interface_configuration_.network_mask;
+    address.sin_addr.s_addr = interface_configuration_.ip_address |
+                                ~interface_configuration_.network_mask;
 
     if( ( bind( g_sockets.udp_local_broadcast_listener,
                   (sockaddr*) &address, sizeof(address) ) ) == -1 )
@@ -404,7 +395,7 @@ EipStatus NetworkHandlerProcessOnce()
 
         for( int socket = 0; socket <= highest_socket_handle; socket++ )
         {
-            if( true == CheckSocketSet( socket ) )
+            if( CheckSocketSet( socket ) )
             {
                 // if it is still checked it is a TCP receive
                 if( kEipStatusError == HandleDataOnTcpSocket( socket ) ) // if error
@@ -468,13 +459,12 @@ bool CheckSocketSet( int socket )
 }
 
 
-EipStatus SendUdpData( struct sockaddr_in* address, int socket, EipUint8* data,
-        int data_length )
+EipStatus SendUdpData( struct sockaddr_in* address, int socket, BufReader aOutput )
 {
-    int sent_count = sendto( socket, (char*) data, data_length, 0,
+    int sent_count = sendto( socket, (char*) aOutput.data(), aOutput.size(), 0,
             (struct sockaddr*) address, sizeof(*address) );
 
-    CIPSTER_TRACE_INFO( "%s: socket:%d sending %d bytes\n", __func__, socket, data_length );
+    CIPSTER_TRACE_INFO( "%s: socket:%d sending %d bytes\n", __func__, socket, (int) aOutput.size() );
 
     if( sent_count < 0 )
     {
@@ -484,16 +474,59 @@ EipStatus SendUdpData( struct sockaddr_in* address, int socket, EipUint8* data,
         return kEipStatusError;
     }
 
-    if( sent_count != data_length )
+    if( sent_count != (int) aOutput.size() )
     {
         CIPSTER_TRACE_WARN(
                 "%s: data_length != sent_count mismatch, sent %d of %d\n",
-                __func__, sent_count, data_length );
+                __func__, sent_count, (int) aOutput.size() );
 
         return kEipStatusError;
     }
 
     return kEipStatusOk;
+}
+
+
+#if defined(DEBUG)
+static void dump( const char* aPrompt, EipByte* aBytes, int aCount )
+{
+    int len = printf( "%s:", aPrompt );
+
+    for( int i = 0; i < aCount;  ++i )
+    {
+        if( i && !( i % 16 ) )
+            printf( "\n%*s", len, "" );
+
+        printf( " %02x", aBytes[i] );
+    }
+
+    printf( "\n" );
+}
+#endif
+
+
+// This can block on the second time through the loop, so may not be a good
+// idea in a single threaded model.  Second time through the loop is not
+// expected generally however.  Instrument it and fix it.
+static int ensuredRead(  int sock, char* where, int count )
+{
+    int i;
+    int numRead;
+
+    for( i=0;  i < count;  i += numRead )
+    {
+        numRead = recv( sock, where+i, count - i, 0 );
+        if( numRead == 0 )
+            break;
+
+        else if( numRead == -1 )
+        {
+            i = -1;
+            break;
+        }
+    }
+
+    return i;
 }
 
 
@@ -505,8 +538,8 @@ EipStatus HandleDataOnTcpSocket( int socket )
      *  the fastest way and a loop here with a non blocking socket would better
      *  fit*/
 
-    // Check how many data is here -- read the first four bytes from the connection
-    int num_read = recv( socket, (char*) s_packet, 4, 0 );
+    // Check how many bytes are here -- read the first four bytes from the connection
+    int num_read = ensuredRead( socket, (char*) s_packet, 4 );
 
     // TODO we may have to set the socket to a non blocking socket
 
@@ -523,9 +556,9 @@ EipStatus HandleDataOnTcpSocket( int socket )
         return kEipStatusError;
     }
 
-    EipUint8* read_buffer = &s_packet[2];    // here is EIP's data length
+    BufReader rb( s_packet + 2, 2 );  // here is EIP's data length
 
-    unsigned packetz = GetIntFromMessage( &read_buffer ) + ENCAPSULATION_HEADER_LENGTH - 4;
+    unsigned packetz = rb.get16() + ENCAPSULATION_HEADER_LENGTH - 4;
     // -4 is for the 4 bytes we have already read
 
     // is the packet bigger than our s_packet buffer?
@@ -540,7 +573,7 @@ EipStatus HandleDataOnTcpSocket( int socket )
         int readz = sizeof(s_packet);
 
         do {
-            num_read = recv( socket, (char*) s_packet, readz, 0 );
+            num_read = ensuredRead( socket, (char*) s_packet, readz );
 
             if( num_read == 0 ) // got error or connection closed by client
             {
@@ -556,7 +589,9 @@ EipStatus HandleDataOnTcpSocket( int socket )
                 return kEipStatusError;
             }
 
-            packetz -= num_read;
+#if defined(DEBUG)
+            dump( "bigTCP", s_packet, num_read );
+#endif
 
             if( packetz != 0 && packetz < sizeof(s_packet) )
             {
@@ -567,7 +602,7 @@ EipStatus HandleDataOnTcpSocket( int socket )
         return kEipStatusOk;
     }
 
-    num_read = recv( socket, (char*) &s_packet[4], packetz, 0 );
+    num_read = ensuredRead( socket, (char*) &s_packet[4], packetz );
 
     if( num_read == 0 ) // got error or connection closed by client
     {
@@ -587,33 +622,29 @@ EipStatus HandleDataOnTcpSocket( int socket )
         // we got the right amount of data
         packetz += 4;
 
+#if defined(DEBUG)
+        dump( "rTCP", s_packet, num_read + 4 );
+#endif
+
         // TODO handle partial packets
         CIPSTER_TRACE_INFO( "Data received on tcp:\n" );
 
         g_current_active_tcp_socket = socket;
 
-        int remaining_bytes = 0;
-
-        num_read = HandleReceivedExplictTcpData(
-                socket, s_packet, packetz, &remaining_bytes );
+        int replyz = HandleReceivedExplictTcpData( socket,
+                            BufReader( s_packet, packetz ),
+                            BufWriter( s_packet, sizeof s_packet ) );
 
         g_current_active_tcp_socket = -1;
 
-        if( remaining_bytes != 0 )
+        if( replyz > 0 )
         {
-            CIPSTER_TRACE_WARN(
-                    "%s: received packet was to long: %d Bytes left!\n",
-                    __func__, remaining_bytes );
-        }
-
-        if( num_read > 0 )
-        {
-            int sent_count = send( socket, (char*) s_packet, num_read, 0 );
+            int sent_count = send( socket, (char*) s_packet, replyz, 0 );
 
             CIPSTER_TRACE_INFO( "%s: sent %d reply bytes. line %d\n",
                 __func__, sent_count, __LINE__ );
 
-            if( sent_count != num_read )
+            if( sent_count != replyz )
             {
                 CIPSTER_TRACE_WARN( "%s: TCP response was not fully sent\n", __func__ );
             }
@@ -629,6 +660,8 @@ EipStatus HandleDataOnTcpSocket( int socket )
          * However with typical packet sizes of EIP this should't be a big issue.
          */
         //TODO handle fragmented packets
+
+        CIPSTER_TRACE_ERR( "%s: TCP read problem\n", __func__ );
     }
 
     return kEipStatusError;
@@ -795,65 +828,69 @@ void CheckAndHandleTcpListenerSocket()
 }
 
 
+/*
+
+    Vol2 2-2:
+    Whenever UDP is used to send an encapsulated message, the entire
+    message shall be sent in a single UDP packet. Only one encapsulated
+    message shall be present in a single UDP packet destined to UDP port
+    0xAF12.
+
+*/
+
+
 void CheckAndHandleUdpLocalBroadcastSocket()
 {
-    struct sockaddr_in from_address;
+    sockaddr_in     from_address;
 
     int from_address_length;
 
     // see if this is an unsolicited inbound UDP message
-    if( true == CheckSocketSet( g_sockets.udp_local_broadcast_listener ) )
+    if( CheckSocketSet( g_sockets.udp_local_broadcast_listener ) )
     {
         from_address_length = sizeof(from_address);
 
         CIPSTER_TRACE_STATE(
-                "networkhandler: unsolicited UDP message on EIP broadcast socket\n" );
+                "networkhandler: unsolicited UDP message on EIP local broadcast socket\n" );
 
         // Handle UDP broadcast messages
         int received_size = recvfrom( g_sockets.udp_local_broadcast_listener,
                 (char*) s_packet,
                 sizeof(s_packet),
-                0, (struct sockaddr*) &from_address,
+                0, (sockaddr*) &from_address,
                 &from_address_length );
 
         if( received_size <= 0 ) // got error
         {
             CIPSTER_TRACE_ERR(
-                    "networkhandler: error on recvfrom UDP broadcast port: %s\n",
+                    "networkhandler: error on recvfrom UDP local broadcast port: %s\n",
                     strerrno().c_str() );
             return;
         }
 
         CIPSTER_TRACE_INFO( "Data received on UDP:\n" );
 
-        EipUint8* receive_buffer = &s_packet[0];
-        int remaining_bytes = 0;
+        int reply_length = HandleReceivedExplictUdpData(
+                g_sockets.udp_local_broadcast_listener, &from_address,
+                BufReader( s_packet, received_size ),
+                BufWriter( s_packet, sizeof s_packet ), false );
 
-        do {
-            int reply_length = HandleReceivedExplictUdpData(
-                    g_sockets.udp_local_broadcast_listener, &from_address,
-                    receive_buffer, received_size, &remaining_bytes, false );
+        if( reply_length > 0 )
+        {
+            // if the active socket matches a registered UDP callback, handle a UDP packet
+            int sent_count = sendto( g_sockets.udp_local_broadcast_listener,
+                        (char*) s_packet, reply_length, 0,
+                        (sockaddr*) &from_address, sizeof(from_address) );
 
-            receive_buffer  += received_size - remaining_bytes;
-            received_size   = remaining_bytes;
+            CIPSTER_TRACE_INFO( "%s: sent %d reply bytes. line %d\n",
+                __func__, sent_count, __LINE__ );
 
-            if( reply_length > 0 )
+            if( sent_count != reply_length )
             {
-                // if the active socket matches a registered UDP callback, handle a UDP packet
-                int sent_count = sendto( g_sockets.udp_local_broadcast_listener,
-                            (char*) s_packet, reply_length, 0,
-                            (struct sockaddr*) &from_address, sizeof(from_address) );
-
-                CIPSTER_TRACE_INFO( "%s: sent %d reply bytes. line %d\n",
-                    __func__, sent_count, __LINE__ );
-
-                if( sent_count != reply_length )
-                {
-                    CIPSTER_TRACE_INFO(
-                            "networkhandler: UDP response was not fully sent\n" );
-                }
+                CIPSTER_TRACE_INFO(
+                        "networkhandler: UDP response was not fully sent\n" );
             }
-        } while( remaining_bytes > 0 );
+        }
     }
 }
 
@@ -889,34 +926,27 @@ void CheckAndHandleUdpGlobalBroadcastSocket()
 
         CIPSTER_TRACE_INFO( "Data received on global broadcast UDP:\n" );
 
-        EipUint8* receive_buffer = &s_packet[0];
-        int remaining_bytes = 0;
+        int reply_length = HandleReceivedExplictUdpData(
+                g_sockets.udp_global_broadcast_listener, &from_address,
+                BufReader( s_packet, received_size ),
+                BufWriter( s_packet, sizeof s_packet ), false );
 
-        do {
-            int reply_length = HandleReceivedExplictUdpData(
-                    g_sockets.udp_global_broadcast_listener, &from_address,
-                    receive_buffer, received_size, &remaining_bytes, false );
+        if( reply_length > 0 )
+        {
+            // if the active socket matches a registered UDP callback, handle a UDP packet
+            int sent_count = sendto( g_sockets.udp_global_broadcast_listener,
+                        (char*) s_packet, reply_length, 0,
+                        (struct sockaddr*) &from_address, sizeof(from_address) );
 
-            receive_buffer  += received_size - remaining_bytes;
-            received_size   = remaining_bytes;
+            CIPSTER_TRACE_INFO( "%s: sent %d reply bytes. line %d:\n",
+                __func__, sent_count, __LINE__ );
 
-            if( reply_length > 0 )
+            if( sent_count != reply_length )
             {
-                // if the active socket matches a registered UDP callback, handle a UDP packet
-                int sent_count = sendto( g_sockets.udp_global_broadcast_listener,
-                            (char*) s_packet, reply_length, 0,
-                            (struct sockaddr*) &from_address, sizeof(from_address) );
-
-                CIPSTER_TRACE_INFO( "%s: sent %d reply bytes. line %d:\n",
-                    __func__, sent_count, __LINE__ );
-
-                if( sent_count != reply_length )
-                {
-                    CIPSTER_TRACE_INFO(
-                            "networkhandler: UDP response was not fully sent\n" );
-                }
+                CIPSTER_TRACE_INFO(
+                        "networkhandler: UDP response was not fully sent\n" );
             }
-        } while( remaining_bytes > 0 );
+        }
     }
 }
 
@@ -952,34 +982,27 @@ void CheckAndHandleUdpUnicastSocket()
 
         CIPSTER_TRACE_INFO( "Data received on UDP unicast:\n" );
 
-        EipUint8* receive_buffer = &s_packet[0];
-        int remaining_bytes = 0;
+        int reply_length = HandleReceivedExplictUdpData(
+                g_sockets.udp_unicast_listener, &from_address,
+                BufReader( s_packet, received_size ),
+                BufWriter( s_packet, sizeof s_packet ), true );
 
-        do {
-            int reply_length = HandleReceivedExplictUdpData(
-                    g_sockets.udp_unicast_listener, &from_address, receive_buffer,
-                    received_size, &remaining_bytes, true );
+        if( reply_length > 0 )
+        {
+            // if the active socket matches a registered UDP callback, handle a UDP packet
+            int sent_count = sendto( g_sockets.udp_unicast_listener,
+                        (char*) s_packet, reply_length, 0,
+                        (struct sockaddr*) &from_address, sizeof(from_address) );
 
-            receive_buffer  += received_size - remaining_bytes;
-            received_size   = remaining_bytes;
+            CIPSTER_TRACE_INFO( "%s: sent %d reply bytes.  line:%d\n",
+                __func__, sent_count, __LINE__ );
 
-            if( reply_length > 0 )
+            if( sent_count != reply_length )
             {
-                // if the active socket matches a registered UDP callback, handle a UDP packet
-                int sent_count = sendto( g_sockets.udp_unicast_listener,
-                            (char*) s_packet, reply_length, 0,
-                            (struct sockaddr*) &from_address, sizeof(from_address) );
-
-                CIPSTER_TRACE_INFO( "%s: sent %d reply bytes.  line:%d\n",
-                    __func__, sent_count, __LINE__ );
-
-                if( sent_count != reply_length )
-                {
-                    CIPSTER_TRACE_INFO(
-                            "%s: UDP unicast response was not fully sent\n", __func__ );
-                }
+                CIPSTER_TRACE_INFO(
+                        "%s: UDP unicast response was not fully sent\n", __func__ );
             }
-        } while( remaining_bytes > 0 );
+        }
     }
 }
 
@@ -997,12 +1020,10 @@ void CheckAndHandleConsumingUdpSockets()
     {
         CipConn* conn = iter;
 
-        /*  do this at the beginning as the close function may can
-            make the entry invalid
-        */
+        // do this at the beginning as the close function can make the entry invalid
         iter = iter->next;
 
-        if( -1 != conn->consuming_socket && CheckSocketSet( conn->consuming_socket ) )
+        if( conn->consuming_socket != -1  &&  CheckSocketSet( conn->consuming_socket ) )
         {
             from_address_length = sizeof(from_address);
 
@@ -1028,8 +1049,8 @@ void CheckAndHandleConsumingUdpSockets()
                 continue;
             }
 
-            HandleReceivedConnectedData( s_packet,
-                    received_size, &from_address );
+            HandleReceivedConnectedData( &from_address,
+                BufReader( s_packet, received_size ) );
         }
     }
 }

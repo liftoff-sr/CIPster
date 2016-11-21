@@ -9,11 +9,13 @@
 
 #include <string>
 #include <vector>
+#include <string.h>
 
 #include "typedefs.h"
 #include "trace.h"
 #include "cipster_user_conf.h"
 #include "ciperror.h"
+#include "byte_bufs.h"
 
 //* @brief Assembly Class Code
 enum ClassIds
@@ -126,12 +128,12 @@ enum CipDataType
 
 /**
  * Enum CIPServiceCode
- * is the set of all CIP service codes.
- * Common services codes range from 0x01 to 0x1C.
+ * is the set of CIP service codes.
+ * Common services codes range from 0x01 to 0x1c.  Beyond that there can
+ * be class or instance specific service codes and some may overlap.
  */
 enum CIPServiceCode
 {
-    // Start CIP common services
     kGetAttributeAll = 0x01,
     kSetAttributeAll = 0x02,
     kGetAttributeList = 0x03,
@@ -154,15 +156,15 @@ enum CIPServiceCode
     kInsertMember = 0x1A,
     kRemoveMember = 0x1B,
     kGroupSync = 0x1C,
-    // End CIP common services
 
-    // Start CIP object-specific services
+
+    // Start CIP class or instance specific services
     kForwardClose = 0x4E,
     kUnconnectedSend = 0x52,
     kForwardOpen = 0x54,
     kLargeForwardOpen = 0x5b,
     kGetConnectionOwner = 0x5A
-    // End CIP object-specific services
+    // End CIP class or instance specific services
 };
 
 //* @brief Definition of Get and Set Flags for CIP Attributes
@@ -244,92 +246,13 @@ struct CipRevision
 
 
 
-class CipBufMutable
-{
-public:
-    CipBufMutable( CipByte* aStart, size_t aCount ) :
-        start( aStart ),
-        byte_count( aCount )
-    {}
-
-    CipBufMutable() :
-        start( 0 ), byte_count( 0 )
-    {}
-
-    CipByte*    data() const    { return start; }
-    size_t      size() const    { return byte_count; }
-
-    /// Move the start of the buffer by the specified number of bytes.
-    CipBufMutable& operator+=( size_t n )
-    {
-        size_t offset = n < byte_count ? n : byte_count;
-        start += offset;
-        byte_count -= offset;
-        return *this;
-    }
-
-    CipBufMutable operator+( size_t n )
-    {
-        CipBufMutable ret = *this;
-
-        ret += n;
-        return ret;
-    }
-
-protected:
-    CipByte*        start;
-    size_t          byte_count;
-};
-
-
-class CipBufNonMutable
-{
-public:
-    CipBufNonMutable() :
-        start( 0 ), byte_count( 0 )
-    {}
-
-    CipBufNonMutable( const CipByte* aStart, size_t aCount ) :
-        start( aStart ), byte_count( aCount )
-    {}
-
-    CipBufNonMutable( const CipBufMutable& m ):
-        start( m.data() ),
-        byte_count( m.size() )
-    {}
-
-    const CipByte*  data() const    { return start; }
-    size_t          size() const    { return byte_count; }
-
-    /// Move the start of the buffer by the specified number of bytes.
-    CipBufNonMutable& operator+=( size_t n )
-    {
-        size_t offset = n < byte_count ? n : byte_count;
-        start += offset;
-        byte_count -= offset;
-        return *this;
-    }
-
-    CipBufNonMutable operator+( size_t n )
-    {
-        CipBufNonMutable ret = *this;
-
-        ret += n;
-        return ret;
-    }
-
-protected:
-    const CipByte*  start;
-    size_t          byte_count;
-};
-
 
 class CipInstance;
 class CipAttribute;
 class CipClass;
-struct CipMessageRouterRequest;
-struct CipMessageRouterResponse;
-struct CipConn;
+class CipMessageRouterRequest;
+class CipMessageRouterResponse;
+class CipConn;
 
 
 /** @ingroup CIP_API
@@ -564,6 +487,7 @@ protected:
     int         service_id;                 ///< service number
 };
 
+class CipCommonPacketFormatData;
 
 /**
  * Class CipClass
@@ -635,7 +559,7 @@ public:
     CipService* ServiceRemove( EipUint8 aServiceId );
 
     /// Get an existing CipService or return NULL if not found.
-    CipService* Service( EipUint8 service_id ) const;
+    CipService* Service( int aServiceId ) const;
 
     /// Return a read only collection of services
     const CipServices& Services() const
@@ -694,7 +618,7 @@ public:
      * @param extended_error_code The returned error code of the connection object
      * @return CIPError
      */
-    virtual     CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );
+    virtual     CipError OpenConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error_code );
 
 protected:
 
@@ -754,7 +678,7 @@ private:
 
 /**
  * Struct CipTcpIpNetworkInterfaceConfiguration
- * if for holding TCP/IP interface information
+ * is for holding TCP/IP interface information
  */
 struct CipTcpIpNetworkInterfaceConfiguration
 {
@@ -767,8 +691,8 @@ struct CipTcpIpNetworkInterfaceConfiguration
 };
 
 
-/* these are used for creating the getAttributeAll masks
- *  TODO there might be a way simplifying this using __VARARGS__ in #define */
+// these are used for creating the getAttributeAll masks
+// TODO there might be a way simplifying this using __VARARGS__ in #define
 #define MASK1( a )          ( 1 << (a) )
 #define MASK2( a, b )       ( 1 << (a) | 1 << (b) )
 #define MASK3( a, b, c )    ( 1 << (a) | 1 << (b) | 1 << (c) )

@@ -16,7 +16,7 @@
 #include "appcontype.h"
 #include "cpf.h"
 #include "trace.h"
-#include "endianconv.h"
+#include "byte_bufs.h"
 
 // The port to be used per default for I/O messages on UDP.
 const int kOpenerEipIoUdpPort = 2222;   // = 0x08AE;
@@ -88,7 +88,7 @@ static ConnectionManagerStatusCode handleConfigData( CipConn* aConn )
 
     // Put the data into the configuration assembly object
     else if( kEipStatusOk != NotifyAssemblyConnectedDataReceived( instance,
-             CipBufNonMutable( (EipByte*)  words.data(),  words.size() * 2 ) ) )
+             BufReader( (EipByte*)  words.data(),  words.size() * 2 ) ) )
     {
         CIPSTER_TRACE_WARN( "Configuration data was invalid\n" );
         result = kConnectionManagerStatusCodeInvalidConfigurationApplicationPath;
@@ -265,9 +265,11 @@ void GeneralConnectionConfiguration( CipConn* aConn )
  */
 static void closeIoConnection( CipConn* aConn )
 {
-    CheckIoConnectionEvent( aConn->conn_path.consuming_path.GetInstanceOrConnPt(),
+    CheckIoConnectionEvent(
+            aConn->conn_path.consuming_path.GetInstanceOrConnPt(),
             aConn->conn_path.producing_path.GetInstanceOrConnPt(),
-            kIoConnectionEventClosed );
+            kIoConnectionEventClosed
+            );
 
     if( aConn->instance_type == kConnInstanceTypeIoExclusiveOwner
      || aConn->instance_type == kConnInstanceTypeIoInputOnly )
@@ -369,16 +371,16 @@ static EipStatus sendConnectedData( CipConn* aConn )
     // set AddressInfo Items to invalid Type
     cpfd.ClearTx();
 
-    CipBufMutable out_buf( g_message_data_reply_buffer, sizeof g_message_data_reply_buffer );
+    BufWriter out_cpfd( g_message_data_reply_buffer, sizeof g_message_data_reply_buffer );
 
-    int reply_length = cpfd.SerializeForIO( out_buf );
+    int reply_length = cpfd.SerializeForIO( out_cpfd );
 
-    if( reply_length == -1 )
+    if( reply_length < 0 )
     {
+        return kEipStatusError;
     }
 
-    EipByte*    out   = out_buf.data() + reply_length - 2;
-    EipByte*    limit = out_buf.data() + out_buf.size();
+    BufWriter out = out_cpfd + (reply_length - 2);
 
     cpfd.data_item.length = attr3_byte_array->length;
 
@@ -391,50 +393,39 @@ static EipStatus sendConnectedData( CipConn* aConn )
     {
         cpfd.data_item.length += 2;
 
-        AddIntToMessage( cpfd.data_item.length, &out );
-
-        AddIntToMessage( aConn->sequence_count_producing, &out );
+        out.put16( cpfd.data_item.length );
+        out.put16( aConn->sequence_count_producing );
     }
     else
     {
-        AddIntToMessage( cpfd.data_item.length, &out );
+        out.put16( cpfd.data_item.length );
     }
 
     if( kOpenerProducedDataHasRunIdleHeader )
     {
-        AddDintToMessage( g_run_idle_state, &out );
+        out.put32( g_run_idle_state );
     }
 
-    // verify this is not a buffer overrun.
-    if( out + attr3_byte_array->length > limit )
-        goto L_error;
-
-    memcpy( out, attr3_byte_array->data,
-            attr3_byte_array->length );
+    out.append( attr3_byte_array->data, attr3_byte_array->length );
 
     reply_length += cpfd.data_item.length;
 
     result = SendUdpData(
             &aConn->remote_address,
             aConn->producing_socket,
-            CipBufNonMutable( g_message_data_reply_buffer, reply_length )
+            BufReader( g_message_data_reply_buffer, reply_length )
             );
 
     return result;
-
-L_error:
-    return kEipStatusError;
 }
 
 
-static EipStatus handleReceivedIoConnectionData( CipConn* aConn, CipBufNonMutable aInput )
+static EipStatus handleReceivedIoConnectionData( CipConn* aConn, BufReader aInput )
 {
     // check class 1 sequence number
     if( aConn->transport_trigger.Class() == kConnectionTransportClass1 )
     {
-        const EipByte* in = aInput.data();
-
-        EipUint16 sequence_buffer = GetIntFromMessage( &in );
+        EipUint16 sequence_buffer = aInput.get16();
 
         if( SEQ_LEQ16( sequence_buffer, aConn->sequence_count_consuming ) )
         {
@@ -442,8 +433,6 @@ static EipStatus handleReceivedIoConnectionData( CipConn* aConn, CipBufNonMutabl
         }
 
         aConn->sequence_count_consuming = sequence_buffer;
-
-        aInput += 2;
     }
 
     if( aInput.size() )
@@ -451,9 +440,7 @@ static EipStatus handleReceivedIoConnectionData( CipConn* aConn, CipBufNonMutabl
         // we have no heartbeat connection
         if( kOpenerConsumedDataHasRunIdleHeader )
         {
-            const EipByte* in = aInput.data();
-
-            EipUint32 nRunIdleBuf = GetDintFromMessage( &in );
+            EipUint32 nRunIdleBuf = aInput.get32();
 
             if( g_run_idle_state != nRunIdleBuf )
             {
@@ -461,8 +448,6 @@ static EipStatus handleReceivedIoConnectionData( CipConn* aConn, CipBufNonMutabl
             }
 
             g_run_idle_state = nRunIdleBuf;
-
-            aInput += 4;
         }
 
         if( NotifyAssemblyConnectedDataReceived( aConn->consuming_instance, aInput ) != 0 )
@@ -479,9 +464,11 @@ static void handleIoConnectionTimeOut( CipConn* aConn )
 {
     CipConn* next_non_control_master_connection;
 
-    CheckIoConnectionEvent( aConn->conn_path.consuming_path.GetInstanceOrConnPt(),
-            aConn->conn_path.producing_path.GetInstanceOrConnPt(),
-            kIoConnectionEventTimedOut );
+    CheckIoConnectionEvent(
+        aConn->conn_path.consuming_path.GetInstanceOrConnPt(),
+        aConn->conn_path.producing_path.GetInstanceOrConnPt(),
+        kIoConnectionEventTimedOut
+        );
 
     if( aConn->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast )
     {
@@ -742,11 +729,9 @@ EipStatus OpenMulticastConnection( UdpCommuncationDirection direction,
 }
 
 
-CipError OpenCommunicationChannels( CipConn* aConn )
+static CipError openCommunicationChannels( CipConn* aConn, CipCommonPacketFormatData* cpfd )
 {
     CipError eip_status = kCipErrorSuccess;
-
-    CipCommonPacketFormatData cpfd;
 
     IOConnType o_to_t = aConn->o_to_t_ncp.ConnectionType();
     IOConnType t_to_o = aConn->t_to_o_ncp.ConnectionType();
@@ -754,7 +739,7 @@ CipError OpenCommunicationChannels( CipConn* aConn )
     // open a connection "point to point" or "multicast" based on the ConnectionParameter
     if( o_to_t == kIOConnTypeMulticast )
     {
-        if( OpenMulticastConnection( kUdpConsuming, aConn, &cpfd ) == kEipStatusError )
+        if( OpenMulticastConnection( kUdpConsuming, aConn, cpfd ) == kEipStatusError )
         {
             CIPSTER_TRACE_ERR( "error in OpenMulticast Connection\n" );
             return kCipErrorConnectionFailure;
@@ -763,7 +748,7 @@ CipError OpenCommunicationChannels( CipConn* aConn )
 
     else if( o_to_t == kIOConnTypePointToPoint )
     {
-        if( OpenConsumingPointToPointConnection( aConn, &cpfd ) == kEipStatusError )
+        if( OpenConsumingPointToPointConnection( aConn, cpfd ) == kEipStatusError )
         {
             CIPSTER_TRACE_ERR( "error in PointToPoint consuming connection\n" );
             return kCipErrorConnectionFailure;
@@ -772,7 +757,7 @@ CipError OpenCommunicationChannels( CipConn* aConn )
 
     if( t_to_o == kIOConnTypeMulticast )
     {
-        if( OpenProducingMulticastConnection( aConn, &cpfd ) == kEipStatusError )
+        if( OpenProducingMulticastConnection( aConn, cpfd ) == kEipStatusError )
         {
             CIPSTER_TRACE_ERR( "error in OpenMulticast Connection\n" );
             return kCipErrorConnectionFailure;
@@ -781,7 +766,7 @@ CipError OpenCommunicationChannels( CipConn* aConn )
 
     else if( t_to_o == kIOConnTypePointToPoint )
     {
-        if( OpenProducingPointToPointConnection( aConn, &cpfd ) != kCipErrorSuccess )
+        if( OpenProducingPointToPointConnection( aConn, cpfd ) != kCipErrorSuccess )
         {
             CIPSTER_TRACE_ERR( "error in PointToPoint producing connection\n" );
             return kCipErrorConnectionFailure;
@@ -796,8 +781,8 @@ CipConnectionClass::CipConnectionClass() :
     CipClass(
         kConnectionClassId,
         "Connection",
-        (1<<7)|(1<<6) /* |(1<<5)|(1<<4)|(1<<3)|(1<<2) */ | (1<<1),
-        MASK3( 7, 6, 1 ),           // class getAttributeAll mask
+        MASK2( 6, 1 ),              // class attributes mask
+        MASK2( 6, 1 ),              // class getAttributeAll mask
         0,                          // instance getAttributeAll mask
         1                           // revision
         )
@@ -807,7 +792,7 @@ CipConnectionClass::CipConnectionClass() :
 }
 
 
-CipError CipConnectionClass::OpenIO( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipError CipConnectionClass::OpenIO( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
 {
     IOConnType o_to_t;
     IOConnType t_to_o;
@@ -960,22 +945,23 @@ CipError CipConnectionClass::OpenIO( CipConn* aConn, ConnectionManagerStatusCode
         }
     }
 
-    CipError result = OpenCommunicationChannels( io_conn );
+    CipError result = openCommunicationChannels( io_conn, cpfd );
 
     if( result != kCipErrorSuccess )
     {
         *extended_error = kConnectionManagerStatusCodeSuccess;
 
-        CIPSTER_TRACE_ERR( "%s: OpenCommunicationChannels failed\n", __func__ );
+        CIPSTER_TRACE_ERR( "%s: openCommunicationChannels failed\n", __func__ );
         return result;
     }
 
     AddNewActiveConnection( io_conn );
 
     CheckIoConnectionEvent(
-            io_conn->conn_path.consuming_path.GetInstanceOrConnPt(),
-            io_conn->conn_path.producing_path.GetInstanceOrConnPt(),
-            kIoConnectionEventOpened );
+        io_conn->conn_path.consuming_path.GetInstanceOrConnPt(),
+        io_conn->conn_path.producing_path.GetInstanceOrConnPt(),
+        kIoConnectionEventOpened
+        );
 
     return result;
 }

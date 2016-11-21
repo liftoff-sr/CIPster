@@ -17,7 +17,7 @@ set( CIP_SRCS
 set( ENCAP_SRCS
     enet_encap/cpf.c
     enet_encap/encap.c
-    enet_encap/endianconv.c
+#    enet_encap/endianconv.c
     )
 
 set( UTILS_SRCS

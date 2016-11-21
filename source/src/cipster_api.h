@@ -13,7 +13,7 @@
 #include "cip/ciptypes.h"
 #include "cip/ciperror.h"
 #include "cip/cipmessagerouter.h"
-#include "enet_encap/endianconv.h"
+#include "byte_bufs.h"
 #include "cipster_user_conf.h"
 
 
@@ -115,13 +115,13 @@ EipStatus RegisterCipClass( CipClass* aClass );
  *
  * This function may be used in own services for sending data back to the
  * requester (e.g., getAttributeSingle for special structs).
- *  @param cip_data_type the cip type to encode
+ *  @param int aDataType the cip type to encode
  *  @param cip_data pointer to data value.
- *  @param cip_message pointer to memory where response should be written
+ *  @param aBuf where response should be written
  *  @return length of attribute in bytes
  *          -1 .. error
  */
-int EncodeData( EipUint8 cip_data_type, void* cip_data, EipByte** cip_message );
+int EncodeData( int aDataType, const void* cip_data, BufWriter& aBuf );
 
 /** @ingroup CIP_API
  * @brief Retrieve the given data according to CIP encoding from the message
@@ -129,13 +129,13 @@ int EncodeData( EipUint8 cip_data_type, void* cip_data, EipByte** cip_message );
  *
  * This function may be used in in own services for handling data from the
  * requester (e.g., setAttributeSingle).
- *  @param cip_data_type the CIP type to decode
+ *  @param aDataType the CIP type to decode
  *  @param cip_data pointer to data value to written.
- *  @param cip_message pointer to memory where the data should be taken from
+ *  @param aBuf where to get the data bytes from
  *  @return length of taken bytes
  *          -1 .. error
  */
-int DecodeData( EipUint8 cip_data_type, void* cip_data, const EipByte** cip_message );
+int DecodeData( int aDataType, void* cip_data, BufReader& aBuf );
 
 /** @ingroup CIP_API
  * @brief Create an instance of an assembly object
@@ -153,7 +153,7 @@ int DecodeData( EipUint8 cip_data_type, void* cip_data, const EipByte** cip_mess
  * The notification on received configuration data is handled with the
  * IApp_after_receive function.
  */
-CipInstance* CreateAssemblyInstance( int aInstanceId, CipBufMutable aBuffer );
+CipInstance* CreateAssemblyInstance( int aInstanceId, BufWriter aBuffer );
 
 class CipConn;
 
@@ -189,7 +189,7 @@ typedef EipStatus (* ConnectionSendDataFunction)( CipConn* aConn );
  *
  * @return Stack status
  */
-typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* aConn, CipBufNonMutable aInput );
+typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* aConn, BufReader aInput );
 
 /** @ingroup CIP_API
  * @brief Configures the connection point for an exclusive owner connection.
@@ -255,7 +255,7 @@ void ConfigureListenOnlyConnectionPoint( int connection_number,
  * @param aReply is the buffer that should be used for the reply.
  * @return int - byte count of reply that needs to be sent back
  */
-int HandleReceivedExplictTcpData( int socket, CipBufNonMutable aCommand, CipBufMutable aReply );
+int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aReply );
 
 /**
  * Function HandleReceivedExplicitUdpData
@@ -270,7 +270,7 @@ int HandleReceivedExplictTcpData( int socket, CipBufNonMutable aCommand, CipBufM
  * @return int - byte count of reply that need to be sent back
  */
 int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
-        CipBufNonMutable aCommand,  CipBufMutable aReply, bool isUnicast );
+        BufReader aCommand,  BufWriter aReply, bool isUnicast );
 
 /**
  * Function HandleReceivedConnectedData
@@ -286,7 +286,7 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
  * @param aReply where to put the reply and tells its maximum length.
  * @return EipStatus
  */
-EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, CipBufNonMutable aCommand );
+EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReader aCommand );
 
 /** @ingroup CIP_API
  * @brief Check if any of the connection timers (TransmissionTrigger or
@@ -372,8 +372,7 @@ void HandleApplication();
  * connection
  * @param io_connection_event information on the change occurred
  */
-void CheckIoConnectionEvent( unsigned output_assembly_id,
-        unsigned input_assembly_id,
+void CheckIoConnectionEvent( int output_assembly_id, int input_assembly_id,
         IoConnectionEvent io_connection_event );
 
 /** @ingroup CIP_CALLBACK_API
@@ -507,7 +506,7 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
  * @param aOutput the data to send and its length
  * @return  EIP_SUCCESS on success
  */
-EipStatus SendUdpData( struct sockaddr_in* socket_data, int socket, CipBufNonMutable aOutput );
+EipStatus SendUdpData( struct sockaddr_in* socket_data, int socket, BufReader aOutput );
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Close the given socket and clean up the stack
@@ -632,7 +631,7 @@ void IApp_CloseSocket_tcp( int socket_handle );
  *   - Receive explicit message data on connected TCP sockets and the UPD socket
  *     for port AF12hex. The received data has to be handed over to Ethernet
  *     encapsulation layer with the functions: \n
- *     int HandleReceivedExplictTcpData( int socket, CipBufUnmutable aCommand, CipBufMutable aReply ),\n
+ *     int HandleReceivedExplictTcpData( int socket, CipBufUnmutable aCommand, BufWriter aReply ),\n
  *     int HandleReceivedExplictUDPData(int socket_handle, struct sockaddr_in
  * *from_address, EIP_UINT8* buffer, unsigned buffer_length, int
  * *number_of_remaining_bytes).\n
@@ -648,7 +647,7 @@ void IApp_CloseSocket_tcp( int socket_handle );
  *     established and new sockets are necessary
  *   - Receive implicit connected data on a receiving UDP socket\n
  *     The received data has to be hand over to the Connection Manager Object
- *     with the function EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, CipBufNonMutable aCommand );
+ *     with the function EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReader aCommand );
  *   - Close UDP and TCP sockets:
  *      -# Requested by CIPster through the call back function: void
  * CloseSocket(int socket_handle)

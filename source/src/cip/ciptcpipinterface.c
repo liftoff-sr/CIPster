@@ -1,7 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Conversion to C++ is Copyright (C) 2016, SoftPLC Corportion.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #include <string.h>
@@ -12,7 +11,7 @@
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
 #include "ciperror.h"
-#include "endianconv.h"
+#include "byte_bufs.h"
 #include "cipethernetlink.h"
 #include "cipster_api.h"
 
@@ -65,7 +64,7 @@ static EipStatus get_attr_4( CipAttribute* attribute,
         CipMessageRouterResponse* response )
 {
     EipStatus   status = kEipStatusOkSend;
-    EipByte*    out = response->data.data();
+    BufWriter   out = response->data;
 
     response->data_length = 0;
     response->reply_service = 0x80 | request->service;
@@ -78,13 +77,13 @@ static EipStatus get_attr_4( CipAttribute* attribute,
     app_path.SetClass( kCipEthernetLinkClassCode );
     app_path.SetInstance( attribute->Instance()->Id() );
 
-    int result = app_path.SerializePadded( out+2, out+2+12 );
+    int result = app_path.SerializeAppPath( out + 2 );
 
-    AddIntToMessage( result/2, &out );  // word count as 16 bits
+    out.put16( result/2 );      // word count as 16 bits
 
     out += result;
 
-    response->data_length += out - response->data.data();
+    response->data_length += out.data() - response->data.data();
 
     return status;
 }
@@ -97,7 +96,7 @@ static EipStatus get_multicast_config( CipAttribute* attribute,
         CipMessageRouterResponse* response )
 {
     EipStatus   status = kEipStatusOkSend;
-    EipByte*    out = response->data.data();
+    BufWriter   out = response->data;
 
     response->reply_service = 0x80 | request->service;
 
@@ -105,23 +104,23 @@ static EipStatus get_multicast_config( CipAttribute* attribute,
     response->size_of_additional_status = 0;
 
     response->data_length += EncodeData(
-            kCipUsint, &g_multicast_configuration.alloc_control, &out );
+            kCipUsint, &g_multicast_configuration.alloc_control, out );
 
     response->data_length += EncodeData(
             kCipUsint, &g_multicast_configuration.reserved_shall_be_zero,
-            &out );
+            out );
 
     response->data_length += EncodeData(
             kCipUint,
             &g_multicast_configuration.number_of_allocated_multicast_addresses,
-            &out );
+            out );
 
     EipUint32 multicast_address = ntohl(
             g_multicast_configuration.starting_multicast_address );
 
     response->data_length += EncodeData( kCipUdint,
             &multicast_address,
-            &out );
+            out );
 
     return status;
 }
@@ -150,9 +149,7 @@ static EipStatus set_attr_13( CipAttribute* attribute,
 
     int instance_id = attribute->Instance()->Id();
 
-    const EipByte* p = request->data.data();
-
-    int inactivity_timeout = GetIntFromMessage( &p );
+    int inactivity_timeout = request->data.get16();
 
     //TODO put it in the instance
 
@@ -275,7 +272,7 @@ EipStatus CipTcpIpInterfaceInit()
     {
         CipClass* clazz = new CipClass( kCipTcpIpInterfaceClassCode,
               "TCP/IP Interface",
-              (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
+              MASK7(1,2,3,4,5,6,7),     // common class attributes mask
               0xffffffff,               // class getAttributeAll mask
               0xffffffff,               // instance getAttributeAll mask
               4                         // version

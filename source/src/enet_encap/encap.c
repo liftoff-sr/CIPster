@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (C) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #include <string.h>
@@ -8,7 +8,7 @@
 #include "cipster_api.h"
 #include "cpf.h"
 #include "encap.h"
-#include "endianconv.h"
+#include "byte_bufs.h"
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
 #include "cipconnectionmanager.h"
@@ -79,9 +79,9 @@ struct DelayedMsg
     EipByte     message[ENCAP_MAX_DELAYED_ENCAP_MESSAGE_SIZE];
     unsigned    message_size;
 
-    CipBufNonMutable Payload() const
+    BufReader Payload() const
     {
-        return CipBufNonMutable( message, message_size );
+        return BufReader( message, message_size );
     }
 };
 
@@ -109,18 +109,10 @@ public:
      *
      * @return int - no. bytes consumed, or -1 if error
      */
-    int DeserializeEncap( CipBufNonMutable aSrc );
+    int DeserializeEncap( BufReader aSrc );
 
-    int SerializeEncap( CipBufMutable aDst );
+    int SerializeEncap( BufWriter aDst );
 };
-
-
-ListServices g_list_services(
-    kCipItemIdListServiceResponse,
-    1,
-    kCapabilityFlagsCipTcp | kCapabilityFlagsCipUdpClass0or1,
-    "Communications"
-    );
 
 
 static int g_registered_sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];
@@ -131,8 +123,6 @@ static DelayedMsg g_delayed_messages[ENCAP_NUMBER_OF_SUPPORTED_DELAYED_ENCAP_MES
 //   @brief Initializes session list and interface information.
 void EncapsulationInit()
 {
-    DetermineEndianess();
-
     // initialize random numbers for random delayed response message generation
     // we use the ip address as seed as suggested in the spec
     srand( interface_configuration_.ip_address );
@@ -208,21 +198,15 @@ static EncapsulationProtocolErrorCode registerSocket( int aSocket, CipUdint* aIn
  * @param aReply where to put reply
  * @return int - num bytes serialized into aReply
  */
-static int registerSession( int socket, CipBufNonMutable aCommand, CipBufMutable aReply,
+static int registerSession( int socket, BufReader aCommand, BufWriter aReply,
         EncapsulationProtocolErrorCode* aEncapError, CipUdint* aSessionHandle )
 {
-    if( aCommand.size() < 4 )
-        return -1;
+    *aEncapError = kEncapsulationProtocolSuccess;
 
-    if( aReply.size() < 4 )
-        return -1;
+    BufWriter out = aReply;
 
-    int result = -1;
-
-    const EipByte* p = aCommand.data();
-
-    int version = GetIntFromMessage( &p );
-    int options = GetIntFromMessage( &p );
+    int version = aCommand.get16();
+    int options = aCommand.get16();
 
     // check if requested protocol version is supported and the register session option flag is zero
     if( version && version <= kSupportedProtocolVersion && !options )
@@ -237,12 +221,10 @@ static int registerSession( int socket, CipBufNonMutable aCommand, CipBufMutable
     if( version > kSupportedProtocolVersion )
         version = kSupportedProtocolVersion;
 
-    EipByte* r = aReply.data();
+    out.put16( version );
+    out.put16( options );
 
-    AddIntToMessage( version, &r );
-    AddIntToMessage( options, &r );
-
-    return r - aReply.data();
+    return out.data() - aReply.data();
 }
 
 
@@ -291,61 +273,59 @@ static EncapsulationProtocolErrorCode unregisterSession( CipUdint session_handle
 }
 
 
-static int encapsulateListIdentyResponseMessage( CipBufMutable aReply )
+static int encapsulateListIdentyResponseMessage( BufWriter aReply )
 {
     if( aReply.size() < 40 )
         return -1;
 
-    EipByte* p = aReply.data();
+    BufWriter out = aReply;
 
-    AddIntToMessage( 1, &p );       // Item count: one item
-    AddIntToMessage( kCipItemIdListIdentityResponse, &p );
+    out.put16( 1 );       // Item count: one item
+    out.put16( kCipItemIdListIdentityResponse );
 
     // at this place the real length will be inserted below
-    EipByte* id_length_buffer = p;
+    BufWriter id_length = out;
 
-    p += 2;
+    out += 2;
 
-    AddIntToMessage( kSupportedProtocolVersion, &p );
+    out.put16( kSupportedProtocolVersion );
 
-    EncapsulateIpAddress( htons( kOpenerEthernetPort ),
-            interface_configuration_.ip_address,
-            &p );
+    out.put16BE( AF_INET );
+    out.put16BE( kOpenerEthernetPort );
+    out.put32BE( ntohl( interface_configuration_.ip_address ) );
 
-    memset( p, 0, 8 );
-    p += 8;
+    out.fill( 8 );
 
-    AddIntToMessage( vendor_id_, &p );
-    AddIntToMessage( device_type_, &p );
-    AddIntToMessage( product_code_, &p );
+    out.put16( vendor_id_ );
+    out.put16( device_type_ );
+    out.put16( product_code_ );
 
-    *p++ = revision_.major_revision;
-    *p++ = revision_.minor_revision;
+    *out++ = revision_.major_revision;
+    *out++ = revision_.minor_revision;
 
-    AddIntToMessage( status_, &p );
-    AddDintToMessage( serial_number_, &p );
+    out.put16( status_ );
+    out.put32( serial_number_ );
 
-    *p++ = (EipByte) product_name_.length;
+    *out++ = (EipByte) product_name_.length;
 
-    memcpy( p, product_name_.string, product_name_.length );
-    p += product_name_.length;
+    out.append( product_name_.string, product_name_.length );
 
-    *p++ = 0xFF;
+    *out++ = 0xff;
 
-    AddIntToMessage( p - id_length_buffer - 2,
-            &id_length_buffer );      // the -2 is for not counting the length field
+    // the -2 is for not counting the length field
+    id_length.put16( out.data() - id_length.data() - 2 );
 
-    return p - aReply.data();
+    return out.data() - aReply.data();
 }
 
 
-static int handleReceivedListIdentityCommandImmediate( CipBufMutable aReply )
+static int handleReceivedListIdentityCommandImmediate( BufWriter aReply )
 {
     return encapsulateListIdentyResponseMessage( aReply );
 }
 
 static int handleReceivedListIdentityCommandDelayed( int socket, const sockaddr_in* from_address,
-        unsigned aMSecDelay, CipBufNonMutable aCommand )
+        unsigned aMSecDelay, BufReader aCommand )
 {
     DelayedMsg* delayed = NULL;
 
@@ -365,15 +345,15 @@ static int handleReceivedListIdentityCommandDelayed( int socket, const sockaddr_
 
         delayed->time_out_usecs = aMSecDelay * 1000;
 
-        memcpy( delayed->message, aCommand.data(), ENCAPSULATION_HEADER_LENGTH );
+        BufWriter out( delayed->message, sizeof delayed->message );
 
-        delayed->message_size = encapsulateListIdentyResponseMessage(
-            CipBufMutable( delayed->message + ENCAPSULATION_HEADER_LENGTH,
-                sizeof( delayed->message ) - ENCAPSULATION_HEADER_LENGTH ) );
+        out.append( aCommand.data(), ENCAPSULATION_HEADER_LENGTH );
 
-        EipByte* buf = delayed->message + 2;
+        delayed->message_size = encapsulateListIdentyResponseMessage( out );
 
-        AddIntToMessage( delayed->message_size, &buf );
+        BufWriter len( delayed->message + 2, 2 );
+
+        len.put16( delayed->message_size );
 
         delayed->message_size += ENCAPSULATION_HEADER_LENGTH;
     }
@@ -382,51 +362,48 @@ static int handleReceivedListIdentityCommandDelayed( int socket, const sockaddr_
 }
 
 
-static int handleReceivedListInterfacesCommand( CipBufMutable aReply )
+static int handleReceivedListInterfacesCommand( BufWriter aReply )
 {
-    EipByte* p = aReply.data();
+    BufWriter out = aReply;
 
     // vOL2 2-4.3.3 At present no public items are defined for the ListInterfaces reply.
-    AddIntToMessage( 0, &p );
+    out.put16( 0 );
 
-    return p - aReply.data();
+    return out.data() - aReply.data();
 }
 
 
 /**
  * Function handleReceivedListServicesCommand
- * generates a reply with "Communications Services" + compatibility Flags.
+ * generates a reply with "Communications" + compatibility Flags.
  * @param aReply where to put the reply
  * @return int - the number of bytes put into aReply or -1 if buffer overrun.
  */
-static int handleReceivedListServicesCommand( CipBufMutable aReply )
+static int handleReceivedListServicesCommand( BufWriter aReply )
 {
-    EipByte* p = aReply.data();
+    BufWriter out = aReply;
 
-    if( aReply.size() >= 26 )
+    static const EipByte name_of_service[16] = "Communications";
+
+    try
     {
-        AddIntToMessage( 1, &p );
+        out.put16( 1 );
+        out.put16( kCipItemIdListServiceResponse );
+        out.put16( 20 );    // length of following command specific data is fixed
+        out.put16( 1 );     // protocol version
+        out.put16( kCapabilityFlagsCipTcp | kCapabilityFlagsCipUdpClass0or1 ); // capability_flags
+        out.append( name_of_service, 16 );
 
-        AddIntToMessage( g_list_services.id, &p );
-
-        AddIntToMessage( (EipUint16) (g_list_services.byte_count - 4), &p );
-
-        AddIntToMessage( g_list_services.protocol_version, &p );
-
-        AddIntToMessage( g_list_services.capability_flags, &p );
-
-        memset( p, 0, 16 );
-        memcpy( p, g_list_services.name_of_service.data(),
-            std::min( (int) g_list_services.name_of_service.size(), 16 ) );
-
-        return p - aReply.data();
+        return out.data() - aReply.data();
     }
-    else
+    catch( std::exception e )
+    {
         return -1;
+    }
 }
 
 
-int HandleReceivedExplictTcpData( int socket, CipBufNonMutable aCommand, CipBufMutable aReply )
+int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aReply )
 {
     CIPSTER_ASSERT( aReply.size() >= ENCAPSULATION_HEADER_LENGTH ); // caller bug
 
@@ -450,8 +427,8 @@ int HandleReceivedExplictTcpData( int socket, CipBufNonMutable aCommand, CipBufM
 
     // Adjust locally for encapsulation header which is both consumed in the
     // the command and reserved in the reply.
-    CipBufNonMutable    command = aCommand + ENCAPSULATION_HEADER_LENGTH;
-    CipBufMutable       reply = aReply + ENCAPSULATION_HEADER_LENGTH;
+    BufReader   command = aCommand + ENCAPSULATION_HEADER_LENGTH;
+    BufWriter   reply = aReply + ENCAPSULATION_HEADER_LENGTH;
 
     // most of these functions need a reply to be sent
     switch( encap.command_code )
@@ -544,7 +521,7 @@ int HandleReceivedExplictTcpData( int socket, CipBufNonMutable aCommand, CipBufM
 
 
 int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
-        CipBufNonMutable aCommand, CipBufMutable aReply, bool isUnicast )
+        BufReader aCommand, BufWriter aReply, bool isUnicast )
 {
     CIPSTER_ASSERT( aReply.size() >= ENCAPSULATION_HEADER_LENGTH ); // caller bug
 
@@ -568,8 +545,8 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
 
     // Adjust locally for encapsulation header which is both consumed in the
     // the command and reserved in the reply.
-    CipBufNonMutable    command = aCommand + ENCAPSULATION_HEADER_LENGTH;
-    CipBufMutable       reply = aReply + ENCAPSULATION_HEADER_LENGTH;
+    BufReader    command = aCommand + ENCAPSULATION_HEADER_LENGTH;
+    BufWriter       reply = aReply + ENCAPSULATION_HEADER_LENGTH;
 
     switch( encap.command_code )
     {
@@ -621,51 +598,43 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
 }
 
 
-int EncapsulationData::DeserializeEncap( CipBufNonMutable aCommand )
+int EncapsulationData::DeserializeEncap( BufReader aCommand )
 {
-    const EipByte* p = aCommand.data();
+    BufReader in = aCommand;
 
-    if( aCommand.size() >= ENCAPSULATION_HEADER_LENGTH )
-    {
-        command_code = GetIntFromMessage( &p );
-        data_length  = GetIntFromMessage( &p );
+    command_code = in.get16();
+    data_length  = in.get16();
 
-        session_handle = GetDintFromMessage( &p );
+    session_handle = in.get32();
 
-        status = GetDintFromMessage( &p );
+    status = in.get32();
 
-        for( int i=0; i<8;  ++i )
-            sender_context[i] = *p++;
+    for( int i=0; i<8;  ++i )
+        sender_context[i] = *in++;
 
-        options = GetDintFromMessage( &p );
-    }
+    options = in.get32();
 
-    int byte_count = p - aCommand.data();
+    int byte_count = in.data() - aCommand.data();
 
     return byte_count;
 }
 
 
-int EncapsulationData::SerializeEncap( CipBufMutable aDst )
+int EncapsulationData::SerializeEncap( BufWriter aDst )
 {
-    EipByte* p = aDst.data();
+    BufWriter out = aDst;
 
-    if( aDst.size() >= ENCAPSULATION_HEADER_LENGTH )
-    {
-        AddIntToMessage( command_code, &p );
-        AddIntToMessage( data_length, &p );
-        AddDintToMessage( session_handle, &p );
-        AddDintToMessage( status, &p );
+    out.put16( command_code );
+    out.put16( data_length );
+    out.put32( session_handle );
+    out.put32( status );
 
-        for( int i=0; i<8;  ++i )
-            *p++ = sender_context[i];
+    out.append( (EipByte*) sender_context, 8 );
 
-        AddDintToMessage( options, &p );
-    }
+    out.put32( options );
 
-    return p - aDst.data();
+    return out.data() - aDst.data();
 }
-
 
 
 void CloseSession( int socket )

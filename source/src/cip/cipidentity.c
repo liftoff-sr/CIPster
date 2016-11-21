@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 
@@ -30,7 +30,7 @@
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
 #include "ciperror.h"
-#include "endianconv.h"
+#include "byte_bufs.h"
 #include "cipster_api.h"
 
 // attributes in CIP Identity Object
@@ -193,7 +193,8 @@ EipStatus CipIdentityInit()
                 "Identity",                     // class name
 
                 // conformance tool wants no instance count attribute in the class, omit no. 3
-                (1<<7)|(1<<6)|(1<<5)|(1<<4)| /* (1<<3)| */ (1<<2)|(1<<1),
+                MASK6( 1, 2, 4, 5, 6, 7 ),
+
                 MASK4( 1, 2, 6, 7 ),            // class getAttributeAll mask		CIP spec 5-2.3.2
                 MASK7( 1, 2, 3, 4, 5, 6, 7 ),   // instance getAttributeAll mask	CIP spec 5-2.3.2
                 1                               // class revision

@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (C) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CPF_H_
@@ -146,7 +146,7 @@ public:
      *     - >  0 : the number of bytes consumed
      *     - <= 0 : the negative offset of the problem byte
      */
-    int DeserializeCPFD( CipBufNonMutable aSrc );
+    int DeserializeCPFD( BufReader aSrc );
 
     /**
      * Function SerializeForMRR
@@ -156,7 +156,7 @@ public:
      * @param  aDst destination byte buffer
      * @return int - serialized byte count or -1 if error.
      */
-    int SerializeCPFD( CipMessageRouterResponse* aResponse, CipBufMutable aDst );
+    int SerializeCPFD( CipMessageRouterResponse* aResponse, BufWriter aDst );
 
     /**
      * Function SerializeForIO
@@ -166,7 +166,7 @@ public:
      * @param  aDst a byte buffer which is where to serialize this object
      * @return int - count of serialized bytes, or -1 if error.
      */
-    int SerializeForIO( CipBufMutable aDst )
+    int SerializeForIO( BufWriter aDst )
     {
         return SerializeCPFD( NULL, aDst );
     }
@@ -264,9 +264,9 @@ public:
         return NULL;
     }
 
-    CipBufNonMutable DataItemPayload() const
+    BufReader DataItemPayload() const
     {
-        return CipBufNonMutable( data_item.data, data_item.length );
+        return BufReader( data_item.data, data_item.length );
     }
 
     CipItemId DataItemType() const      { return CipItemId( data_item.type_id ); }
@@ -300,7 +300,7 @@ private:
  * @return int - number of bytes to be sent back. <= 0 if nothing should be sent and is the
  *  the negative of one of the values in EncapsulationProtocolErrorCode.
  */
-int NotifyCommonPacketFormat( CipBufNonMutable aCommand, CipBufMutable aReply );
+int NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply );
 
 /**
  * Function NotifyConnectedCommonPacketFormat
@@ -313,6 +313,6 @@ int NotifyCommonPacketFormat( CipBufNonMutable aCommand, CipBufMutable aReply );
  * @return int - number of bytes to be sent back. <= 0 if nothing should be sent and is the
  *  the negative of one of the values in EncapsulationProtocolErrorCode.
  */
-int NotifyConnectedCommonPacketFormat( CipBufNonMutable aCommand, CipBufMutable aReply );
+int NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply );
 
 #endif    // CIPSTER_CPF_H_

@@ -27,26 +27,28 @@ EipStatus ApplicationInitialization()
 {
     // create 3 assembly object instances
     // INPUT
-    CreateAssemblyInstance( DEMO_APP_INPUT_ASSEMBLY_NUM, g_assembly_data064,
-            sizeof(g_assembly_data064) );
+    CreateAssemblyInstance( DEMO_APP_INPUT_ASSEMBLY_NUM,
+        BufWriter( g_assembly_data064, sizeof(g_assembly_data064) ) );
 
     // OUTPUT
-    CreateAssemblyInstance( DEMO_APP_OUTPUT_ASSEMBLY_NUM, g_assembly_data096,
-            sizeof(g_assembly_data096) );
+    CreateAssemblyInstance( DEMO_APP_OUTPUT_ASSEMBLY_NUM,
+        BufWriter( g_assembly_data096, sizeof(g_assembly_data096) ) );
 
     // CONFIG
-    CreateAssemblyInstance( DEMO_APP_CONFIG_ASSEMBLY_NUM, g_assembly_data097,
-            sizeof(g_assembly_data097) );
+    CreateAssemblyInstance( DEMO_APP_CONFIG_ASSEMBLY_NUM,
+        BufWriter( g_assembly_data097, sizeof(g_assembly_data097) ) );
 
     // Heart-beat output assembly for Input only connections
-    CreateAssemblyInstance( DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM, 0, 0 );
+    CreateAssemblyInstance( DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM,
+        BufWriter( 0, 0 ) );
 
     // Heart-beat output assembly for Listen only connections
-    CreateAssemblyInstance( DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM, 0, 0 );
+    CreateAssemblyInstance( DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM,
+        BufWriter( 0, 0 ) );
 
     // assembly for explicit messaging
-    CreateAssemblyInstance( DEMO_APP_EXPLICT_ASSEMBLY_NUM, &g_assembly_data09A[0],
-            sizeof(g_assembly_data09A) );
+    CreateAssemblyInstance( DEMO_APP_EXPLICT_ASSEMBLY_NUM,
+        BufWriter( g_assembly_data09A, sizeof(g_assembly_data09A) ) );
 
     ConfigureExclusiveOwnerConnectionPoint( 0, DEMO_APP_OUTPUT_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
@@ -78,8 +80,7 @@ void HandleApplication()
 }
 
 
-void CheckIoConnectionEvent( unsigned output_assembly_id,
-        unsigned input_assembly_id,
+void CheckIoConnectionEvent( int output_assembly_id, int input_assembly_id,
         IoConnectionEvent io_connection_event )
 {
     // maintain a correct output state according to the connection state

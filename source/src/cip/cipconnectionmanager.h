@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (C) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPCONNECTIONMANAGER_H_

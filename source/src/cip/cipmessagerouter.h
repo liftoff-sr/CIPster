@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPMESSAGEROUTER_H_
@@ -16,9 +16,9 @@
  */
 struct CipMessageRouterRequest
 {
-    CipUsint            service;
-    CipAppPath          request_path;
-    CipBufNonMutable    data;
+    CipUsint    service;
+    CipAppPath  request_path;
+    BufReader   data;
 
     /**
      * Function DeserializeMRR
@@ -28,9 +28,10 @@ struct CipMessageRouterRequest
      * @param aCommand the serizlized CPFD data item, i.e. CIP command
      * @return int - number of bytes consumed or -1 if error.
      */
-    int DeserializeMRR( CipBufNonMutable aCommand );
+    int DeserializeMRR( BufReader aCommand );
 };
 
+class CipCommonPacketFormatData;
 
 /**
  * Class CipMessageRouterResponse
@@ -39,30 +40,37 @@ struct CipMessageRouterRequest
 class CipMessageRouterResponse
 {
 public:
-    CipUsint reply_service;                 ///< Reply service code, the requested service code + 0x80
-    CipOctet reserved;                      ///< Reserved; Shall be zero
-
-    CipUsint general_status;                ///< One of the General Status codes listed in CIP
-                                            ///< Specification Volume 1, Appendix B
-
-    CipUsint size_of_additional_status;     ///< Number of additional 16 bit words in Additional Status Array
-
-    EipUint16 additional_status[2];         ///< Array of 16 bit words; Additional status;
-                                            ///< If SizeOfAdditionalStatus is 0. there is no
-                                            ///< Additional Status
-
-    CipBufMutable   data;                   ///< where to put CIP reply with data.size() limit
-    int             data_length;            ///< how many bytes actually filled at data.data().
-
-    CipMessageRouterResponse();
+    CipMessageRouterResponse( CipCommonPacketFormatData* cpfd );
 
     /// Return a CipBuf holding the serialized CIP response.
-    CipBufNonMutable Payload() const
+    BufReader Payload() const
     {
-        return CipBufNonMutable( data.data(), data_length );
+        return BufReader( data.data(), data_length );
     }
 
+    CipCommonPacketFormatData* CPFD() const     { return cpfd; }
+
+
+    CipUsint reply_service;             ///< Reply service code, the requested service code + 0x80
+    CipOctet reserved;                  ///< Reserved; Shall be zero
+
+    CipUsint general_status;            ///< One of the General Status codes listed in CIP
+                                        ///< Specification Volume 1, Appendix B
+
+    CipUsint size_of_additional_status; ///< Number of additional 16 bit words in Additional Status Array
+
+    EipUint16 additional_status[2];     ///< Array of 16 bit words; Additional status;
+                                        ///< If SizeOfAdditionalStatus is 0. there is no
+                                        ///< Additional Status
+
+    BufWriter   data;                   ///< where to put CIP reply with data.size() limit
+    int         data_length;            ///< how many bytes actually filled at data.data().
+
+
 private:
+
+    CipCommonPacketFormatData*  cpfd;
+
     // The common packet format makes it impossible to avoid copying the
     // reply payload because there's no way to know length in advance.
     // So the message router response is generated into a temporary location
@@ -93,11 +101,11 @@ void DeleteAllClasses();
  *
  * @param aCommand CPFD data payload which is the CIP part.
  * @param aReply where to put the reply, must fill in
- *   CipMessageRouterResponse and its CipBufMutable 'data' and data_length.  This is
+ *   CipMessageRouterResponse and its BufWriter 'data' and data_length.  This is
  *   how caller knows the length.
  * @return EipStatus
  */
-EipStatus NotifyMR( CipBufNonMutable aCommand, CipMessageRouterResponse* aReply );
+EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply );
 
 /**
  * Function RegisterCipClass

@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 
@@ -13,7 +13,7 @@
 #include "cipmessagerouter.h"
 #include "cipconnectionmanager.h"
 #include "cipconnection.h"
-#include "endianconv.h"
+#include "byte_bufs.h"
 #include "ciperror.h"
 #include "trace.h"
 
@@ -107,7 +107,7 @@ CipClass* GetCipClass( int class_id )
 
 std::vector<EipByte> CipMessageRouterResponse::mmr_temp( CIPSTER_MESSAGE_DATA_REPLY_BUFFER );
 
-CipMessageRouterResponse::CipMessageRouterResponse() :
+CipMessageRouterResponse::CipMessageRouterResponse( CipCommonPacketFormatData* aCPFD ) :
     reply_service( 0 ),
     reserved( 0 ),
     general_status( 0 ),
@@ -115,7 +115,8 @@ CipMessageRouterResponse::CipMessageRouterResponse() :
 
     // shared resizeable response buffer.
     data( mmr_temp.data(), mmr_temp.size() ),
-    data_length( 0 )
+    data_length( 0 ),
+    cpfd( aCPFD )
 {
     memset( additional_status, 0, sizeof additional_status );
 }
@@ -125,18 +126,21 @@ class CipMessageRouterClass : public CipClass
 {
 public:
     CipMessageRouterClass();
-    CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );    // override
+
+    CipError OpenConnection( CipConn* aConn,
+        CipCommonPacketFormatData* cpfd,
+        ConnectionManagerStatusCode* extended_error_code );    // override
 };
 
 
 CipMessageRouterClass::CipMessageRouterClass() :
     CipClass( kCipMessageRouterClassCode,
-                "Message Router",   // class name
-                (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
-                0,                  // class getAttributeAll mask
-                0,                  // instance getAttributeAll mask
-                1                   // revision
-                )
+        "Message Router",
+        MASK7(1,2,3,4,5,6,7),   // common class attributes mask
+        0,                      // class getAttributeAll mask
+        0,                      // instance getAttributeAll mask
+        1                       // revision
+        )
 {
     // CIP_Vol_1 3.19 section 5A-3.3 shows that Message Router class has no
     // SetAttributeSingle.
@@ -158,7 +162,8 @@ static CipConn* getFreeExplicitConnection()
 }
 
 
-CipError CipMessageRouterClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipError CipMessageRouterClass::OpenConnection( CipConn* aConn,
+            CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
 {
     CipError ret = kCipErrorSuccess;
 
@@ -235,7 +240,7 @@ EipStatus CipMessageRouterInit()
 }
 
 
-EipStatus NotifyMR( CipBufNonMutable aCommand, CipMessageRouterResponse* aReply )
+EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply )
 {
     EipStatus   eip_status = kEipStatusOkSend;
 
@@ -328,23 +333,22 @@ EipStatus NotifyMR( CipBufNonMutable aCommand, CipMessageRouterResponse* aReply 
 }
 
 
-int CipMessageRouterRequest::DeserializeMRR( CipBufNonMutable aRequest )
+int CipMessageRouterRequest::DeserializeMRR( BufReader aRequest )
 {
-    const EipByte* in    = aRequest.data();
-    const EipByte* limit = in + aRequest.size();
+    BufReader in = aRequest;
 
     service = *in++;
 
     int byte_count = *in++ * 2;     // word count x 2
 
-    int result = request_path.DeserializePadded( in, in + byte_count );
+    int result = request_path.DeserializeAppPath( in );
 
     if( result <= 0 )
     {
         return result;
     }
 
-    int bytes_consumed = in - aRequest.data() + result;
+    int bytes_consumed = in.data() - aRequest.data() + result;
 
     data = aRequest + bytes_consumed;   // set this->data
 

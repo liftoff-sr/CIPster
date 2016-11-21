@@ -1,8 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2016, SoftPLC Corportion.
  *
- * All rights reserved.
- *
  ******************************************************************************/
 #ifndef CIPEPATH_H_
 #define CIPEPATH_H_
@@ -60,14 +58,10 @@ public:
     }
 
     /**
-     * Function DeserializePadded
+     * Function DeserializeDataSegment
      * decodes a padded EPATH
      *
-     * @param aSrc is the first word of the serialized input byte sequence, which is
-     *  expected to be the first segment not the word count.
-     *
-     * @param aLimit points one past the last byte of the allowed range of serialized
-     *   aSrc, this is an exclusive end.
+     * @param aInput starts at a possible data segment, if any, and can extend beyond it.
      *
      * @return int - Number of decoded bytes, or < 0 if error.  If error, then
      *  the absolute value of this result is the byte offset of the problem starting
@@ -75,7 +69,7 @@ public:
      *  available input bytes may not have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
      */
-    int DeserializePadded( const EipByte* aSrc, const EipByte* aLimit );
+    int DeserializeDataSegment( BufReader aInput );
 
     Words       words;
 };
@@ -103,14 +97,10 @@ public:
     }
 
     /**
-     * Function DeserializePadded
+     * Function DeserializeAppPath
      * decodes a padded EPATH
      *
-     * @param aSrc is the first word of the serialized input byte sequence, which is
-     *  expected to be the first segment not the word count.
-     *
-     * @param aLimit points one past the last byte of the allowed range of serialized
-     *   aSrc, this is an exclusive end.
+     * @param aInput starts at a possible app_path can can extend beyond it.
      *
      * @return int - Number of decoded bytes, or < 0 if error.  If negative, then
      *  the absolute value of this result is the byte offset into the problem starting
@@ -118,17 +108,17 @@ public:
      *  available input bytes may not have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
      */
-    int DeserializePadded( const EipByte* aSrc, const EipByte* aLimit, CipAppPath* aPreviousToInheritFrom = NULL );
+    int DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom = NULL );
 
     /**
      * Function SerializePadded
      * encodes a padded EPATH according to fields which are present in this object and
      * by a sequence given by grammar on page C-17 of Vol1.
-     * @param aDst is a buffer to serialize into.
-     * @param aLimit is one past the end of the buffer.
+     *
+     * @param aOutput where to serialize into.
      * @return int - the number of bytes consumed, or -1 if not enough space.
      */
-    int SerializePadded( EipByte* aDst, EipByte* aLimit );
+    int SerializeAppPath( BufWriter aOutput );
 
     void SetClass( int aClass )
     {
@@ -282,8 +272,8 @@ private:
 
     char    tag[42];
 
-    int deserialize_symbolic( const EipByte* aSrc, const EipByte* aLimit );
-    int deserialize_logical( const EipByte* aSrc, Stuff aField, int aFormat );
+    int deserialize_symbolic( BufReader aInput );
+    int deserialize_logical( BufReader aInput, Stuff aField, int aFormat );
 
     void inherit( int aStart, CipAppPath* from );
 
@@ -355,14 +345,10 @@ public:
     }
 
     /**
-     * Function DeserializePadded
+     * Function DeserializePortSegmentGroup
      * decodes a padded EPATH
      *
-     * @param aSrc is the first word of the serialized input byte sequence, which is
-     *  expected to be the first segment not the word count.
-     *
-     * @param aLimit points one past the last byte of the allowed range of serialized
-     *  aSrc, this is an exclusive end.
+     * @param aInput starts at a possible port segment group and can extend beyond it.
      *
      * @return int - Number of decoded bytes, or <= 0 if error.  If error, then
      *  the absolute value of this result is the byte offset of the problem starting
@@ -370,10 +356,10 @@ public:
      *  available input bytes may not have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
      */
-    int DeserializePadded( const EipByte* aSrc, const EipByte* aLimit );
+    int DeserializePortSegmentGroup( BufReader aInput );
 
     /**
-     * Function SerializePadded
+     * Function SerializePortSegmentGroup
      * encodes a padded EPATH according to fields which are present in this object and
      * by a sequence given by grammar on page C-17 of Vol1.
      * @param aDst is a buffer to serialize into.
@@ -388,7 +374,6 @@ public:
     bool HasPIT_MSecs() const           { return pbits & (1<<PIT_MSECS); }
     bool HasPIT() const                 { return pbits & ((1<<PIT_USECS) | (1<<PIT_MSECS)); }
     bool HasKey() const                 { return pbits & (1<<KEY); }
-
 
     void SetCipPortSegment( int aPort, EipByte* aSrc, int aByteCount )
     {

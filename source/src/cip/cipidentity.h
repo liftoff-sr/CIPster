@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPIDENTITY_H_
@@ -41,13 +41,19 @@ enum CipIdentityExtendedStatus
     kAtLeastOneIoConnectionEstablishedAllInIdleMode = 0x0070
 };
 
-// global public variables
 
-// public functions
 /** @brief CIP Identity object constructor
  *
  * @returns EipError if the class could not be created, otherwise EipOk
  */
 EipStatus CipIdentityInit();
+
+
+// values needed from the CIP identity object
+extern EipUint16    vendor_id_;
+extern EipUint16    device_type_;
+extern EipUint16    product_code_;
+extern CipRevision  revision_;
+
 
 #endif    // CIPSTER_CIPIDENTITY_H_

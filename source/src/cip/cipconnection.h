@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2011, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 
@@ -293,7 +293,7 @@ public:
 
     void Clear();
 
-    CipError parseConnectionPath( CipBufNonMutable aPath, ConnectionManagerStatusCode* extended_error );
+    CipError parseConnectionPath( BufReader aPath, ConnectionManagerStatusCode* extended_error );
 
     ConnectionState     state;
     ConnInstanceType    instance_type;
@@ -436,8 +436,8 @@ private:
  * @return general status on the open process
  *    - EIP_OK ... on success
  *    - On an error the general status code to be put into the response
- */
 CipError OpenCommunicationChannels( CipConn* aConn );
+ */
 
 
 /** Copy the given connection data from pa_pstSrc to pa_pstDst
@@ -465,7 +465,7 @@ class CipConnectionClass : public CipClass
 public:
     CipConnectionClass();
 
-    static CipError OpenIO( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );
+    static CipError OpenIO( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error_code );
 };
 
 
