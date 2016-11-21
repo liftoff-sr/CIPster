@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (C) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_ENCAP_H_
@@ -18,7 +18,7 @@
 
 //** defines **
 
-#define ENCAPSULATION_HEADER_LENGTH 24
+#define ENCAPSULATION_HEADER_LENGTH         24
 
 //* @brief Ethernet/IP standard port
 static const int kOpenerEthernetPort = 0xAF12;
@@ -30,57 +30,12 @@ static const int kOpenerEthernetPort = 0xAF12;
 enum EncapsulationProtocolErrorCode
 {
     kEncapsulationProtocolSuccess = 0x0000,
-    kEncapsulationProtocolInvalidCommand = 0x0001,
+    kEncapsulationProtocolInvalidOrUnsupportedCommand = 0x0001,
     kEncapsulationProtocolInsufficientMemory = 0x0002,
     kEncapsulationProtocolIncorrectData = 0x0003,
     kEncapsulationProtocolInvalidSessionHandle = 0x0064,
     kEncapsulationProtocolInvalidLength = 0x0065,
     kEncapsulationProtocolUnsupportedProtocol = 0x0069
-};
-
-
-struct  EncapsulationData
-{
-    int         command_code;
-    int         data_length;
-    CipUdint    session_handle;
-    CipUdint    status;
-    CipOctet    sender_context[8];      ///< length of 8, according to the specification
-    CipUdint    options;
-    EipByte*    buf_start;              ///< Pointer to the communication buffer used for this message
-    EipByte*    buf_pos;                ///< The current position in the communication buffer during the decoding process
-
-    /**
-     * Function Init
-     * grabs fields from encapsulation header into this struct.
-     *
-     * @param aBuf the received packet
-     * @param aByteCount length of the data in aBuf. Might be more than one message
-     *
-     * @return int - difference between bytes in pa_buf an data_length
-     *          0 .. full package received
-     *          >0 .. more than one packet received
-     *          <0 .. only fragment of data portion received
-     */
-    int Init( EipByte* receive_buffer, int receive_buffer_length );
-};
-
-
-struct ListServices
-{
-    ListServices( int aId, int aVersion, int aFlags, const char* aName ):
-        id( aId ),
-        byte_count( sizeof(*this) ),
-        protocol_version( aVersion ),
-        capability_flags( aFlags ),
-        name_of_service( aName )
-    {}
-
-    EipUint16   id;
-    EipUint16   byte_count;
-    EipUint16   protocol_version;
-    EipUint16   capability_flags;
-    std::string name_of_service;
 };
 
 

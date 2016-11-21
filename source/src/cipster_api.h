@@ -13,7 +13,7 @@
 #include "cip/ciptypes.h"
 #include "cip/ciperror.h"
 #include "cip/cipmessagerouter.h"
-#include "enet_encap/endianconv.h"
+#include "byte_bufs.h"
 #include "cipster_user_conf.h"
 
 
@@ -42,7 +42,7 @@ EipStatus ConfigureNetworkInterface( const char* ip_address, const char* subnet_
  *
  *  @param mac_address  the hardware MAC address of the network interface
  */
-void ConfigureMacAddress( const EipUint8* mac_address );
+void ConfigureMacAddress( const EipByte* mac_address );
 
 /** @ingroup CIP_API
  * @brief Configure the domain name of the device
@@ -115,13 +115,13 @@ EipStatus RegisterCipClass( CipClass* aClass );
  *
  * This function may be used in own services for sending data back to the
  * requester (e.g., getAttributeSingle for special structs).
- *  @param cip_data_type the cip type to encode
+ *  @param int aDataType the cip type to encode
  *  @param cip_data pointer to data value.
- *  @param cip_message pointer to memory where response should be written
+ *  @param aBuf where response should be written
  *  @return length of attribute in bytes
  *          -1 .. error
  */
-int EncodeData( EipUint8 cip_data_type, void* cip_data, EipUint8** cip_message );
+int EncodeData( int aDataType, const void* cip_data, BufWriter& aBuf );
 
 /** @ingroup CIP_API
  * @brief Retrieve the given data according to CIP encoding from the message
@@ -129,21 +129,20 @@ int EncodeData( EipUint8 cip_data_type, void* cip_data, EipUint8** cip_message )
  *
  * This function may be used in in own services for handling data from the
  * requester (e.g., setAttributeSingle).
- *  @param cip_data_type the CIP type to decode
+ *  @param aDataType the CIP type to decode
  *  @param cip_data pointer to data value to written.
- *  @param cip_message pointer to memory where the data should be taken from
+ *  @param aBuf where to get the data bytes from
  *  @return length of taken bytes
  *          -1 .. error
  */
-int DecodeData( EipUint8 cip_data_type, void* cip_data, EipUint8** cip_message );
+int DecodeData( int aDataType, void* cip_data, BufReader& aBuf );
 
 /** @ingroup CIP_API
  * @brief Create an instance of an assembly object
  *
- * @param instance_number  instance number of the assembly object to create
- * @param data         pointer to the data the assembly object should contain
- * @param data_length   length of the assembly object's data
- * @return pointer to the instance of the created assembly object. NULL on error
+ * @param aInstanceId  instance number of the assembly object to create
+ * @param aBuffer      the data the assembly object should contain and its byte count.
+ * @return CipInstance* - the instance of the created assembly object or NULL on error.
  *
  * Assembly Objects for Configuration Data:
  *
@@ -154,46 +153,43 @@ int DecodeData( EipUint8 cip_data_type, void* cip_data, EipUint8** cip_message )
  * The notification on received configuration data is handled with the
  * IApp_after_receive function.
  */
-CipInstance* CreateAssemblyInstance( int instance_number, EipByte* data, int data_length );
+CipInstance* CreateAssemblyInstance( int aInstanceId, BufWriter aBuffer );
 
 class CipConn;
 
 /** @ingroup CIP_API
  * @brief Function prototype for handling the closing of connections
  *
- * @param cip_conn The connection object which is closing the
+ * @param aConn The connection object which is closing the
  * connection
  */
-typedef void (* ConnectionCloseFunction)( CipConn* cip_conn );
+typedef void (* ConnectionCloseFunction)( CipConn* aConn );
 
 /** @ingroup CIP_API
  * @brief Function prototype for handling the timeout of connections
  *
- * @param cip_conn The connection object which connection timed out
+ * @param aConn The connection object which connection timed out
  */
-typedef void (* ConnectionTimeoutFunction)( CipConn* cip_conn );
+typedef void (* ConnectionTimeoutFunction)( CipConn* aConn );
 
 /** @ingroup CIP_API
  * @brief Function prototype for sending data via a connection
  *
- * @param cip_conn The connection object which connection timed out
+ * @param aConn The connection object which connection timed out
  *
  * @return EIP stack status
  */
-typedef EipStatus (* ConnectionSendDataFunction)( CipConn* cip_conn );
+typedef EipStatus (* ConnectionSendDataFunction)( CipConn* aConn );
 
 /** @ingroup CIP_API
  * @brief Function prototype for receiving data via a connection
  *
- * @param cip_conn The connection object which connection timed out
- * @param data The payload of the CIP message
- * @param data_length Length of the payload
+ * @param aConn the connection object which connection timed out
+ * @param aInput the payload of the CIP message with its length
  *
  * @return Stack status
  */
-typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* cip_conn,
-        EipUint8* data,
-        EipUint16 data_length );
+typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* aConn, BufReader aInput );
 
 /** @ingroup CIP_API
  * @brief Configures the connection point for an exclusive owner connection.
@@ -249,53 +245,48 @@ void ConfigureListenOnlyConnectionPoint( int connection_number,
         int input_assembly_id,
         int configuration_assembly_id );
 
-/** @ingroup CIP_API
- * @brief Notify the encapsulation layer that an explicit message has been
+/**
+ * Function HandleReceivedExplicitTcpData
+ * notifies the encapsulation layer that an explicit message has been
  * received via TCP.
  *
- * @param socket_handle socket handle from which data is received.
- * @param buffer buffer that contains the received data. This buffer will also
- * contain the response if one is to be sent.
- * @param buffer length of the data in buffer.
- * @param number_of_remaining_bytes return how many bytes of the input are left
- * over after we're done here
- * @return length of reply that needs to be sent back
+ * @param socket the BSD socket from which data is received.
+ * @param aCommand is the buffer that contains the received data.
+ * @param aReply is the buffer that should be used for the reply.
+ * @return int - byte count of reply that needs to be sent back
  */
-int HandleReceivedExplictTcpData( int socket, EipUint8* buffer,
-        unsigned buffer_length,
-        int* number_of_remaining_bytes );
+int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aReply );
 
-/** @ingroup CIP_API
- * @brief Notify the encapsulation layer that an explicit message has been
+/**
+ * Function HandleReceivedExplicitUdpData
+ * notifies the encapsulation layer that an explicit message has been
  * received via UDP.
  *
- * @param socket_handle socket handle from which data is received.
+ * @param socket BSD socket from which data is received.
  * @param from_address remote address from which the data is received.
- * @param buffer buffer that contains the received data. This buffer will also
- * contain the response if one is to be sent.
- * @param buffer_length length of the data in buffer.
- * @param number_of_remaining_bytes return how many bytes of the input are left
- * over after we're done here
- * @return length of reply that need to be sent back
+ * @param aCommand received data buffer pointing just past the encapsulation header and its length.
+ * @param aReply where to put reply and tells its maximum length.
+ * @param isUnicast true if unicast, else false.
+ * @return int - byte count of reply that need to be sent back
  */
-int HandleReceivedExplictUdpData( int socket, struct sockaddr_in* from_address,
-        EipUint8* buffer, unsigned buffer_length,
-        int* number_of_remaining_bytes, int unicast );
+int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
+        BufReader aCommand,  BufWriter aReply, bool isUnicast );
 
-/** @ingroup CIP_API
- *  @brief Notify the connection manager that data for a connection has been
- *  received.
+/**
+ * Function HandleReceivedConnectedData
+ * notifies the connection manager that data for a connection has been
+ * received.
  *
- *  This function should be invoked by the network layer.
- *  @param received_data pointer to the buffer of data that has been received
- *  @param received_data_length number of bytes in the data buffer
- *  @param from_address address from which the data has been received. Only
+ * This function should be invoked by the network layer.
+ * @param from_address address from which the data has been received. Only
  *           data from the connections originator may be accepted. Avoids
  *           connection hijacking
- *  @return EIP_OK on success
+ * @param aCommand received data buffer pointing just past the
+ *   encapsulation header and a byte count remaining in frame.
+ * @param aReply where to put the reply and tells its maximum length.
+ * @return EipStatus
  */
-EipStatus HandleReceivedConnectedData( EipUint8* received_data, int received_data_length,
-        struct sockaddr_in* from_address );
+EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReader aCommand );
 
 /** @ingroup CIP_API
  * @brief Check if any of the connection timers (TransmissionTrigger or
@@ -317,10 +308,10 @@ EipStatus ManageConnections();
  * inhibit timer. The application is informed via the
  * bool BeforeAssemblyDataSend( CipInstance* aInstance )
  * callback function when the production will happen. This function should only
- * be invoked from void HandleApplication(void).
+ * be invoked from void HandleApplication().
  *
  * The connection can only be triggered if the application is established and it
- * is of application application triggered type.
+ * is of application triggered type.
  *
  * @param output_assembly_id the output assembly connection point of the
  * connection
@@ -328,8 +319,7 @@ EipStatus ManageConnections();
  * connection
  * @return EIP_OK on success
  */
-EipStatus TriggerConnections( unsigned output_assembly_id,
-        unsigned input_assembly_id );
+EipStatus TriggerConnections( int output_assembly_id, int input_assembly_id );
 
 /** @ingroup CIP_API
  * @brief Inform the encapsulation layer that the remote host has closed the
@@ -382,8 +372,7 @@ void HandleApplication();
  * connection
  * @param io_connection_event information on the change occurred
  */
-void CheckIoConnectionEvent( unsigned output_assembly_id,
-        unsigned input_assembly_id,
+void CheckIoConnectionEvent( int output_assembly_id, int input_assembly_id,
         IoConnectionEvent io_connection_event );
 
 /** @ingroup CIP_CALLBACK_API
@@ -514,12 +503,10 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
  *
  * @param socket_data pointer to the "send to" address
  * @param socket_handle socket descriptor to send on
- * @param data pointer to the data to send
- * @param data_length length of the data to send
+ * @param aOutput the data to send and its length
  * @return  EIP_SUCCESS on success
  */
-EipStatus SendUdpData( struct sockaddr_in* socket_data, int socket, EipUint8* data,
-        EipUint16 data_length );
+EipStatus SendUdpData( struct sockaddr_in* socket_data, int socket, BufReader aOutput );
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Close the given socket and clean up the stack
@@ -642,11 +629,10 @@ void IApp_CloseSocket_tcp( int socket_handle );
  * specific code:
  *   - Establish connections requested on TCP port AF12hex
  *   - Receive explicit message data on connected TCP sockets and the UPD socket
- *     for port AF12hex. The received data has to be hand over to Ethernet
+ *     for port AF12hex. The received data has to be handed over to Ethernet
  *     encapsulation layer with the functions: \n
- *      int HandleReceivedExplictTCPData(int socket_handle, EIP_UINT8* buffer, int
- * buffer_length, int *number_of_remaining_bytes),\n
- *      int HandleReceivedExplictUDPData(int socket_handle, struct sockaddr_in
+ *     int HandleReceivedExplictTcpData( int socket, CipBufUnmutable aCommand, BufWriter aReply ),\n
+ *     int HandleReceivedExplictUDPData(int socket_handle, struct sockaddr_in
  * *from_address, EIP_UINT8* buffer, unsigned buffer_length, int
  * *number_of_remaining_bytes).\n
  *     Depending if the data has been received from a TCP or from a UDP socket.
@@ -661,8 +647,7 @@ void IApp_CloseSocket_tcp( int socket_handle );
  *     established and new sockets are necessary
  *   - Receive implicit connected data on a receiving UDP socket\n
  *     The received data has to be hand over to the Connection Manager Object
- *     with the function EIP_STATUS HandleReceivedConnectedData(EIP_UINT8
- * *data, int data_length)
+ *     with the function EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReader aCommand );
  *   - Close UDP and TCP sockets:
  *      -# Requested by CIPster through the call back function: void
  * CloseSocket(int socket_handle)

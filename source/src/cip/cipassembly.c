@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 
@@ -43,12 +43,12 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
             CIPSTER_TRACE_WARN( "%s: received data for connected input assembly\n", __func__ );
             response->general_status = kCipErrorAttributeNotSetable;
         }
-        else if( request->data_length < byte_array->length )
+        else if( request->data.size() < byte_array->length )
         {
             CIPSTER_TRACE_INFO( "%s: not enough data received.\n", __func__ );
             response->general_status = kCipErrorNotEnoughData;
         }
-        else if( request->data_length > byte_array->length )
+        else if( request->data.size() > byte_array->length )
         {
             CIPSTER_TRACE_INFO( "%s: too much data received.\n", __func__ );
             response->general_status = kCipErrorTooMuchData;
@@ -58,11 +58,11 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
             CIPSTER_TRACE_INFO(
                 "%s: writing %d bytes to assembly_id: %d.\n",
                 __func__,
-                request->data_length,
+                (int) request->data.size(),
                 instance->Id()
                 );
 
-            memcpy( byte_array->data, request->data, byte_array->length );
+            memcpy( byte_array->data, request->data.data(), byte_array->length );
 
             if( AfterAssemblyDataReceived( instance ) != kEipStatusOk )
             {
@@ -112,7 +112,7 @@ public:
 };
 
 
-CipInstance* CreateAssemblyInstance( int instance_id, EipByte* data, int data_length )
+CipInstance* CreateAssemblyInstance( int instance_id, BufWriter aBuffer )
 {
     CipClass* clazz = GetCipClass( kCipAssemblyClassCode );
 
@@ -128,8 +128,8 @@ CipInstance* CreateAssemblyInstance( int instance_id, EipByte* data, int data_le
 
     AssemblyInstance* i = new AssemblyInstance( instance_id );
 
-    i->byte_array.length = data_length;
-    i->byte_array.data   = data;
+    i->byte_array.length = aBuffer.size();
+    i->byte_array.data   = aBuffer.data();
 
     // Attribute 3 is the byte array transfer of the assembly data itself
     i->AttributeInsert( 3, kCipByteArray, kSetAndGetAble, getAttrAssemblyData, setAttrAssemblyData, &i->byte_array );
@@ -148,22 +148,23 @@ class CipAssemblyClass : public CipClass
 public:
     CipAssemblyClass() :
         CipClass( kCipAssemblyClassCode,
-            "Assembly",     // aClassName
-            (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
-            0,              // assembly class has no get_attribute_all service
-            0,              // assembly instance has no get_attribute_all service
-            2               // aRevision, according to the CIP spec currently this has to be 2
+            "Assembly",
+            MASK7( 1,2,3,4,5,6,7 ), // common class attributes mask
+            0,                      // assembly class has no get_attribute_all service
+            0,                      // assembly instance has no get_attribute_all service
+            2                       // aRevision, according to the CIP spec currently this has to be 2
             )
     {
     }
 
-    CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error ); // override
+    CipError OpenConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error ); // override
 };
 
 
-CipError CipAssemblyClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipError CipAssemblyClass::OpenConnection( CipConn* aConn,
+    CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
 {
-    return CipConnectionClass::OpenIO( aConn, extended_error );
+    return CipConnectionClass::OpenIO( aConn, cpfd, extended_error );
 }
 
 
@@ -180,9 +181,7 @@ EipStatus CipAssemblyInitialize()
 }
 
 
-EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
-        EipUint8* data,
-        EipUint16 data_length )
+EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, BufReader aBuffer )
 {
     CIPSTER_ASSERT( instance->owning_class->ClassId() == kCipAssemblyClassCode );
 
@@ -195,7 +194,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
     CipByteArray* byte_array = (CipByteArray*) attr3->data;
     CIPSTER_ASSERT( byte_array );
 
-    if( byte_array->length != data_length )
+    if( byte_array->length != aBuffer.size() )
     {
         CIPSTER_TRACE_ERR( "%s: wrong amount of data arrived for assembly object\n", __func__ );
         return kEipStatusError;
@@ -205,7 +204,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance,
     }
     else
     {
-        memcpy( byte_array->data, data, data_length );
+        memcpy( byte_array->data, aBuffer.data(), aBuffer.size() );
     }
 
     // notify application that new data arrived

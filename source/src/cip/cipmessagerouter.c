@@ -1,23 +1,22 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 
 #include <unordered_map>
 #include <string.h>
 
+
 #include "cipster_api.h"
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
 #include "cipconnectionmanager.h"
 #include "cipconnection.h"
-#include "endianconv.h"
+#include "byte_bufs.h"
 #include "ciperror.h"
 #include "trace.h"
 
-CipMessageRouterRequest     g_request;
-CipMessageRouterResponse    g_response;
 
 /// @brief Array of the available explicit connections
 static CipConn g_explicit_connections[CIPSTER_CIP_NUM_EXPLICIT_CONNS];
@@ -105,37 +104,49 @@ CipClass* GetCipClass( int class_id )
 
 //-----------------------------------------------------------------------------
 
+
+std::vector<EipByte> CipMessageRouterResponse::mmr_temp( CIPSTER_MESSAGE_DATA_REPLY_BUFFER );
+
+CipMessageRouterResponse::CipMessageRouterResponse( CipCommonPacketFormatData* aCPFD ) :
+    reply_service( 0 ),
+    reserved( 0 ),
+    general_status( 0 ),
+    size_of_additional_status( 0 ),
+
+    // shared resizeable response buffer.
+    data( mmr_temp.data(), mmr_temp.size() ),
+    data_length( 0 ),
+    cpfd( aCPFD )
+{
+    memset( additional_status, 0, sizeof additional_status );
+}
+
+
 class CipMessageRouterClass : public CipClass
 {
 public:
     CipMessageRouterClass();
-    CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );    // override
+
+    CipError OpenConnection( CipConn* aConn,
+        CipCommonPacketFormatData* cpfd,
+        ConnectionManagerStatusCode* extended_error_code );    // override
 };
 
 
 CipMessageRouterClass::CipMessageRouterClass() :
     CipClass( kCipMessageRouterClassCode,
-                "Message Router",  // class name
-                (1<<7)|(1<<6)|(1<<5)|(1<<4)|(1<<3)|(1<<2)|(1<<1),
-                0,                  // class getAttributeAll mask
-                0,                  // instance getAttributeAll mask
-                1                   // revision
-                )
+        "Message Router",
+        MASK7(1,2,3,4,5,6,7),   // common class attributes mask
+        0,                      // class getAttributeAll mask
+        0,                      // instance getAttributeAll mask
+        1                       // revision
+        )
 {
     // CIP_Vol_1 3.19 section 5A-3.3 shows that Message Router class has no
     // SetAttributeSingle.
     // Also, conformance test tool does not like SetAttributeSingle on this class,
     // delete the service which was established in CipClass constructor.
     delete ServiceRemove( kSetAttributeSingle );
-
-    // reserved for future use -> set to zero
-    g_response.reserved = 0;
-
-    // set reply buffer, using a fixed buffer (about 100 bytes)
-    g_response.data = g_message_data_reply_buffer;
-
-    //TODO this is bad, use a CipConn constructor instead.
-    memset( g_explicit_connections, 0, sizeof g_explicit_connections );
 }
 
 
@@ -151,7 +162,8 @@ static CipConn* getFreeExplicitConnection()
 }
 
 
-CipError CipMessageRouterClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipError CipMessageRouterClass::OpenConnection( CipConn* aConn,
+            CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
 {
     CipError ret = kCipErrorSuccess;
 
@@ -217,31 +229,35 @@ EipStatus CipMessageRouterInit()
         RegisterCipClass( clazz );
 
         createCipMessageRouterInstance();
+
+        /* done by "static construction" of CipConn instances now:
+        //TODO this is bad, use a CipConn constructor instead.
+        memset( g_explicit_connections, 0, sizeof g_explicit_connections );
+        */
     }
 
     return kEipStatusOk;
 }
 
 
-EipStatus NotifyMR( EipUint8* data, int data_length )
+EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply )
 {
     EipStatus   eip_status = kEipStatusOkSend;
 
-    // set reply buffer, using a fixed buffer (about 100 bytes)
-    g_response.data = g_message_data_reply_buffer;
-
     CIPSTER_TRACE_INFO( "notifyMR: routing unconnected message\n" );
 
-    CipError result = g_request.InitRequest( data, data_length );
+    CipMessageRouterRequest request;
 
-    if( result != kCipErrorSuccess )
+    int result = request.DeserializeMRR( aCommand );
+
+    if( result <= 0 )
     {
         CIPSTER_TRACE_ERR( "notifyMR: error from createMRRequeststructure\n" );
-        g_response.general_status = result;
-        g_response.size_of_additional_status = 0;
-        g_response.reserved = 0;
-        g_response.data_length = 0;
-        g_response.reply_service = 0x80 | g_request.service;
+        aReply->general_status = kCipErrorPathSegmentError;
+        aReply->size_of_additional_status = 0;
+        aReply->reserved = 0;
+        aReply->data_length = 0;
+        aReply->reply_service = 0x80 | request.service;
     }
 
     else
@@ -249,9 +265,9 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
         // Forward request to appropriate Object if it is registered.
         CipClass*   clazz = NULL;
 
-        if( g_request.request_path.HasLogical() )
-            clazz = GetCipClass( g_request.request_path.GetClass() );
-        else if( g_request.request_path.HasSymbol() )
+        if( request.request_path.HasLogical() )
+            clazz = GetCipClass( request.request_path.GetClass() );
+        else if( request.request_path.HasSymbol() )
         {
             // per Rockwell Automation Publication 1756-PM020D-EN-P - June 2016:
             // Symbol Class Id is 0x6b.  Forward this request to that class.
@@ -267,28 +283,28 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
             CIPSTER_TRACE_ERR(
                 "%s: CIP_ERROR_OBJECT_DOES_NOT_EXIST reply, class:0x%02x not registered\n",
                 __func__,
-                g_request.request_path.GetClass()
+                request.request_path.GetClass()
                 );
 
             // According to the test tool this should be the correct error flag
             // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
-            g_response.general_status = kCipErrorPathDestinationUnknown;
+            aReply->general_status = kCipErrorPathDestinationUnknown;
 
-            g_response.size_of_additional_status = 0;
-            g_response.reserved = 0;
-            g_response.data_length = 0;
-            g_response.reply_service = 0x80 | g_request.service;
+            aReply->size_of_additional_status = 0;
+            aReply->reserved = 0;
+            aReply->data_length = 0;
+            aReply->reply_service = 0x80 | request.service;
         }
         else
         {
             // Call notify function from Object with ClassID (gMRRequest.RequestPath.ClassID)
             // object will or will not make an reply into gMRResponse.
-            g_response.reserved = 0;
+            aReply->reserved = 0;
 
             CIPSTER_TRACE_INFO( "notifyMR: calling notify function of class '%s'\n",
                     clazz->ClassName().c_str() );
 
-            eip_status = NotifyClass( clazz, &g_request, &g_response );
+            eip_status = NotifyClass( clazz, &request, aReply );
 
 #ifdef CIPSTER_TRACE_ENABLED
             if( eip_status == kEipStatusError )
@@ -317,28 +333,25 @@ EipStatus NotifyMR( EipUint8* data, int data_length )
 }
 
 
-CipError CipMessageRouterRequest::InitRequest( EipUint8* aRequest, EipInt16 aCount )
+int CipMessageRouterRequest::DeserializeMRR( BufReader aRequest )
 {
-    EipUint8* start = aRequest;
+    BufReader in = aRequest;
 
-    service = *aRequest++;
+    service = *in++;
 
-    int byte_count = *aRequest++ * 2;
+    int byte_count = *in++ * 2;     // word count x 2
 
-    int result = request_path.DeserializePadded( aRequest, aRequest + byte_count );
+    int result = request_path.DeserializeAppPath( in );
 
     if( result <= 0 )
     {
-        return kCipErrorPathSegmentError;
+        return result;
     }
 
-    aRequest += result;
-    data = aRequest;
+    int bytes_consumed = in.data() - aRequest.data() + result;
 
-    data_length = aCount - (aRequest - start);
+    data = aRequest + bytes_consumed;   // set this->data
 
-    if( data_length < 0 )
-        return kCipErrorPathSizeInvalid;
-    else
-        return kCipErrorSuccess;
+    return bytes_consumed;   // how many bytes consumed
 }
+

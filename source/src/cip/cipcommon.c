@@ -1,9 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- *
- * Conversion to C++ is Copyright (C) 2016, SoftPLC Corportion.
- *
- * All rights reserved.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #include <string.h>
@@ -17,7 +14,7 @@
 #include "cipethernetlink.h"
 #include "cipconnectionmanager.h"
 #include "cipconnection.h"
-#include "endianconv.h"
+#include "byte_bufs.h"
 #include "encap.h"
 #include "ciperror.h"
 #include "cipassembly.h"
@@ -50,7 +47,7 @@ IterT vec_search( IterT begin, IterT end, T target )
 }
 
 // global public variables
-EipUint8 g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
+EipByte g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
 
 const EipUint16 kCipUintZero = 0;
 
@@ -217,9 +214,9 @@ CipAttribute::~CipAttribute()
 EipStatus GetAttrData( CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    EipByte* message = response->data;
+    BufWriter out = response->data;
 
-    response->data_length = EncodeData( attr->type, attr->data, &message );
+    response->data_length = EncodeData( attr->type, attr->data, out );
 
     response->general_status = kCipErrorSuccess;
 
@@ -238,9 +235,9 @@ EipStatus GetInstanceCount( CipAttribute* attr, CipMessageRouterRequest* request
     {
         EipUint16 instance_count = clazz->Instances().size();
 
-        EipByte* message = response->data;
+        BufWriter out = response->data;
 
-        response->data_length = EncodeData( attr->type, &instance_count, &message );
+        response->data_length = EncodeData( attr->type, &instance_count, out );
 
         response->general_status = kCipErrorSuccess;
 
@@ -255,16 +252,17 @@ EipStatus SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, Cip
     response->size_of_additional_status = 0;
     response->reply_service = 0x80 | request->service;
 
-    EipByte* message = request->data;
+    BufReader in = request->data;
 
-    int out_count = DecodeData( attr->type, attr->data, &message );
+    int out_count = DecodeData( attr->type, attr->data, in );
 
     if( out_count >= 0 )
     {
-        request->data_length -= out_count;
         request->data += out_count;
 
         response->general_status = kCipErrorSuccess;
+
+        // TODO this should not be needed, but check when nested.
         response->data_length = 0;
 
         return kEipStatusOkSend;
@@ -349,7 +347,7 @@ bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 
 
 CipAttribute* CipInstance::AttributeInsert(
-        EipUint16       attribute_id,
+        int             attribute_id,
         EipUint8        cip_type,
         EipByte         cip_flags,
         AttributeFunc   aGetter,
@@ -377,7 +375,7 @@ CipAttribute* CipInstance::AttributeInsert(
 
 
 CipAttribute* CipInstance::AttributeInsert(
-        EipUint16       attribute_id,
+        int             attribute_id,
         EipUint8        cip_type,
         EipByte         cip_flags,
         void* data
@@ -438,7 +436,7 @@ CipClass::CipClass(
 {
     // The public class holds services for the instances, and attributes for itself.
 
-    // class of "this" public class is meta_class.
+    // class of "this" public class is meta_class, call meta-class special constructor.
     CipClass* meta_class = new CipClass(
                 aClassName,
                 a_get_all_class_attributes_mask
@@ -543,7 +541,7 @@ CipClass::~CipClass()
         // The public class owns the meta-class.
         // Delete the meta-class, which invokes a small bit of recursion
         // back into this function, but on the nested call cip_class will
-        // be NULL for the meta-class.
+        // be NULL for the meta-class, and IsMetaClass() returns true.
         delete owning_class;
     }
 
@@ -563,7 +561,7 @@ CipClass::~CipClass()
 }
 
 
-CipError CipClass::OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipError CipClass::OpenConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
 {
     CIPSTER_TRACE_INFO( "%s: NOT implemented for class '%s'\n", __func__, ClassName().c_str() );
     *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
@@ -588,17 +586,17 @@ int CipClass::FindUniqueFreeId() const
 }
 
 
-CipService* CipClass::Service( EipUint8 service_id ) const
+CipService* CipClass::Service( int aServiceId ) const
 {
     CipServices::const_iterator  it;
 
     // binary search thru vector of pointers looking for attribute_id
-    it = vec_search( services.begin(), services.end(), service_id );
+    it = vec_search( services.begin(), services.end(), aServiceId );
 
     if( it != services.end() )
         return *it;
 
-    CIPSTER_TRACE_WARN( "service %d not defined\n", service_id );
+    CIPSTER_TRACE_WARN( "service %d not defined\n", aServiceId );
 
     return NULL;
 }
@@ -647,35 +645,21 @@ bool CipClass::InstanceInsert( CipInstance* aInstance )
 }
 
 
-CipInstance* CipClass::InstanceInsert( EipUint32 instance_id )
+CipInstance* CipClass::Instance( int aInstanceId ) const
 {
-    CipInstance* instance = new CipInstance( instance_id );
-
-    if( !InstanceInsert( instance ) )
-    {
-        delete instance;
-        instance = NULL;        // return NULL on failure
-    }
-
-    return instance;
-}
-
-
-CipInstance* CipClass::Instance( EipUint32 instance_id ) const
-{
-    if( instance_id == 0 )
+    if( aInstanceId == 0 )
         return (CipInstance*)  this;        // cast away const-ness
 
     CipInstances::const_iterator  it;
 
     // binary search thru the vector of pointers looking for id
-    it = vec_search( instances.begin(), instances.end(), instance_id );
+    it = vec_search( instances.begin(), instances.end(), aInstanceId );
 
     if( it != instances.end() )
         return *it;
 
     CIPSTER_TRACE_WARN( "instance %d not in class '%s'\n",
-        instance_id, class_name.c_str() );
+        aInstanceId, class_name.c_str() );
 
     return NULL;
 }
@@ -710,10 +694,10 @@ bool CipClass::ServiceInsert( CipService* aService )
 }
 
 
-CipService* CipClass::ServiceInsert( EipUint8 service_id,
-        CipServiceFunction service_function, const char* service_name )
+CipService* CipClass::ServiceInsert( int aServiceId,
+        CipServiceFunction aServiceFunction, const char* aServiceName )
 {
-    CipService* service = new CipService( service_name, service_id, service_function );
+    CipService* service = new CipService( aServiceName, aServiceId, aServiceFunction );
 
     if( !ServiceInsert( service ) )
     {
@@ -746,15 +730,12 @@ CipService* CipClass::ServiceRemove( EipUint8 aServiceId )
 }
 
 
-// TODO this needs to check for buffer overflow
 EipStatus GetAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
     // Mask for filtering get-ability
     EipByte get_mask;
-
-    EipByte* message = response->data;
 
     response->data_length = 0;
     response->reply_service = 0x80 | request->service;
@@ -793,16 +774,11 @@ EipStatus GetAttributeSingle( CipInstance* instance,
 
             // create a reply message containing the data
             attribute->Get( request, response );
+
+            CIPSTER_TRACE_INFO( "%s: attribute_id:%d  len:%d\n",
+                __func__, attribute->Id(), response->data_length );
         }
     }
-
-#if 0
-    else if( request->request_path.attribute_number == 0 )
-    {
-        // This abomination is wanted by the conformance test tool:
-        response->general_status = kCipErrorServiceNotSupported;
-    }
-#endif
 
     return kEipStatusOkSend;
 }
@@ -858,41 +834,39 @@ EipStatus SetAttributeSingle( CipInstance* instance,
 }
 
 
-int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
+int EncodeData( int aDataType, const void* data, BufWriter& aBuf )
 {
-    EipByte*    p = *message;
+    EipByte*    start = aBuf.data();
 
-    switch( cip_type )
+    switch( aDataType )
     // check the data type of attribute
     {
     case kCipBool:
     case kCipSint:
     case kCipUsint:
     case kCipByte:
-        *p++ = *(EipUint8*) data;
+        *aBuf++ = *(EipUint8*) data;
         break;
 
     case kCipInt:
     case kCipUint:
     case kCipWord:
-        AddIntToMessage( *(EipUint16*) data, &p );
+        aBuf.put16( *(EipUint16*) data );
         break;
 
     case kCipDint:
     case kCipUdint:
     case kCipDword:
     case kCipReal:
-        AddDintToMessage( *(EipUint32*) data, &p );
+        aBuf.put32( *(EipUint32*) data );
         break;
 
-#ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
     case kCipLint:
     case kCipUlint:
     case kCipLword:
     case kCipLreal:
-        AddLintToMessage( *(EipUint64*) data, &p );
+        aBuf.put64( *(EipUint64*) data );
         break;
-#endif
 
     case kCipStime:
     case kCipDate:
@@ -904,13 +878,12 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         {
             CipString* string = (CipString*) data;
 
-            AddIntToMessage( *(EipUint16*) &string->length, &p );
-            memcpy( p, string->string, string->length );
-            p += string->length;
+            aBuf.put16( *(EipUint16*) &string->length );
+            aBuf.append( string->string, string->length );
 
-            if( (p - *message) & 1 )
+            if( (aBuf.data() - start) & 1 )
             {
-                *p++ = 0;       // pad to even byte count
+                *aBuf++ = 0;       // pad to even byte count
             }
         }
         break;
@@ -926,10 +899,8 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         {
             CipShortString* short_string = (CipShortString*) data;
 
-            *p++ = short_string->length;
-
-            memcpy( p, short_string->string, short_string->length );
-            p += short_string->length;
+            *aBuf++ = short_string->length;
+            aBuf.append( short_string->string, short_string->length );
         }
         break;
 
@@ -943,8 +914,8 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         {
             CipRevision* revision = (CipRevision*) data;
 
-            *p++ = revision->major_revision;
-            *p++ = revision->minor_revision;
+            *aBuf++ = revision->major_revision;
+            *aBuf++ = revision->minor_revision;
         }
         break;
 
@@ -954,24 +925,19 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
             CipTcpIpNetworkInterfaceConfiguration* tcp_data =
                 (CipTcpIpNetworkInterfaceConfiguration*) data;
 
-            AddDintToMessage( ntohl( tcp_data->ip_address ), &p );
+            aBuf.put32( ntohl( tcp_data->ip_address ) );
+            aBuf.put32( ntohl( tcp_data->network_mask ) );
+            aBuf.put32( ntohl( tcp_data->gateway ) );
+            aBuf.put32( ntohl( tcp_data->name_server ) );
+            aBuf.put32( ntohl( tcp_data->name_server_2 ) );
 
-            AddDintToMessage( ntohl( tcp_data->network_mask ), &p );
-
-            AddDintToMessage( ntohl( tcp_data->gateway ), &p );
-
-            AddDintToMessage( ntohl( tcp_data->name_server ), &p );
-
-            AddDintToMessage( ntohl( tcp_data->name_server_2 ), &p );
-
-            p += EncodeData( kCipString, &tcp_data->domain_name, &p );
+            EncodeData( kCipString, &tcp_data->domain_name, aBuf );
         }
         break;
 
     case kCip6Usint:
         {
-            memcpy( p, data, 6 );
-            p += 6;
+            aBuf.append( (const EipByte*) data, 6 );
         }
         break;
 
@@ -984,8 +950,7 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
             CipByteArray* cip_byte_array = (CipByteArray*) data;
 
             // the array length is not encoded for CipByteArray.
-            memcpy( p, cip_byte_array->data, cip_byte_array->length );
-            p += cip_byte_array->length;
+            aBuf.append( cip_byte_array->data, cip_byte_array->length );
         }
         break;
 
@@ -993,47 +958,43 @@ int EncodeData( EipUint8 cip_type, void* data, EipUint8** message )
         break;
     }
 
-    int byte_count = p - *message;
-
-    *message += byte_count;
+    int byte_count = aBuf.data() - start;
 
     return byte_count;
 }
 
 
-int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
+int DecodeData( int aDataType, void* data, BufReader& aBuf )
 {
-    EipByte* p = *message;
+    const EipByte* start = aBuf.data();
 
     // check the data type of attribute
-    switch( cip_type )
+    switch( aDataType )
     {
     case kCipBool:
     case kCipSint:
     case kCipUsint:
     case kCipByte:
-        *(EipUint8*) data = *p++;
+        *(EipUint8*) data = *aBuf++;
         break;
 
     case kCipInt:
     case kCipUint:
     case kCipWord:
-        *(EipUint16*) data = GetIntFromMessage( &p );
+        *(EipUint16*) data = aBuf.get16();
         break;
 
     case kCipDint:
     case kCipUdint:
     case kCipDword:
-        *(EipUint32*) data = GetDintFromMessage( &p );
+        *(EipUint32*) data = aBuf.get32();
         break;
 
-#ifdef CIPSTER_SUPPORT_64BIT_DATATYPES
     case kCipLint:
     case kCipUlint:
     case kCipLword:
-        *(EipUint64*) data = GetLintFromMessage( &p );
+        *(EipUint64*) data = aBuf.get64();
         break;
-#endif
 
     case kCipByteArray:
         // this code has no notion of buffer overrun protection or memory ownership, be careful.
@@ -1044,20 +1005,23 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
             // in advance and set in advance by caller.  And the data field
             // must point to a buffer large enough for this.
             CipByteArray* byte_array = (CipByteArray*) data;
-            memcpy( byte_array->data, p, byte_array->length );
-            p += byte_array->length;   // no length field
+            memcpy( byte_array->data, aBuf.data(), byte_array->length );
+            aBuf += byte_array->length;   // no length field
         }
         break;
 
     case kCipString:
         {
             CipString* string = (CipString*) data;
-            string->length = GetIntFromMessage( &p );
-            memcpy( string->string, p, string->length );
-            p += string->length;
+            string->length = *aBuf++;
+            memcpy( string->string, aBuf.data(), string->length );
+            aBuf += string->length;
 
-            if( (p - *message) & 1 )
-                *p++ = 0;   // pad to even byte count
+            // serialized input was padded to even byte count
+            if( (aBuf.data() - start) & 1 )
+            {
+                ++aBuf;
+            }
         }
         break;
 
@@ -1065,10 +1029,10 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
         {
             CipShortString* short_string = (CipShortString*) data;
 
-            short_string->length = *p++;
+            short_string->length = *aBuf++;
 
-            memcpy( short_string->string, p, short_string->length );
-            p += short_string->length;
+            memcpy( short_string->string, aBuf.data(), short_string->length );
+            aBuf += short_string->length;
         }
         break;
 
@@ -1076,9 +1040,7 @@ int DecodeData( EipUint8 cip_type, void* data, EipUint8** message )
         return -1;
     }
 
-    int byte_count = p - *message;
-
-    *message += byte_count;
+    int byte_count = aBuf.data() - start;
 
     return byte_count;
 }
@@ -1088,14 +1050,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipUint8* start = response->data;
-
-    /*
-    if( instance->instance_id == 2 )
-    {
-        CIPSTER_TRACE_INFO( "GetAttributeAll: instance number 2\n" );
-    }
-    */
+    BufWriter start = response->data;
 
     CipService* service = instance->owning_class->Service( kGetAttributeSingle );
 
@@ -1135,10 +1090,15 @@ EipStatus GetAttributeAll( CipInstance* instance,
                     }
 
                     response->data += response->data_length;
+
+                    response->data_length = 0;
                 }
             }
 
-            response->data_length = response->data - start;
+            response->data_length = response->data.data() - start.data();
+
+            CIPSTER_TRACE_INFO( "%s: response->data_length:%d\n", __func__, response->data_length );
+
             response->data = start;
         }
 

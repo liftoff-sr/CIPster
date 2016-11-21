@@ -1,9 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- *
- * Conversion to C++ is Copyright (C) 2016, SoftPLC Corportion.
- *
- * All rights reserved.
+ * Copyright (C) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPTYPES_H_
@@ -12,11 +9,13 @@
 
 #include <string>
 #include <vector>
+#include <string.h>
 
 #include "typedefs.h"
 #include "trace.h"
 #include "cipster_user_conf.h"
 #include "ciperror.h"
+#include "byte_bufs.h"
 
 //* @brief Assembly Class Code
 enum ClassIds
@@ -129,12 +128,12 @@ enum CipDataType
 
 /**
  * Enum CIPServiceCode
- * is the set of all CIP service codes.
- * Common services codes range from 0x01 to 0x1C.
+ * is the set of CIP service codes.
+ * Common services codes range from 0x01 to 0x1c.  Beyond that there can
+ * be class or instance specific service codes and some may overlap.
  */
 enum CIPServiceCode
 {
-    // Start CIP common services
     kGetAttributeAll = 0x01,
     kSetAttributeAll = 0x02,
     kGetAttributeList = 0x03,
@@ -157,15 +156,15 @@ enum CIPServiceCode
     kInsertMember = 0x1A,
     kRemoveMember = 0x1B,
     kGroupSync = 0x1C,
-    // End CIP common services
 
-    // Start CIP object-specific services
+
+    // Start CIP class or instance specific services
     kForwardClose = 0x4E,
     kUnconnectedSend = 0x52,
     kForwardOpen = 0x54,
     kLargeForwardOpen = 0x5b,
     kGetConnectionOwner = 0x5A
-    // End CIP object-specific services
+    // End CIP class or instance specific services
 };
 
 //* @brief Definition of Get and Set Flags for CIP Attributes
@@ -246,9 +245,6 @@ struct CipRevision
 };
 
 
-/// For now we support extended status codes up to 2 16bit values.
-/// There is mostly only one 16bit value used
-#define NUM_ADD_STATUS      2
 
 class CipBufMutable
 {
@@ -333,9 +329,9 @@ protected:
 class CipInstance;
 class CipAttribute;
 class CipClass;
-struct CipMessageRouterRequest;
-struct CipMessageRouterResponse;
-struct CipConn;
+class CipMessageRouterRequest;
+class CipMessageRouterResponse;
+class CipConn;
 
 
 /** @ingroup CIP_API
@@ -474,13 +470,13 @@ public:
      */
     bool AttributeInsert( CipAttribute* aAttributes );
 
-    CipAttribute* AttributeInsert( EipUint16 attribute_id,
+    CipAttribute* AttributeInsert( int attribute_id,
         EipUint8        cip_type,
         EipByte         cip_flags,
         void*           data
         );
 
-    CipAttribute* AttributeInsert( EipUint16 attribute_id,
+    CipAttribute* AttributeInsert( int attribute_id,
         EipUint8        cip_type,
         EipByte         cip_flags,
         AttributeFunc   aGetter,
@@ -522,23 +518,24 @@ private:
 };
 
 
-/** @ingroup CIP_API
- *  @typedef  EIP_STATUS (*TCIPServiceFunc)( CipInstance *,
+/**
+ * Typedef EipStatus (*CipServiceFunc)( CipInstance *,
  *    CipMessageRouterRequest*, CipMessageRouterResponse*)
- *  @brief Signature definition for the implementation of CIP services.
+ * is the function type for the implementation of CIP services.
  *
- *  CIP services have to follow this signature in order to be handled correctly
+ * CIP services have to follow this signature in order to be handled correctly
  * by the stack.
- *  @param instance which was referenced in the service request
- *  @param request request data
- *  @param response storage for the response data, including a buffer for
- *      extended data
- *  @return EIP_OK_SEND if service could be executed successfully and a response
- * should be sent
+ *
+ * @param aInstance which was referenced in the service request
+ * @param aRequest holds "data" coming from client, and it includes a length.
+ * @param aResponse where to put the response, do it into member "data" which is length
+ *  defined.  Upon completions update data_length to how many bytes were filled in.
+ *
+ * @return EipStatus - EipOKSend if service could be executed successfully
+ *    and a response should be sent.
  */
-typedef EipStatus (* CipServiceFunction)( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response );
+typedef EipStatus (* CipServiceFunction)( CipInstance* aInstance,
+        CipMessageRouterRequest* aRequest, CipMessageRouterResponse* aResponse );
 
 
 /**
@@ -569,6 +566,7 @@ protected:
     int         service_id;                 ///< service number
 };
 
+class CipCommonPacketFormatData;
 
 /**
  * Class CipClass
@@ -629,8 +627,8 @@ public:
      */
     bool ServiceInsert( CipService* aService );
 
-    CipService* ServiceInsert( EipUint8 service_id,
-        CipServiceFunction service_function, const char* service_name );
+    CipService* ServiceInsert( int aServiceId,
+        CipServiceFunction aServiceFunction, const char* aServiceName );
 
     /**
      * Function ServiceRemove
@@ -640,7 +638,7 @@ public:
     CipService* ServiceRemove( EipUint8 aServiceId );
 
     /// Get an existing CipService or return NULL if not found.
-    CipService* Service( EipUint8 service_id ) const;
+    CipService* Service( int aServiceId ) const;
 
     /// Return a read only collection of services
     const CipServices& Services() const
@@ -663,14 +661,7 @@ public:
      */
     bool InstanceInsert( CipInstance* aInstances );
 
-    /**
-     * Function InstanceInsert
-     * inserts a new instance into this class if the @a instance_id is unique.
-     * @return CipInstance* - the new instance or NULL if failure.
-     */
-    CipInstance* InstanceInsert( EipUint32 instance_id );
-
-    CipInstance* Instance( EipUint32 instance_id ) const;
+    CipInstance* Instance( int aInstanceId ) const;
 
     /// Return a read only collection of CipInstances.
     const CipInstances& Instances() const   { return instances; }
@@ -706,7 +697,7 @@ public:
      * @param extended_error_code The returned error code of the connection object
      * @return CIPError
      */
-    virtual     CipError OpenConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error_code );
+    virtual     CipError OpenConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error_code );
 
 protected:
 
@@ -766,7 +757,7 @@ private:
 
 /**
  * Struct CipTcpIpNetworkInterfaceConfiguration
- * if for holding TCP/IP interface information
+ * is for holding TCP/IP interface information
  */
 struct CipTcpIpNetworkInterfaceConfiguration
 {
@@ -779,8 +770,8 @@ struct CipTcpIpNetworkInterfaceConfiguration
 };
 
 
-/* these are used for creating the getAttributeAll masks
- *  TODO there might be a way simplifying this using __VARARGS__ in #define */
+// these are used for creating the getAttributeAll masks
+// TODO there might be a way simplifying this using __VARARGS__ in #define
 #define MASK1( a )          ( 1 << (a) )
 #define MASK2( a, b )       ( 1 << (a) | 1 << (b) )
 #define MASK3( a, b, c )    ( 1 << (a) | 1 << (b) | 1 << (c) )
