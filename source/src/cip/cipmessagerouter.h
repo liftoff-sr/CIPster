@@ -54,7 +54,7 @@ public:
     CipUsint reply_service;             ///< Reply service code, the requested service code + 0x80
     CipOctet reserved;                  ///< Reserved; Shall be zero
 
-    CipUsint general_status;            ///< One of the General Status codes listed in CIP
+    CipError general_status;            ///< One of the General Status codes listed in CIP
                                         ///< Specification Volume 1, Appendix B
 
     CipUsint size_of_additional_status; ///< Number of additional 16 bit words in Additional Status Array

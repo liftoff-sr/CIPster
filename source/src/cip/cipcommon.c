@@ -175,10 +175,6 @@ EipStatus NotifyClass( CipClass* cip_class,
     // handle error replies, general_status was set above.
 
 exit:
-    response->size_of_additional_status = 0;
-    response->data_length = 0;
-    response->reply_service = 0x80 | request->service;
-
     return kEipStatusOkSend;
 }
 
@@ -214,13 +210,25 @@ CipAttribute::~CipAttribute()
 EipStatus GetAttrData( CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    BufWriter out = response->data;
+    BufWriter out = response->data; // always copy response->data so it is not advanced.
 
     response->data_length = EncodeData( attr->type, attr->data, out );
 
-    response->general_status = kCipErrorSuccess;
-
     return kEipStatusOkSend;
+}
+
+
+EipStatus SetAttrData( CipAttribute* attr,
+        CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+{
+    BufReader in = request->data;
+
+    int out_count = DecodeData( attr->type, attr->data, in );
+
+    if( out_count >= 0 )
+        return kEipStatusOkSend;
+    else
+        return kEipStatusError;
 }
 
 
@@ -239,36 +247,9 @@ EipStatus GetInstanceCount( CipAttribute* attr, CipMessageRouterRequest* request
 
         response->data_length = EncodeData( attr->type, &instance_count, out );
 
-        response->general_status = kCipErrorSuccess;
-
         return kEipStatusOkSend;
     }
     return kEipStatusError;
-}
-
-
-EipStatus SetAttrData( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response )
-{
-    response->size_of_additional_status = 0;
-    response->reply_service = 0x80 | request->service;
-
-    BufReader in = request->data;
-
-    int out_count = DecodeData( attr->type, attr->data, in );
-
-    if( out_count >= 0 )
-    {
-        request->data += out_count;
-
-        response->general_status = kCipErrorSuccess;
-
-        // TODO this should not be needed, but check when nested.
-        response->data_length = 0;
-
-        return kEipStatusOkSend;
-    }
-    else
-        return kEipStatusError;
 }
 
 
@@ -400,17 +381,17 @@ CipAttribute* CipInstance::AttributeInsert(
 }
 
 
-CipAttribute* CipInstance::Attribute( EipUint16 attribute_id ) const
+CipAttribute* CipInstance::Attribute( int aAttributeId ) const
 {
     CipAttributes::const_iterator  it;
 
-    // a binary search thru the vector of pointers looking for attribute_id
-    it = vec_search( attributes.begin(), attributes.end(), attribute_id );
+    // a binary search thru the vector of pointers looking for aAttributeId
+    it = vec_search( attributes.begin(), attributes.end(), aAttributeId );
 
     if( it != attributes.end() )
         return *it;
 
-    CIPSTER_TRACE_WARN( "attribute %d not defined\n", attribute_id );
+    CIPSTER_TRACE_WARN( "attribute %d not defined\n", aAttributeId );
 
     return NULL;
 }
@@ -645,6 +626,27 @@ bool CipClass::InstanceInsert( CipInstance* aInstance )
 }
 
 
+CipInstance* CipClass::InstanceRemove( int aInstanceId )
+{
+    CipInstance* ret = NULL;
+
+    for( CipInstances::iterator it = instances.begin();  it != instances.end();  ++it )
+    {
+        if( aInstanceId == (*it)->Id() )
+        {
+            CIPSTER_TRACE_INFO(
+                "%s: removing instance '%d'.\n", __func__, aInstanceId );
+
+            ret = *it;                  // pass ownership to ret
+            instances.erase( it );      // close gap
+            break;
+        }
+    }
+
+    return ret;
+}
+
+
 CipInstance* CipClass::Instance( int aInstanceId ) const
 {
     if( aInstanceId == 0 )
@@ -709,7 +711,7 @@ CipService* CipClass::ServiceInsert( int aServiceId,
 }
 
 
-CipService* CipClass::ServiceRemove( EipUint8 aServiceId )
+CipService* CipClass::ServiceRemove( int aServiceId )
 {
     CipService* ret = NULL;
 
@@ -727,110 +729,6 @@ CipService* CipClass::ServiceRemove( EipUint8 aServiceId )
     }
 
     return ret;
-}
-
-
-EipStatus GetAttributeSingle( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response )
-{
-    // Mask for filtering get-ability
-    EipByte get_mask;
-
-    response->data_length = 0;
-    response->reply_service = 0x80 | request->service;
-
-    response->general_status = kCipErrorAttributeNotSupported;
-    response->size_of_additional_status = 0;
-
-    // set filter according to service: get_attribute_all or get_attribute_single
-    if( kGetAttributeAll == request->service )
-    {
-        get_mask = kGetableAll;
-        response->general_status = kCipErrorSuccess;
-    }
-    else
-    {
-        get_mask = kGetableSingle;
-    }
-
-    CipAttribute* attribute = instance->Attribute( request->request_path.GetAttribute() );
-
-    if( attribute )
-    {
-        CIPSTER_TRACE_INFO( "%s: attribute->attribute_flags:%02x\n",
-            __func__, attribute->attribute_flags );
-
-        if( attribute->attribute_flags & get_mask )
-        {
-            CIPSTER_TRACE_INFO(
-                "%s: attribute:%d  class:'%s'  instance:%d\n",
-                __func__,
-                request->request_path.GetAttribute(),
-                instance->Id() == 0 ? ((CipClass*)instance)->ClassName().c_str() :
-                                        instance->owning_class->ClassName().c_str(),
-                instance->Id()
-                );
-
-            // create a reply message containing the data
-            attribute->Get( request, response );
-
-            CIPSTER_TRACE_INFO( "%s: attribute_id:%d  len:%d\n",
-                __func__, attribute->Id(), response->data_length );
-        }
-    }
-
-    return kEipStatusOkSend;
-}
-
-
-EipStatus SetAttributeSingle( CipInstance* instance,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response )
-{
-    response->size_of_additional_status = 0;
-    response->data_length = 0;
-    response->reply_service = 0x80 | request->service;
-
-    CipAttribute* attribute = instance->Attribute( request->request_path.GetAttribute() );
-
-    if( attribute )
-    {
-        if( attribute->attribute_flags & kSetable )
-        {
-            CIPSTER_TRACE_INFO(
-                "%s: attribute:%d  class:'%s'  instance:%d\n",
-                __func__,
-                request->request_path.GetAttribute(),
-                instance->Id() == 0 ? ((CipClass*)instance)->ClassName().c_str() :
-                                        instance->owning_class->ClassName().c_str(),
-                instance->Id()
-                );
-
-            // Set() is very "attribute specific" and is determined by which
-            // AttributeFunc is installed into the attribute, if any.
-            return attribute->Set( request, response );
-        }
-
-        // it is an attribute we have, however this attribute is not setable
-        response->general_status = kCipErrorAttributeNotSetable;
-    }
-
-#if 0
-    else if( request->request_path.attribute_number == 0 )
-    {
-        // This abomination is wanted by the conformance test tool:
-        response->general_status = kCipErrorServiceNotSupported;
-    }
-#endif
-
-    else
-    {
-        // we don't have this attribute
-        response->general_status = kCipErrorAttributeNotSupported;
-    }
-
-    return kEipStatusOkSend;
 }
 
 
@@ -1046,6 +944,57 @@ int DecodeData( int aDataType, void* data, BufReader& aBuf )
 }
 
 
+EipStatus GetAttributeSingle( CipInstance* instance,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response )
+{
+    // Mask for filtering get-ability
+    EipByte get_mask;
+
+    // set filter according to service: get_attribute_all or get_attribute_single
+    if( kGetAttributeAll == request->service )
+    {
+        get_mask = kGetableAll;
+    }
+    else
+    {
+        get_mask = kGetableSingle;
+    }
+
+    CipAttribute* attribute = instance->Attribute( request->request_path.GetAttribute() );
+
+    if( attribute )
+    {
+        CIPSTER_TRACE_INFO( "%s: attribute->attribute_flags:%02x\n",
+            __func__, attribute->attribute_flags );
+
+        if( attribute->attribute_flags & get_mask )
+        {
+            CIPSTER_TRACE_INFO(
+                "%s: attribute:%d  class:'%s'  instance:%d\n",
+                __func__,
+                request->request_path.GetAttribute(),
+                instance->Id() == 0 ? ((CipClass*)instance)->ClassName().c_str() :
+                                        instance->owning_class->ClassName().c_str(),
+                instance->Id()
+                );
+
+            // create a reply message containing the data
+            attribute->Get( request, response );
+
+            CIPSTER_TRACE_INFO( "%s: attribute_id:%d  len:%d\n",
+                __func__, attribute->Id(), response->data_length );
+        }
+        else
+            response->general_status = kCipErrorAttributeNotSupported;
+    }
+    else
+        response->general_status = kCipErrorAttributeNotSupported;
+
+    return kEipStatusOkSend;
+}
+
+
 EipStatus GetAttributeAll( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
@@ -1061,11 +1010,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
         if( !attributes.size() )
         {
             // there are no attributes to be sent back
-            response->data_length = 0;
-            response->reply_service = 0x80 | request->service;
-
             response->general_status = kCipErrorServiceNotSupported;
-            response->size_of_additional_status = 0;
         }
         else
         {
@@ -1079,6 +1024,7 @@ EipStatus GetAttributeAll( CipInstance* instance,
                 // only return attributes that are flagged as being part of GetAttributeAll
                 if( attribute_id < 32 && (get_mask & (1 << attribute_id)) )
                 {
+                    // change the attribute id in the request path
                     request->request_path.SetAttribute( attribute_id );
 
                     EipStatus result = service->service_function( instance, request, response );
@@ -1090,8 +1036,8 @@ EipStatus GetAttributeAll( CipInstance* instance,
                     }
 
                     response->data += response->data_length;
-
                     response->data_length = 0;
+                    response->general_status = kCipErrorSuccess;    // clear non-readable from GetAttributeSingle()
                 }
             }
 
@@ -1110,3 +1056,43 @@ EipStatus GetAttributeAll( CipInstance* instance,
         return kEipStatusOk;
     }
 }
+
+
+EipStatus SetAttributeSingle( CipInstance* instance,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response )
+{
+    CipAttribute* attribute = instance->Attribute( request->request_path.GetAttribute() );
+
+    if( attribute )
+    {
+        if( attribute->attribute_flags & kSetable )
+        {
+            CIPSTER_TRACE_INFO(
+                "%s: attribute:%d  class:'%s'  instance:%d\n",
+                __func__,
+                request->request_path.GetAttribute(),
+                instance->Id() == 0 ? ((CipClass*)instance)->ClassName().c_str() :
+                                        instance->owning_class->ClassName().c_str(),
+                instance->Id()
+                );
+
+            // Set() is very "attribute specific" and is determined by which
+            // AttributeFunc is installed into the attribute, if any.
+            return attribute->Set( request, response );
+        }
+
+        // it is an attribute we have, however this attribute is not setable
+        response->general_status = kCipErrorAttributeNotSetable;
+    }
+
+    else
+    {
+        // we don't have this attribute
+        response->general_status = kCipErrorAttributeNotSupported;
+    }
+
+    return kEipStatusOkSend;
+}
+
+

@@ -984,36 +984,36 @@ EipStatus ConnectionClassInit( EipUint16 unique_connection_id )
 
 const std::string CipConnPath::Format() const
 {
-    std::string ret;
+    std::string dest;
 
     if( config_path.HasAny() )
     {
-        ret += "config_path=\"";
-        ret += config_path.Format();
-        ret += '"';
+        dest += "config_path=\"";
+        dest += config_path.Format();
+        dest += '"';
     }
 
     if( consuming_path.HasAny() )
     {
-        if( ret.size() )
-            ret += ' ';
+        if( dest.size() )
+            dest += ' ';
 
-        ret += "consuming_path=\"";
-        ret += consuming_path.Format();
-        ret += '"';
+        dest += "consuming_path=\"";
+        dest += consuming_path.Format();
+        dest += '"';
     }
 
     if( producing_path.HasAny() )
     {
-        if( ret.size() )
-            ret += ' ';
+        if( dest.size() )
+            dest += ' ';
 
-        ret += "producing_path=\"";
-        ret += producing_path.Format();
-        ret += '"';
+        dest += "producing_path=\"";
+        dest += producing_path.Format();
+        dest += '"';
     }
 
-    return ret;
+    return dest;
 }
 
 

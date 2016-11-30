@@ -10,6 +10,23 @@
 #include "ciptypes.h"
 
 
+/**
+ * Class AssemblyInstance
+ * is extended from CipInstance with an extra CipByteArray at the end.
+ * That byte array has no ownership of the low level array, which for an
+ * assembly is owned by the application program and passed into
+ * CreateAssemblyInstance().
+ */
+class AssemblyInstance : public CipInstance
+{
+public:
+    AssemblyInstance( int aInstanceId, BufWriter aBuf );
+
+//protected:
+    CipByteArray    byte_array;
+};
+
+
 // public functions
 
 /** @brief Setup the Assembly object

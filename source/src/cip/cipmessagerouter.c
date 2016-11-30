@@ -110,7 +110,7 @@ std::vector<EipByte> CipMessageRouterResponse::mmr_temp( CIPSTER_MESSAGE_DATA_RE
 CipMessageRouterResponse::CipMessageRouterResponse( CipCommonPacketFormatData* aCPFD ) :
     reply_service( 0 ),
     reserved( 0 ),
-    general_status( 0 ),
+    general_status( kCipErrorSuccess ),
     size_of_additional_status( 0 ),
 
     // shared resizeable response buffer.
@@ -250,14 +250,12 @@ EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply )
 
     int result = request.DeserializeMRR( aCommand );
 
+    aReply->reply_service = request.service | 0x80;
+
     if( result <= 0 )
     {
         CIPSTER_TRACE_ERR( "notifyMR: error from createMRRequeststructure\n" );
         aReply->general_status = kCipErrorPathSegmentError;
-        aReply->size_of_additional_status = 0;
-        aReply->reserved = 0;
-        aReply->data_length = 0;
-        aReply->reply_service = 0x80 | request.service;
     }
 
     else
@@ -269,31 +267,26 @@ EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply )
             clazz = GetCipClass( request.request_path.GetClass() );
         else if( request.request_path.HasSymbol() )
         {
-            // per Rockwell Automation Publication 1756-PM020D-EN-P - June 2016:
+            // Per Rockwell Automation Publication 1756-PM020D-EN-P - June 2016:
             // Symbol Class Id is 0x6b.  Forward this request to that class.
-            // This is not implemented in core stack, but can be added by
-            // an application using this CIPster stack using simple
-            // RegisterCipClass( CipClass* aClass );  In such a case I suppose instances
-            // of this class might be tags.
+            // This class is not implemented in CIPster stack, but can be added by
+            // an application using simple RegisterCipClass( CipClass* aClass );
+            // Instances of this class are tags.
+            // I have such an implementation in my application.
             clazz = GetCipClass( 0x6b );
         }
 
         if( !clazz )
         {
             CIPSTER_TRACE_ERR(
-                "%s: CIP_ERROR_OBJECT_DOES_NOT_EXIST reply, class:0x%02x not registered\n",
+                "%s: unknown destination in request path:'%s'\n",
                 __func__,
-                request.request_path.GetClass()
+                request.request_path.Format().c_str()
                 );
 
             // According to the test tool this should be the correct error flag
             // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
             aReply->general_status = kCipErrorPathDestinationUnknown;
-
-            aReply->size_of_additional_status = 0;
-            aReply->reserved = 0;
-            aReply->data_length = 0;
-            aReply->reply_service = 0x80 | request.service;
         }
         else
         {

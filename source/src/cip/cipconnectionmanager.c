@@ -202,14 +202,11 @@ static CipInstance* check_path( const CipAppPath& aPath, ConnectionManagerStatus
  * Function parseConnectionPath
  * parses the connection path of a forward open request.
  *
- * This function will take the connection object and the received data stream
- * and parse the connection path.
- *
  * @param aPath just _past_ the word count of connection_path
- * @param extended_status where to put the extended error code in case an error happened
+ * @param extended_status where to put the extended error code in case of error
  *
  * @return CipError - indicating success of the parsing
- *    - kEipStatusOk on success
+ *    - kCipErrorSuccess on success
  *    - On an error the general status code to be put into the response
  */
 CipError CipConn::parseConnectionPath( BufReader aPath, ConnectionManagerStatusCode* extended_error )
@@ -810,7 +807,6 @@ static void assembleForwardOpenResponse( CipConn* aConn,
 
     cpfd.AddNullAddressItem();
 
-    response->reply_service  = 0x80 | kForwardOpen;
     response->general_status = general_status;
 
     if( general_status == kCipErrorSuccess )
@@ -1319,15 +1315,10 @@ static EipStatus forward_close_service( CipInstance* instance,
     out.put16( originator_vendor_id );
     out.put32( originator_serial_number );
 
-    response->reply_service = 0x80 | request->service;
-
     if( connection_status == kConnectionManagerStatusCodeSuccess )
     {
         // Vol1 Table 3-5.22
         *out++ = 0;         // application data word count
-        response->general_status = kCipErrorSuccess;
-        response->size_of_additional_status = 0;
-
         *out++ = 0;         // reserved
     }
     else
@@ -1357,7 +1348,7 @@ public:
 CipConnMgrClass::CipConnMgrClass() :
     CipClass( kCipConnectionManagerClassCode,
         "Connection Manager",
-        MASK5( 1,2,3,6,7 ),     // class attributes
+        MASK5( 1,2,3,6,7 ),     // common class attributes
         MASK5( 1,2,3,6,7 ),     // class getAttributeAll mask
         0,                      // instance getAttributeAll mask
         1                       // revision

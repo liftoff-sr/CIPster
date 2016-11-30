@@ -190,7 +190,7 @@ public:
 
     ConnectionTriggerType Trigger()  const
     {
-        return ConnectionTriggerType((bits >> 4) & 7);
+        return ConnectionTriggerType( (bits >> 4) & 7 );
     }
 
     ConnectionTransportClass Class() const

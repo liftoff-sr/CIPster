@@ -66,12 +66,6 @@ static EipStatus get_attr_4( CipAttribute* attribute,
     EipStatus   status = kEipStatusOkSend;
     BufWriter   out = response->data;
 
-    response->data_length = 0;
-    response->reply_service = 0x80 | request->service;
-
-    response->general_status = kCipErrorSuccess;
-    response->size_of_additional_status = 0;
-
     CipAppPath app_path;
 
     app_path.SetClass( kCipEthernetLinkClassCode );
@@ -98,29 +92,19 @@ static EipStatus get_multicast_config( CipAttribute* attribute,
     EipStatus   status = kEipStatusOkSend;
     BufWriter   out = response->data;
 
-    response->reply_service = 0x80 | request->service;
+    response->data_length += EncodeData( kCipUsint,
+            &g_multicast_configuration.alloc_control, out );
 
-    response->general_status = kCipErrorSuccess;
-    response->size_of_additional_status = 0;
+    response->data_length += EncodeData( kCipUsint,
+            &g_multicast_configuration.reserved_shall_be_zero, out );
 
-    response->data_length += EncodeData(
-            kCipUsint, &g_multicast_configuration.alloc_control, out );
+    response->data_length += EncodeData( kCipUint,
+            &g_multicast_configuration.number_of_allocated_multicast_addresses, out );
 
-    response->data_length += EncodeData(
-            kCipUsint, &g_multicast_configuration.reserved_shall_be_zero,
-            out );
-
-    response->data_length += EncodeData(
-            kCipUint,
-            &g_multicast_configuration.number_of_allocated_multicast_addresses,
-            out );
-
-    EipUint32 multicast_address = ntohl(
-            g_multicast_configuration.starting_multicast_address );
+    EipUint32 multicast_address = ntohl( g_multicast_configuration.starting_multicast_address );
 
     response->data_length += EncodeData( kCipUdint,
-            &multicast_address,
-            out );
+            &multicast_address, out );
 
     return status;
 }
@@ -130,12 +114,13 @@ static EipStatus get_attr_7( CipAttribute* attribute,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
+    BufWriter out = response->data;
+
     // insert 6 zeros for the required empty safety network number
     // according to Table 5-4.15
-    memset( response->data.data(), 0, 6 );
-    response->data_length += 6;
+    out.fill( 6 );
 
-    response->general_status = kCipErrorSuccess;
+    response->data_length += 6;
 
     return kEipStatusOkSend;
 }
@@ -145,15 +130,11 @@ static EipStatus set_attr_13( CipAttribute* attribute,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    response->general_status = kCipErrorSuccess;
-
     int instance_id = attribute->Instance()->Id();
 
     int inactivity_timeout = request->data.get16();
 
     //TODO put it in the instance
-
-    response->general_status = kCipErrorSuccess;
 
     return kEipStatusOkSend;
 }

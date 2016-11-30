@@ -157,8 +157,7 @@ enum CIPServiceCode
     kRemoveMember = 0x1B,
     kGroupSync = 0x1C,
 
-
-    // Start CIP class or instance specific services
+    // Start CIP class or instance specific services, probably should go in class specific area
     kForwardClose = 0x4E,
     kUnconnectedSend = 0x52,
     kForwardOpen = 0x54,
@@ -341,9 +340,13 @@ class CipConn;
  * @brief Signature definition for the implementation of CIP services.
  *
  * @param aAttribute
+ *
  * @param aRequest request data
+ *
  * @param aResponse storage for the response data, including a buffer for
- *      extended data
+ *      extended data.  Do not advance aResponse->data BufWriter, but rather only set
+ *      aRequest->data_length to the number of bytes written to aReponse->data.
+ *
  * @return EIP_OK_SEND if service could be executed successfully and a response
  *  should be sent
  */
@@ -455,14 +458,15 @@ public:
 
     virtual ~CipInstance();
 
-    int   Id() const { return instance_id; }
+    int   Id() const            { return instance_id; }
 
     /**
      * Function AttributeInsert
      * inserts an attribute and returns true if succes, else false.
      *
      * @param aAttribute is the one to insert, and may not already be a member
-     *  of another instance.
+     *  of another instance.  It must be dynamically allocated, not compiled in,
+     *  because this container takes ownership of aAttribute.
      *
      * @return bool - true if success, else false if failed.  Currently attributes
      *  may be overrridden, so any existing CipAttribute in this instance with the
@@ -470,13 +474,13 @@ public:
      */
     bool AttributeInsert( CipAttribute* aAttributes );
 
-    CipAttribute* AttributeInsert( int attribute_id,
+    CipAttribute* AttributeInsert( int aAttributeId,
         EipUint8        cip_type,
         EipByte         cip_flags,
         void*           data
         );
 
-    CipAttribute* AttributeInsert( int attribute_id,
+    CipAttribute* AttributeInsert( int aAttributeId,
         EipUint8        cip_type,
         EipByte         cip_flags,
         AttributeFunc   aGetter,
@@ -488,7 +492,7 @@ public:
      * Function Attribute
      * returns a CipAttribute or NULL if not found.
      */
-    CipAttribute* Attribute( EipUint16 attribute_id ) const;
+    CipAttribute* Attribute( int aAttributeId ) const;
 
     const CipAttributes& Attributes() const
     {
@@ -620,6 +624,8 @@ public:
      * inserts a service and returns true if succes, else false.
      *
      * @param aService is to be inserted and must not already be part of a CipClass.
+     *  It must by dynamically allocated, not compiled in, because this container
+     *  takes ownership of aService.
      *
      * @return bool - true on success, else false.  Since services may be overridden,
      *  currently this will not fail if the service_id already exists.  It will merely
@@ -632,10 +638,10 @@ public:
 
     /**
      * Function ServiceRemove
-     * removes @a a service given by aServiceId and returns ownership to caller
+     * removes a service given by @a aServiceId and returns ownership to caller
      * if it exists, else NULL.  Caller may delete it, and typically should.
      */
-    CipService* ServiceRemove( EipUint8 aServiceId );
+    CipService* ServiceRemove( int aServiceId );
 
     /// Get an existing CipService or return NULL if not found.
     CipService* Service( int aServiceId ) const;
@@ -652,14 +658,27 @@ public:
      *
      * @param aInstance is a new instance, and since the normal CipInstance
      *  constructor marks any new instance as not yet belonging to a class, this
-     *  instance may not belong to any class at the time this call is made.
+     *  instance may not belong to any class at the time this call is made.  After
+     *  this call this container owns aInstance (=> will delete it upon destruction)
+     *  so therefore aInstance must be dynamically (heap) allocated, not compiled in.
      *
      * @return bool - true on succes, else false.  Failure happens when the instance
      *  was marked as already being in another class, or if the instance_id was
      *  not unique.  On success, ownership is passed to this class as a container.
      *  On failure, ownership remains with the caller.
      */
-    bool InstanceInsert( CipInstance* aInstances );
+    bool InstanceInsert( CipInstance* aInstance );
+
+    /**
+     * Function InstanceRemove
+     * removes an instance and returns it if succes, else NULL.
+     *
+     * @param aInstanceId is the instance to remove.
+     *
+     * @return CipInstance* - removed instance, caller normally should delete it,
+     *  NULL if not found.
+     */
+    CipInstance* InstanceRemove( int aInstanceId );
 
     CipInstance* Instance( int aInstanceId ) const;
 

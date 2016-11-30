@@ -123,6 +123,7 @@ CipAttribute* CipAppPath::Attribute( int aAttrId ) const
 }
 
 
+// make static so compiler has option of inlining this
 static void serialize( BufWriter& out, int seg_type, unsigned aValue )
 {
     if( aValue < 256 )
@@ -149,12 +150,12 @@ int CipAppPath::SerializeAppPath( BufWriter aOutput )
 
     if( HasSymbol() )
     {
-        int tag_count = strlen( tag );
+        int tag_size = strlen( tag );
 
         *out++ = kDataSegmentTypeAnsiExtendedSymbolMessage;
-        *out++ = tag_count;
+        *out++ = tag_size;
 
-        out.append( (EipByte*) tag, tag_count );
+        out.append( (EipByte*) tag, tag_size );
 
         if( (out.data() - aOutput.data()) & 1 )
             *out++ = 0;               // output possible pad byte
@@ -297,39 +298,42 @@ int CipAppPath::DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInh
     {
         in += result;       // advance over deserialized symbolic
 
-        int first = *in;
-
-        // Grammar in C.1.5 shows we can have Connection_Point optionally here:
-        if( (first & 0xfc) == kLogicalSegmentTypeConnectionPoint )
+        if( in.size() )     // if more bytes, look for [connection_point] [member1 [member2 [member3]]]
         {
-            ++in;
-            in += deserialize_logical( in, CONN_PT, first & 3 );
-        }
+            int first = *in;
 
-        first = *in;
-
-        Stuff   last_member;
-
-        for( last_member = MEMBER1;  last_member <= MEMBER3; last_member = Stuff(last_member +1) )
-        {
-            /*
-
-                Grammar in C.1.5 shows we can have member_specification optionally here.
-
-                member id is the "element id" found in A-B publication
-                "Logix5000 Data Access" (Rockwell Automation Publication
-                1756-PM020D-EN-P - June 2016) and is expected only in the
-                context of a symbolic address accoring to that document.
-
-            */
-            if( (first & 0xfc) == kLogicalSegmentTypeMemberId )
+            // Grammar in C.1.5 shows we can have Connection_Point optionally here:
+            if( (first & 0xfc) == kLogicalSegmentTypeConnectionPoint )
             {
-
-                ++in;
-                in += deserialize_logical( in, last_member, first & 3 );
+                ++in;       // ate first
+                in += deserialize_logical( in, CONN_PT, first & 3 );
             }
-            else
-                break;
+
+            Stuff   last_member;
+
+            for( last_member = MEMBER1;  in.size() && last_member <= MEMBER3;
+                    last_member = Stuff(last_member +1) )
+            {
+                /*
+
+                    Grammar in C.1.5 shows we can have member_specification optionally here.
+
+                    member id is the "element id" found in A-B publication
+                    "Logix5000 Data Access" (Rockwell Automation Publication
+                    1756-PM020D-EN-P - June 2016) and is expected only in the
+                    context of a symbolic address accoring to that document.
+
+                */
+                first = *in;
+
+                if( (first & 0xfc) == kLogicalSegmentTypeMemberId )
+                {
+                    ++in;   // ate first
+                    in += deserialize_logical( in, last_member, first & 3 );
+                }
+                else
+                    break;
+            }
         }
     }
 
@@ -399,19 +403,31 @@ exit:
 static int vprint( std::string* result, const char* format, va_list ap )
 {
     char    msg[512];
-
     size_t  len = vsnprintf( msg, sizeof(msg), format, ap );
 
     if( len < sizeof(msg) )     // the output fit into msg
     {
         result->append( msg, msg + len );
+        return len;
     }
-
-    return len;
+    else
+        return 0;       // increase size of msg[], or shorten prints
 }
 
 
-std::string Sprintf( const char* aFormat, ... )
+static int StrPrintf( std::string* result, const char* format, ... )
+{
+    va_list     args;
+
+    va_start( args, format );
+    int ret = vprint( result, format, args );
+    va_end( args );
+
+    return ret;
+}
+
+
+static std::string StrPrintf( const char* aFormat, ... )
 {
     std::string ret;
     va_list     args;
@@ -427,45 +443,45 @@ std::string Sprintf( const char* aFormat, ... )
 
 const std::string CipAppPath::Format() const
 {
-    std::string ret;
+    std::string dest;
 
     if( HasClass() )
     {
-        ret += "Class:";
-        ret += Sprintf( "%d", GetClass() );
+        dest += "Class:";
+        StrPrintf( &dest, "%d", GetClass() );
 
         if( HasInstance() )
         {
-            ret += " Instance:";
-            ret += Sprintf( "%d", GetInstance() );
+            dest += " Instance:";
+            StrPrintf( &dest, "%d", GetInstance() );
         }
 
         if( HasConnPt() )
         {
-            ret += " ConnPt:";
-            ret += Sprintf( "%d", GetConnPt() );
+            dest += " ConnPt:";
+            StrPrintf( &dest, "%d", GetConnPt() );
         }
     }
     else if( HasSymbol() )
     {
-        ret += "Tag:";
-        ret += tag;
+        dest += "Tag:";
+        dest += tag;
 
         if( HasMember1() )
         {
-            ret += Sprintf( "[%d]", GetMember1() );
+            StrPrintf( &dest, "[%d]", GetMember1() );
 
             if( HasMember2() )
             {
-                ret += Sprintf( "[%d]", GetMember2() );
+                StrPrintf( &dest, "[%d]", GetMember2() );
 
                 if( HasMember3() )
-                    ret += Sprintf( "[%d]", GetMember3() );
+                    StrPrintf( &dest, "[%d]", GetMember3() );
             }
         }
     }
 
-    return ret;
+    return dest;
 }
 
 
@@ -502,6 +518,8 @@ void CipAppPath::inherit_assembly( int aStart, CipAppPath* aPreviousToInheritFro
 }
 
 
+// Only called from a context which is certain of segment type, so eating first
+// is handled a bit differently, advancing 'in' with read is ok.
 static int parsePortSegment( BufReader aInput, CipPortSegment* aSegment )
 {
     BufReader   in = aInput;
@@ -619,10 +637,12 @@ int CipSimpleDataSegment::DeserializeDataSegment( BufReader aInput )
 
     Clear();
 
-    int first = *in++;
+    int first = *in;
 
     if( first == kDataSegmentTypeSimpleDataMessage )
     {
+        ++in;   // ate first
+
         int word_count = *in++;
 
         while( word_count-- )

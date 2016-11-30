@@ -92,24 +92,18 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
 }
 
 
-/**
- * Class AssemblyInstance
- * is extended from CipInstance with an extra CipByteArray at the end.
- * That byte array has no ownership of the low level array, which for an
- * assembly is owned by the application program and passed into
- * CreateAssemblyInstance().
- */
-class AssemblyInstance : public CipInstance
+AssemblyInstance::AssemblyInstance( int aInstanceId, BufWriter aBuffer ) :
+    CipInstance( aInstanceId )
 {
-public:
-    AssemblyInstance( EipUint16 aInstanceId ) :
-        CipInstance( aInstanceId )
-    {
-    }
+    byte_array.length = aBuffer.size();
+    byte_array.data   = aBuffer.data();
 
-//protected:
-    CipByteArray    byte_array;
-};
+    // Attribute 3 is the byte array transfer of the assembly data itself
+    AttributeInsert( 3, kCipByteArray, kSetAndGetAble, getAttrAssemblyData, setAttrAssemblyData, &byte_array );
+
+    // Attribute 4 Number of bytes in Attribute 3
+    AttributeInsert( 4, kCipUint, kGetableSingle, &byte_array.length );
+}
 
 
 CipInstance* CreateAssemblyInstance( int instance_id, BufWriter aBuffer )
@@ -118,26 +112,17 @@ CipInstance* CreateAssemblyInstance( int instance_id, BufWriter aBuffer )
 
     CIPSTER_ASSERT( clazz ); // Stack startup should have called CipAssemblyInitialize()
 
-    if( clazz->Instance( instance_id ) )
+    AssemblyInstance* i = new AssemblyInstance( instance_id, aBuffer );
+
+    if( !clazz->InstanceInsert( i ) )
     {
-        CIPSTER_TRACE_ERR( "%s: cannot create another instance_id = %d.\n", __func__, instance_id );
-        return NULL;
+        delete i;
+        i = NULL;
     }
-
-    CIPSTER_TRACE_INFO( "%s: creating assembly instance_id %d\n", __func__, instance_id );
-
-    AssemblyInstance* i = new AssemblyInstance( instance_id );
-
-    i->byte_array.length = aBuffer.size();
-    i->byte_array.data   = aBuffer.data();
-
-    // Attribute 3 is the byte array transfer of the assembly data itself
-    i->AttributeInsert( 3, kCipByteArray, kSetAndGetAble, getAttrAssemblyData, setAttrAssemblyData, &i->byte_array );
-
-    // Attribute 4 Number of bytes in Attribute 3
-    i->AttributeInsert( 4, kCipUint, kGetableSingle, &i->byte_array.length );
-
-    clazz->InstanceInsert( i );
+    else
+    {
+        CIPSTER_TRACE_INFO( "%s: created assembly instance_id %d\n", __func__, instance_id );
+    }
 
     return i;
 }

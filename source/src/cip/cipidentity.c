@@ -95,11 +95,6 @@ static EipStatus reset_service( CipInstance* instance,
 
     eip_status = kEipStatusOkSend;
 
-    response->reply_service = 0x80 | request->service;
-    response->size_of_additional_status = 0;
-
-    response->general_status = kCipErrorSuccess;
-
     if( request->data.size() == 1 )
     {
         int value = request->data.data()[0];
@@ -154,7 +149,6 @@ static EipStatus reset_service( CipInstance* instance,
         response->general_status = kCipErrorInvalidParameter;
     }
 
-    response->data_length = 0;
     return eip_status;
 }
 

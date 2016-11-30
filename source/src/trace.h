@@ -51,41 +51,44 @@ extern int g_CIPSTER_TRACE_LEVEL;       // defined in cipcommon.c
  *  In order to activate this trace level set the CIPSTER_TRACE_LEVEL_ERROR flag
  *  in CIPSTER_TRACE_LEVEL.
  */
-#define CIPSTER_TRACE_ERR(...)                                                  \
-  do {                                                                         \
-    if (CIPSTER_TRACE_LEVEL_ERROR & g_CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
+#define CIPSTER_TRACE_ERR(...)  \
+  do {                          \
+    if( CIPSTER_TRACE_LEVEL_ERROR & g_CIPSTER_TRACE_LEVEL ) \
+        LOG_TRACE(__VA_ARGS__); \
   } while (0)
 
 /** @def CIPSTER_TRACE_WARN(...) Trace warning messages.
  *  In order to activate this trace level set the CIPSTER_TRACE_LEVEL_WARNING
  * flag in CIPSTER_TRACE_LEVEL.
  */
-#define CIPSTER_TRACE_WARN(...)                           \
-  do {                                                   \
-    if (CIPSTER_TRACE_LEVEL_WARNING & g_CIPSTER_TRACE_LEVEL) \
-      LOG_TRACE(__VA_ARGS__);                            \
+#define CIPSTER_TRACE_WARN(...)  \
+  do {                           \
+    if( CIPSTER_TRACE_LEVEL_WARNING & g_CIPSTER_TRACE_LEVEL ) \
+      LOG_TRACE(__VA_ARGS__);    \
   } while (0)
 
 /** @def CIPSTER_TRACE_STATE(...) Trace state messages.
  *  In order to activate this trace level set the CIPSTER_TRACE_LEVEL_STATE flag
  *  in CIPSTER_TRACE_LEVEL.
  */
-#define CIPSTER_TRACE_STATE(...)                                                \
-  do {                                                                         \
-    if (CIPSTER_TRACE_LEVEL_STATE & g_CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
+#define CIPSTER_TRACE_STATE(...) \
+  do {                           \
+    if( CIPSTER_TRACE_LEVEL_STATE & g_CIPSTER_TRACE_LEVEL ) \
+        LOG_TRACE(__VA_ARGS__);  \
   } while (0)
 
 /** @def CIPSTER_TRACE_INFO(...) Trace information messages.
  *  In order to activate this trace level set the CIPSTER_TRACE_LEVEL_INFO flag
  *  in CIPSTER_TRACE_LEVEL.
  */
-#define CIPSTER_TRACE_INFO(...)                                                \
-  do {                                                                        \
-    if (CIPSTER_TRACE_LEVEL_INFO & g_CIPSTER_TRACE_LEVEL) LOG_TRACE(__VA_ARGS__); \
+#define CIPSTER_TRACE_INFO(...)  \
+  do {                           \
+    if( CIPSTER_TRACE_LEVEL_INFO & g_CIPSTER_TRACE_LEVEL ) \
+        LOG_TRACE(__VA_ARGS__);  \
   } while (0)
 
-#else
-// define the tracing macros empty in order to save space
+
+#else       // define the tracing macros empty in order to save space
 
 #undef CIPSTER_TRACE_LEVEL
 #define CIPSTER_TRACE_LEVEL 0
@@ -95,6 +98,5 @@ extern int g_CIPSTER_TRACE_LEVEL;       // defined in cipcommon.c
 #define CIPSTER_TRACE_STATE(...)
 #define CIPSTER_TRACE_INFO(...)
 #endif
-// TRACING ******************************************************************
 
 #endif //CIPSTER_TRACE_H_

@@ -294,6 +294,8 @@ int CipCommonPacketFormatData::SerializeCPFD( CipMessageRouterResponse* aRespons
                 encodeUnconnectedDataItemLength( aResponse, out );
             }
 
+            CIPSTER_ASSERT( aResponse->reply_service & 0x80 );
+
             // serialize message router response
             *out++ = aResponse->reply_service;
             *out++ = aResponse->reserved;

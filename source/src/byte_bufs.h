@@ -40,7 +40,7 @@ public:
     BufWriter& operator+=( size_t advance )
     {
         if( advance > size() )
-            throw std::overflow_error( "past end" );
+            overrun();
         start += advance;
         return *this;
     }
@@ -56,7 +56,7 @@ public:
     CipByte& operator * ()
     {
         if( start >= limit )
-            throw std::overflow_error( "past end" );
+            overrun();
 
         return *start;
     }
@@ -76,7 +76,7 @@ public:
     void put8( CipByte aValue )
     {
         if( start + 1 > limit )
-            throw std::overflow_error( "past end" );
+            overrun();
 
         *start++ = aValue;
     }
@@ -84,7 +84,7 @@ public:
     void put16( EipUint16 aValue )
     {
         if( start + 2 > limit )
-            throw std::overflow_error( "past end" );
+            overrun();
         start[0] = (CipByte) (aValue >> 0);
         start[1] = (CipByte) (aValue >> 8);
         start += 2;
@@ -93,7 +93,7 @@ public:
     void put32( EipUint32 aValue )
     {
         if( start + 4 > limit )
-            throw std::overflow_error( "past end" );
+            overrun();
         start[0] = (CipByte) (aValue >> 0);
         start[1] = (CipByte) (aValue >> 8);
         start[2] = (CipByte) (aValue >> 16);
@@ -104,7 +104,7 @@ public:
     void put64( EipUint64 aValue )
     {
         if( start + 8 > limit )
-            throw std::overflow_error( "past end" );
+            overrun();
         start[0] = (CipByte) (aValue >> 0);
         start[1] = (CipByte) (aValue >> 8);
         start[2] = (CipByte) (aValue >> 16);
@@ -141,7 +141,7 @@ public:
     void put16BE( EipUint16 aValue )
     {
         if( start + 2 > limit )
-            throw std::overflow_error( "past end" );
+            overrun();
         start[1] = (CipByte) (aValue >> 0);
         start[0] = (CipByte) (aValue >> 8);
         start += 2;
@@ -150,7 +150,7 @@ public:
     void put32BE( EipUint32 aValue )
     {
         if( start + 4 > limit )
-            throw std::overflow_error( "past end" );
+            overrun();
         start[3] = (CipByte) (aValue >> 0);
         start[2] = (CipByte) (aValue >> 8);
         start[1] = (CipByte) (aValue >> 16);
@@ -161,7 +161,7 @@ public:
     void append( const EipByte* aStart, size_t aCount )
     {
         if( start + aCount > limit )
-            throw std::overflow_error( "past end" );
+            overrun();
         memcpy( start, aStart, aCount );
         start += aCount;
     }
@@ -169,7 +169,7 @@ public:
     void fill( size_t aCount, EipByte aValue = 0 )
     {
         if( start + aCount > limit )
-            throw std::overflow_error( "past end" );
+            overrun();
         memset( start, aValue, aCount );
         start += aCount;
     }
@@ -177,6 +177,12 @@ public:
 protected:
     CipByte*    start;
     CipByte*    limit;          // points to one past last byte
+
+private:
+    void        overrun() const
+    {
+        throw std::overflow_error( "write > limit" );
+    }
 };
 
 
@@ -209,12 +215,14 @@ public:
     const CipByte*  end()  const    { return limit; }
     size_t          size() const    { return limit - start; }
 
+
+
     /// Advance the start of the buffer by the specified number of bytes and trim
     /// the size().
     BufReader& operator += ( size_t advance )
     {
         if( advance > size() )
-            throw std::range_error( "past end" );
+            overrun();
 
         start += advance;
         return *this;
@@ -243,21 +251,21 @@ public:
     CipByte operator * () const
     {
         if( start >= limit )
-            throw std::range_error( "past end" );
+            overrun();
         return *start;
     }
 
     CipByte get8()
     {
         if( start + 1 > limit )
-            throw std::range_error( "past end" );
+            overrun();
         return *start++;
     }
 
     EipUint16 get16()
     {
         if( start + 2 > limit )
-            throw std::range_error( "past end" );
+            overrun();
 
         EipUint16 ret = (start[0] << 0) |
                         (start[1] << 8);
@@ -268,7 +276,7 @@ public:
     EipUint32 get32()
     {
         if( start + 4 > limit )
-            throw std::range_error( "past end" );
+            overrun();
 
         EipUint32 ret = (start[0] << 0 ) |
                         (start[1] << 8 ) |
@@ -281,7 +289,7 @@ public:
     EipUint64 get64()
     {
         if( start + 8 > limit )
-            throw std::range_error( "past end" );
+            overrun();
 
         EipUint64 ret = ((EipUint64) start[0] << 0 ) |
                         ((EipUint64) start[1] << 8 ) |
@@ -295,10 +303,33 @@ public:
         return ret;
     }
 
+    float get_float()
+    {
+        union {
+            float       f;
+            EipUint32   i;
+        } t;
+
+        t.i = get32();
+
+        return t.f;
+    }
+
+    double get_double()
+    {
+        union {
+            double      d;
+            EipUint64   i;
+        } t;
+
+        t.i = get64();
+        return t.d;
+    }
+
     EipUint16 get16BE()
     {
         if( start + 2 > limit )
-            throw std::range_error( "past end" );
+            overrun();
 
         EipUint16 ret = (start[1] << 0) |
                         (start[0] << 8);
@@ -309,7 +340,7 @@ public:
     EipUint32 get32BE()
     {
         if( start + 4 > limit )
-            throw std::range_error( "past end" );
+            overrun();
 
         EipUint32 ret = (start[3] << 0 ) |
                         (start[2] << 8 ) |
@@ -322,6 +353,12 @@ public:
 protected:
     const CipByte*  start;
     const CipByte*  limit;          // points to one past last byte
+
+private:
+    void overrun() const
+    {
+        throw std::range_error( "read > limit" );
+    }
 };
 
 #endif // BYTE_BUFS_H_
