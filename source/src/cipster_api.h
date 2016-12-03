@@ -111,14 +111,12 @@ EipStatus RegisterCipClass( CipClass* aClass );
 
 
 /** @ingroup CIP_API
- * @brief Produce the data according to CIP encoding onto the message buffer.
+ * @brief Serialize aDataType according to CIP encoding into aBuf
  *
- * This function may be used in own services for sending data back to the
- * requester (e.g., getAttributeSingle for special structs).
  *  @param int aDataType the cip type to encode
  *  @param cip_data pointer to data value.
  *  @param aBuf where response should be written
- *  @return length of attribute in bytes
+ *  @return int - byte count writte into aBuf.
  *          -1 .. error
  */
 int EncodeData( int aDataType, const void* cip_data, BufWriter& aBuf );

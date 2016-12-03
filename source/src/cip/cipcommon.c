@@ -46,6 +46,27 @@ IterT vec_search( IterT begin, IterT end, T target )
     return initial_end;
 }
 
+
+/// Binary search function template, same as vec_search but returns equal or next greater
+template< typename T, typename IterT >
+IterT vec_search_gte( IterT begin, IterT end, T target )
+{
+    while( begin < end )
+    {
+        IterT   middle = begin + (end - begin - 1)/2;
+        int     r = target - (*middle)->Id();
+
+        if( r < 0 )
+            end = middle;
+        else if( r > 0 )
+            begin = middle + 1;
+        else
+            return middle;
+    }
+    return end;
+}
+
+
 // global public variables
 EipByte g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
 
@@ -105,78 +126,6 @@ void ShutdownCipStack()
     DeleteAllClasses();
 }
 
-
-EipStatus NotifyClass( CipClass* cip_class,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response )
-{
-    CipInstance*    instance;
-    unsigned        instance_id;
-    CipService*     service;
-
-    if( request->request_path.HasSymbol() )
-    {
-        instance_id = 0;   // talk to class 06b instance 0
-    }
-    else if( request->request_path.HasInstance() )
-    {
-        instance_id = request->request_path.GetInstance();
-    }
-    else
-    {
-        CIPSTER_TRACE_WARN( "%s: no instance specified\n", __func__ );
-
-        // instance_id was not in the request
-        response->general_status = kCipErrorPathDestinationUnknown;
-
-        goto exit;
-    }
-
-    instance = cip_class->Instance( instance_id );
-    if( !instance )
-    {
-        CIPSTER_TRACE_WARN( "%s: instance %d does not exist\n", __func__, instance_id );
-
-        // If instance not found, return an error reply.
-        // According to the test tool this should be the correct error flag
-        // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
-        response->general_status = kCipErrorPathDestinationUnknown;
-
-        goto exit;
-    }
-
-    CIPSTER_TRACE_INFO(
-        "%s: targeting instance %d of class %s\n",
-        __func__,
-        instance_id,
-        instance_id ? instance->owning_class->ClassName().c_str() :
-                      ((CipClass*)instance)->ClassName().c_str()
-        );
-
-    service = cip_class->Service( request->service );
-    if( service )
-    {
-        CIPSTER_TRACE_INFO( "%s: calling service '%s'\n",
-            __func__, service->ServiceName().c_str() );
-
-        CIPSTER_ASSERT( service->service_function );
-
-        // call the service, and return what it returns
-        return service->service_function( instance, request, response );
-    }
-
-    CIPSTER_TRACE_WARN( "%s: service 0x%02x not supported\n",
-            __func__,
-            request->service );
-
-    // if no services or service not found, return an error reply
-    response->general_status = kCipErrorServiceNotSupported;
-
-    // handle error replies, general_status was set above.
-
-exit:
-    return kEipStatusOkSend;
-}
 
 //-----<CipAttrube>-------------------------------------------------------
 
@@ -294,7 +243,7 @@ bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
 
         else if( aAttribute->Id() == (*it)->Id() )
         {
-            CIPSTER_TRACE_ERR( "class '%s' instance %d already has attribute %d, ovveriding\n",
+            CIPSTER_TRACE_ERR( "class '%s' instance %d already has attribute %d, overriding\n",
                 owning_class ? owning_class->ClassName().c_str() : "meta-something",
                 instance_id,
                 aAttribute->Id()
@@ -664,6 +613,13 @@ CipInstance* CipClass::Instance( int aInstanceId ) const
         aInstanceId, class_name.c_str() );
 
     return NULL;
+}
+
+
+CipClass::CipInstances::const_iterator CipClass::InstanceNext( int aInstanceId ) const
+{
+    CipInstances::const_iterator it = vec_search_gte( instances.begin(), instances.end(), aInstanceId );
+    return it;
 }
 
 

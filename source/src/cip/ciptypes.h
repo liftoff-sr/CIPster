@@ -187,34 +187,11 @@ enum IoConnectionEvent
 };
 
 
-#if 0
-typedef std::basic_string<EipByte>    ByteArrayBase;
-
-/** @brief CIP Byte Array
- *
- */
-class CipByteArray : public ByteArrayBase
-{
-    CipByteArray( EipUint16 aLength = 0, EipByte* aData = 0 ) :
-        ByteArrayBase( aData, aLength )
-    {
-    }
-
-    EipUint16       Length() const  { return size(); }
-    const EipByte*  Data() const    { return data(); }
-
-    // inherit all member funcs of ByteArrayBase.
-};
-
-#else
-
 struct CipByteArray
 {
     EipUint16   length;     ///< Length of the Byte Array
     EipByte*    data;       ///< Pointer to the data
 };
-
-#endif
 
 
 /** @brief CIP Short String
@@ -241,87 +218,6 @@ struct CipRevision
 {
     EipUint8    major_revision;
     EipUint8    minor_revision;
-};
-
-
-
-class CipBufMutable
-{
-public:
-    CipBufMutable( CipByte* aStart, size_t aCount ) :
-        start( aStart ),
-        byte_count( aCount )
-    {}
-
-    CipBufMutable() :
-        start( 0 ), byte_count( 0 )
-    {}
-
-    CipByte*    data() const    { return start; }
-    size_t      size() const    { return byte_count; }
-
-    /// Move the start of the buffer by the specified number of bytes.
-    CipBufMutable& operator+=( size_t n )
-    {
-        size_t offset = n < byte_count ? n : byte_count;
-        start += offset;
-        byte_count -= offset;
-        return *this;
-    }
-
-    CipBufMutable operator+( size_t n )
-    {
-        CipBufMutable ret = *this;
-
-        ret += n;
-        return ret;
-    }
-
-protected:
-    CipByte*        start;
-    size_t          byte_count;
-};
-
-
-class CipBufNonMutable
-{
-public:
-    CipBufNonMutable() :
-        start( 0 ), byte_count( 0 )
-    {}
-
-    CipBufNonMutable( const CipByte* aStart, size_t aCount ) :
-        start( aStart ), byte_count( aCount )
-    {}
-
-    CipBufNonMutable( const CipBufMutable& m ):
-        start( m.data() ),
-        byte_count( m.size() )
-    {}
-
-    const CipByte*  data() const    { return start; }
-    size_t          size() const    { return byte_count; }
-
-    /// Move the start of the buffer by the specified number of bytes.
-    CipBufNonMutable& operator+=( size_t n )
-    {
-        size_t offset = n < byte_count ? n : byte_count;
-        start += offset;
-        byte_count -= offset;
-        return *this;
-    }
-
-    CipBufNonMutable operator+( size_t n )
-    {
-        CipBufNonMutable ret = *this;
-
-        ret += n;
-        return ret;
-    }
-
-protected:
-    const CipByte*  start;
-    size_t          byte_count;
 };
 
 
@@ -538,7 +434,7 @@ private:
  * @return EipStatus - EipOKSend if service could be executed successfully
  *    and a response should be sent.
  */
-typedef EipStatus (* CipServiceFunction)( CipInstance* aInstance,
+typedef EipStatus (*CipServiceFunction)( CipInstance* aInstance,
         CipMessageRouterRequest* aRequest, CipMessageRouterResponse* aResponse );
 
 
@@ -663,7 +559,7 @@ public:
      *  so therefore aInstance must be dynamically (heap) allocated, not compiled in.
      *
      * @return bool - true on succes, else false.  Failure happens when the instance
-     *  was marked as already being in another class, or if the instance_id was
+     *  was marked as already being in another class, or if the instance id was
      *  not unique.  On success, ownership is passed to this class as a container.
      *  On failure, ownership remains with the caller.
      */
@@ -681,6 +577,10 @@ public:
     CipInstance* InstanceRemove( int aInstanceId );
 
     CipInstance* Instance( int aInstanceId ) const;
+
+    /// Return an iterator for aInstanceId it if exists, else for the next greater
+    /// instance id, else Instances().end();
+    CipInstances::const_iterator InstanceNext( int aInstanceId ) const;
 
     /// Return a read only collection of CipInstances.
     const CipInstances& Instances() const   { return instances; }

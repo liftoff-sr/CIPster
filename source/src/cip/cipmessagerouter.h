@@ -97,12 +97,13 @@ void DeleteAllClasses();
 /**
  * Function NotifyMR
  * notifies the MessageRouter that an explicit message (connected or unconnected)
- * has been received. This function will be called from the encapsulation layer.
+ * has been received. This function is called from the encapsulation layer.
  *
  * @param aCommand CPFD data payload which is the CIP part.
  * @param aReply where to put the reply, must fill in
  *   CipMessageRouterResponse and its BufWriter 'data' and data_length.  This is
- *   how caller knows the length.
+ *   how caller knows the length.  Should not advance data.data().
+ *
  * @return EipStatus
  */
 EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply );

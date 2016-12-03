@@ -321,7 +321,7 @@ int CipAppPath::DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInh
                     member id is the "element id" found in A-B publication
                     "Logix5000 Data Access" (Rockwell Automation Publication
                     1756-PM020D-EN-P - June 2016) and is expected only in the
-                    context of a symbolic address accoring to that document.
+                    context of a symbolic address according to that document.
 
                 */
                 first = *in;

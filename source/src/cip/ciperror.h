@@ -48,7 +48,9 @@ enum CipError
     kCipErrorUnexpectedAttributeInList = 0x27,                  ///< An attempt was made to set an attribute that is not able to be set at this time.
     kCipErrorInvalidMemberId    = 0x28,                         ///< The Member ID specified in the request does not exist in the specified Class/Instance/Attribute
     kCipErrorMemberNotSetable   = 0x29,                         ///< A request to modify a non-modifiable member was received
-    kCipErrorGroup2OnlyServerGeneralFailure = 0x2A              ///< This error code may only be reported by DeviceNet group 2 only servers with 4K or less code space and only in place of Service not supported, Attribute not supported and Attribute not setable.
+    kCipErrorGroup2OnlyServerGeneralFailure = 0x2A,             ///< This error code may only be reported by DeviceNet group 2 only servers with 4K or less code space and only in place of Service not supported, Attribute not supported and Attribute not setable.
 //2B - CF Reserved by CIP for future extensions D0 - FF Reserved for Object Class and service errors
+
+    kCipErrorGeneralError = 0xff,
 };
 #endif // CIPSTER_CIPERROR_H_

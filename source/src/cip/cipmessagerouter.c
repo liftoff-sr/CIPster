@@ -240,89 +240,122 @@ EipStatus CipMessageRouterInit()
 }
 
 
-EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply )
+EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
 {
-    EipStatus   eip_status = kEipStatusOkSend;
-
     CIPSTER_TRACE_INFO( "notifyMR: routing unconnected message\n" );
 
     CipMessageRouterRequest request;
 
     int result = request.DeserializeMRR( aCommand );
 
-    aReply->reply_service = request.service | 0x80;
+    aResponse->reply_service = request.service | 0x80;
 
     if( result <= 0 )
     {
         CIPSTER_TRACE_ERR( "notifyMR: error from createMRRequeststructure\n" );
-        aReply->general_status = kCipErrorPathSegmentError;
+        aResponse->general_status = kCipErrorPathSegmentError;
+        return kEipStatusOkSend;
     }
 
+    CipClass* clazz = NULL;
+
+    int instance_id;
+
+    if( request.request_path.HasSymbol() )
+    {
+        instance_id = 0;   // talk to class 06b instance 0
+
+        // Per Rockwell Automation Publication 1756-PM020D-EN-P - June 2016:
+        // Symbol Class Id is 0x6b.  Forward this request to that class.
+        // This class is not implemented in CIPster stack, but can be added by
+        // an application using simple RegisterCipClass( CipClass* aClass );
+        // Instances of this class are tags.
+        // I have such an implementation in my application.
+        clazz = GetCipClass( 0x6b );
+
+#if 0
+        // We cannot know the instance number without looking it up in the
+        // the symbol class.  If that lookup is a service of the class, not
+        // of each instance, then enable this.  Any service for a class is
+        // always held in the meta-class, given by owning_class on the clazz.
+        if( clazz )
+            clazz = clazz->owning_class;
+#endif
+
+    }
+    else if( request.request_path.HasInstance() )
+    {
+        instance_id = request.request_path.GetInstance();
+        clazz = GetCipClass( request.request_path.GetClass() );
+    }
     else
     {
-        // Forward request to appropriate Object if it is registered.
-        CipClass*   clazz = NULL;
+        CIPSTER_TRACE_WARN( "%s: no instance specified\n", __func__ );
 
-        if( request.request_path.HasLogical() )
-            clazz = GetCipClass( request.request_path.GetClass() );
-        else if( request.request_path.HasSymbol() )
-        {
-            // Per Rockwell Automation Publication 1756-PM020D-EN-P - June 2016:
-            // Symbol Class Id is 0x6b.  Forward this request to that class.
-            // This class is not implemented in CIPster stack, but can be added by
-            // an application using simple RegisterCipClass( CipClass* aClass );
-            // Instances of this class are tags.
-            // I have such an implementation in my application.
-            clazz = GetCipClass( 0x6b );
-        }
-
-        if( !clazz )
-        {
-            CIPSTER_TRACE_ERR(
-                "%s: unknown destination in request path:'%s'\n",
-                __func__,
-                request.request_path.Format().c_str()
-                );
-
-            // According to the test tool this should be the correct error flag
-            // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
-            aReply->general_status = kCipErrorPathDestinationUnknown;
-        }
-        else
-        {
-            // Call notify function from Object with ClassID (gMRRequest.RequestPath.ClassID)
-            // object will or will not make an reply into gMRResponse.
-            aReply->reserved = 0;
-
-            CIPSTER_TRACE_INFO( "notifyMR: calling notify function of class '%s'\n",
-                    clazz->ClassName().c_str() );
-
-            eip_status = NotifyClass( clazz, &request, aReply );
-
-#ifdef CIPSTER_TRACE_ENABLED
-            if( eip_status == kEipStatusError )
-            {
-                CIPSTER_TRACE_ERR(
-                        "notifyMR: notify function of class '%s' returned an error\n",
-                        clazz->ClassName().c_str() );
-            }
-            else if( eip_status == kEipStatusOk )
-            {
-                CIPSTER_TRACE_INFO(
-                        "notifyMR: notify function of class '%s' returned no reply\n",
-                        clazz->ClassName().c_str() );
-            }
-            else
-            {
-                CIPSTER_TRACE_INFO(
-                        "notifyMR: notify function of class '%s' returned a reply\n",
-                        clazz->ClassName().c_str() );
-            }
-#endif
-        }
+        // instance_id was not in the request
+        aResponse->general_status = kCipErrorPathDestinationUnknown;
+        return kEipStatusOkSend;
     }
 
-    return eip_status;
+    if( !clazz )
+    {
+        CIPSTER_TRACE_ERR(
+            "%s: unknown destination in request path:'%s'\n",
+            __func__,
+            request.request_path.Format().c_str()
+            );
+
+        // According to the test tool this should be the correct error flag
+        // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
+        aResponse->general_status = kCipErrorPathDestinationUnknown;
+        return kEipStatusOkSend;
+    }
+
+    CipInstance* instance = clazz->Instance( instance_id );
+    if( !instance )
+    {
+        CIPSTER_TRACE_WARN( "%s: instance %d does not exist\n", __func__, instance_id );
+
+        // If instance not found, return an error reply.
+        // According to the test tool this should be the correct error flag
+        // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
+        aResponse->general_status = kCipErrorPathDestinationUnknown;
+        return kEipStatusOkSend;
+    }
+
+    CipService* service = clazz->Service( request.service );
+    if( !service )
+    {
+        CIPSTER_TRACE_WARN( "%s: service 0x%02x not found\n",
+                __func__,
+                request.service );
+
+        // if no services or service not found, return an error reply
+        aResponse->general_status = kCipErrorServiceNotSupported;
+        return kEipStatusOkSend;
+    }
+
+    CIPSTER_TRACE_INFO(
+        "%s: targeting instance %d of class %s with service %s\n",
+        __func__,
+        instance_id,
+        instance->owning_class->ClassName().c_str(),
+        service->ServiceName().c_str()
+        );
+
+    CIPSTER_ASSERT( service->service_function );
+
+    EipStatus status = service->service_function( instance, &request, aResponse );
+
+    CIPSTER_TRACE_ERR(
+            "%s: service %s of class '%s' returned %d\n",
+            __func__,
+            service->ServiceName().c_str(),
+            clazz->ClassName().c_str(),
+            status
+            );
+
+    return status;
 }
 
 

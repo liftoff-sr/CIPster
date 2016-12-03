@@ -21,27 +21,15 @@
  */
 extern EipByte g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
 
-/** @brief Check if requested service present in class/instance and call appropriate service.
+/**
+ * Function GetAttributeSingle
+ * is an implementation of CipServiceFunction that provids
+ * a generic GetAttributeSingle CIP service.
  *
- * @param clazz class receiving the message
- * @param request request message
- * @param response reply message
- * @return
- *     - EIP_OK_SEND    ... success
- *     - EIP_OK  ... no reply to send back
- *     - EIP_ERROR ... error
- */
-EipStatus NotifyClass( CipClass* clazz,
-        CipMessageRouterRequest* request,
-        CipMessageRouterResponse* response );
-
-/** @brief Generic implementation of the GetAttributeSingle CIP service
+ * @param instance which instance to act on.
+ * @param request
+ * @param response
  *
- *  Check from classID which Object requests an attribute, search if object has
- *  the appropriate attribute implemented.
- * @param instance pointer to instance.
- * @param request pointer to request.
- * @param response pointer to response.
  * @return status  >0 .. success
  *          -1 .. requested attribute not available
  */
