@@ -29,6 +29,7 @@ enum CipIdentityStatus
                                          *  to the "Major Unrecoverable Fault" state */
 };
 
+
 enum CipIdentityExtendedStatus
 {
     kSelftestingUnknown = 0x0000,

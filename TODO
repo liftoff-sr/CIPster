@@ -1,3 +1,6 @@
-*) Use object oriented design changes to disallow buffer overruns when formulating
-packets to send on the network.
+*) Class 3 connection size should be used to limit size of reply buffers now
+   that buffer overruns are impossible.
+
+
+
 

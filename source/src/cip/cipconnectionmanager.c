@@ -14,7 +14,6 @@
 #include "byte_bufs.h"
 #include "cipster_api.h"
 #include "encap.h"
-#include "cipidentity.h"
 #include "trace.h"
 #include "cipconnection.h"
 #include "cipassembly.h"
@@ -65,87 +64,6 @@ static CipConn* findExistingMatchingConnection( CipConn* aConn )
     }
 
     return NULL;
-}
-
-
-/**
- * Function checkElectronicKey
- * compares the electronic key received with a forward open request with the device's data.
- *
- * @param key_data the electronic key data received in the forward open request
- * @param extended_status the extended error code in case an error happened
- *
- * @return bool - true on success, false on error
- *    - On an error the general status code to be put into the response
- */
-static bool checkElectronicKeyData( CipElectronicKeySegment* key_data, ConnectionManagerStatusCode* extended_status )
-{
-    bool compatiblity_mode = key_data->major_revision & 0x80;
-
-    // Remove compatibility bit
-    key_data->major_revision &= 0x7F;       // bad, modifying caller's data
-
-    // Default return value
-    *extended_status = kConnectionManagerStatusCodeSuccess;
-
-    // Check VendorID and ProductCode, must match, or 0
-    if( ( key_data->vendor_id != vendor_id_  &&  key_data->vendor_id != 0 )
-     || ( key_data->product_code != product_code_  &&  key_data->product_code != 0 ) )
-    {
-        *extended_status = kConnectionManagerStatusCodeErrorVendorIdOrProductcodeError;
-        return false;
-    }
-    else
-    {
-        // VendorID and ProductCode are correct
-
-        // Check DeviceType, must match or 0
-        if( key_data->device_type != device_type_  &&  key_data->device_type != 0 )
-        {
-            *extended_status = kConnectionManagerStatusCodeErrorDeviceTypeError;
-            return false;
-        }
-        else
-        {
-            // VendorID, ProductCode and DeviceType are correct
-
-            if( !compatiblity_mode )
-            {
-                // Major = 0 is valid
-                if( 0 == key_data->major_revision )
-                {
-                    return true;
-                }
-
-                // Check Major / Minor Revision, Major must match, Minor match or 0
-                if(  key_data->major_revision != revision_.major_revision ||
-                   ( key_data->minor_revision != revision_.minor_revision && key_data->minor_revision != 0 ) )
-                {
-                    *extended_status = kConnectionManagerStatusCodeErrorRevisionMismatch;
-                    return false;
-                }
-            }
-            else
-            {
-                // Compatibility mode is set
-
-                // Major must match, Minor != 0 and <= MinorRevision
-                if( key_data->major_revision == revision_.major_revision &&
-                    key_data->minor_revision > 0 &&
-                    key_data->minor_revision <= revision_.minor_revision )
-                {
-                    return true;
-                }
-                else
-                {
-                    *extended_status = kConnectionManagerStatusCodeErrorRevisionMismatch;
-                    return false;
-                }
-            } // end if CompatiblityMode handling
-        }
-    }
-
-    //return *extended_status == kConnectionManagerStatusCodeSuccess ? true : false;
 }
 
 
@@ -244,8 +162,11 @@ CipError CipConn::parseConnectionPath( BufReader aPath, ConnectionManagerStatusC
     // electronic key?
     if( conn_path.port_segs.HasKey() )
     {
-        if( !checkElectronicKeyData( &conn_path.port_segs.key, extended_error ) )
+        ConnectionManagerStatusCode sts = conn_path.port_segs.key.Check();
+
+        if( sts != kConnectionManagerStatusCodeSuccess )
         {
+            *extended_error = sts;
             CIPSTER_TRACE_ERR( "%s: checkElectronicKeyData failed\n", __func__ );
             goto L_exit_error;
         }

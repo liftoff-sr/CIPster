@@ -365,19 +365,45 @@ int CipMessageRouterRequest::DeserializeMRR( BufReader aRequest )
 
     service = *in++;
 
-    int byte_count = *in++ * 2;     // word count x 2
+    unsigned byte_count = *in++ * 2;     // word count x 2
 
-    int result = request_path.DeserializeAppPath( in );
-
-    if( result <= 0 )
+    if( byte_count > in.size() )
     {
-        return result;
+        return -1;
     }
 
-    int bytes_consumed = in.data() - aRequest.data() + result;
+    // limit the length of the request input so it pertains only to request path
+    BufReader rpath( in.data(), byte_count );
 
-    data = aRequest + bytes_consumed;   // set this->data
+#if 1
+    // Vol1 2-4.1.1
+    CipElectronicKeySegment key;
 
-    return bytes_consumed;   // how many bytes consumed
+    int result = key.DeserializeElectronicKey( rpath );
+
+    if( result < 0 )
+        return result;
+
+/*
+    if( result > 0 )
+    {
+        key.Check();
+    }
+*/
+
+    rpath += result;
+#endif
+
+    result = request_path.DeserializeAppPath( rpath );
+
+    if( result < 0 )
+        return result;
+
+    int bytes_consumed = rpath.data() - aRequest.data() + result;
+
+    // set this->data for service functions
+    data = aRequest + bytes_consumed;
+
+    return bytes_consumed;
 }
 

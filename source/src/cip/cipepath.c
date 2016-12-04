@@ -10,6 +10,7 @@
 #include "cipster_api.h"
 #include "cipepath.h"
 #include "byte_bufs.h"
+#include "cipidentity.h"
 
 
 //* @brief Enum containing values which kind of logical segment is encoded
@@ -548,6 +549,98 @@ static int parsePortSegment( BufReader aInput, CipPortSegment* aSegment )
 }
 
 
+int CipElectronicKeySegment::DeserializeElectronicKey( BufReader aInput )
+{
+    BufReader in = aInput;
+
+    int first = *in;
+
+    if( first == 0x34 )
+    {
+        ++in;   // ate first
+
+        int key_format = *in++;
+
+        if( key_format != 4 )
+        {
+            CIPSTER_TRACE_ERR( "%s: unknown electronic key format: %d\n",
+                __func__, key_format );
+
+            return aInput.data() - (in.data() - 1);    // return negative byte offset of error
+        }
+
+        vendor_id      = in.get16();
+        device_type    = in.get16();
+        product_code   = in.get16();
+        major_revision = *in++;
+        minor_revision = *in++;
+    }
+
+    return in.data() - aInput.data();
+}
+
+
+ConnectionManagerStatusCode CipElectronicKeySegment::Check() const
+{
+    bool compatiblity_mode = major_revision & 0x80;
+
+    // Remove compatibility bit
+    int mjr_revision = major_revision & 0x7f;
+
+    // Check VendorID and ProductCode, must match, or be 0
+    if( ( vendor_id    != vendor_id_     &&  vendor_id != 0 )
+     || ( product_code != product_code_  &&  product_code != 0 ) )
+    {
+        return kConnectionManagerStatusCodeErrorVendorIdOrProductcodeError;
+    }
+    else
+    {
+        // VendorID and ProductCode are correct
+
+        // Check DeviceType, must match or 0
+        if( device_type != device_type_  &&  device_type != 0 )
+        {
+            return kConnectionManagerStatusCodeErrorDeviceTypeError;
+        }
+        else
+        {
+            // VendorID, ProductCode and DeviceType are correct
+            if( !compatiblity_mode )
+            {
+                // Major = 0 is valid
+                if( 0 == mjr_revision )
+                {
+                    return kConnectionManagerStatusCodeSuccess;
+                }
+
+                // Check Major / Minor Revision, Major must match, Minor match or 0
+                if(  mjr_revision   != revision_.major_revision ||
+                   ( minor_revision != revision_.minor_revision && minor_revision != 0 ) )
+                {
+                    return kConnectionManagerStatusCodeErrorRevisionMismatch;
+                }
+            }
+            else
+            {
+                // Compatibility mode is set
+
+                // Major must match, Minor != 0 and <= MinorRevision
+                if( mjr_revision == revision_.major_revision &&
+                    minor_revision > 0 &&
+                    minor_revision <= revision_.minor_revision )
+                {
+                    return kConnectionManagerStatusCodeSuccess;
+                }
+                else
+                {
+                    return kConnectionManagerStatusCodeErrorRevisionMismatch;
+                }
+            }
+        }
+    }
+}
+
+
 int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
 {
     BufReader in = aInput;
@@ -558,6 +651,7 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
 
     while( in.size() )
     {
+        int result;
         int first = *in;
 
         if( (first & 0xe0) == kSegmentTypePort )
@@ -570,25 +664,12 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
             switch( first )
             {
             case 0x34:      // electronic key
-                ++in;
+                result = key.DeserializeElectronicKey( in );
 
-                int key_format;
+                if( result < 0 )
+                    return result;
 
-                key_format = *in++;
-
-                if( key_format != 4 )
-                {
-                    CIPSTER_TRACE_ERR( "%s: unknown electronic key format: %d\n",
-                        __func__, key_format );
-
-                    return aInput.data() - (in.data() - 1);    // return negative byte offset of error
-                }
-
-                key.vendor_id      = in.get16();
-                key.device_type    = in.get16();
-                key.product_code   = in.get16();
-                key.major_revision = *in++;
-                key.minor_revision = *in++;
+                in += result;
                 pbits |= (1<<KEY);
                 break;
 

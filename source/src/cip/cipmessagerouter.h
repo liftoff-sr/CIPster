@@ -13,6 +13,7 @@
 
 /**
  * Struct CipMessageRouterRequest
+ * See Vol1 - 2-4.1
  */
 struct CipMessageRouterRequest
 {
@@ -25,11 +26,32 @@ struct CipMessageRouterRequest
      * parses the UCMM header consisting of: service, IOI size, IOI,
      * data into a request structure
      *
-     * @param aCommand the serizlized CPFD data item, i.e. CIP command
+     * @param aCommand the serialized CPFD data item, i.e. CIP command
      * @return int - number of bytes consumed or -1 if error.
      */
     int DeserializeMRR( BufReader aCommand );
+
+    // Not used anywhere yet, inlined so that no code is generated.
+    int SerializeMRR( BufWriter aOutput )
+    {
+        BufWriter out = aOutput;
+
+        *out++ = service;
+        int rplen = request_path.SerializeAppPath( out+1 );
+
+        if( rplen < 0 )
+            return rplen;
+
+        *out++ = rplen / 2;     // word count = byte_count / 2
+
+        out += rplen;
+
+        out.append( data.data(), data.size() );
+
+        return out.data() - aOutput.data();
+    }
 };
+
 
 class CipCommonPacketFormatData;
 
@@ -42,7 +64,7 @@ class CipMessageRouterResponse
 public:
     CipMessageRouterResponse( CipCommonPacketFormatData* cpfd );
 
-    /// Return a CipBuf holding the serialized CIP response.
+    /// Return a BufReader holding the serialized CIP response.
     BufReader Payload() const
     {
         return BufReader( data.data(), data_length );

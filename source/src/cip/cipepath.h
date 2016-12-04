@@ -296,6 +296,24 @@ struct CipElectronicKeySegment
     int         major_revision;     /**< Major Revision and Compatibility (Bit 0-6 = Major
                                      *  Revision) Bit 7 = Compatibility */
     int         minor_revision;     ///< Minor Revision
+
+    /**
+     * Function DeserializeElectronicKey
+     * parses an electronic key into this structure.
+     * @param aSource gives the bytes to parse and their length.
+     * @return int - number of bytes consumed.  If zero, this means bytes
+     *  given by aSource were not an electronic key.
+     */
+    int DeserializeElectronicKey( BufReader aSource );
+
+    /**
+     * Function Check
+     * compares this electronic key with this device's global data.
+     *
+     * @return ConnectionManagerStatusCode - kConnectionManagerStatusCodeSuccess
+     *  on success, other value from this enum on error.
+     */
+    ConnectionManagerStatusCode Check() const;
 };
 
 

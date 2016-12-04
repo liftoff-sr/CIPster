@@ -149,7 +149,7 @@ public:
     int DeserializeCPFD( BufReader aSrc );
 
     /**
-     * Function SerializeForMRR
+     * Function SerializeCPFD
      * serializes this object.
      *
      * @param  aResponse message router response or NULL if implicit response.
