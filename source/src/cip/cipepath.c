@@ -673,13 +673,13 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
                 pbits |= (1<<KEY);
                 break;
 
-            case 0x43:
+            case 0x43:      // PIT msecs
                 ++in;
                 value = *in++;
                 SetPIT_MSecs( value );  // convert to usecs
                 break;
 
-            case 0x51:
+            case 0x51:      // PIT usecs
                 ++in;
 
                 int num_words;

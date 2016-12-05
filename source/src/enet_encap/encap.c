@@ -13,18 +13,8 @@
 #include "cipmessagerouter.h"
 #include "cipconnectionmanager.h"
 #include "cipidentity.h"
+#include "ciptcpipinterface.h"
 
-// Identity data from cipidentity.c
-extern EipUint16 vendor_id_;
-extern EipUint16 device_type_;
-extern EipUint16 product_code_;
-extern CipRevision revision_;
-extern EipUint16 status_;
-extern EipUint32 serial_number_;
-extern CipShortString product_name_;
-
-// ip address data taken from TCPIPInterfaceObject
-extern CipTcpIpNetworkInterfaceConfiguration interface_configuration_;
 
 const int kSupportedProtocolVersion = 1;                    //*< Supported Encapsulation protocol version
 

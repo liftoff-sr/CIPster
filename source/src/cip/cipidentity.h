@@ -51,10 +51,13 @@ EipStatus CipIdentityInit();
 
 
 // values needed from the CIP identity object
-extern EipUint16    vendor_id_;
-extern EipUint16    device_type_;
-extern EipUint16    product_code_;
-extern CipRevision  revision_;
+extern EipUint16        vendor_id_;
+extern EipUint16        device_type_;
+extern EipUint16        product_code_;
+extern CipRevision      revision_;
+extern EipUint16        status_;
+extern EipUint32        serial_number_;
+extern CipShortString   product_name_;
 
 
 #endif    // CIPSTER_CIPIDENTITY_H_

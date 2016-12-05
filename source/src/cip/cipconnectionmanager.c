@@ -22,11 +22,6 @@
 #include "encap.h"
 
 
-/// Length in bytes of the forward open command specific data until the start
-/// of the connection path
-const int g_kForwardOpenHeaderLength = 36;
-
-
 /// List holding all currently active connections
 CipConn* g_active_connection_list;
 
@@ -1124,13 +1119,13 @@ static EipStatus forward_open_common( CipInstance* instance,
 
     unsigned conn_path_byte_count = *in++ * 2;
 
-    if( g_kForwardOpenHeaderLength + conn_path_byte_count < request->data.size() )
+    if( conn_path_byte_count < in.size() )
     {
         assembleForwardOpenResponse( &dummy, response, kCipErrorTooMuchData, connection_status );
         return kEipStatusOkSend;    // send reply
     }
 
-    if( g_kForwardOpenHeaderLength + conn_path_byte_count > request->data.size() )
+    if( conn_path_byte_count > in.size() )
     {
         assembleForwardOpenResponse( &dummy, response, kCipErrorNotEnoughData, connection_status );
         return kEipStatusOkSend;

@@ -16,9 +16,9 @@
  * The Ethernet encapsulation layer handles provides the abstraction between the Ethernet and the CIP layer.
  */
 
-//** defines **
 
 #define ENCAPSULATION_HEADER_LENGTH         24
+
 
 //* @brief Ethernet/IP standard port
 static const int kOpenerEthernetPort = 0xAF12;
