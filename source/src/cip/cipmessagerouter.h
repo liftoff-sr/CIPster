@@ -64,6 +64,8 @@ class CipMessageRouterResponse
 public:
     CipMessageRouterResponse( CipCommonPacketFormatData* cpfd );
 
+    void Clear();
+
     /// Return a BufReader holding the serialized CIP response.
     BufReader Payload() const
     {
@@ -72,6 +74,8 @@ public:
 
     CipCommonPacketFormatData* CPFD() const     { return cpfd; }
 
+    /// Serialize this CipMessageRouterResponse, return byte count consumed.
+    int SerializeMRResponse( BufWriter aOutput );
 
     CipUsint reply_service;             ///< Reply service code, the requested service code + 0x80
     CipOctet reserved;                  ///< Reserved; Shall be zero

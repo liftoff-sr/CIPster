@@ -221,15 +221,6 @@ static void encodeConnectedDataItemLength( CipMessageRouterResponse* response, B
 }
 
 
-static void encodeExtendedStatus( CipMessageRouterResponse* response, BufWriter& out )
-{
-    *out++ = response->size_of_additional_status;
-
-    for( int i = 0;  i < response->size_of_additional_status;  ++i )
-        out.put16( response->additional_status[i] );
-}
-
-
 static void encodeUnconnectedDataItemLength( CipMessageRouterResponse* response, BufWriter& out )
 {
     // Unconnected Item
@@ -294,14 +285,8 @@ int CipCommonPacketFormatData::SerializeCPFD( CipMessageRouterResponse* aRespons
                 encodeUnconnectedDataItemLength( aResponse, out );
             }
 
-            CIPSTER_ASSERT( aResponse->reply_service & 0x80 );
-
             // serialize message router response
-            *out++ = aResponse->reply_service;
-            *out++ = aResponse->reserved;
-            *out++ = aResponse->general_status;
-
-            encodeExtendedStatus( aResponse, out );
+            out += aResponse->SerializeMRResponse( out );
 
             out.append( aResponse->data.data(), aResponse->data_length );
         }

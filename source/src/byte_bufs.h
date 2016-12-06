@@ -41,6 +41,7 @@ public:
     {
         if( advance > size() )
             overrun();
+
         start += advance;
         return *this;
     }
@@ -68,7 +69,7 @@ public:
 
     BufWriter operator++(int)  // postfix ++
     {
-        BufWriter result(*this);
+        BufWriter result( *this );
         *this += 1;
         return result;
     }
@@ -215,8 +216,6 @@ public:
     const CipByte*  end()  const    { return limit; }
     size_t          size() const    { return limit - start; }
 
-
-
     /// Advance the start of the buffer by the specified number of bytes and trim
     /// the size().
     BufReader& operator += ( size_t advance )
@@ -231,7 +230,6 @@ public:
     BufReader operator+( size_t n )
     {
         BufReader ret = *this;
-
         ret += n;
         return ret;
     }
@@ -243,7 +241,7 @@ public:
 
     BufReader operator++(int)  // postfix ++
     {
-        BufReader result(*this);
+        BufReader result( *this );
         *this += 1;
         return result;
     }

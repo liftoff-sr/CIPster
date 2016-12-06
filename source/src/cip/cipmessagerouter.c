@@ -108,17 +108,41 @@ CipClass* GetCipClass( int class_id )
 std::vector<EipByte> CipMessageRouterResponse::mmr_temp( CIPSTER_MESSAGE_DATA_REPLY_BUFFER );
 
 CipMessageRouterResponse::CipMessageRouterResponse( CipCommonPacketFormatData* aCPFD ) :
-    reply_service( 0 ),
-    reserved( 0 ),
-    general_status( kCipErrorSuccess ),
-    size_of_additional_status( 0 ),
-
-    // shared resizeable response buffer.
-    data( mmr_temp.data(), mmr_temp.size() ),
-    data_length( 0 ),
+    data ( mmr_temp.data(), mmr_temp.size() ),
     cpfd( aCPFD )
 {
+    Clear();
+}
+
+
+void CipMessageRouterResponse::Clear()
+{
+    reply_service = 0;
+    reserved = 0;
+    general_status = kCipErrorSuccess,
+    size_of_additional_status = 0;
+
+    data_length = 0;
+
+    // shared resizeable response buffer.
+
     memset( additional_status, 0, sizeof additional_status );
+}
+
+
+int CipMessageRouterResponse::SerializeMRResponse( BufWriter aOutput )
+{
+    BufWriter out = aOutput;
+
+    *out++ = reply_service | 0x80;
+    *out++ = reserved;
+    *out++ = general_status;
+    *out++ = size_of_additional_status;
+
+    for( int i = 0;  i < size_of_additional_status;  ++i )
+        out.put16( additional_status[i] );
+
+    return out.data() - aOutput.data();
 }
 
 
@@ -229,11 +253,6 @@ EipStatus CipMessageRouterInit()
         RegisterCipClass( clazz );
 
         createCipMessageRouterInstance();
-
-        /* done by "static construction" of CipConn instances now:
-        //TODO this is bad, use a CipConn constructor instead.
-        memset( g_explicit_connections, 0, sizeof g_explicit_connections );
-        */
     }
 
     return kEipStatusOk;
@@ -248,7 +267,7 @@ EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
 
     int result = request.DeserializeMRR( aCommand );
 
-    aResponse->reply_service = request.service | 0x80;
+    aResponse->reply_service = request.service;
 
     if( result <= 0 )
     {
