@@ -66,8 +66,9 @@ public:
      * @return int - Number of decoded bytes, or < 0 if error.  If error, then
      *  the absolute value of this result is the byte offset of the problem starting
      *  from aSrc at zero.  If positive, it is not an error, even though not all the
-     *  available input bytes may not have been consumed.  Parsing may stop at the first
+     *  available input bytes may have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
+     *  If zero, then the first bytes at aInput were not pertinent to this class.
      */
     int DeserializeDataSegment( BufReader aInput );
 
@@ -98,25 +99,32 @@ public:
 
     /**
      * Function DeserializeAppPath
-     * decodes a padded EPATH
+     * deserializes an application_path
      *
-     * @param aInput starts at a possible app_path can can extend beyond it.
+     * @param aInput starts at a possible app_path and can extend beyond it.
+     *
+     * @param aPreviousToInheritFrom is typically an immediately preceding CipAppPath
+     *  that this one is to inherit values from.  The value inherited are the
+     *  "more significant" fields than the first one encountered for this CipAppPath.
      *
      * @return int - Number of decoded bytes, or < 0 if error.  If negative, then
      *  the absolute value of this result is the byte offset into the problem starting
      *  from aSrc at zero.  If positive, it is not an error, even though not all the
-     *  available input bytes may not have been consumed.  Parsing may stop at the first
+     *  available input bytes may have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
+     *  If zero, then the first bytes at aInput were not an application_path.
+     *
+     * @throw whatever BufReader throws on buffer overrun.
      */
     int DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom = NULL );
 
     /**
      * Function SerializePadded
-     * encodes a padded EPATH according to fields which are present in this object and
-     * by a sequence given by grammar on page C-17 of Vol1.
+     * serializes this application_path according to grammar on page C-17 of Vol1.
      *
      * @param aOutput where to serialize into.
-     * @return int - the number of bytes consumed, or -1 if not enough space.
+     * @return int - the number of bytes consumed
+     * @throw whatever BufWriter throws on buffer overrun.
      */
     int SerializeAppPath( BufWriter aOutput );
 
@@ -179,6 +187,8 @@ public:
         // return pbits & ((1<<CLASS)|(1<<INSTANCE)|(1<<ATTRIBUTE));
     }
 
+    /// Return true if this application_path is sufficiently specified in a
+    /// logical way, not a symbolic way.
     bool IsSufficient() const
     {
         if( GetClass() == kCipAssemblyClassCode )
@@ -220,7 +230,7 @@ public:
             return GetInstance();
     }
 
-    /// Return the ASCII symbol, or "" if none.  Will never exceed strlen() == 31.
+    /// Return the ASCII symbol, or "" if none.
     const char* GetSymbol() const;
 
     int GetMember1() const
@@ -254,6 +264,8 @@ private:
 
     enum Stuff
     {
+        // The order of these is relied upon by inheritance mechanism.  Do not
+        // arbitrarily change the order here.
         ATTRIBUTE,
         CONN_PT,
         INSTANCE,
@@ -303,6 +315,8 @@ struct CipElectronicKeySegment
      * @param aSource gives the bytes to parse and their length.
      * @return int - number of bytes consumed.  If zero, this means bytes
      *  given by aSource were not an electronic key.
+     *
+     * @throw whatever BufReader throws on buffer overrun.
      */
     int DeserializeElectronicKey( BufReader aSource );
 
@@ -347,9 +361,10 @@ public:
 
 /**
  * Class CipPortSegmentGroup
- * holds optionally an electronic key segment, any number of network segments,
- * and an optional port segment.   See grammar on page 3-60 of Vol1_3.19.
- * The Port segment is not optional and terminates the sequence.
+ * holds optionally an electronic key segment, some network segments,
+ * and a port segment.  All are optional, and the Has*() functions tell
+ * what is contained.  See grammar on page 3-60 of Vol1_3.19.
+ * The Port segment terminates the sequence according to the grammar.
  */
 class CipPortSegmentGroup : public SegmentGroup
 {
@@ -364,15 +379,18 @@ public:
 
     /**
      * Function DeserializePortSegmentGroup
-     * decodes a padded EPATH
+     * deserializes any of the segments mentioned in the class description.
      *
      * @param aInput starts at a possible port segment group and can extend beyond it.
      *
      * @return int - Number of decoded bytes, or <= 0 if error.  If error, then
      *  the absolute value of this result is the byte offset of the problem starting
      *  from aSrc at zero.  If positive, it is not an error, even though not all the
-     *  available input bytes may not have been consumed.  Parsing may stop at the first
+     *  available input bytes may have been consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
+     *  If zero, then the first bytes at aInput do not pertain to this class.
+     *
+     * @throw whatever BufReader will throw on buffer overrun.
      */
     int DeserializePortSegmentGroup( BufReader aInput );
 
@@ -380,11 +398,11 @@ public:
      * Function SerializePortSegmentGroup
      * encodes a padded EPATH according to fields which are present in this object and
      * by a sequence given by grammar on page C-17 of Vol1.
-     * @param aDst is a buffer to serialize into.
-     * @param aLimit is one past the end of the buffer.
-     * @return int - the number of bytes consumed, or -1 if not enough space.
+     * @param aOutput is a buffer to serialize into.
+     * @return int - the number of bytes consumed
+     * @throw whatever BufWriter throws on buffer overrun.
+    int SerializePortSegmentGroup( BufWriter aOutput );
      */
-  //  int SerializePadded( EipByte* aDst, EipByte* aLimit );
 
     bool HasPortSeg() const             { return pbits & (1<<PORT); }
 
@@ -431,7 +449,5 @@ protected:
         STUFF_COUNT
     };
 };
-
-
 
 #endif  // CIPEPATH_H_
