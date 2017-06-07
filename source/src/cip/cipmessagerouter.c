@@ -261,7 +261,7 @@ EipStatus CipMessageRouterInit()
 
 EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
 {
-    CIPSTER_TRACE_INFO( "notifyMR: routing unconnected message\n" );
+    CIPSTER_TRACE_INFO( "%s: routing unconnected message\n", __func__ );
 
     CipMessageRouterRequest request;
 

@@ -244,7 +244,7 @@ CipError CipConn::parseConnectionPath( BufReader aPath, ConnectionManagerStatusC
 
     int actual_app_path_count;
 
-    actual_app_path_count = 1 + int( app_path2.HasAny() + app_path3.HasAny() );
+    actual_app_path_count = 1 + app_path2.HasAny() + app_path3.HasAny();
 
     // This 'if else if' block is coded to look like table
     // 3-5.13; which should reduce risk of error
@@ -595,7 +595,7 @@ EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReade
                         conn->inactivity_watchdog_timer_usecs =
                             conn->o_to_t_RPI_usecs << (2 + conn->connection_timeout_multiplier);
 
-                        CIPSTER_TRACE_INFO( "%s: reset inactivity_watchdog_timer_usecs:%u\n",
+                        CIPSTER_TRACE_INFO( "%s: reset inactivity watchdog to %u usecs\n",
                             __func__,
                             conn->inactivity_watchdog_timer_usecs );
 
@@ -607,11 +607,25 @@ EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReade
                                 BufReader( cpfd.data_item.data, cpfd.data_item.length ) );
                         }
                     }
+                    else
+                    {
+                        CIPSTER_TRACE_INFO( "%s: received sequence number was not greater, no watchdog reset\n"
+                            " received:%08x   connection seqn:%08x\n",
+                            __func__,
+                            cpfd.address_item.data.sequence_number,
+                            conn->eip_level_sequence_count_consuming
+                            );
+                    }
                 }
                 else
                 {
                     CIPSTER_TRACE_WARN(
-                            "Connected Message Data Received with wrong address information\n" );
+                            "%s: connected data received with wrong originator address.\n"
+                            " from:%08x   connection originator:%08x\n",
+                            __func__,
+                            from_address->sin_addr.s_addr,
+                            conn->originator_address.sin_addr.s_addr
+                            );
                 }
             }
         }
@@ -790,7 +804,7 @@ static void assembleForwardOpenResponse( CipConn* aConn,
     *out++ = 0;   // remaining path size - for routing devices relevant
     *out++ = 0;   // reserved
 
-    response->data_length += out.data() - response->data.data();
+    response->data_length = out.data() - response->data.data();
 }
 
 
@@ -852,40 +866,56 @@ void CloseConnection( CipConn* conn )
 }
 
 
-void AddNewActiveConnection( CipConn* conn )
+void AddNewActiveConnection( CipConn* aConn )
 {
-    conn->prev = NULL;
-    conn->next = g_active_connection_list;
+#if defined(DEBUG) || 1
+    if( aConn->transport_trigger.Class() == kConnectionTransportClass1 )
+    {
+        CIPSTER_TRACE_INFO( "%s: conn->consuming_connection_id:%d\n",
+            __func__, aConn->consuming_connection_id );
+    }
+#endif
+
+    aConn->prev = NULL;
+    aConn->next = g_active_connection_list;
 
     if( g_active_connection_list )
     {
-        g_active_connection_list->prev = conn;
+        g_active_connection_list->prev = aConn;
     }
 
-    g_active_connection_list = conn;
+    g_active_connection_list = aConn;
     g_active_connection_list->state = kConnectionStateEstablished;
 }
 
 
-void RemoveFromActiveConnections( CipConn* conn )
+void RemoveFromActiveConnections( CipConn* aConn )
 {
-    if( conn->prev )
+#if defined(DEBUG) || 1
+    if( aConn->transport_trigger.Class() == kConnectionTransportClass1 )
     {
-        conn->prev->next = conn->next;
+        CIPSTER_TRACE_INFO( "%s: conn->consuming_connection_id:%d\n",
+            __func__, aConn->consuming_connection_id );
+    }
+#endif
+
+    if( aConn->prev )
+    {
+        aConn->prev->next = aConn->next;
     }
     else
     {
-        g_active_connection_list = conn->next;
+        g_active_connection_list = aConn->next;
     }
 
-    if( conn->next )
+    if( aConn->next )
     {
-        conn->next->prev = conn->prev;
+        aConn->next->prev = aConn->prev;
     }
 
-    conn->prev  = NULL;
-    conn->next  = NULL;
-    conn->state = kConnectionStateNonExistent;
+    aConn->prev  = NULL;
+    aConn->next  = NULL;
+    aConn->state = kConnectionStateNonExistent;
 }
 
 
@@ -1051,11 +1081,6 @@ static EipStatus forward_open_common( CipInstance* instance,
     else
         dummy.o_to_t_ncp.SetNotLarge( in.get16() );
 
-    CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, dummy.o_to_t_RPI_usecs );
-    CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, dummy.o_to_t_ncp.ConnectionSize() );
-    CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, dummy.o_to_t_ncp.Priority() );
-    CIPSTER_TRACE_INFO( "%s: o_to_t type:%d\n", __func__, dummy.o_to_t_ncp.ConnectionType() );
-
     dummy.t_to_o_RPI_usecs = in.get32();
 
     // The requested packet interval parameter needs to be a multiple of
@@ -1140,6 +1165,12 @@ static EipStatus forward_open_common( CipInstance* instance,
         assembleForwardOpenResponse( &dummy, response, result, connection_status );
         return kEipStatusOkSend;
     }
+
+    CIPSTER_TRACE_INFO( "%s: transport_trigger_class:%d\n", __func__, dummy.transport_trigger.Class() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, dummy.o_to_t_RPI_usecs );
+    CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, dummy.o_to_t_ncp.ConnectionSize() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, dummy.o_to_t_ncp.Priority() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t type:%d\n", __func__, dummy.o_to_t_ncp.ConnectionType() );
 
     CipClass* clazz = GetCipClass( dummy.mgmnt_class );
 

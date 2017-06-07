@@ -242,12 +242,17 @@ struct LinkObject
  * Struct CipConnPath
  * holds data deserialized from the connection_path portion of a
  * forward_open service request.
+ * @see 3-5.4.1.10  Connection Path
  */
 struct CipConnPath
 {
     // They arrive in this order when all are present:
 
     CipPortSegmentGroup     port_segs;
+
+    // per 3-5.4.1.10 the application path names are relative to the target node.
+    // A consuming_path is for a O->T connection.
+    // A producing_path is for a T->O connection.
 
     CipAppPath  config_path;
     CipAppPath  consuming_path;     ///< consumption from my perspective, output from network's perspective

@@ -515,28 +515,43 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
 {
     CIPSTER_ASSERT( aReply.size() >= ENCAPSULATION_HEADER_LENGTH ); // caller bug
 
-    int result = -1;
-
     if( aCommand.size() < ENCAPSULATION_HEADER_LENGTH )
+    {
+        CIPSTER_TRACE_ERR( "%s: aCommand.size too small\n", __func__ );
         return -1;
+    }
 
     EncapsulationData encap;
 
-    if( encap.DeserializeEncap( aCommand ) != ENCAPSULATION_HEADER_LENGTH )
+    int result = encap.DeserializeEncap( aCommand );
+
+    if( result != ENCAPSULATION_HEADER_LENGTH )
+    {
+        CIPSTER_TRACE_ERR( "%s: unable to DeserializeEncap, result=%d\n", __func__, result );
         return -1;
+    }
 
     if( encap.command_code == kEncapsulationCommandNoOperation )
+    {
+        CIPSTER_TRACE_INFO( "%s: NOP ignored\n",  __func__ );
         return -1;
+    }
+
+    CIPSTER_TRACE_INFO( "%s: aCommand .command_code:%d .size:%d  aReply.size:%d\n",
+        __func__, encap.command_code, aCommand.size(), aReply.size() );
 
     if( encap.status )  // all commands have 0 in status, else ignore
+    {
+        CIPSTER_TRACE_ERR( "%s: encap.status != 0\n", __func__ );
         return -1;
+    }
 
     encap.data_length = 0;  // aCommand.size() has our length, establish default for reply
 
     // Adjust locally for encapsulation header which is both consumed in the
     // the command and reserved in the reply.
-    BufReader    command = aCommand + ENCAPSULATION_HEADER_LENGTH;
-    BufWriter       reply = aReply + ENCAPSULATION_HEADER_LENGTH;
+    BufReader   command = aCommand + ENCAPSULATION_HEADER_LENGTH;
+    BufWriter   reply = aReply + ENCAPSULATION_HEADER_LENGTH;
 
     switch( encap.command_code )
     {
@@ -572,6 +587,7 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
     case kEncapsulationCommandSendRequestReplyData:
     case kEncapsulationCommandSendUnitData:
     default:
+        result = -1;
         encap.status = kEncapsulationProtocolInvalidOrUnsupportedCommand;
         break;
     }
@@ -583,6 +599,8 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
         encap.SerializeEncap( aReply );
         result += ENCAPSULATION_HEADER_LENGTH;
     }
+
+    CIPSTER_TRACE_INFO( "%s: ret:%d\n", __func__, result );
 
     return result;
 }
