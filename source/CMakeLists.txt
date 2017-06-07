@@ -16,6 +16,8 @@ project( CIPster )
 set( CIPster_VERSION_MAJOR 1 )
 set( CIPster_VERSION_MINOR 0 )
 
+option( BYTEBUFS_INLINE "Use inline byte_bufs, which is bigger code and maybe a little faster" NO )
+
 set( USER_INCLUDE_DIR "" CACHE PATH "Location of user specific include file (opener_user_conf.h)" )
 
 if( USER_INCLUDE_DIR STREQUAL "" )

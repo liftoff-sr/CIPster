@@ -7,9 +7,9 @@
 #define BYTE_BUFS_H_
 
 #include <string.h>
-#include <stdexcept>
 
 #include "typedefs.h"
+
 
 
 /**
@@ -37,153 +37,46 @@ public:
 
     /// Advance the start of the buffer by the specified number of bytes and trim
     /// the size().
-    BufWriter& operator+=( size_t advance )
-    {
-        if( advance > size() )
-            overrun();
+    BufWriter& operator+=( size_t advance );
 
-        start += advance;
-        return *this;
-    }
+    BufWriter operator+( size_t n );
 
-    BufWriter operator+( size_t n )
-    {
-        BufWriter ret = *this;
+    CipByte& operator * ();
 
-        ret += n;
-        return ret;
-    }
+    /// prefix ++
+    BufWriter& operator++();
 
-    CipByte& operator * ()
-    {
-        if( start >= limit )
-            overrun();
+    /// postfix ++
+    BufWriter operator++(int);
 
-        return *start;
-    }
+    void put8( CipByte aValue );
 
-    BufWriter& operator++()  // prefix ++
-    {
-        return *this += 1;
-    }
+    void put16( EipUint16 aValue );
 
-    BufWriter operator++(int)  // postfix ++
-    {
-        BufWriter result( *this );
-        *this += 1;
-        return result;
-    }
+    void put32( EipUint32 aValue );
 
-    void put8( CipByte aValue )
-    {
-        if( start + 1 > limit )
-            overrun();
+    void put64( EipUint64 aValue );
 
-        *start++ = aValue;
-    }
+    void put_float( float aValue );
 
-    void put16( EipUint16 aValue )
-    {
-        if( start + 2 > limit )
-            overrun();
-        start[0] = (CipByte) (aValue >> 0);
-        start[1] = (CipByte) (aValue >> 8);
-        start += 2;
-    }
+    void put_double( double aValue );
 
-    void put32( EipUint32 aValue )
-    {
-        if( start + 4 > limit )
-            overrun();
-        start[0] = (CipByte) (aValue >> 0);
-        start[1] = (CipByte) (aValue >> 8);
-        start[2] = (CipByte) (aValue >> 16);
-        start[3] = (CipByte) (aValue >> 24);
-        start += 4;
-    }
+    // Put 16 bit integer Big Endian
+    void put16BE( EipUint16 aValue );
 
-    void put64( EipUint64 aValue )
-    {
-        if( start + 8 > limit )
-            overrun();
-        start[0] = (CipByte) (aValue >> 0);
-        start[1] = (CipByte) (aValue >> 8);
-        start[2] = (CipByte) (aValue >> 16);
-        start[3] = (CipByte) (aValue >> 24);
-        start[4] = (CipByte) (aValue >> 32);
-        start[5] = (CipByte) (aValue >> 40);
-        start[6] = (CipByte) (aValue >> 48);
-        start[7] = (CipByte) (aValue >> 56);
-        start += 8;
-    }
+    // Put 32 bit integer Big Endian
+    void put32BE( EipUint32 aValue );
 
-    void put_float( float aValue )
-    {
-        union {
-            float       f;
-            EipUint32   i;
-        } t;
+    void append( const EipByte* aStart, size_t aCount );
 
-        t.f = aValue;
-        put32( t.i );
-    }
-
-    void put_double( double aValue )
-    {
-        union {
-            double      d;
-            EipUint64   i;
-        } t;
-
-        t.d = aValue;
-        put64( t.i );
-    }
-
-    void put16BE( EipUint16 aValue )
-    {
-        if( start + 2 > limit )
-            overrun();
-        start[1] = (CipByte) (aValue >> 0);
-        start[0] = (CipByte) (aValue >> 8);
-        start += 2;
-    }
-
-    void put32BE( EipUint32 aValue )
-    {
-        if( start + 4 > limit )
-            overrun();
-        start[3] = (CipByte) (aValue >> 0);
-        start[2] = (CipByte) (aValue >> 8);
-        start[1] = (CipByte) (aValue >> 16);
-        start[0] = (CipByte) (aValue >> 24);
-        start += 4;
-    }
-
-    void append( const EipByte* aStart, size_t aCount )
-    {
-        if( start + aCount > limit )
-            overrun();
-        memcpy( start, aStart, aCount );
-        start += aCount;
-    }
-
-    void fill( size_t aCount, EipByte aValue = 0 )
-    {
-        if( start + aCount > limit )
-            overrun();
-        memset( start, aValue, aCount );
-        start += aCount;
-    }
+    void fill( size_t aCount, EipByte aValue = 0 );
 
 protected:
     CipByte*    start;
     CipByte*    limit;          // points to one past last byte
 
 private:
-    void        overrun() const
-    {
-        throw std::overflow_error( "write > limit" );
-    }
+    void        overrun() const;
 };
 
 
@@ -218,145 +111,46 @@ public:
 
     /// Advance the start of the buffer by the specified number of bytes and trim
     /// the size().
-    BufReader& operator += ( size_t advance )
-    {
-        if( advance > size() )
-            overrun();
+    BufReader& operator += ( size_t advance );
 
-        start += advance;
-        return *this;
-    }
+    BufReader operator+( size_t n );
 
-    BufReader operator+( size_t n )
-    {
-        BufReader ret = *this;
-        ret += n;
-        return ret;
-    }
+    /// prefix ++
+    BufReader& operator++();
 
-    BufReader& operator++()  // prefix ++
-    {
-        return *this += 1;
-    }
+    /// postfix ++
+    BufReader operator++(int);
 
-    BufReader operator++(int)  // postfix ++
-    {
-        BufReader result( *this );
-        *this += 1;
-        return result;
-    }
+    CipByte operator * () const;
 
-    CipByte operator * () const
-    {
-        if( start >= limit )
-            overrun();
-        return *start;
-    }
+    CipByte get8();
 
-    CipByte get8()
-    {
-        if( start + 1 > limit )
-            overrun();
-        return *start++;
-    }
+    EipUint16 get16();
 
-    EipUint16 get16()
-    {
-        if( start + 2 > limit )
-            overrun();
+    EipUint32 get32();
 
-        EipUint16 ret = (start[0] << 0) |
-                        (start[1] << 8);
-        start += 2;
-        return ret;
-    }
+    EipUint64 get64();
 
-    EipUint32 get32()
-    {
-        if( start + 4 > limit )
-            overrun();
+    float get_float();
 
-        EipUint32 ret = (start[0] << 0 ) |
-                        (start[1] << 8 ) |
-                        (start[2] << 16) |
-                        (start[3] << 24) ;
-        start += 4;
-        return ret;
-    }
+    double get_double();
 
-    EipUint64 get64()
-    {
-        if( start + 8 > limit )
-            overrun();
+    /// Get a 16 bit integer as Big Endian
+    EipUint16 get16BE();
 
-        EipUint64 ret = ((EipUint64) start[0] << 0 ) |
-                        ((EipUint64) start[1] << 8 ) |
-                        ((EipUint64) start[2] << 16) |
-                        ((EipUint64) start[3] << 24) |
-                        ((EipUint64) start[4] << 32) |
-                        ((EipUint64) start[5] << 40) |
-                        ((EipUint64) start[6] << 48) |
-                        ((EipUint64) start[7] << 56) ;
-        start += 8;
-        return ret;
-    }
-
-    float get_float()
-    {
-        union {
-            float       f;
-            EipUint32   i;
-        } t;
-
-        t.i = get32();
-
-        return t.f;
-    }
-
-    double get_double()
-    {
-        union {
-            double      d;
-            EipUint64   i;
-        } t;
-
-        t.i = get64();
-        return t.d;
-    }
-
-    EipUint16 get16BE()
-    {
-        if( start + 2 > limit )
-            overrun();
-
-        EipUint16 ret = (start[1] << 0) |
-                        (start[0] << 8);
-        start += 2;
-        return ret;
-    }
-
-    EipUint32 get32BE()
-    {
-        if( start + 4 > limit )
-            overrun();
-
-        EipUint32 ret = (start[3] << 0 ) |
-                        (start[2] << 8 ) |
-                        (start[1] << 16) |
-                        (start[0] << 24) ;
-        start += 4;
-        return ret;
-    }
+    /// Get a 32 bit integer as Big Endian
+    EipUint32 get32BE();
 
 protected:
     const CipByte*  start;
     const CipByte*  limit;          // points to one past last byte
 
 private:
-    void overrun() const
-    {
-        throw std::range_error( "read > limit" );
-    }
+    void overrun() const;
 };
+
+#if BYTEBUFS_INLINE
+ #include "byte_bufs.impl"
+#endif
 
 #endif // BYTE_BUFS_H_

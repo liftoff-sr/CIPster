@@ -1,0 +1,300 @@
+/*******************************************************************************
+ * Copyright (c) 2016, SoftPLC Corportion.
+ *
+ ******************************************************************************/
+
+#include <stdexcept>
+
+
+#if BYTEBUFS_INLINE
+ #define MAYBE_INLINE       inline
+#else
+ #define MAYBE_INLINE       /* nothing, so therefore not inline */
+#endif
+
+
+MAYBE_INLINE BufWriter& BufWriter::operator+=( size_t advance )
+{
+    if( advance > size() )
+        overrun();
+
+    start += advance;
+    return *this;
+}
+
+MAYBE_INLINE BufWriter BufWriter::operator+( size_t n )
+{
+    BufWriter ret = *this;
+
+    ret += n;
+    return ret;
+}
+
+MAYBE_INLINE CipByte& BufWriter::operator * ()
+{
+    if( start >= limit )
+        overrun();
+
+    return *start;
+}
+
+MAYBE_INLINE BufWriter& BufWriter::operator++()  // prefix ++
+{
+    return *this += 1;
+}
+
+MAYBE_INLINE BufWriter BufWriter::operator++(int)  // postfix ++
+{
+    BufWriter result( *this );
+    *this += 1;
+    return result;
+}
+
+MAYBE_INLINE void BufWriter::put8( CipByte aValue )
+{
+    if( start + 1 > limit )
+        overrun();
+
+    *start++ = aValue;
+}
+
+MAYBE_INLINE void BufWriter::put16( EipUint16 aValue )
+{
+    if( start + 2 > limit )
+        overrun();
+    start[0] = (CipByte) (aValue >> 0);
+    start[1] = (CipByte) (aValue >> 8);
+    start += 2;
+}
+
+MAYBE_INLINE void BufWriter::put32( EipUint32 aValue )
+{
+    if( start + 4 > limit )
+        overrun();
+    start[0] = (CipByte) (aValue >> 0);
+    start[1] = (CipByte) (aValue >> 8);
+    start[2] = (CipByte) (aValue >> 16);
+    start[3] = (CipByte) (aValue >> 24);
+    start += 4;
+}
+
+MAYBE_INLINE void BufWriter::put64( EipUint64 aValue )
+{
+    if( start + 8 > limit )
+        overrun();
+    start[0] = (CipByte) (aValue >> 0);
+    start[1] = (CipByte) (aValue >> 8);
+    start[2] = (CipByte) (aValue >> 16);
+    start[3] = (CipByte) (aValue >> 24);
+    start[4] = (CipByte) (aValue >> 32);
+    start[5] = (CipByte) (aValue >> 40);
+    start[6] = (CipByte) (aValue >> 48);
+    start[7] = (CipByte) (aValue >> 56);
+    start += 8;
+}
+
+MAYBE_INLINE void BufWriter::put_float( float aValue )
+{
+    union {
+        float       f;
+        EipUint32   i;
+    } t;
+
+    t.f = aValue;
+    put32( t.i );
+}
+
+MAYBE_INLINE void BufWriter::put_double( double aValue )
+{
+    union {
+        double      d;
+        EipUint64   i;
+    } t;
+
+    t.d = aValue;
+    put64( t.i );
+}
+
+
+MAYBE_INLINE void BufWriter::put16BE( EipUint16 aValue )
+{
+    if( start + 2 > limit )
+        overrun();
+    start[1] = (CipByte) (aValue >> 0);
+    start[0] = (CipByte) (aValue >> 8);
+    start += 2;
+}
+
+
+MAYBE_INLINE void BufWriter::put32BE( EipUint32 aValue )
+{
+    if( start + 4 > limit )
+        overrun();
+    start[3] = (CipByte) (aValue >> 0);
+    start[2] = (CipByte) (aValue >> 8);
+    start[1] = (CipByte) (aValue >> 16);
+    start[0] = (CipByte) (aValue >> 24);
+    start += 4;
+}
+
+
+MAYBE_INLINE void BufWriter::append( const EipByte* aStart, size_t aCount )
+{
+    if( start + aCount > limit )
+        overrun();
+    memcpy( start, aStart, aCount );
+    start += aCount;
+}
+
+
+MAYBE_INLINE void BufWriter::fill( size_t aCount, EipByte aValue )
+{
+    if( start + aCount > limit )
+        overrun();
+    memset( start, aValue, aCount );
+    start += aCount;
+}
+
+
+MAYBE_INLINE void BufWriter::overrun() const
+{
+    throw std::overflow_error( "write > limit" );
+}
+
+
+//-----<BufReader>--------------------------------------------------------------
+
+MAYBE_INLINE BufReader& BufReader::operator += ( size_t advance )
+{
+    if( advance > size() )
+        overrun();
+
+    start += advance;
+    return *this;
+}
+
+MAYBE_INLINE BufReader BufReader::operator+( size_t n )
+{
+    BufReader ret = *this;
+    ret += n;
+    return ret;
+}
+
+MAYBE_INLINE BufReader& BufReader::operator++()  // prefix ++
+{
+    return *this += 1;
+}
+
+MAYBE_INLINE BufReader BufReader::operator++(int)  // postfix ++
+{
+    BufReader result( *this );
+    *this += 1;
+    return result;
+}
+
+MAYBE_INLINE CipByte BufReader::operator * () const
+{
+    if( start >= limit )
+        overrun();
+    return *start;
+}
+
+MAYBE_INLINE CipByte BufReader::get8()
+{
+    if( start + 1 > limit )
+        overrun();
+    return *start++;
+}
+
+MAYBE_INLINE EipUint16 BufReader::get16()
+{
+    if( start + 2 > limit )
+        overrun();
+
+    EipUint16 ret = (start[0] << 0) |
+                    (start[1] << 8);
+    start += 2;
+    return ret;
+}
+
+MAYBE_INLINE EipUint32 BufReader::get32()
+{
+    if( start + 4 > limit )
+        overrun();
+
+    EipUint32 ret = (start[0] << 0 ) |
+                    (start[1] << 8 ) |
+                    (start[2] << 16) |
+                    (start[3] << 24) ;
+    start += 4;
+    return ret;
+}
+
+MAYBE_INLINE EipUint64 BufReader::get64()
+{
+    if( start + 8 > limit )
+        overrun();
+
+    EipUint64 ret = ((EipUint64) start[0] << 0 ) |
+                    ((EipUint64) start[1] << 8 ) |
+                    ((EipUint64) start[2] << 16) |
+                    ((EipUint64) start[3] << 24) |
+                    ((EipUint64) start[4] << 32) |
+                    ((EipUint64) start[5] << 40) |
+                    ((EipUint64) start[6] << 48) |
+                    ((EipUint64) start[7] << 56) ;
+    start += 8;
+    return ret;
+}
+
+MAYBE_INLINE float BufReader::get_float()
+{
+    union {
+        float       f;
+        EipUint32   i;
+    } t;
+
+    t.i = get32();
+
+    return t.f;
+}
+
+MAYBE_INLINE double BufReader::get_double()
+{
+    union {
+        double      d;
+        EipUint64   i;
+    } t;
+
+    t.i = get64();
+    return t.d;
+}
+
+MAYBE_INLINE EipUint16 BufReader::get16BE()
+{
+    if( start + 2 > limit )
+        overrun();
+
+    EipUint16 ret = (start[1] << 0) |
+                    (start[0] << 8);
+    start += 2;
+    return ret;
+}
+
+MAYBE_INLINE EipUint32 BufReader::get32BE()
+{
+    if( start + 4 > limit )
+        overrun();
+
+    EipUint32 ret = (start[3] << 0 ) |
+                    (start[2] << 8 ) |
+                    (start[1] << 16) |
+                    (start[0] << 24) ;
+    start += 4;
+    return ret;
+}
+
+MAYBE_INLINE void BufReader::overrun() const
+{
+    throw std::range_error( "read > limit" );
+}
