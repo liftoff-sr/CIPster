@@ -567,7 +567,7 @@ public:
 
     /**
      * Function InstanceRemove
-     * removes an instance and returns it if succes, else NULL.
+     * removes an instance and returns it if success, else NULL.
      *
      * @param aInstanceId is the instance to remove.
      *

@@ -192,17 +192,15 @@ typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* aConn, BufReader a
 /** @ingroup CIP_API
  * @brief Configures the connection point for an exclusive owner connection.
  *
- * @param connection_number The number of the exclusive owner connection. The
- *        enumeration starts with 0. Has to be smaller than
- *        CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS.
  * @param output_assembly_id ID of the O-to-T point to be used for this
  * connection
  * @param input_assembly_id ID of the T-to-O point to be used for this
  * connection
  * @param configuration_assembly_id ID of the configuration point to be used for
  * this connection
+ * @return bool - true on success, else false if too many
  */
-void ConfigureExclusiveOwnerConnectionPoint( int connection_number,
+bool ConfigureExclusiveOwnerConnectionPoint(
         int output_assembly_id,
         int input_assembly_id,
         int configuration_assembly_id );
@@ -210,17 +208,15 @@ void ConfigureExclusiveOwnerConnectionPoint( int connection_number,
 /** @ingroup CIP_API
  * @brief Configures the connection point for an input only connection.
  *
- * @param connection_number The number of the input only connection. The
- *        enumeration starts with 0. Has to be smaller than
- *        CIPSTER_CIP_NUM_INPUT_ONLY_CONNS.
  * @param output_assembly_id ID of the O-to-T point to be used for this
  * connection
  * @param input_assembly_id ID of the T-to-O point to be used for this
  * connection
  * @param configuration_assembly_id ID of the configuration point to be used for
  * this connection
+ * @return bool - true on success, else false if too many
  */
-void ConfigureInputOnlyConnectionPoint( int connection_number,
+bool ConfigureInputOnlyConnectionPoint( int connection_number,
         int output_assembly_id,
         int input_assembly_id,
         int configuration_assembly_id );
@@ -237,8 +233,9 @@ void ConfigureInputOnlyConnectionPoint( int connection_number,
  * connection
  * @param configuration_assembly_id ID of the configuration point to be used for
  * this connection
+ * @return bool - true on success, else false if too many
  */
-void ConfigureListenOnlyConnectionPoint( int connection_number,
+bool ConfigureListenOnlyConnectionPoint(
         int output_assembly_id,
         int input_assembly_id,
         int configuration_assembly_id );

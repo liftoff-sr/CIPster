@@ -9,6 +9,8 @@
 
 void InitializeIoConnectionData();
 
+void DestroyIoConnectionData();
+
 /** @brief check if for the given connection data received in a forward_open request
  *  a suitable connection is available.
  *

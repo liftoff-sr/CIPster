@@ -83,7 +83,7 @@ CipConn* GetConnectionByProducingId( int aConnectionId );
  *   @return pointer to connected Object
  *           0 .. connection not present in device
  */
-CipConn* GetConnectedOutputAssembly( EipUint32 output_assembly_id );
+CipConn* GetConnectedOutputAssembly( int output_assembly_id );
 
 
 /** @brief Close the given connection
@@ -94,10 +94,10 @@ CipConn* GetConnectedOutputAssembly( EipUint32 output_assembly_id );
  */
 void CloseConnection( CipConn* aConn );
 
-bool IsConnectedInputAssembly( EipUint32 aInstanceId );
+bool IsConnectedInputAssembly( int aInstanceId );
 
 // TODO: Missing documentation
-bool IsConnectedOutputAssembly( EipUint32 aInstanceId );
+bool IsConnectedOutputAssembly( int aInstanceId );
 
 /** @brief Insert the given connection object to the list of currently active
  *  and managed connections.

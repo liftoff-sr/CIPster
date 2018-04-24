@@ -124,6 +124,8 @@ void ShutdownCipStack()
 
     // clear all the instances and classes
     DeleteAllClasses();
+
+    DestroyIoConnectionData();
 }
 
 

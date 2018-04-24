@@ -829,7 +829,7 @@ CipConn* GetConnectionByConsumingId( int aConnectionId )
 }
 
 
-CipConn* GetConnectedOutputAssembly( EipUint32 output_assembly_id )
+CipConn* GetConnectedOutputAssembly( int output_assembly_id )
 {
     CipConn* active = g_active_connection_list;
 
@@ -920,7 +920,7 @@ void RemoveFromActiveConnections( CipConn* aConn )
 
 
 
-bool IsConnectedInputAssembly( EipUint32 aInstanceId )
+bool IsConnectedInputAssembly( int aInstanceId )
 {
     CipConn* conn = g_active_connection_list;
 
@@ -936,7 +936,7 @@ bool IsConnectedInputAssembly( EipUint32 aInstanceId )
 }
 
 
-bool IsConnectedOutputAssembly( EipUint32 aInstanceId )
+bool IsConnectedOutputAssembly( int aInstanceId )
 {
     CipConn* conn = g_active_connection_list;
 
