@@ -50,6 +50,8 @@ CipAppPath& CipAppPath::operator = ( const CipAppPath& other )
 
     if( HasSymbol() )
         memcpy( tag, other.tag, sizeof tag );
+
+    return *this;
 }
 
 
