@@ -1,5 +1,5 @@
 
-opener_common_includes()
+cipster_common_includes()
 
 set( CIP_SRCS
     cip/appcontype.cc
@@ -41,8 +41,6 @@ add_subdirectory( cip_objects )
 
 add_definitions( -D__STDC_FORMAT_MACROS )       # <inttypes.h>'s PRIX32
 add_definitions( -std=c++0x )
-
-opener_common_includes()
 
 #message( "OBJECTS_SRC:${OBJECTS_SRC}" )
 

@@ -538,7 +538,7 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
     }
 
     CIPSTER_TRACE_INFO( "%s: aCommand .command_code:%d .size:%d  aReply.size:%d\n",
-        __func__, encap.command_code, aCommand.size(), aReply.size() );
+        __func__, encap.command_code, (int) aCommand.size(), (int) aReply.size() );
 
     if( encap.status )  // all commands have 0 in status, else ignore
     {

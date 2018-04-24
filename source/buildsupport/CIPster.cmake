@@ -1,5 +1,5 @@
 
-function(opener_add_definition)
+function(cipster_add_definition)
     foreach(ARG ${ARGV})
         set_property(GLOBAL APPEND PROPERTY CIPSTER_DEFINITION ${ARG})
     endforeach(ARG)
@@ -7,7 +7,7 @@ endfunction()
 
 
 # Adds common Include directories
-macro(opener_common_includes)
+macro(cipster_common_includes)
     set( SRC_DIR "${PROJECT_SOURCE_DIR}/src" )
     set( CIP_SRC_DIR "${SRC_DIR}/cip" )
     set( ENET_ENCAP_SRC_DIR "${SRC_DIR}/enet_encap" )
@@ -25,7 +25,7 @@ macro(opener_common_includes)
 endmacro()
 
 
-macro(opener_add_cip_object NAME DESCRIPTION)
+macro(cipster_add_cip_object NAME DESCRIPTION)
   set(CIPster_CIP_OBJECT_${NAME} OFF CACHE BOOL "${DESCRIPTION}")
 
   foreach(dependencies ${ARGN})

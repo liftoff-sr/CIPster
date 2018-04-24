@@ -18,10 +18,10 @@ set( CIPster_VERSION_MINOR 0 )
 
 option( BYTEBUFS_INLINE "Use inline byte_bufs, which is bigger code and maybe a little faster" NO )
 
-set( USER_INCLUDE_DIR "" CACHE PATH "Location of user specific include file (opener_user_conf.h)" )
+set( USER_INCLUDE_DIR "" CACHE PATH "Location of user specific include file (cipster_user_conf.h)" )
 
 if( USER_INCLUDE_DIR STREQUAL "" )
-    message( WARNING "Please set variable USER_INCLUDE_DIR to a directory containing a file named opener_user_conf.h" )
+    message( WARNING "Please set variable USER_INCLUDE_DIR to a directory containing a file named cipster_user_conf.h" )
 endif()
 
 

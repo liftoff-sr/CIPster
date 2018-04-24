@@ -6,7 +6,7 @@
 #ifndef CIPSTER_USER_CONF_H_
 #define CIPSTER_USER_CONF_H_
 
-/** @file
+/** @file cipster_user_conf.h
  * @brief CIPster configuration setup
  *
  * This file contains the general application specific configuration for CIPster.
@@ -24,13 +24,13 @@
 #include <windows.h>
 typedef unsigned short in_port_t;
 
-//! Identity configuration of the device
-#define CIPSTER_DEVICE_VENDOR_ID            1
-#define CIPSTER_DEVICE_TYPE                 12
-#define CIPSTER_DEVICE_PRODUCT_CODE         65001
-#define CIPSTER_DEVICE_MAJOR_REVISION       1
-#define CIPSTER_DEVICE_MINOR_REVISION       2
-#define CIPSTER_DEVICE_NAME                 "amphibius goodie"
+//* @brief Identity configuration of the device
+#define CIPSTER_DEVICE_VENDOR_ID         60000
+#define CIPSTER_DEVICE_TYPE              12
+#define CIPSTER_DEVICE_PRODUCT_CODE      65001
+#define CIPSTER_DEVICE_MAJOR_REVISION    1
+#define CIPSTER_DEVICE_MINOR_REVISION    2
+#define CIPSTER_DEVICE_NAME              "amphibius goodie"
 
 
 /** @brief Define the number of supported explicit connections.
@@ -43,7 +43,7 @@ typedef unsigned short in_port_t;
  *  void configureExclusiveOwnerConnectionPoint(unsigned pa_unConnNum, unsigned pa_unOutputAssembly, unsigned pa_unInputAssembly, unsigned pa_unConfigAssembly)
  *
  */
-#define CIPSTER_CIP_NUM_EXLUSIVE_OWNER_CONNS 5
+#define CIPSTER_CIP_NUM_EXCLUSIVE_OWNER_CONNS 5
 
 /** @brief Define the number of supported input only connections.
  *  Each of these connections has to be configured with the function
@@ -107,12 +107,7 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
 
 #define LOG_TRACE(...)  fprintf(stderr,__VA_ARGS__)
 
-//#define PRINT_TRACE(args...)  fprintf(stderr,args);
-
-#endif
-
-
-#ifndef NDEBUG
+#ifndef NDEBUG      // for "Debug" builds
 
 /** @brief A specialized assertion command that will log the assertion and block
  *  further execution in an while(1) loop.
@@ -125,27 +120,18 @@ static const int kOpenerProducedDataHasRunIdleHeader = 0;
       } \
     } while(0)
 
-// else use standard assert()
+// could use standard assert()
 //#include <assert.h>
-//#include <stdio.h>
 //#define CIPSTER_ASSERT(assertion) assert(assertion)
 
-#else
+#else   // for "Release" builds
 
-// for release builds execute the assertion, but don't test it
-#define CIPSTER_ASSERT(assertion) (assertion)
+#define CIPSTER_ASSERT(x)   // nothing
+#endif  // NDEBUG
 
-/* the above may result in "statement with no effect" warnings.
- *  If you do not use assert()s to run functions, the an empty
- *  macro can be used as below
- */
-//#define CIPSTER_ASSERT(assertion)
-// else if you still want assertions to stop execution but without tracing, use the following
-//#define CIPSTER_ASSERT(assertion) do { if(!(assertion)) { while(1){;} } } while (0)
-// else use standard assert()
-//#include <assert.h>
-//#include <stdio.h>
-//#define CIPSTER_ASSERT(assertion) assert(assertion)
+#else   // no CIPSTER_WITH_TRACES
+#define LOG_TRACE(x)        // nothing
+#define CIPSTER_ASSERT(x)   // nothing
 
 #endif
 

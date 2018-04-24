@@ -216,7 +216,7 @@ bool ConfigureExclusiveOwnerConnectionPoint(
  * this connection
  * @return bool - true on success, else false if too many
  */
-bool ConfigureInputOnlyConnectionPoint( int connection_number,
+bool ConfigureInputOnlyConnectionPoint(
         int output_assembly_id,
         int input_assembly_id,
         int configuration_assembly_id );

@@ -52,23 +52,23 @@ EipStatus ApplicationInitialization()
 
     // Reserve some connection instances for the above assemblies:
 
-    ConfigureExclusiveOwnerConnectionPoint( 0,
+    ConfigureExclusiveOwnerConnectionPoint(
             DEMO_APP_OUTPUT_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             DEMO_APP_CONFIG_ASSEMBLY_NUM );
 
     // Reserve a connection instance that can connect without a config_path
-    ConfigureExclusiveOwnerConnectionPoint( 1,
+    ConfigureExclusiveOwnerConnectionPoint(
             DEMO_APP_OUTPUT_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             -1 );                           // config path may be omitted
 
-    ConfigureInputOnlyConnectionPoint( 0,
+    ConfigureInputOnlyConnectionPoint(
             DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             DEMO_APP_CONFIG_ASSEMBLY_NUM );
 
-    ConfigureListenOnlyConnectionPoint( 0,
+    ConfigureListenOnlyConnectionPoint(
             DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             DEMO_APP_CONFIG_ASSEMBLY_NUM );
