@@ -6,7 +6,7 @@
 #ifndef BYTE_BUFS_H_
 #define BYTE_BUFS_H_
 
-#include <string.h>
+#include <string>
 
 #include "typedefs.h"
 
@@ -60,6 +60,15 @@ public:
     void put_float( float aValue );
 
     void put_double( double aValue );
+
+    /// Serialize a CIP SHORT_STRING
+    void put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding = true );
+
+    /// Serialize a CIP STRING
+    void put_STRING( const std::string& aString, bool doEvenByteCountPadding = true );
+
+    /// Serialize a CIP STRING2
+    void put_STRING2( const std::string& aString );
 
     // Put 16 bit integer Big Endian
     void put16BE( EipUint16 aValue );
@@ -134,6 +143,15 @@ public:
     float get_float();
 
     double get_double();
+
+    /// Deserialize a CIP SHORT_STRING
+    std::string get_SHORT_STRING( bool ExpectPossiblePaddingToEvenByteCount = true );
+
+    /// Deserialize a CIP STRING
+    std::string get_STRING( bool ExpectPossiblePaddingToEvenByteCount = true );
+
+    /// Deserialize a CIP STRING2 and encode the result as UTF8 within a std::string.
+    std::string get_STRING2();
 
     /// Get a 16 bit integer as Big Endian
     EipUint16 get16BE();

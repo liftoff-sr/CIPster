@@ -4,6 +4,7 @@
  ******************************************************************************/
 
 #include <stdexcept>
+#include <string.h>
 
 
 #if BYTEBUFS_INLINE
