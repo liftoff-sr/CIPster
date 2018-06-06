@@ -129,7 +129,7 @@ void ShutdownCipStack()
 }
 
 
-//-----<CipAttrube>-------------------------------------------------------
+//-----<CipAttribute>-------------------------------------------------------
 
 CipAttribute::CipAttribute(
         int         aAttributeId,
@@ -183,7 +183,8 @@ EipStatus SetAttrData( CipAttribute* attr,
 }
 
 
-EipStatus GetInstanceCount( CipAttribute* attr, CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+EipStatus GetInstanceCount( CipAttribute* attr,
+        CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     CipClass* clazz = dynamic_cast<CipClass*>( attr->Instance() );
 
@@ -493,7 +494,8 @@ CipClass::~CipClass()
 }
 
 
-CipError CipClass::OpenConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
+CipError CipClass::OpenConnection( CipConn* aConn,
+        CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
 {
     CIPSTER_TRACE_INFO( "%s: NOT implemented for class '%s'\n", __func__, ClassName().c_str() );
     *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
@@ -730,36 +732,24 @@ int EncodeData( int aDataType, const void* data, BufWriter& aBuf )
     case kCipDateAndTime:
         break;
 
+    case kCipShortString:
+        aBuf.put_SHORT_STRING( (std::string&) data );
+        break;
+
     case kCipString:
-        {
-            CipString* string = (CipString*) data;
-
-            aBuf.put16( *(EipUint16*) &string->length );
-            aBuf.append( string->string, string->length );
-
-            if( (aBuf.data() - start) & 1 )
-            {
-                *aBuf++ = 0;       // pad to even byte count
-            }
-        }
+        aBuf.put_STRING( (std::string&) data );
         break;
 
     case kCipString2:
-    case kCipFtime:
-    case kCipLtime:
-    case kCipItime:
+        aBuf.put_STRING2( (std::string&) data );
+        break;
+
     case kCipStringN:
         break;
 
-    case kCipShortString:
-        {
-            CipShortString* short_string = (CipShortString*) data;
-
-            *aBuf++ = short_string->length;
-            aBuf.append( short_string->string, short_string->length );
-        }
-        break;
-
+    case kCipFtime:
+    case kCipLtime:
+    case kCipItime:
     case kCipTime:
         break;
 
@@ -867,29 +857,15 @@ int DecodeData( int aDataType, void* data, BufReader& aBuf )
         break;
 
     case kCipString:
-        {
-            CipString* string = (CipString*) data;
-            string->length = *aBuf++;
-            memcpy( string->string, aBuf.data(), string->length );
-            aBuf += string->length;
-
-            // serialized input was padded to even byte count
-            if( (aBuf.data() - start) & 1 )
-            {
-                ++aBuf;
-            }
-        }
+        *(std::string*) data = aBuf.get_STRING();
         break;
 
     case kCipShortString:
-        {
-            CipShortString* short_string = (CipShortString*) data;
+        *(std::string*) data = aBuf.get_SHORT_STRING();
+        break;
 
-            short_string->length = *aBuf++;
-
-            memcpy( short_string->string, aBuf.data(), short_string->length );
-            aBuf += short_string->length;
-        }
+    case kCipString2:
+        *(std::string*) data = aBuf.get_STRING2();
         break;
 
     default:

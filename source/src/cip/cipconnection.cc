@@ -779,7 +779,7 @@ static CipError openCommunicationChannels( CipConn* aConn, CipCommonPacketFormat
 
 CipConnectionClass::CipConnectionClass() :
     CipClass(
-        kConnectionClassId,
+        kCipConnectionClass,
         "Connection",
         MASK2( 6, 1 ),              // class attributes mask
         MASK2( 6, 1 ),              // class getAttributeAll mask
@@ -787,8 +787,9 @@ CipConnectionClass::CipConnectionClass() :
         1                           // revision
         )
 {
-    // There are no attributes in instance of this class yet, so nothing to set.
+    // There are no attributes in instance of this class yet.
     delete ServiceRemove( kSetAttributeSingle );
+    delete ServiceRemove( kGetAttributeSingle );
 }
 
 
@@ -969,7 +970,7 @@ CipError CipConnectionClass::OpenIO( CipConn* aConn, CipCommonPacketFormatData* 
 
 EipStatus ConnectionClassInit( EipUint16 unique_connection_id )
 {
-    if( !GetCipClass( kCipConnectionManagerClassCode ) )
+    if( !GetCipClass( kCipConnectionClass ) )
     {
         CipClass* clazz = new CipConnectionClass();
 
@@ -1022,7 +1023,7 @@ static EipStatus create( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    CipClass* clazz = GetCipClass( kCipConnectionManagerClassCode );
+    CipClass* clazz = GetCipClass( kCipConnectionManagerClass );
 
     int id = find_unique_free_id( clazz );
 

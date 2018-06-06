@@ -502,7 +502,7 @@ CipError CipConn::parseConnectionPath( BufReader aPath, ConnectionManagerStatusC
     if( transport_trigger.Class() == kConnectionTransportClass3 )
     {
         // connection end point has to be the message router instance 1
-        if( conn_path.consuming_path.GetClass() != kCipMessageRouterClassCode ||
+        if( conn_path.consuming_path.GetClass() != kCipMessageRouterClass ||
             conn_path.consuming_path.GetInstanceOrConnPt() != 1 )
         {
             *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
@@ -1293,7 +1293,7 @@ public:
 
 
 CipConnMgrClass::CipConnMgrClass() :
-    CipClass( kCipConnectionManagerClassCode,
+    CipClass( kCipConnectionManagerClass,
         "Connection Manager",
         MASK5( 1,2,3,6,7 ),     // common class attributes
         MASK5( 1,2,3,6,7 ),     // class getAttributeAll mask
@@ -1315,7 +1315,7 @@ CipConnMgrClass::CipConnMgrClass() :
 
 static CipInstance* createConnectionManagerInstance()
 {
-    CipClass* clazz = GetCipClass( kCipConnectionManagerClassCode );
+    CipClass* clazz = GetCipClass( kCipConnectionManagerClass );
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
@@ -1327,7 +1327,7 @@ static CipInstance* createConnectionManagerInstance()
 
 EipStatus ConnectionManagerInit()
 {
-    if( !GetCipClass( kCipConnectionManagerClassCode ) )
+    if( !GetCipClass( kCipConnectionManagerClass ) )
     {
         CipClass* clazz = new CipConnMgrClass();
 

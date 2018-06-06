@@ -191,7 +191,7 @@ public:
     /// logical way, not a symbolic way.
     bool IsSufficient() const
     {
-        if( GetClass() == kCipAssemblyClassCode )
+        if( GetClass() == kCipAssemblyClass )
             return HasClass() && (HasInstance() || HasConnPt());
         else
             return HasClass() && HasInstance();
@@ -222,7 +222,7 @@ public:
     /// Hide the ugli-ness pertaining to the Assembly class app_path
     int GetInstanceOrConnPt() const
     {
-        if( GetClass() == kCipAssemblyClassCode )
+        if( GetClass() == kCipAssemblyClass )
         {
             return HasInstance() ? GetInstance() : GetConnPt();
         }

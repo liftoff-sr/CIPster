@@ -52,12 +52,7 @@ EipUint16 status_ = 0;               //*< Attribute 5: Status
 
 EipUint32 serial_number_ = 0;        //*< Attribute 6: Serial Number, has to be set prior to CIPster initialization
 
-CipShortString product_name_ =
-{
-    //*< Attribute 7: Product Name
-    sizeof(CIPSTER_DEVICE_NAME) - 1,
-    (EipByte*) CIPSTER_DEVICE_NAME
-};
+std::string product_name_ = CIPSTER_DEVICE_NAME;
 
 
 /** Private functions, sets the devices serial number
@@ -155,7 +150,7 @@ static EipStatus reset_service( CipInstance* instance,
 
 static CipInstance* createIdentityInstance()
 {
-    CipClass* clazz = GetCipClass( kIdentityClassCode );
+    CipClass* clazz = GetCipClass( kCipIdentityClass );
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
@@ -181,9 +176,9 @@ static CipInstance* createIdentityInstance()
  */
 EipStatus CipIdentityInit()
 {
-    if( !GetCipClass( kIdentityClassCode ) )
+    if( !GetCipClass( kCipIdentityClass ) )
     {
-        CipClass* clazz = new CipClass( kIdentityClassCode,
+        CipClass* clazz = new CipClass( kCipIdentityClass,
                 "Identity",                     // class name
 
                 // conformance tool wants no instance count attribute in the class, omit no. 3

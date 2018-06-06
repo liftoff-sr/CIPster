@@ -158,7 +158,7 @@ public:
 
 
 CipMessageRouterClass::CipMessageRouterClass() :
-    CipClass( kCipMessageRouterClassCode,
+    CipClass( kCipMessageRouterClass,
         "Message Router",
         MASK7(1,2,3,4,5,6,7),   // common class attributes mask
         0,                      // class getAttributeAll mask
@@ -233,7 +233,7 @@ CipError CipMessageRouterClass::OpenConnection( CipConn* aConn,
 
 static CipInstance* createCipMessageRouterInstance()
 {
-    CipClass* clazz = GetCipClass( kCipMessageRouterClassCode );
+    CipClass* clazz = GetCipClass( kCipMessageRouterClass );
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
@@ -246,7 +246,7 @@ static CipInstance* createCipMessageRouterInstance()
 EipStatus CipMessageRouterInit()
 {
     // may not already be registered.
-    if( !GetCipClass( kCipMessageRouterClassCode ) )
+    if( !GetCipClass( kCipMessageRouterClass ) )
     {
         CipClass* clazz = new CipMessageRouterClass();
 
@@ -319,23 +319,11 @@ EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
     if( !clazz )
     {
         CIPSTER_TRACE_ERR(
-            "%s: unknown destination in request path:'%s'\n",
+            "%s: un-registered class in request path:'%s'\n",
             __func__,
             request.request_path.Format().c_str()
             );
 
-        // According to the test tool this should be the correct error flag
-        // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
-        aResponse->general_status = kCipErrorPathDestinationUnknown;
-        return kEipStatusOkSend;
-    }
-
-    CipInstance* instance = clazz->Instance( instance_id );
-    if( !instance )
-    {
-        CIPSTER_TRACE_WARN( "%s: instance %d does not exist\n", __func__, instance_id );
-
-        // If instance not found, return an error reply.
         // According to the test tool this should be the correct error flag
         // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
         aResponse->general_status = kCipErrorPathDestinationUnknown;
@@ -349,8 +337,16 @@ EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
                 __func__,
                 request.service );
 
-        // if no services or service not found, return an error reply
         aResponse->general_status = kCipErrorServiceNotSupported;
+        return kEipStatusOkSend;
+    }
+
+    CipInstance* instance = clazz->Instance( instance_id );
+    if( !instance )
+    {
+        CIPSTER_TRACE_WARN( "%s: instance %d does not exist\n", __func__, instance_id );
+
+        aResponse->general_status = kCipErrorPathDestinationUnknown;
         return kEipStatusOkSend;
     }
 

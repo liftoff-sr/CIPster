@@ -296,11 +296,9 @@ static int encapsulateListIdentyResponseMessage( BufWriter aReply )
     out.put16( status_ );
     out.put32( serial_number_ );
 
-    *out++ = (EipByte) product_name_.length;
+    out.put_SHORT_STRING( product_name_, false );
 
-    out.append( product_name_.string, product_name_.length );
-
-    *out++ = 0xff;
+    *out++ = 0xff;      // optional STATE, not supported indicated by 0xff.
 
     // the -2 is for not counting the length field
     id_length.put16( out.data() - id_length.data() - 2 );
@@ -415,8 +413,8 @@ int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aRep
 
     encap.data_length = 0;  // aCommand.size() has our length, establish default for reply
 
-    // Adjust locally for encapsulation header which is both consumed in the
-    // the command and reserved in the reply.
+    // Adjust locally for fixed length encapsulation header which is both
+    // consumed in the command and reserved in the reply.
     BufReader   command = aCommand + ENCAPSULATION_HEADER_LENGTH;
     BufWriter   reply = aReply + ENCAPSULATION_HEADER_LENGTH;
 

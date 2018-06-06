@@ -108,7 +108,7 @@ AssemblyInstance::AssemblyInstance( int aInstanceId, BufWriter aBuffer ) :
 
 CipInstance* CreateAssemblyInstance( int instance_id, BufWriter aBuffer )
 {
-    CipClass* clazz = GetCipClass( kCipAssemblyClassCode );
+    CipClass* clazz = GetCipClass( kCipAssemblyClass );
 
     CIPSTER_ASSERT( clazz ); // Stack startup should have called CipAssemblyInitialize()
 
@@ -132,7 +132,7 @@ class CipAssemblyClass : public CipClass
 {
 public:
     CipAssemblyClass() :
-        CipClass( kCipAssemblyClassCode,
+        CipClass( kCipAssemblyClass,
             "Assembly",
             MASK7( 1,2,3,4,5,6,7 ), // common class attributes mask
             0,                      // assembly class has no get_attribute_all service
@@ -155,7 +155,7 @@ CipError CipAssemblyClass::OpenConnection( CipConn* aConn,
 
 EipStatus CipAssemblyInitialize()
 {
-    if( !GetCipClass( kCipAssemblyClassCode ) )
+    if( !GetCipClass( kCipAssemblyClass ) )
     {
         CipClass* clazz = new CipAssemblyClass();
 
@@ -168,7 +168,7 @@ EipStatus CipAssemblyInitialize()
 
 EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, BufReader aBuffer )
 {
-    CIPSTER_ASSERT( instance->owning_class->ClassId() == kCipAssemblyClassCode );
+    CIPSTER_ASSERT( instance->owning_class->ClassId() == kCipAssemblyClass );
 
     // empty path (path size = 0) need to be checked and taken care of in future
 

@@ -20,13 +20,13 @@
 //* @brief Assembly Class Code
 enum ClassIds
 {
-    kIdentityClassCode = 0x01,
-    kCipMessageRouterClassCode = 0x02,
-    kCipAssemblyClassCode = 0x04,
-    kConnectionClassId = 0x05,
-    kCipConnectionManagerClassCode = 0x06,
-    kCipTcpIpInterfaceClassCode = 0xF5,
-    kCipEthernetLinkClassCode = 0xF6,
+    kCipIdentityClass = 0x01,
+    kCipMessageRouterClass = 0x02,
+    kCipAssemblyClass = 0x04,
+    kCipConnectionClass = 0x05,
+    kCipConnectionManagerClass = 0x06,
+    kCipTcpIpInterfaceClass = 0xF5,
+    kCipEthernetLinkClass = 0xF6,
 };
 
 
@@ -191,26 +191,6 @@ struct CipByteArray
 {
     EipUint16   length;     ///< Length of the Byte Array
     EipByte*    data;       ///< Pointer to the data
-};
-
-
-/** @brief CIP Short String
- *
- */
-struct CipShortString
-{
-    EipUint8    length;     ///< Length of the String (8 bit value)
-    EipByte*    string;     ///< Pointer to the string data
-};
-
-
-/** @brief CIP String
- *
- */
-struct CipString
-{
-    EipUint16   length;     ///< Length of the String (16 bit value)
-    EipByte*    string;     ///< Pointer to the string data
 };
 
 
@@ -685,7 +665,7 @@ struct CipTcpIpNetworkInterfaceConfiguration
     CipUdint    gateway;
     CipUdint    name_server;
     CipUdint    name_server_2;
-    CipString   domain_name;
+    std::string domain_name;
 };
 
 

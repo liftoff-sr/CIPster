@@ -15,14 +15,21 @@
 #include "cipethernetlink.h"
 #include "cipster_api.h"
 
-static CipDword tcp_status_ = 0x1;                         //*< #1  TCP status with 1 we indicate that we got a valid configuration from DHCP or BOOTP
+/// #1  TCP status with 1 we indicate that we got a valid
+/// configuration from DHCP or BOOTP
+static CipDword tcp_status_ = 0x1;
 
-static CipDword configuration_capability_ = 0x04 | 0x20;   //*< #2  This is a default value meaning that it is a DHCP client see 5-3.2.2.2 EIP specification; 0x20 indicates "Hardware Configurable"
+/// #2  This is a default value meaning that it is a DHCP client
+/// see 5-3.2.2.2 EIP specification; 0x20 indicates "Hardware Configurable"
+static CipDword configuration_capability_ = 0x04 | 0x20;
 
-static CipDword configuration_control_ = 0;                //*< #3  This is a TCP/IP object attribute. For now it is always zero and is not used for anything.
+/// #3  This is a TCP/IP object attribute. For now it is always zero
+/// and is not used for anything.
+static CipDword configuration_control_ = 0;
 
 
-CipTcpIpNetworkInterfaceConfiguration interface_configuration_ =    //*< #5 IP, network mask, gateway, name server 1 & 2, domain name
+/// #5 IP, network mask, gateway, name server 1 & 2, domain name
+CipTcpIpNetworkInterfaceConfiguration interface_configuration_ =
 {
     0,                               // default IP address
     0,                               // NetworkMask
@@ -34,8 +41,7 @@ CipTcpIpNetworkInterfaceConfiguration interface_configuration_ =    //*< #5 IP, 
     }
 };
 
-static CipString hostname_ =    //*< #6 Hostname
-{ 0, NULL };
+static std::string hostname_;       //*< #6 Hostname
 
 /** @brief #8 the time to live value to be used for multi-cast connections
  *
@@ -44,7 +50,8 @@ static CipString hostname_ =    //*< #6 Hostname
 EipUint8 g_time_to_live_value = 1;
 
 
-/** @brief #9 The multicast configuration for this device
+/**
+ * #9 The multicast configuration for this device
  *
  * Currently we implement it non set-able and use the default
  * allocation algorithm
@@ -68,7 +75,7 @@ static EipStatus get_attr_4( CipAttribute* attribute,
 
     CipAppPath app_path;
 
-    app_path.SetClass( kCipEthernetLinkClassCode );
+    app_path.SetClass( kCipEthernetLinkClass );
     app_path.SetInstance( attribute->Instance()->Id() );
 
     int result = app_path.SerializeAppPath( out + 2 );
@@ -164,59 +171,19 @@ EipStatus ConfigureNetworkInterface( const char* ip_address,
 
 void ConfigureDomainName( const char* domain_name )
 {
-    if( interface_configuration_.domain_name.string )
-    {
-        /* if the string is already set to a value we have to free the resources
-         * before we can set the new value in order to avoid memory leaks.
-         */
-        CipFree( interface_configuration_.domain_name.string );
-    }
-
-    interface_configuration_.domain_name.length = strlen( domain_name );
-
-    if( interface_configuration_.domain_name.length )
-    {
-        interface_configuration_.domain_name.string = (EipByte*) CipCalloc(
-                interface_configuration_.domain_name.length + 1, sizeof(EipInt8) );
-
-        strcpy( (char*) interface_configuration_.domain_name.string, domain_name );
-    }
-    else
-    {
-        interface_configuration_.domain_name.string = NULL;
-    }
+    interface_configuration_.domain_name = domain_name;
 }
 
 
 void ConfigureHostName( const char* hostname )
 {
-    if( hostname_.string )
-    {
-        /* if the string is already set to a value we have to free the resources
-         * before we can set the new value in order to avoid memory leaks.
-         */
-        CipFree( hostname_.string );
-    }
-
-    hostname_.length = strlen( hostname );
-
-    if( hostname_.length )
-    {
-        hostname_.string = (EipByte*) CipCalloc( hostname_.length + 1,
-                sizeof(EipByte) );
-
-        strcpy( (char*) hostname_.string, hostname );
-    }
-    else
-    {
-        hostname_.string = NULL;
-    }
+    hostname_ = hostname;
 }
 
 
 static CipInstance* createTcpIpInterfaceInstance()
 {
-    CipClass* clazz = GetCipClass( kCipTcpIpInterfaceClassCode );
+    CipClass* clazz = GetCipClass( kCipTcpIpInterfaceClass );
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
@@ -249,9 +216,9 @@ static CipInstance* createTcpIpInterfaceInstance()
 
 EipStatus CipTcpIpInterfaceInit()
 {
-    if( !GetCipClass( kCipTcpIpInterfaceClassCode ) )
+    if( !GetCipClass( kCipTcpIpInterfaceClass ) )
     {
-        CipClass* clazz = new CipClass( kCipTcpIpInterfaceClassCode,
+        CipClass* clazz = new CipClass( kCipTcpIpInterfaceClass,
               "TCP/IP Interface",
               MASK7(1,2,3,4,5,6,7),     // common class attributes mask
               0xffffffff,               // class getAttributeAll mask
@@ -270,15 +237,4 @@ EipStatus CipTcpIpInterfaceInit()
 
 void ShutdownTcpIpInterface()
 {
-    if( hostname_.string )
-    {
-        CipFree( hostname_.string );
-        hostname_.string = NULL;
-    }
-
-    if( interface_configuration_.domain_name.string )
-    {
-        CipFree( interface_configuration_.domain_name.string );
-        interface_configuration_.domain_name.string = NULL;
-    }
 }

@@ -57,7 +57,7 @@ extern EipUint16        product_code_;
 extern CipRevision      revision_;
 extern EipUint16        status_;
 extern EipUint32        serial_number_;
-extern CipShortString   product_name_;
+extern std::string      product_name_;
 
 
 #endif    // CIPSTER_CIPIDENTITY_H_
