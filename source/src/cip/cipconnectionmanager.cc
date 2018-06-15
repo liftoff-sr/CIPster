@@ -564,8 +564,8 @@ EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReade
 
             CIPSTER_TRACE_INFO( "%s: c.s_addr=%08x  f.s_addr=%08x\n",
                 __func__,
-                conn->originator_address.sin_addr.s_addr,
-                from_address->sin_addr.s_addr
+                (unsigned) conn->originator_address.sin_addr.s_addr,
+                (unsigned) from_address->sin_addr.s_addr
                 );
 
             // only handle the data if it is coming from the originator
@@ -622,8 +622,8 @@ EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReade
                         "%s: connected data received with wrong originator address.\n"
                         " from:%08x   connection originator:%08x\n",
                         __func__,
-                        from_address->sin_addr.s_addr,
-                        conn->originator_address.sin_addr.s_addr
+                        (unsigned) from_address->sin_addr.s_addr,
+                        (unsigned) conn->originator_address.sin_addr.s_addr
                         );
             }
         }

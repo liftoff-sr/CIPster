@@ -573,7 +573,7 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
 
     // Adjust locally for encapsulation header which is both consumed in the
     // the command and reserved in the reply.
-    BufReader   command = aCommand + ENCAPSULATION_HEADER_LENGTH;
+    //BufReader   command = aCommand + ENCAPSULATION_HEADER_LENGTH;
     BufWriter   reply = aReply + ENCAPSULATION_HEADER_LENGTH;
 
     switch( encap.command_code )

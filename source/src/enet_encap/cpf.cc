@@ -236,97 +236,104 @@ int CipCommonPacketFormatData::SerializeCPFD( CipMessageRouterResponse* aRespons
 {
     BufWriter   out = aDst;
 
-    if( aResponse )
-    {
-        // add Interface Handle and Timeout = 0 -> only for SendRRData and SendUnitData
-        out.put32( 0 );
-        out.put16( 0 );
-    }
+    try {
 
-    out.put16( item_count + TxSocketAddressInfoItemCount() - RxSocketAddressInfoItemCount() );
-
-    // process Address Item
-    switch( address_item.type_id )
-    {
-    case kCipItemIdNullAddress:
-        out.put16( kCipItemIdNullAddress );
-        out.put16( 0 );
-        break;
-
-    case kCipItemIdConnectionAddress:
-        // connected data item -> address length set to 4 and copy ConnectionIdentifier
-        out.put16( kCipItemIdConnectionAddress );
-        out.put16( 4 );
-        out.put32( address_item.data.connection_identifier );
-        break;
-
-    case kCipItemIdSequencedAddressItem:
-        // sequenced address item -> address length set to 8 and copy ConnectionIdentifier and SequenceNumber
-        out.put16( kCipItemIdSequencedAddressItem );
-        out.put16( 8 );
-        out.put32( address_item.data.connection_identifier );
-        out.put32( address_item.data.sequence_number );
-        break;
-    }
-
-    // process Data Item
-    if( data_item.type_id == kCipItemIdUnconnectedDataItem ||
-        data_item.type_id == kCipItemIdConnectedDataItem )
-    {
         if( aResponse )
         {
-            out.put16( data_item.type_id );
-
-            if( data_item.type_id == kCipItemIdConnectedDataItem ) // Connected Item
-            {
-                encodeConnectedDataItemLength( aResponse, out );
-
-                // sequence number
-                out.put16( address_item.data.sequence_number );
-            }
-            else // Unconnected Item
-            {
-                encodeUnconnectedDataItemLength( aResponse, out );
-            }
-
-            // serialize message router response
-            out += aResponse->SerializeMRResponse( out );
-
-            out.append( aResponse->data.data(), aResponse->data_length );
+            // add Interface Handle and Timeout = 0 -> only for SendRRData and SendUnitData
+            out.put32( 0 );
+            out.put16( 0 );
         }
-        else // connected IO Message to send
+
+        out.put16( item_count + TxSocketAddressInfoItemCount() - RxSocketAddressInfoItemCount() );
+
+        // process Address Item
+        switch( address_item.type_id )
         {
-            out.put16( data_item.type_id );
-            out.put16( data_item.length );
-            out.append( data_item.data, data_item.length );
-        }
-    }
+        case kCipItemIdNullAddress:
+            out.put16( kCipItemIdNullAddress );
+            out.put16( 0 );
+            break;
 
-    /*
-        Process SockAddr Info Items. Make sure first the O->T and then T->O
-        appears on the wire. EtherNet/IP specification doesn't demand it, but
-        there are EIP devices which depend on CPF items to appear in the order
-        of their ID number
-    */
-    for( int type = kCipItemIdSocketAddressInfoOriginatorToTarget;
-         type <= kCipItemIdSocketAddressInfoTargetToOriginator;  ++type )
+        case kCipItemIdConnectionAddress:
+            // connected data item -> address length set to 4 and copy ConnectionIdentifier
+            out.put16( kCipItemIdConnectionAddress );
+            out.put16( 4 );
+            out.put32( address_item.data.connection_identifier );
+            break;
+
+        case kCipItemIdSequencedAddressItem:
+            // sequenced address item -> address length set to 8 and copy ConnectionIdentifier and SequenceNumber
+            out.put16( kCipItemIdSequencedAddressItem );
+            out.put16( 8 );
+            out.put32( address_item.data.connection_identifier );
+            out.put32( address_item.data.sequence_number );
+            break;
+
+        default:
+            ;   // TODO
+        }
+
+        // process Data Item
+        if( data_item.type_id == kCipItemIdUnconnectedDataItem ||
+            data_item.type_id == kCipItemIdConnectedDataItem )
+        {
+            if( aResponse )
+            {
+                out.put16( data_item.type_id );
+
+                if( data_item.type_id == kCipItemIdConnectedDataItem ) // Connected Item
+                {
+                    encodeConnectedDataItemLength( aResponse, out );
+
+                    // sequence number
+                    out.put16( address_item.data.sequence_number );
+                }
+                else // Unconnected Item
+                {
+                    encodeUnconnectedDataItemLength( aResponse, out );
+                }
+
+                // serialize message router response
+                out += aResponse->SerializeMRResponse( out );
+
+                out.append( aResponse->data.data(), aResponse->data_length );
+            }
+            else // connected IO Message to send
+            {
+                out.put16( data_item.type_id );
+                out.put16( data_item.length );
+                out.append( data_item.data, data_item.length );
+            }
+        }
+
+        /*
+            Process SockAddr Info Items. Make sure first the O->T and then T->O
+            appears on the wire. EtherNet/IP specification doesn't demand it, but
+            there are EIP devices which depend on CPF items to appear in the order
+            of their ID number
+        */
+        for( int type = kCipItemIdSocketAddressInfoOriginatorToTarget;
+             type <= kCipItemIdSocketAddressInfoTargetToOriginator;  ++type )
+        {
+            SocketAddressInfoItem* saii = SearchTx( CipItemId(type) );
+
+            if( saii )
+            {
+                out.put16( saii->type_id );
+                out.put16( saii->length );
+                out.put16BE( saii->sin_family );
+                out.put16BE( saii->sin_port );
+                out.put32BE( saii->sin_addr );
+                out.append( saii->nasin_zero, 8 );
+            }
+        }
+
+        return out.data() - aDst.data();
+    }
+    catch( const std::overflow_error& e )
     {
-        SocketAddressInfoItem* saii = SearchTx( CipItemId(type) );
-
-        if( saii )
-        {
-            out.put16( saii->type_id );
-            out.put16( saii->length );
-            out.put16BE( saii->sin_family );
-            out.put16BE( saii->sin_port );
-            out.put32BE( saii->sin_addr );
-            out.append( saii->nasin_zero, 8 );
-        }
+        return -1;      // buffer overrun indication to caller
     }
-
-    return out.data() - aDst.data();
-
-error:
-    return -1;      // would be buffer overrun prevented
 }
 

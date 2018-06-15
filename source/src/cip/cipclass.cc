@@ -451,11 +451,9 @@ EipStatus CipClass::GetAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    // Mask for filtering get-ability
-    EipByte get_mask;
     int     attribute_id = request->request_path.GetAttribute();
 
-#if 1
+#if 0
     if( instance->Id() == 0 && instance->Class()->ClassId() == 1 && attribute_id == 3 )
     {
         int break_here = 1;
@@ -487,7 +485,7 @@ EipStatus CipClass::GetAttributeAll( CipInstance* instance,
         return kEipStatusOk;
     }
 
-#if 1
+#if 0
     if( instance->Id() == 0 && instance->Class()->ClassId() == 6 )
     {
         int break_here = 1;

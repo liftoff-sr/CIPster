@@ -4,7 +4,6 @@
  ******************************************************************************/
 
 #include <byte_bufs.h>
-#include <stdexcept>
 
 
 void BufWriter::overrun() const

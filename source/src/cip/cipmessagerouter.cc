@@ -320,7 +320,7 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
     CipService* service = clazz->Service( request.service );
     if( !service )
     {
-#if 1
+#if 0
         if( request.service == kGetAttributeAll && instance_id == 0 && clazz->ClassId() == 6 )
         {
             int break_here = 1;
@@ -384,7 +384,6 @@ int CipMessageRouterRequest::DeserializeMRR( BufReader aRequest )
     // limit the length of the request input so it pertains only to request path
     BufReader rpath( in.data(), byte_count );
 
-#if 1
     // Vol1 2-4.1.1
     CipElectronicKeySegment key;
 
@@ -393,15 +392,7 @@ int CipMessageRouterRequest::DeserializeMRR( BufReader aRequest )
     if( result < 0 )
         return result;
 
-/*
-    if( result > 0 )
-    {
-        key.Check();
-    }
-*/
-
     rpath += result;
-#endif
 
     result = request_path.DeserializeAppPath( rpath );
 

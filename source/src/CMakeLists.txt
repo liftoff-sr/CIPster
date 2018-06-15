@@ -3,7 +3,7 @@ cipster_common_includes()
 
 add_definitions( -D__STDC_FORMAT_MACROS )       # <inttypes.h>'s PRIX32
 add_definitions( -std=c++0x )
-#add_definitions( -Wall )           # TODO
+add_definitions( -Wall -Wno-reorder -Wno-sign-compare )
 
 
 set( CIP_SRCS
@@ -25,7 +25,6 @@ set( CIP_SRCS
 set( ENCAP_SRCS
     enet_encap/cpf.cc
     enet_encap/encap.cc
-#    enet_encap/endianconv.cc
     )
 
 if( BYTEBUFS_INLINE )

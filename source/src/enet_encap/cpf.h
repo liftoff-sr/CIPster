@@ -106,6 +106,7 @@ struct SocketAddressInfoItem
         sin_family  = rhs.sin_family;
         sin_port    = ntohs( rhs.sin_port );
         sin_addr    = ntohl( rhs.sin_addr.s_addr );
+        return *this;
     }
 
     /// convert this to a sockaddr_in

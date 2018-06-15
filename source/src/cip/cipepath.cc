@@ -397,7 +397,6 @@ logical_exit:
         }
     }
 
-exit:
     int byte_count = in.data() - aInput.data();
 
     return byte_count;
@@ -431,6 +430,7 @@ static int StrPrintf( std::string* result, const char* format, ... )
 }
 
 
+/* not needed yet
 static std::string StrPrintf( const char* aFormat, ... )
 {
     std::string ret;
@@ -443,6 +443,7 @@ static std::string StrPrintf( const char* aFormat, ... )
 
     return ret;
 }
+*/
 
 
 const std::string CipAppPath::Format() const
