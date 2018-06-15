@@ -7,10 +7,11 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "cipster_api.h"
-#include "cipepath.h"
-#include "byte_bufs.h"
-#include "cipidentity.h"
+#include <cipster_api.h>
+#include <cipepath.h>
+#include <byte_bufs.h>
+#include <cipidentity.h>
+#include <cipclass.h>
 
 
 //* @brief Enum containing values which kind of logical segment is encoded
@@ -131,17 +132,17 @@ static void serialize( BufWriter& out, int seg_type, unsigned aValue )
 {
     if( aValue < 256 )
     {
-        *out++ = seg_type;
-        *out++ = aValue;
+        out.put8( seg_type );
+        out.put8( aValue );
     }
     else if( aValue < 65536 )
     {
-        *out++ = seg_type | 1;
+        out.put8( seg_type | 1 );
         out.put16( aValue );
     }
     else
     {
-        *out++ = seg_type | 2;
+        out.put8( seg_type | 2 );
         out.put32( aValue );
     }
 }
@@ -155,13 +156,13 @@ int CipAppPath::SerializeAppPath( BufWriter aOutput )
     {
         int tag_size = strlen( tag );
 
-        *out++ = kDataSegmentTypeAnsiExtendedSymbolMessage;
-        *out++ = tag_size;
+        out.put8( kDataSegmentTypeAnsiExtendedSymbolMessage );
+        out.put8( tag_size );
 
         out.append( (EipByte*) tag, tag_size );
 
         if( (out.data() - aOutput.data()) & 1 )
-            *out++ = 0;               // output possible pad byte
+            out.put8( 0 );               // output possible pad byte
 
         if( HasConnPt() )
             serialize( out, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
@@ -212,7 +213,7 @@ int CipAppPath::deserialize_logical( BufReader aInput, CipAppPath::Stuff aField,
     int value;
 
     if( aFormat == 0 )
-        value = *in++;
+        value = in.get8();
     else if( aFormat == 1 )
     {
         ++in;
@@ -241,7 +242,7 @@ inline int CipAppPath::deserialize_symbolic( BufReader aInput )
     {
         ++in;     // ate first
 
-        int byte_count = *in++;
+        int byte_count = in.get8();
 
         if( byte_count > (int) sizeof(tag)-1 )
         {
@@ -526,10 +527,10 @@ void CipAppPath::inherit_assembly( int aStart, CipAppPath* aPreviousToInheritFro
 static int parsePortSegment( BufReader aInput, CipPortSegment* aSegment )
 {
     BufReader   in = aInput;
-    int         first = *in++;
+    int         first = in.get8();
 
     // p points to 2nd byte here.
-    int link_addrz = (first & 0x10) ? *in++ : 0;
+    int link_addrz = (first & 0x10) ? in.get8() : 0;
 
     if( (first & 0xf) == 15 )
         aSegment->port = in.get16();
@@ -540,7 +541,7 @@ static int parsePortSegment( BufReader aInput, CipPortSegment* aSegment )
 
     while( link_addrz-- )
     {
-        aSegment->link_address.push_back( *in++ );
+        aSegment->link_address.push_back( in.get8() );
     }
 
     // skip a byte if not an even number of them have been consumed.
@@ -561,7 +562,7 @@ int CipElectronicKeySegment::DeserializeElectronicKey( BufReader aInput )
     {
         ++in;   // ate first
 
-        int key_format = *in++;
+        int key_format = in.get8();
 
         if( key_format != 4 )
         {
@@ -574,8 +575,8 @@ int CipElectronicKeySegment::DeserializeElectronicKey( BufReader aInput )
         vendor_id      = in.get16();
         device_type    = in.get16();
         product_code   = in.get16();
-        major_revision = *in++;
-        minor_revision = *in++;
+        major_revision = in.get8();
+        minor_revision = in.get8();
     }
 
     return in.data() - aInput.data();
@@ -590,56 +591,42 @@ ConnectionManagerStatusCode CipElectronicKeySegment::Check() const
     int mjr_revision = major_revision & 0x7f;
 
     // Check VendorID and ProductCode, must match, or be 0
-    if( ( vendor_id    != vendor_id_     &&  vendor_id != 0 )
-     || ( product_code != product_code_  &&  product_code != 0 ) )
+    if( ( vendor_id != 0     && vendor_id    != vendor_id_ )
+     || ( product_code != 0  && product_code != product_code_ ) )
     {
         return kConnectionManagerStatusCodeErrorVendorIdOrProductcodeError;
     }
-    else
+
+    // VendorID and ProductCode are correct
+
+    // Check DeviceType, must match or 0
+    if( device_type != 0 && device_type != device_type_ )
     {
-        // VendorID and ProductCode are correct
+        return kConnectionManagerStatusCodeErrorDeviceTypeError;
+    }
 
-        // Check DeviceType, must match or 0
-        if( device_type != device_type_  &&  device_type != 0 )
+    // VendorID, ProductCode and DeviceType are correct
+    if( !compatiblity_mode )
+    {
+        if( ( mjr_revision   != 0 && mjr_revision   != revision_.major_revision )
+         || ( minor_revision != 0 && minor_revision != revision_.minor_revision ) )
         {
-            return kConnectionManagerStatusCodeErrorDeviceTypeError;
-        }
-        else
-        {
-            // VendorID, ProductCode and DeviceType are correct
-            if( !compatiblity_mode )
-            {
-                // Major = 0 is valid
-                if( 0 == mjr_revision )
-                {
-                    return kConnectionManagerStatusCodeSuccess;
-                }
-
-                // Check Major / Minor Revision, Major must match, Minor match or 0
-                if(  mjr_revision   != revision_.major_revision ||
-                   ( minor_revision != revision_.minor_revision && minor_revision != 0 ) )
-                {
-                    return kConnectionManagerStatusCodeErrorRevisionMismatch;
-                }
-            }
-            else
-            {
-                // Compatibility mode is set
-
-                // Major must match, Minor != 0 and <= MinorRevision
-                if( mjr_revision == revision_.major_revision &&
-                    minor_revision > 0 &&
-                    minor_revision <= revision_.minor_revision )
-                {
-                    return kConnectionManagerStatusCodeSuccess;
-                }
-                else
-                {
-                    return kConnectionManagerStatusCodeErrorRevisionMismatch;
-                }
-            }
+            return kConnectionManagerStatusCodeErrorRevisionMismatch;
         }
     }
+
+    else    // compatibility_mode
+    {
+        // mjr_revision must match, minor_revision must be <= my revision_.minor
+        if( mjr_revision != revision_.major_revision
+         || minor_revision == 0
+         || minor_revision > revision_.minor_revision )
+        {
+            return kConnectionManagerStatusCodeErrorRevisionMismatch;
+        }
+    }
+
+    return kConnectionManagerStatusCodeSuccess;
 }
 
 
@@ -677,7 +664,7 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
 
             case 0x43:      // PIT msecs
                 ++in;
-                value = *in++;
+                value = in.get8();
                 SetPIT_MSecs( value );  // convert to usecs
                 break;
 
@@ -685,7 +672,7 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
                 ++in;
 
                 int num_words;
-                num_words = *in++;
+                num_words = in.get8();
 
                 if( num_words == 1 )
                 {
@@ -726,7 +713,7 @@ int CipSimpleDataSegment::DeserializeDataSegment( BufReader aInput )
     {
         ++in;   // ate first
 
-        int word_count = *in++;
+        int word_count = in.get8();
 
         while( word_count-- )
         {

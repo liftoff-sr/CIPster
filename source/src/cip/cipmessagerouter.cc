@@ -134,10 +134,10 @@ int CipMessageRouterResponse::SerializeMRResponse( BufWriter aOutput )
 {
     BufWriter out = aOutput;
 
-    *out++ = reply_service | 0x80;
-    *out++ = reserved;
-    *out++ = general_status;
-    *out++ = size_of_additional_status;
+    out.put8( reply_service | 0x80 );
+    out.put8( reserved );
+    out.put8( general_status );
+    out.put8( size_of_additional_status );
 
     for( int i = 0;  i < size_of_additional_status;  ++i )
         out.put16( additional_status[i] );
@@ -146,23 +146,10 @@ int CipMessageRouterResponse::SerializeMRResponse( BufWriter aOutput )
 }
 
 
-class CipMessageRouterClass : public CipClass
-{
-public:
-    CipMessageRouterClass();
-
-    CipError OpenConnection( CipConn* aConn,
-        CipCommonPacketFormatData* cpfd,
-        ConnectionManagerStatusCode* extended_error_code );    // override
-};
-
-
 CipMessageRouterClass::CipMessageRouterClass() :
     CipClass( kCipMessageRouterClass,
         "Message Router",
         MASK7(1,2,3,4,5,6,7),   // common class attributes mask
-        0,                      // class getAttributeAll mask
-        0,                      // instance getAttributeAll mask
         1                       // revision
         )
 {
@@ -243,7 +230,7 @@ static CipInstance* createCipMessageRouterInstance()
 }
 
 
-EipStatus CipMessageRouterInit()
+EipStatus CipMessageRouterClass::Init()
 {
     // may not already be registered.
     if( !GetCipClass( kCipMessageRouterClass ) )
@@ -259,7 +246,7 @@ EipStatus CipMessageRouterInit()
 }
 
 
-EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
+EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
 {
     CIPSTER_TRACE_INFO( "%s: routing unconnected message\n", __func__ );
 
@@ -333,6 +320,13 @@ EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
     CipService* service = clazz->Service( request.service );
     if( !service )
     {
+#if 1
+        if( request.service == kGetAttributeAll && instance_id == 0 && clazz->ClassId() == 6 )
+        {
+            int break_here = 1;
+        }
+#endif
+
         CIPSTER_TRACE_WARN( "%s: service 0x%02x not found\n",
                 __func__,
                 request.service );
@@ -354,7 +348,7 @@ EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
         "%s: targeting instance %d of class %s with service %s\n",
         __func__,
         instance_id,
-        instance->owning_class->ClassName().c_str(),
+        instance->Class()->ClassName().c_str(),
         service->ServiceName().c_str()
         );
 
@@ -378,9 +372,9 @@ int CipMessageRouterRequest::DeserializeMRR( BufReader aRequest )
 {
     BufReader in = aRequest;
 
-    service = *in++;
+    service = in.get8();
 
-    unsigned byte_count = *in++ * 2;     // word count x 2
+    unsigned byte_count = in.get8() * 2;     // word count x 2
 
     if( byte_count > in.size() )
     {

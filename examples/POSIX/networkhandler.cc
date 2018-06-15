@@ -120,6 +120,8 @@ EipStatus NetworkHandlerInitialize()
 {
     static const int one = 1;
 
+    const CipTcpIpInterfaceConfiguration& c = CipTCPIPInterfaceClass::InterfaceConf(1);
+
     // clear the master an temp sets
     FD_ZERO( &master_set );
     FD_ZERO( &read_set );
@@ -146,7 +148,7 @@ EipStatus NetworkHandlerInitialize()
 
     // Activates address reuse
     if( setsockopt( g_sockets.tcp_listener, SOL_SOCKET, SO_REUSEADDR,
-                &one, sizeof(one) ) == -1 )
+               (char*) &one, sizeof(one) ) == -1 )
     {
         CIPSTER_TRACE_ERR(
                 "error setting socket option SO_REUSEADDR on tcp_listener\n" );
@@ -156,7 +158,7 @@ EipStatus NetworkHandlerInitialize()
     memset( &address, 0, sizeof( address ) );
     address.sin_family = AF_INET;
     address.sin_port = htons( kOpenerEthernetPort );
-    address.sin_addr.s_addr = interface_configuration_.ip_address;
+    address.sin_addr.s_addr = c.ip_address;
 
     // bind the new socket to port 0xAF12 (CIP)
     if( bind( g_sockets.tcp_listener, (sockaddr*) &address, sizeof( address ) ) == -1 )
@@ -222,7 +224,7 @@ EipStatus NetworkHandlerInitialize()
 
     // Activates address reuse
     if( setsockopt( g_sockets.udp_local_broadcast_listener,
-            SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one) ) == -1 )
+            SOL_SOCKET, SO_REUSEADDR, (char*) &one, sizeof(one) ) == -1 )
     {
         CIPSTER_TRACE_ERR(
                 "error setting socket option SO_REUSEADDR on udp_broadcast_listener\n" );
@@ -233,8 +235,7 @@ EipStatus NetworkHandlerInitialize()
     memset( &address, 0, sizeof( address ) );
     address.sin_family = AF_INET;
     address.sin_port   = htons( kOpenerEthernetPort );
-    address.sin_addr.s_addr = interface_configuration_.ip_address |
-                                ~interface_configuration_.network_mask;
+    address.sin_addr.s_addr = c.ip_address | ~c.network_mask;
 
     if( ( bind( g_sockets.udp_local_broadcast_listener,
                   (sockaddr*) &address, sizeof(address) ) ) == -1 )
@@ -258,7 +259,7 @@ EipStatus NetworkHandlerInitialize()
 
     // Activates address reuse
     if( setsockopt( g_sockets.udp_unicast_listener, SOL_SOCKET, SO_REUSEADDR,
-            &one, sizeof(one) ) == -1 )
+            (char*) &one, sizeof(one) ) == -1 )
     {
         CIPSTER_TRACE_ERR(
                 "error setting socket option SO_REUSEADDR on udp_unicast_listener\n" );
@@ -268,7 +269,7 @@ EipStatus NetworkHandlerInitialize()
     memset( &address, 0, sizeof( address ) );
     address.sin_family = AF_INET;
     address.sin_port = htons( kOpenerEthernetPort );
-    address.sin_addr.s_addr = interface_configuration_.ip_address;
+    address.sin_addr.s_addr = c.ip_address;
 
     if( ( bind( g_sockets.udp_unicast_listener,
                   (sockaddr*) &address, sizeof(address) ) ) == -1 )
@@ -430,7 +431,7 @@ bool CheckSocketSet( int socket )
 
 EipStatus SendUdpData( struct sockaddr_in* address, int socket, BufReader aOutput )
 {
-    int sent_count = sendto( socket, aOutput.data(), aOutput.size(), 0,
+    int sent_count = sendto( socket, (char*) aOutput.data(), aOutput.size(), 0,
             (struct sockaddr*) address, sizeof(*address) );
 
     CIPSTER_TRACE_INFO( "%s: socket:%d sending %d bytes\n", __func__, socket, (int) aOutput.size() );
@@ -474,14 +475,17 @@ static void dump( const char* aPrompt, EipByte* aBytes, int aCount )
 #endif
 
 
-static int ensuredRead(  int sock, EipByte* where, int count )
+// This can block on the second time through the loop, so may not be a good
+// idea in a single threaded model.  Second time through the loop is not
+// expected generally however.  Instrument it and fix it.
+static int ensuredRead(  int sock, unsigned char* where, int count )
 {
     int i;
     int numRead;
 
     for( i=0;  i < count;  i += numRead )
     {
-        numRead = recv( sock, where+i, count - i, 0 );
+        numRead = recv( sock, (char*) where+i, count - i, 0 );
         if( numRead == 0 )
             break;
 
@@ -504,7 +508,7 @@ EipStatus HandleDataOnTcpSocket( int socket )
      *  the fastest way and a loop here with a non blocking socket would better
      *  fit*/
 
-    // Check how many bytes are here -- read the first four bytes from the connection
+    // Check how many bytes are here -- read the first 4 bytes from the connection
     int num_read = ensuredRead( socket, s_packet, 4 );
 
     // TODO we may have to set the socket to a non blocking socket
@@ -524,22 +528,23 @@ EipStatus HandleDataOnTcpSocket( int socket )
 
     BufReader rb( s_packet + 2, 2 );  // here is EIP's data length
 
-    unsigned packetz = rb.get16() + ENCAPSULATION_HEADER_LENGTH - 4;
+    unsigned payloadz  = rb.get16();
+    unsigned remaining = payloadz + (ENCAPSULATION_HEADER_LENGTH - 4);
     // -4 is for the 4 bytes we have already read
 
     // is the packet bigger than our s_packet buffer?
-    if( packetz > sizeof(s_packet) - 4 )
+    if( remaining > sizeof(s_packet) - 4 )
     {
         CIPSTER_TRACE_ERR(
-                "%s: packet len=%d is too big, ignoring packet\n",
-                __func__, packetz );
+                "%s: packet len=%u is too big for #defined , ignoring entire packet\n",
+                __func__, payloadz );
 
         // toss the whole packet in chunks.
 
         int readz = sizeof(s_packet);
 
         do {
-            num_read = ensuredRead( socket, &s_packet[0], readz );
+            num_read = ensuredRead( socket, s_packet, readz );
 
             if( num_read == 0 ) // got error or connection closed by client
             {
@@ -559,16 +564,17 @@ EipStatus HandleDataOnTcpSocket( int socket )
             dump( "bigTCP", s_packet, num_read );
 #endif
 
-            if( packetz != 0 && packetz < sizeof(s_packet) )
-            {
-                readz = packetz;
-            }
-        } while( packetz );
+            remaining -= num_read;
+
+            if( remaining < sizeof(s_packet) )
+                readz = remaining;
+
+        } while( remaining );
 
         return kEipStatusOk;
     }
 
-    num_read = ensuredRead( socket, &s_packet[4], packetz );
+    num_read = ensuredRead( socket, &s_packet[4], remaining );
 
     if( num_read == 0 ) // got error or connection closed by client
     {
@@ -583,10 +589,10 @@ EipStatus HandleDataOnTcpSocket( int socket )
         return kEipStatusError;
     }
 
-    if( (unsigned) num_read == packetz )
+    if( (unsigned) num_read == remaining )
     {
-        // we got the right amount of data
-        packetz += 4;
+        // we got the right amount of data, add back in the first 4 bytes to total
+        num_read += 4;
 
 #if defined(DEBUG)
         dump( "rTCP", s_packet, num_read + 4 );
@@ -598,13 +604,16 @@ EipStatus HandleDataOnTcpSocket( int socket )
         g_current_active_tcp_socket = socket;
 
         int replyz = HandleReceivedExplictTcpData( socket,
-                            BufReader( s_packet, packetz ),
+                            BufReader( s_packet, num_read ),
                             BufWriter( s_packet, sizeof s_packet ) );
 
         g_current_active_tcp_socket = -1;
 
         if( replyz > 0 )
         {
+#if defined(DEBUG)
+            dump( "sTCP", s_packet, replyz );
+#endif
             int sent_count = send( socket, (char*) s_packet, replyz, 0 );
 
             CIPSTER_TRACE_INFO( "%s: sent %d reply bytes. line %d\n",
@@ -685,18 +694,18 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
     }
     else    // we have a producing udp socket
     {
-        if( socket_data->sin_addr.s_addr
-            == g_multicast_configuration.starting_multicast_address )
+        if( socket_data->sin_addr.s_addr ==
+                CipTCPIPInterfaceClass::MultiCast( 1 ).starting_multicast_address )
         {
-            if( 1 != g_time_to_live_value ) // we need to set a TTL value for the socket
+            uint8_t ttl = CipTCPIPInterfaceClass::TTL(1);
+            if( 1 != ttl )
             {
-                if( setsockopt( new_socket, IPPROTO_IP, IP_MULTICAST_TTL,
-                            &g_time_to_live_value,
-                            sizeof(g_time_to_live_value) < 0 ) )
+                // we need to set a TTL value for the socket using a byte value
+                if( setsockopt( new_socket, IPPROTO_IP, IP_MULTICAST_TTL, (char*) &ttl, 1 ) < 0 )
                 {
                     CIPSTER_TRACE_ERR(
                             "networkhandler: could not set the TTL to: %d, error: %s\n",
-                            g_time_to_live_value, strerrno().c_str() );
+                            ttl, strerrno().c_str() );
                     return kEipInvalidSocket;
                 }
             }
@@ -816,7 +825,7 @@ void CheckAndHandleUdpLocalBroadcastSocket()
 
         // Handle UDP broadcast messages
         int received_size = recvfrom( g_sockets.udp_local_broadcast_listener,
-                s_packet,
+                (char*) s_packet,
                 sizeof(s_packet),
                 0, (sockaddr*) &from_address,
                 &from_address_length );
@@ -825,7 +834,7 @@ void CheckAndHandleUdpLocalBroadcastSocket()
         {
             CIPSTER_TRACE_ERR(
                     "networkhandler: error on recvfrom UDP local broadcast port: %s\n",
-                    strerror( errno ) );
+                    strerrno().c_str() );
             return;
         }
 
@@ -863,7 +872,7 @@ void CheckAndHandleUdpGlobalBroadcastSocket()
     socklen_t from_address_length;
 
     // see if this is an unsolicited inbound UDP message
-    if( true == CheckSocketSet( g_sockets.udp_global_broadcast_listener ) )
+    if( CheckSocketSet( g_sockets.udp_global_broadcast_listener ) )
     {
         from_address_length = sizeof(from_address);
 
@@ -872,7 +881,7 @@ void CheckAndHandleUdpGlobalBroadcastSocket()
 
         // Handle UDP broadcast messages
         int received_size = recvfrom( g_sockets.udp_global_broadcast_listener,
-                s_packet,
+                (char*) s_packet,
                 sizeof(s_packet),
                 0, (struct sockaddr*) &from_address,
                 &from_address_length );
@@ -919,16 +928,16 @@ void CheckAndHandleUdpUnicastSocket()
     socklen_t from_address_length;
 
     // see if this is an unsolicited inbound UDP message
-    if( true == CheckSocketSet( g_sockets.udp_unicast_listener ) )
+    if( CheckSocketSet( g_sockets.udp_unicast_listener ) )
     {
         from_address_length = sizeof(from_address);
 
         CIPSTER_TRACE_STATE(
-                "networkhandler: unsolicited UDP message on EIP unicast socket\n" );
+                "%s: unsolicited UDP message on EIP unicast socket\n", __func__ );
 
         // Handle UDP broadcast messages
         int received_size = recvfrom( g_sockets.udp_unicast_listener,
-                s_packet,
+                (char*) s_packet,
                 sizeof(s_packet),
                 0, (struct sockaddr*) &from_address,
                 &from_address_length );
@@ -936,12 +945,13 @@ void CheckAndHandleUdpUnicastSocket()
         if( received_size <= 0 ) // got error
         {
             CIPSTER_TRACE_ERR(
-                    "networkhandler: error on recvfrom UDP unicast port: %s\n",
+                    "%s: error on recvfrom UDP unicast port: %s\n",
+                    __func__,
                     strerrno().c_str() );
             return;
         }
 
-        CIPSTER_TRACE_INFO( "Data received on UDP unicast:\n" );
+        CIPSTER_TRACE_INFO( "%s: data received on UDP unicast:\n", __func__ );
 
         int reply_length = HandleReceivedExplictUdpData(
                 g_sockets.udp_unicast_listener, &from_address,
@@ -990,7 +1000,7 @@ void CheckAndHandleConsumingUdpSockets()
 
             int received_size = recvfrom(
                     conn->consuming_socket,
-                    s_packet, sizeof(s_packet), 0,
+                    (char*) s_packet, sizeof(s_packet), 0,
                     (struct sockaddr*) &from_address, &from_address_length );
 
             if( 0 == received_size )
@@ -1001,7 +1011,7 @@ void CheckAndHandleConsumingUdpSockets()
                 continue;
             }
 
-            if( 0 > received_size )
+            if( received_size < 0 )
             {
                 CIPSTER_TRACE_ERR( "%s: error on recv: %s\n",
                         __func__, strerrno().c_str() );
@@ -1009,6 +1019,8 @@ void CheckAndHandleConsumingUdpSockets()
                 conn->connection_close_function( conn );
                 continue;
             }
+            CIPSTER_TRACE_INFO( "%s: got %d UDP bytes for consuming connection %d\n",
+                __func__, received_size, conn->consuming_connection_id );
 
             HandleReceivedConnectedData( &from_address,
                 BufReader( s_packet, received_size ) );

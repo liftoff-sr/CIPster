@@ -9,14 +9,13 @@
 
 #include "cipconnection.h"
 
+#include <cipster_api.h>
 #include "cipconnectionmanager.h"
-#include "cipassembly.h"
-#include "ciptcpipinterface.h"
-#include "cipcommon.h"
 #include "appcontype.h"
 #include "cpf.h"
-#include "trace.h"
-#include "byte_bufs.h"
+#include "cipassembly.h"
+#include "cipcommon.h"
+
 
 // The port to be used per default for I/O messages on UDP.
 const int kOpenerEipIoUdpPort = 2222;   // = 0x08AE;
@@ -28,18 +27,6 @@ EipUint32 g_run_idle_state;    //*< buffer for holding the run idle information.
 /* producing multicast connections have to consider the rules that apply for
  * application connection types.
  */
-EipStatus OpenProducingMulticastConnection( CipConn* conn,
-        CipCommonPacketFormatData* cpfd );
-
-EipStatus OpenMulticastConnection( UdpCommuncationDirection direction,
-        CipConn* conn,
-        CipCommonPacketFormatData* cpfd );
-
-EipStatus OpenConsumingPointToPointConnection( CipConn* conn,
-        CipCommonPacketFormatData* cpfd );
-
-CipError OpenProducingPointToPointConnection( CipConn* conn,
-        CipCommonPacketFormatData* cpfd );
 
 
 /**
@@ -77,7 +64,7 @@ static ConnectionManagerStatusCode handleConfigData( CipConn* aConn )
         // we have to have the same data as already present in the config point,
         // else it's an error.  And if same, no reason to write it.
 
-        CipByteArray* p = (CipByteArray*) instance->Attribute( 3 )->data;
+        CipByteArray* p = (CipByteArray*) instance->Attribute( 3 )->Data();
 
         if( p->length != words.size() * 2  ||
             memcmp( p->data, words.data(), p->length ) != 0 )
@@ -129,9 +116,6 @@ void CipConn::Clear()
     state = kConnectionStateNonExistent;
     instance_type = kConnInstanceTypeExplicit;
 
-    producing_connection_size = 0;
-    consuming_connection_size = 0;
-
     producing_connection_id = 0;
     consuming_connection_id = 0;
 
@@ -155,7 +139,7 @@ void CipConn::Clear()
     t_to_o_ncp.Clear();
     o_to_t_ncp.Clear();
 
-    transport_trigger.Clear();
+    trigger.Clear();
 
     consuming_instance = NULL;
     producing_instance = NULL;
@@ -187,8 +171,8 @@ void CipConn::Clear()
     next = NULL;
     prev = NULL;
 
-    correct_originator_to_target_size = 0;
-    correct_target_to_originator_size = 0;
+    corrected_o_to_t_size = 0;
+    corrected_t_to_o_size = 0;
 
     expected_packet_rate_usecs = 0;
 }
@@ -225,7 +209,7 @@ void GeneralConnectionConfiguration( CipConn* aConn )
 
     aConn->SetExpectedPacketRateUSecs( 0 );    // default value
 
-    if( !aConn->transport_trigger.IsServer() )  // Client Type Connection requested
+    if( !aConn->trigger.IsServer() )  // Client Type Connection requested
     {
         aConn->SetExpectedPacketRateUSecs( aConn->t_to_o_RPI_usecs );
 
@@ -251,11 +235,7 @@ void GeneralConnectionConfiguration( CipConn* aConn )
 
     CIPSTER_TRACE_INFO( "%s: inactivity_watchdog_timer_usecs:%u\n", __func__,
             aConn->inactivity_watchdog_timer_usecs );
-
-    aConn->consuming_connection_size = aConn->o_to_t_ncp.ConnectionSize();
-    aConn->producing_connection_size = aConn->t_to_o_ncp.ConnectionSize();
 }
-
 
 
 /**
@@ -329,7 +309,7 @@ static EipStatus sendConnectedData( CipConn* aConn )
         order to pre-setup the whole message on connection opening and just
         change the variable data items e.g., sequence number
     */
-    CipCommonPacketFormatData cpfd;
+    CipCommonPacketFormatData cpfd( aConn->producing_socket );
 
     aConn->eip_level_sequence_count_producing++;
 
@@ -337,7 +317,7 @@ static EipStatus sendConnectedData( CipConn* aConn )
     cpfd.SetItemCount( 2 );
 
     // use Sequenced Address Items if not Connection Class 0
-    if( aConn->transport_trigger.Class() != kConnectionTransportClass0 )
+    if( aConn->trigger.Class() != kConnectionTransportClass0 )
     {
         cpfd.address_item.type_id = kCipItemIdSequencedAddressItem;
         cpfd.address_item.length  = 8;
@@ -363,7 +343,7 @@ static EipStatus sendConnectedData( CipConn* aConn )
     CipAttribute* attr3 = aConn->producing_instance->Attribute( 3 );
     CIPSTER_ASSERT( attr3 );
 
-    CipByteArray* attr3_byte_array = (CipByteArray*) attr3->data;
+    CipByteArray* attr3_byte_array = (CipByteArray*) attr3->Data();
     CIPSTER_ASSERT( attr3_byte_array );
 
     cpfd.data_item.length = 0;
@@ -389,7 +369,7 @@ static EipStatus sendConnectedData( CipConn* aConn )
         cpfd.data_item.length += 4;
     }
 
-    if( aConn->transport_trigger.Class() == kConnectionTransportClass1 )
+    if( aConn->trigger.Class() == kConnectionTransportClass1 )
     {
         cpfd.data_item.length += 2;
 
@@ -422,22 +402,25 @@ static EipStatus sendConnectedData( CipConn* aConn )
 
 static EipStatus handleReceivedIoConnectionData( CipConn* aConn, BufReader aInput )
 {
-    // check class 1 sequence number
-    if( aConn->transport_trigger.Class() == kConnectionTransportClass1 )
+    if( aConn->trigger.Class() == kConnectionTransportClass1 )
     {
+        // consume 2 bytes for the sequence count
         EipUint16 sequence_buffer = aInput.get16();
 
         if( SEQ_LEQ16( sequence_buffer, aConn->sequence_count_consuming ) )
         {
-            return kEipStatusOk; // no new data for the assembly
+            // This is a duplication of earlier data.  No new data for the assembly.
+            return kEipStatusOk;
         }
 
         aConn->sequence_count_consuming = sequence_buffer;
     }
 
+    // we may have consumed 2 bytes above, what is left is without sequence count
     if( aInput.size() )
     {
-        // we have no heartbeat connection
+        // We have no heartbeat connection, because a heartbeat payload
+        // may not contain a run_idle header.
         if( kOpenerConsumedDataHasRunIdleHeader )
         {
             EipUint32 nRunIdleBuf = aInput.get32();
@@ -607,51 +590,6 @@ CipError OpenProducingPointToPointConnection( CipConn* aConn, CipCommonPacketFor
 }
 
 
-EipStatus OpenProducingMulticastConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd )
-{
-    CipConn* existing_conn =
-        GetExistingProducerMulticastConnection( aConn->conn_path.producing_path.GetInstanceOrConnPt() );
-
-    // If we are the first connection producing for the given Input Assembly
-    if( !existing_conn )
-    {
-        return OpenMulticastConnection( kUdpProducing, aConn, cpfd );
-    }
-    else
-    {
-        // inform our originator about the correct connection id
-        aConn->producing_connection_id = existing_conn->producing_connection_id;
-    }
-
-    // we have a connection reuse the data and the socket
-
-    if( kConnInstanceTypeIoExclusiveOwner == aConn->instance_type )
-    {
-        /* exclusive owners take the socket and further manage the connection
-         * especially in the case of time outs.
-         */
-        aConn->producing_socket = existing_conn->producing_socket;
-
-        existing_conn->producing_socket =  kEipInvalidSocket;
-    }
-    else    // this connection will not produce the data
-    {
-        aConn->producing_socket = kEipInvalidSocket;
-    }
-
-    SocketAddressInfoItem saii( kCipItemIdSocketAddressInfoTargetToOriginator,
-        ntohl( g_multicast_configuration.starting_multicast_address ),
-        kOpenerEipIoUdpPort
-        );
-
-    cpfd->AppendTx( saii );
-
-    aConn->remote_address = saii;
-
-    return kEipStatusOk;
-}
-
-
 /**  @brief Open a Multicast connection dependent on @var direction.
  *
  *   @param direction Flag to indicate if consuming or producing.
@@ -701,7 +639,7 @@ EipStatus OpenMulticastConnection( UdpCommuncationDirection direction,
     else
     {
         SocketAddressInfoItem   a( kCipItemIdSocketAddressInfoTargetToOriginator,
-            ntohl( g_multicast_configuration.starting_multicast_address ),
+            ntohl( CipTCPIPInterfaceClass::MultiCast( 1 ).starting_multicast_address ),
             kOpenerEipIoUdpPort
             );
 
@@ -724,6 +662,51 @@ EipStatus OpenMulticastConnection( UdpCommuncationDirection direction,
     }
 
     CIPSTER_TRACE_INFO( "%s: opened OK\n", __func__ );
+
+    return kEipStatusOk;
+}
+
+
+EipStatus OpenProducingMulticastConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd )
+{
+    CipConn* existing_conn =
+        GetExistingProducerMulticastConnection( aConn->conn_path.producing_path.GetInstanceOrConnPt() );
+
+    // If we are the first connection producing for the given Input Assembly
+    if( !existing_conn )
+    {
+        return OpenMulticastConnection( kUdpProducing, aConn, cpfd );
+    }
+    else
+    {
+        // inform our originator about the correct connection id
+        aConn->producing_connection_id = existing_conn->producing_connection_id;
+    }
+
+    // we have a connection reuse the data and the socket
+
+    if( kConnInstanceTypeIoExclusiveOwner == aConn->instance_type )
+    {
+        /* exclusive owners take the socket and further manage the connection
+         * especially in the case of time outs.
+         */
+        aConn->producing_socket = existing_conn->producing_socket;
+
+        existing_conn->producing_socket =  kEipInvalidSocket;
+    }
+    else    // this connection will not produce the data
+    {
+        aConn->producing_socket = kEipInvalidSocket;
+    }
+
+    SocketAddressInfoItem saii( kCipItemIdSocketAddressInfoTargetToOriginator,
+        ntohl( CipTCPIPInterfaceClass::MultiCast( 1 ).starting_multicast_address ),
+        kOpenerEipIoUdpPort
+        );
+
+    cpfd->AppendTx( saii );
+
+    aConn->remote_address = saii;
 
     return kEipStatusOk;
 }
@@ -782,8 +765,6 @@ CipConnectionClass::CipConnectionClass() :
         kCipConnectionClass,
         "Connection",
         MASK2( 6, 1 ),              // class attributes mask
-        MASK2( 6, 1 ),              // class getAttributeAll mask
-        0,                          // instance getAttributeAll mask
         1                           // revision
         )
 {
@@ -818,7 +799,7 @@ CipError CipConnectionClass::OpenIO( CipConn* aConn, CipCommonPacketFormatData* 
     // Both Change of State and Cyclic triggers use the Transmission Trigger Timer
     // according to Vol1_3.19_3-4.4.3.7.
 
-    if( io_conn->transport_trigger.Trigger() != kConnectionTriggerTypeCyclic )
+    if( io_conn->trigger.Trigger() != kConnectionTriggerTypeCyclic )
     {
         // trigger is not cyclic, it is Change of State here.
 
@@ -863,32 +844,35 @@ CipError CipConnectionClass::OpenIO( CipConn* aConn, CipCommonPacketFormatData* 
         // an assembly object should always have an attribute 3
         CIPSTER_ASSERT( attribute );
 
-        data_size    = io_conn->consuming_connection_size;
+        data_size    = io_conn->o_to_t_ncp.ConnectionSize();
         diff_size    = 0;
-        is_heartbeat = ( ( (CipByteArray*) attribute->data )->length == 0 );
+        is_heartbeat = ( ( (CipByteArray*) attribute->Data() )->length == 0 );
 
-        if( io_conn->transport_trigger.Class() == kConnectionTransportClass1 )
+        if( io_conn->trigger.Class() == kConnectionTransportClass1 )
         {
             data_size -= 2;     // remove 16-bit sequence count length
             diff_size += 2;
         }
 
-        if( kOpenerConsumedDataHasRunIdleHeader && data_size > 0
-            && !is_heartbeat )    // only have a run idle header if it is not a heartbeat connection
+        if( kOpenerConsumedDataHasRunIdleHeader && data_size >= 4
+            // only expect a run idle header if it is not a heartbeat connection
+            && !is_heartbeat )
         {
             data_size -= 4;       // remove the 4 bytes needed for run/idle header
             diff_size += 4;
         }
 
-        if( ( (CipByteArray*) attribute->data )->length != data_size )
+        if( ( io_conn->o_to_t_ncp.IsFixed() &&
+              data_size != ( (CipByteArray*) attribute->Data() )->length )
+          ||  data_size >  ( (CipByteArray*) attribute->Data() )->length )
         {
             // wrong connection size
-            aConn->correct_originator_to_target_size =
-                ( (CipByteArray*) attribute->data )->length + diff_size;
+            aConn->corrected_o_to_t_size = ( (CipByteArray*) attribute->Data() )->length + diff_size;
 
             *extended_error = kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize;
 
-            CIPSTER_TRACE_INFO( "%s: byte_array length != data_size\n", __func__ );
+            CIPSTER_TRACE_INFO( "%s: assembly size(%d) != conn_size(%d)\n",
+                    __func__,  ((CipByteArray*) attribute->Data() )->length, data_size );
             return kCipErrorConnectionFailure;
         }
     }
@@ -904,28 +888,32 @@ CipError CipConnectionClass::OpenIO( CipConn* aConn, CipCommonPacketFormatData* 
         // an assembly object should always have an attribute 3
         CIPSTER_ASSERT( attribute );
 
-        data_size    = io_conn->producing_connection_size;
+        data_size    = io_conn->t_to_o_ncp.ConnectionSize();
         diff_size    = 0;
-        is_heartbeat = ( ( (CipByteArray*) attribute->data )->length == 0 );
 
-        if( io_conn->transport_trigger.Class() == kConnectionTransportClass1 )
+        // Note: spec never talks about a heartbeat t_to_o connection, so why this?
+        is_heartbeat = ( ( (CipByteArray*) attribute->Data() )->length == 0 );
+
+        if( io_conn->trigger.Class() == kConnectionTransportClass1 )
         {
             data_size -= 2; // remove 16-bit sequence count length
             diff_size += 2;
         }
 
-        if( kOpenerProducedDataHasRunIdleHeader && data_size > 0
-            && !is_heartbeat )  // only have a run idle header if it is not a heartbeat connection
+        if( kOpenerProducedDataHasRunIdleHeader && data_size >= 4
+            // only have a run idle header if it is not a heartbeat connection
+            && !is_heartbeat )
         {
             data_size -= 4;   // remove the 4 bytes needed for run/idle header
             diff_size += 4;
         }
 
-        if( ( (CipByteArray*) attribute->data )->length != data_size )
+        if( ( io_conn->t_to_o_ncp.IsFixed() &&
+              data_size != ( (CipByteArray*) attribute->Data() )->length )
+          ||  data_size >  ( (CipByteArray*) attribute->Data() )->length )
         {
             // wrong connection size
-            aConn->correct_target_to_originator_size =
-                ( (CipByteArray*) attribute->data )->length + diff_size;
+            aConn->corrected_t_to_o_size = ( (CipByteArray*) attribute->Data() )->length + diff_size;
 
             *extended_error = kConnectionManagerStatusCodeErrorInvalidTToOConnectionSize;
 
@@ -968,7 +956,7 @@ CipError CipConnectionClass::OpenIO( CipConn* aConn, CipCommonPacketFormatData* 
 }
 
 
-EipStatus ConnectionClassInit( EipUint16 unique_connection_id )
+EipStatus CipConn::Init( EipUint16 unique_connection_id )
 {
     if( !GetCipClass( kCipConnectionClass ) )
     {

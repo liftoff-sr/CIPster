@@ -25,13 +25,15 @@
  */
 
 #include <string.h>
-#include "cipster_user_conf.h"
-#include "cipidentity.h"
-#include "cipcommon.h"
-#include "cipmessagerouter.h"
-#include "ciperror.h"
-#include "byte_bufs.h"
-#include "cipster_api.h"
+#include <cipster_user_conf.h>
+#include <cipidentity.h>
+#include <cipcommon.h>
+#include <cipmessagerouter.h>
+#include <ciperror.h>
+#include <byte_bufs.h>
+#include <cipster_api.h>
+#include <cipclass.h>
+
 
 // attributes in CIP Identity Object
 
@@ -154,15 +156,15 @@ static CipInstance* createIdentityInstance()
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
-    i->AttributeInsert( 1, kCipUint, kGetableSingleAndAll, GetAttrData, NULL, &vendor_id_ );
-    i->AttributeInsert( 2, kCipUint, kGetableSingleAndAll, GetAttrData, NULL, &device_type_ );
-    i->AttributeInsert( 3, kCipUint, kGetableSingleAndAll, GetAttrData, NULL, &product_code_ );
-    i->AttributeInsert( 4, kCipUsintUsint, kGetableSingleAndAll, GetAttrData, NULL, &revision_ );
+    i->AttributeInsert( 1, kCipUint, &vendor_id_ );
+    i->AttributeInsert( 2, kCipUint, &device_type_ );
+    i->AttributeInsert( 3, kCipUint, &product_code_ );
+    i->AttributeInsert( 4, kCipUsintUsint, &revision_ );
 
-    i->AttributeInsert( 5, kCipWord, kGetableSingleAndAll, GetAttrData, NULL, &status_ );
-    i->AttributeInsert( 6, kCipUdint, kGetableSingleAndAll, GetAttrData, NULL, &serial_number_ );
+    i->AttributeInsert( 5, kCipWord, &status_ );
+    i->AttributeInsert( 6, kCipUdint, &serial_number_ );
 
-    i->AttributeInsert( 7, kCipShortString, kGetableSingleAndAll, GetAttrData, NULL, &product_name_ );
+    i->AttributeInsert( 7, kCipShortString, &product_name_ );
 
     clazz->InstanceInsert( i );
 
@@ -183,9 +185,6 @@ EipStatus CipIdentityInit()
 
                 // conformance tool wants no instance count attribute in the class, omit no. 3
                 MASK6( 1, 2, 4, 5, 6, 7 ),
-
-                MASK4( 1, 2, 6, 7 ),            // class getAttributeAll mask		CIP spec 5-2.3.2
-                MASK7( 1, 2, 3, 4, 5, 6, 7 ),   // instance getAttributeAll mask	CIP spec 5-2.3.2
                 1                               // class revision
                 );
 

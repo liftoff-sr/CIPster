@@ -1,14 +1,19 @@
 /*******************************************************************************
- * Copyright (C) 2016, SoftPLC Corportion.
+ * Copyright (C) 2016-2018, SoftPLC Corportion.
  *
  ******************************************************************************/
 
 #include <byte_bufs.h>
+#include <stdexcept>
 
-#include <byte_bufs.impl>
+
+void BufWriter::overrun() const
+{
+    throw std::overflow_error( "write > limit" );
+}
 
 
-void BufWriter::put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding )
+BufWriter& BufWriter::put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding )
 {
     put8( (EipByte) aString.size() );
     append( (EipByte*) aString.c_str(), aString.size() );
@@ -17,31 +22,41 @@ void BufWriter::put_SHORT_STRING( const std::string& aString, bool doEvenByteCou
     // itself is odd sum can be odd when length is even.
     if( doEvenByteCountPadding && !(aString.size() & 1)  )
         put8( 0 );
+
+    return *this;
 }
 
 
-void BufWriter::put_STRING( const std::string& aString, bool doEvenByteCountPadding )
+BufWriter& BufWriter::put_STRING( const std::string& aString, bool doEvenByteCountPadding )
 {
     put16( aString.size() );
 
     append( (EipByte*) aString.c_str(), aString.size() );
     if( doEvenByteCountPadding && ( aString.size() & 1 )  )
         put8( 0 );
+    return *this;
 }
 
 
-void BufWriter::put_STRING2( const std::string& aString )
+BufWriter& BufWriter::put_STRING2( const std::string& aString )
 {
     put16( aString.size() );
 
     // TODO: decode from UTF8 here:
     for( unsigned i = 0; i < aString.size(); ++i )
-        put16( (EipByte) aString[i] );
+        put16( (unsigned char) aString[i] );
+    return *this;
 }
 
 
 
 //-----<BufReader>------------------------------------------------------------
+
+void BufReader::overrun() const
+{
+    throw std::range_error( "read > limit" );
+}
+
 
 std::string BufReader::get_SHORT_STRING( bool ExpectPossiblePaddingToEvenByteCount )
 {
@@ -95,3 +110,8 @@ std::string BufReader::get_STRING2()
 
     return ret;
 }
+
+
+#if !BYTEBUFS_INLINE
+ #include <byte_bufs.impl>
+#endif

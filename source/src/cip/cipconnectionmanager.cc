@@ -499,7 +499,7 @@ CipError CipConn::parseConnectionPath( BufReader aPath, ConnectionManagerStatusC
         }
     }
 
-    if( transport_trigger.Class() == kConnectionTransportClass3 )
+    if( trigger.Class() == kConnectionTransportClass3 )
     {
         // connection end point has to be the message router instance 1
         if( conn_path.consuming_path.GetClass() != kCipMessageRouterClass ||
@@ -537,96 +537,94 @@ EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReade
     {
         return kEipStatusError;
     }
-    else
+
+    // Check if connected address item or sequenced address item  received,
+    // otherwise it is no connected message and should not be here.
+    if( cpfd.address_item.type_id == kCipItemIdConnectionAddress
+     || cpfd.address_item.type_id == kCipItemIdSequencedAddressItem )
     {
-        // Check if connected address item or sequenced address item  received,
-        // otherwise it is no connected message and should not be here.
-        if( cpfd.address_item.type_id == kCipItemIdConnectionAddress
-         || cpfd.address_item.type_id == kCipItemIdSequencedAddressItem )
+        // found connected address item or found sequenced address item
+        // -> for now the sequence number will be ignored
+
+        if( cpfd.data_item.type_id == kCipItemIdConnectedDataItem ) // connected data item received
         {
-            // found connected address item or found sequenced address item
-            // -> for now the sequence number will be ignored
+            CipConn* conn = GetConnectionByConsumingId( cpfd.address_item.data.connection_identifier );
 
-            if( cpfd.data_item.type_id == kCipItemIdConnectedDataItem ) // connected data item received
+            if( !conn )
             {
-                CipConn* conn = GetConnectionByConsumingId( cpfd.address_item.data.connection_identifier );
-
-                if( !conn )
-                {
-                    CIPSTER_TRACE_INFO( "%s: no consuming connection for conn_id %d\n",
-                        __func__, cpfd.address_item.data.connection_identifier
-                        );
-                    return kEipStatusError;
-                }
-
-                CIPSTER_TRACE_INFO( "%s: got consuming connection for conn_id %d\n",
+                CIPSTER_TRACE_INFO( "%s: no consuming connection for conn_id 0x%x\n",
                     __func__, cpfd.address_item.data.connection_identifier
                     );
+                return kEipStatusError;
+            }
 
-                CIPSTER_TRACE_INFO( "%s: c.s_addr=%08x  f.s_addr=%08x\n",
+            CIPSTER_TRACE_INFO( "%s: got consuming connection for conn_id 0x%x\n",
+                __func__, cpfd.address_item.data.connection_identifier
+                );
+
+            CIPSTER_TRACE_INFO( "%s: c.s_addr=%08x  f.s_addr=%08x\n",
+                __func__,
+                conn->originator_address.sin_addr.s_addr,
+                from_address->sin_addr.s_addr
+                );
+
+            // only handle the data if it is coming from the originator
+            if( conn->originator_address.sin_addr.s_addr == from_address->sin_addr.s_addr )
+            {
+                CIPSTER_TRACE_INFO( "%s: g.sn=0x%08x  c.sn=0x%08x\n",
                     __func__,
-                    conn->originator_address.sin_addr.s_addr,
-                    from_address->sin_addr.s_addr
+                    cpfd.address_item.data.sequence_number,
+                    conn->eip_level_sequence_count_consuming
                     );
 
-                // only handle the data if it is coming from the originator
-                if( conn->originator_address.sin_addr.s_addr == from_address->sin_addr.s_addr )
+                // if this is the first received frame
+                if( conn->eip_level_sequence_count_consuming_first )
                 {
-                    CIPSTER_TRACE_INFO( "%s: g.sn=0x%08x  c.sn=0x%08x\n",
+                    // put our tracking count within a half cycle of the leader.  Without this
+                    // there are many scenarios where the SEQ_GT32 below won't evaluate as true.
+                    conn->eip_level_sequence_count_consuming = cpfd.address_item.data.sequence_number - 1;
+                    conn->eip_level_sequence_count_consuming_first = false;
+                }
+
+                // only inform assembly object if the sequence counter is greater or equal, or
+                if( SEQ_GT32( cpfd.address_item.data.sequence_number,
+                              conn->eip_level_sequence_count_consuming ) )
+                {
+                    // reset the watchdog timer
+                    conn->inactivity_watchdog_timer_usecs =
+                        conn->o_to_t_RPI_usecs << (2 + conn->connection_timeout_multiplier);
+
+                    CIPSTER_TRACE_INFO( "%s: reset inactivity watchdog to %u usecs\n",
                         __func__,
-                        cpfd.address_item.data.sequence_number,
-                        conn->eip_level_sequence_count_consuming
-                        );
+                        conn->inactivity_watchdog_timer_usecs );
 
-                    // if this is the first received frame
-                    if( conn->eip_level_sequence_count_consuming_first )
+                    conn->eip_level_sequence_count_consuming = cpfd.address_item.data.sequence_number;
+
+                    if( conn->connection_receive_data_function )
                     {
-                        // put our tracking count within a half cycle of the leader.  Without this
-                        // there are many scenarios where the SEQ_GT32 below won't evaluate as true.
-                        conn->eip_level_sequence_count_consuming = cpfd.address_item.data.sequence_number - 1;
-                        conn->eip_level_sequence_count_consuming_first = false;
-                    }
-
-                    // only inform assembly object if the sequence counter is greater or equal, or
-                    if( SEQ_GT32( cpfd.address_item.data.sequence_number,
-                                  conn->eip_level_sequence_count_consuming ) )
-                    {
-                        // reset the watchdog timer
-                        conn->inactivity_watchdog_timer_usecs =
-                            conn->o_to_t_RPI_usecs << (2 + conn->connection_timeout_multiplier);
-
-                        CIPSTER_TRACE_INFO( "%s: reset inactivity watchdog to %u usecs\n",
-                            __func__,
-                            conn->inactivity_watchdog_timer_usecs );
-
-                        conn->eip_level_sequence_count_consuming = cpfd.address_item.data.sequence_number;
-
-                        if( conn->connection_receive_data_function )
-                        {
-                            return conn->connection_receive_data_function( conn,
-                                BufReader( cpfd.data_item.data, cpfd.data_item.length ) );
-                        }
-                    }
-                    else
-                    {
-                        CIPSTER_TRACE_INFO( "%s: received sequence number was not greater, no watchdog reset\n"
-                            " received:%08x   connection seqn:%08x\n",
-                            __func__,
-                            cpfd.address_item.data.sequence_number,
-                            conn->eip_level_sequence_count_consuming
-                            );
+                        return conn->connection_receive_data_function( conn,
+                            BufReader( cpfd.data_item.data, cpfd.data_item.length ) );
                     }
                 }
                 else
                 {
-                    CIPSTER_TRACE_WARN(
-                            "%s: connected data received with wrong originator address.\n"
-                            " from:%08x   connection originator:%08x\n",
-                            __func__,
-                            from_address->sin_addr.s_addr,
-                            conn->originator_address.sin_addr.s_addr
-                            );
+                    CIPSTER_TRACE_INFO( "%s: received sequence number was not greater, no watchdog reset\n"
+                        " received:%08x   connection seqn:%08x\n",
+                        __func__,
+                        cpfd.address_item.data.sequence_number,
+                        conn->eip_level_sequence_count_consuming
+                        );
                 }
+            }
+            else
+            {
+                CIPSTER_TRACE_WARN(
+                        "%s: connected data received with wrong originator address.\n"
+                        " from:%08x   connection originator:%08x\n",
+                        __func__,
+                        from_address->sin_addr.s_addr,
+                        conn->originator_address.sin_addr.s_addr
+                        );
             }
         }
     }
@@ -651,7 +649,7 @@ EipStatus ManageConnections()
             if( active->consuming_instance ||
 
                 // All server connections have to maintain an inactivity watchdog timer
-                active->transport_trigger.IsServer() )
+                active->trigger.IsServer() )
             {
                 active->inactivity_watchdog_timer_usecs -= kOpenerTimerTickInMicroSeconds;
 
@@ -680,7 +678,7 @@ EipStatus ManageConnections()
                     // only produce for the master connection
                     active->producing_socket != kEipInvalidSocket )
                 {
-                    if( active->transport_trigger.Trigger() != kConnectionTriggerTypeCyclic )
+                    if( active->trigger.Trigger() != kConnectionTriggerTypeCyclic )
                     {
                         // non cyclic connections have to decrement production inhibit timer
                         if( 0 <= active->production_inhibit_timer_usecs )
@@ -705,7 +703,7 @@ EipStatus ManageConnections()
                         // reload the timer value
                         active->transmission_trigger_timer_usecs = active->GetExpectedPacketRateUSecs();
 
-                        if( active->transport_trigger.Trigger() != kConnectionTriggerTypeCyclic )
+                        if( active->trigger.Trigger() != kConnectionTriggerTypeCyclic )
                         {
                             // non cyclic connections have to reload the production inhibit timer
                             active->production_inhibit_timer_usecs = active->GetPIT_USecs();
@@ -728,7 +726,7 @@ static void assembleForwardOpenResponse( CipConn* aConn,
         CipMessageRouterResponse* response, CipError general_status,
         ConnectionManagerStatusCode extended_status )
 {
-    CipCommonPacketFormatData cpfd;
+    CipCommonPacketFormatData cpfd( 0 );
 
     BufWriter out = response->data;
 
@@ -772,13 +770,13 @@ static void assembleForwardOpenResponse( CipConn* aConn,
             case kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize:
                 response->size_of_additional_status = 2;
                 response->additional_status[0] = extended_status;
-                response->additional_status[1] = aConn->correct_originator_to_target_size;
+                response->additional_status[1] = aConn->corrected_o_to_t_size;
                 break;
 
             case kConnectionManagerStatusCodeErrorInvalidTToOConnectionSize:
                 response->size_of_additional_status = 2;
                 response->additional_status[0] = extended_status;
-                response->additional_status[1] = aConn->correct_target_to_originator_size;
+                response->additional_status[1] = aConn->corrected_t_to_o_size;
                 break;
 
             default:
@@ -801,8 +799,8 @@ static void assembleForwardOpenResponse( CipConn* aConn,
         out.put32( aConn->t_to_o_RPI_usecs );
     }
 
-    *out++ = 0;   // remaining path size - for routing devices relevant
-    *out++ = 0;   // reserved
+    out.put8( 0 );   // remaining path size - for routing devices relevant
+    out.put8( 0 );   // reserved
 
     response->data_length = out.data() - response->data.data();
 }
@@ -852,7 +850,7 @@ void CloseConnection( CipConn* conn )
 {
     conn->state = kConnectionStateNonExistent;
 
-    if( conn->transport_trigger.Class() != kConnectionTransportClass3 )
+    if( conn->trigger.Class() != kConnectionTransportClass3 )
     {
         // only close the UDP connection for not class 3 connections
         IApp_CloseSocket_udp( conn->consuming_socket );
@@ -869,7 +867,7 @@ void CloseConnection( CipConn* conn )
 void AddNewActiveConnection( CipConn* aConn )
 {
 #if defined(DEBUG) || 1
-    if( aConn->transport_trigger.Class() == kConnectionTransportClass1 )
+    if( aConn->trigger.Class() == kConnectionTransportClass1 )
     {
         CIPSTER_TRACE_INFO( "%s: conn->consuming_connection_id:%d\n",
             __func__, aConn->consuming_connection_id );
@@ -892,7 +890,7 @@ void AddNewActiveConnection( CipConn* aConn )
 void RemoveFromActiveConnections( CipConn* aConn )
 {
 #if defined(DEBUG) || 1
-    if( aConn->transport_trigger.Class() == kConnectionTransportClass1 )
+    if( aConn->trigger.Class() == kConnectionTransportClass1 )
     {
         CIPSTER_TRACE_INFO( "%s: conn->consuming_connection_id:%d\n",
             __func__, aConn->consuming_connection_id );
@@ -963,7 +961,7 @@ EipStatus TriggerConnections( int aOutputAssembly, int aInputAssembly )
         if( aOutputAssembly == conn->conn_path.consuming_path.GetInstanceOrConnPt()
          && aInputAssembly  == conn->conn_path.producing_path.GetInstanceOrConnPt() )
         {
-            if( conn->transport_trigger.Trigger() == kConnectionTriggerTypeApplication )
+            if( conn->trigger.Trigger() == kConnectionTriggerTypeApplication )
             {
                 // produce at the next allowed occurrence
                 conn->transmission_trigger_timer_usecs = conn->production_inhibit_timer_usecs;
@@ -1005,8 +1003,8 @@ static EipStatus forward_open_common( CipInstance* instance,
 
     BufReader in = request->data;
 
-    dummy.priority_timetick = *in++;
-    dummy.timeout_ticks = *in++;
+    dummy.priority_timetick = in.get8();
+    dummy.timeout_ticks     = in.get8();
 
     dummy.consuming_connection_id = in.get32();     // O_to_T
     dummy.producing_connection_id = in.get32();     // T_to_O
@@ -1048,7 +1046,7 @@ static EipStatus forward_open_common( CipInstance* instance,
 
     dummy.sequence_count_producing = 0; // set the sequence count to zero
 
-    dummy.connection_timeout_multiplier = *in++;
+    dummy.connection_timeout_multiplier = in.get8();
 
     if( dummy.connection_timeout_multiplier > 7 )
     {
@@ -1076,11 +1074,7 @@ static EipStatus forward_open_common( CipInstance* instance,
 
     dummy.o_to_t_RPI_usecs = in.get32();
 
-    if( isLarge )
-        dummy.o_to_t_ncp.SetLarge( in.get32() );
-    else
-        dummy.o_to_t_ncp.SetNotLarge( in.get16() );
-
+    dummy.o_to_t_ncp.Set( isLarge ? in.get32() : in.get16(), isLarge );
     dummy.t_to_o_RPI_usecs = in.get32();
 
     // The requested packet interval parameter needs to be a multiple of
@@ -1094,10 +1088,8 @@ static EipStatus forward_open_common( CipInstance* instance,
             * kOpenerTimerTickInMicroSeconds + kOpenerTimerTickInMicroSeconds;
     }
 
-    if( isLarge )
-        dummy.t_to_o_ncp.SetLarge( in.get32() );
-    else
-        dummy.t_to_o_ncp.SetNotLarge( in.get16() );
+
+    dummy.t_to_o_ncp.Set( isLarge ? in.get32() : in.get16(), isLarge );
 
     // check if Network connection parameters are ok
     if( dummy.o_to_t_ncp.ConnectionType() == kIOConnTypeInvalid )
@@ -1124,7 +1116,7 @@ static EipStatus forward_open_common( CipInstance* instance,
         return kEipStatusOkSend;    // send reply
     }
 
-    int trigger = *in++;
+    int trigger = in.get8();
 
     // check for undocumented trigger bits
     if( 0x4c & trigger )
@@ -1140,9 +1132,9 @@ static EipStatus forward_open_common( CipInstance* instance,
         return kEipStatusOkSend;    // send reply
     }
 
-    dummy.transport_trigger.Set( trigger );
+    dummy.trigger.Set( trigger );
 
-    unsigned conn_path_byte_count = *in++ * 2;
+    unsigned conn_path_byte_count = in.get8() * 2;
 
     if( conn_path_byte_count < in.size() )
     {
@@ -1166,11 +1158,17 @@ static EipStatus forward_open_common( CipInstance* instance,
         return kEipStatusOkSend;
     }
 
-    CIPSTER_TRACE_INFO( "%s: transport_trigger_class:%d\n", __func__, dummy.transport_trigger.Class() );
+    CIPSTER_TRACE_INFO( "%s: trigger_class:%d\n", __func__, dummy.trigger.Class() );
+
     CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, dummy.o_to_t_RPI_usecs );
     CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, dummy.o_to_t_ncp.ConnectionSize() );
     CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, dummy.o_to_t_ncp.Priority() );
     CIPSTER_TRACE_INFO( "%s: o_to_t type:%d\n", __func__, dummy.o_to_t_ncp.ConnectionType() );
+
+    CIPSTER_TRACE_INFO( "%s: t_to_o RPI_usecs:%u\n", __func__, dummy.t_to_o_RPI_usecs );
+    CIPSTER_TRACE_INFO( "%s: t_to_o size:%d\n", __func__, dummy.t_to_o_ncp.ConnectionSize() );
+    CIPSTER_TRACE_INFO( "%s: t_to_o priority:%d\n", __func__, dummy.t_to_o_ncp.Priority() );
+    CIPSTER_TRACE_INFO( "%s: t_to_o type:%d\n", __func__, dummy.t_to_o_ncp.ConnectionType() );
 
     CipClass* clazz = GetCipClass( dummy.mgmnt_class );
 
@@ -1228,7 +1226,7 @@ static EipStatus forward_close_service( CipInstance* instance,
     EipUint16 connection_serial_number = in.get16();
     EipUint16 originator_vendor_id     = in.get16();
     EipUint32 originator_serial_number = in.get32();
-    EipUint8  connection_path_size     = *in++;
+    EipUint8  connection_path_size     = in.get8();
 
     CIPSTER_TRACE_INFO( "ForwardClose: ConnSerNo %d\n", connection_serial_number );
 
@@ -1265,18 +1263,18 @@ static EipStatus forward_close_service( CipInstance* instance,
     if( connection_status == kConnectionManagerStatusCodeSuccess )
     {
         // Vol1 Table 3-5.22
-        *out++ = 0;         // application data word count
-        *out++ = 0;         // reserved
+        out.put8( 0 );         // application data word count
+        out.put8( 0 );         // reserved
     }
     else
     {
         // Vol1 Table 3-5.23
-        *out++ = connection_path_size;
+        out.put8( connection_path_size );
         response->general_status = kCipErrorConnectionFailure;
         response->additional_status[0] = connection_status;
         response->size_of_additional_status = 1;
 
-        *out++ = 0;         // reserved
+        out.put8( 0 );         // reserved
     }
 
     response->data_length = out.data() - response->data.data();
@@ -1285,19 +1283,10 @@ static EipStatus forward_close_service( CipInstance* instance,
 }
 
 
-class CipConnMgrClass : public CipClass
-{
-public:
-    CipConnMgrClass();
-};
-
-
 CipConnMgrClass::CipConnMgrClass() :
     CipClass( kCipConnectionManagerClass,
         "Connection Manager",
         MASK5( 1,2,3,6,7 ),     // common class attributes
-        MASK5( 1,2,3,6,7 ),     // class getAttributeAll mask
-        0,                      // instance getAttributeAll mask
         1                       // revision
         )
 {
@@ -1308,6 +1297,11 @@ CipConnMgrClass::CipConnMgrClass() :
     ServiceInsert( kLargeForwardOpen, large_forward_open_service, "LargeForwardOpen" );
 
     ServiceInsert( kForwardClose, forward_close_service, "ForwardClose" );
+
+    // Vol1 Table 3-5.4 limits what GetAttributeAll returns, but I want to support
+    // attribute 3 also, so remove 3 from the auto generated
+    // (via CipInstance::AttributeInsert()) bitmap.
+    getable_all_mask = MASK4( 1,2,6,7 );
 
     InitializeIoConnectionData();
 }
@@ -1339,4 +1333,3 @@ EipStatus ConnectionManagerInit()
 
     return kEipStatusOk;
 }
-

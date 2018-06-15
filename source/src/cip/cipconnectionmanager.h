@@ -1,17 +1,24 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (C) 2016, SoftPLC Corportion.
+ * Copyright (C) 2016-2018, SoftPLC Corportion.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPCONNECTIONMANAGER_H_
 #define CIPSTER_CIPCONNECTIONMANAGER_H_
 
-#include "cipster_user_conf.h"
-#include "cipster_api.h"
-#include "typedefs.h"
+#include <cipster_user_conf.h>
+#include <typedefs.h>
 #include "ciptypes.h"
 #include "cipmessagerouter.h"
 #include "cipconnection.h"
+
+
+
+class CipConnMgrClass : public CipClass
+{
+public:
+    CipConnMgrClass();
+};
 
 
 

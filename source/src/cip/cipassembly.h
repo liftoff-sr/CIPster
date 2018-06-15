@@ -6,8 +6,9 @@
 #ifndef CIPSTER_CIPASSEMBLY_H_
 #define CIPSTER_CIPASSEMBLY_H_
 
-#include "typedefs.h"
+#include <typedefs.h>
 #include "ciptypes.h"
+#include "cipinstance.h"
 
 
 /**

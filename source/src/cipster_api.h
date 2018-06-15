@@ -8,13 +8,13 @@
 
 #include <assert.h>
 
+#include <cipster_user_conf.h>
 
-#include "typedefs.h"
-#include "cip/ciptypes.h"
 #include "cip/ciperror.h"
+#include "cip/cipclass.h"
 #include "cip/cipmessagerouter.h"
+#include "cip/ciptcpipinterface.h"
 #include "byte_bufs.h"
-#include "cipster_user_conf.h"
 
 
 
@@ -22,6 +22,7 @@
  * @brief This is the public interface of the CIPster. It provides all function
  * needed to implement an EtherNet/IP enabled slave-device.
  */
+
 
 /** @ingroup CIP_API
  * @brief Configure the data of the network interface of the device
@@ -34,8 +35,13 @@
  *  @param gateway_address     the gateway address
  *  @return EIP_OK if the configuring worked otherwise EIP_ERROR
  */
-EipStatus ConfigureNetworkInterface( const char* ip_address, const char* subnet_mask,
-        const char* gateway_address );
+inline EipStatus ConfigureNetworkInterface( const char* ip_address, const char* subnet_mask,
+        const char* gateway_address )
+{
+    return CipTCPIPInterfaceClass::ConfigureNetworkInterface(
+                1, ip_address, subnet_mask, gateway_address );
+}
+
 
 /** @ingroup CIP_API
  * @brief Configure the MAC address of the device
@@ -48,13 +54,21 @@ void ConfigureMacAddress( const EipByte* mac_address );
  * @brief Configure the domain name of the device
  * @param domain_name the domain name to be used
  */
-void ConfigureDomainName( const char* domain_name );
+inline void ConfigureDomainName( const char* domain_name )
+{
+    // The eventual API is probably this:
+    CipTCPIPInterfaceClass::ConfigureDomainName( 1, domain_name );
+}
 
 /** @ingroup CIP_API
  * @brief Configure the host name of the device
  * @param host_name the host name to be used
  */
-void ConfigureHostName( const char* host_name );
+inline void ConfigureHostName( const char* host_name )
+{
+    // The eventual API is probably this:
+    CipTCPIPInterfaceClass::ConfigureHostName( 1, host_name );
+}
 
 /** @ingroup CIP_API
  * @brief Set the serial number of the device's identity object.
@@ -155,39 +169,6 @@ CipInstance* CreateAssemblyInstance( int aInstanceId, BufWriter aBuffer );
 
 class CipConn;
 
-/** @ingroup CIP_API
- * @brief Function prototype for handling the closing of connections
- *
- * @param aConn The connection object which is closing the
- * connection
- */
-typedef void (* ConnectionCloseFunction)( CipConn* aConn );
-
-/** @ingroup CIP_API
- * @brief Function prototype for handling the timeout of connections
- *
- * @param aConn The connection object which connection timed out
- */
-typedef void (* ConnectionTimeoutFunction)( CipConn* aConn );
-
-/** @ingroup CIP_API
- * @brief Function prototype for sending data via a connection
- *
- * @param aConn The connection object which connection timed out
- *
- * @return EIP stack status
- */
-typedef EipStatus (* ConnectionSendDataFunction)( CipConn* aConn );
-
-/** @ingroup CIP_API
- * @brief Function prototype for receiving data via a connection
- *
- * @param aConn the connection object which connection timed out
- * @param aInput the payload of the CIP message with its length
- *
- * @return Stack status
- */
-typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* aConn, BufReader aInput );
 
 /** @ingroup CIP_API
  * @brief Configures the connection point for an exclusive owner connection.
@@ -423,47 +404,6 @@ EipStatus ResetDevice();
  */
 EipStatus ResetDeviceToInitialConfiguration( bool also_reset_comm_parameters );
 
-#if defined(__linux__) || defined(__WIN32)
-
-#include <stdlib.h>
-
-static inline void* CipCalloc( unsigned pa_nNumberOfElements, unsigned pa_nSizeOfElement )
-{
-    return calloc( pa_nNumberOfElements, pa_nSizeOfElement );
-}
-
-
-static inline void CipFree( void* pa_poData )
-{
-    free( pa_poData );
-}
-
-
-#else
-
-/** @ingroup CIP_CALLBACK_API
- * @brief Allocate memory for the CIP stack
- *
- * emulate the common c-library function calloc
- * In CIPster allocation only happens on application startup and on
- * class/instance creation and configuration not on during operation
- * (processing messages).
- * @param number_of_elements number of elements to allocate
- * @param size_of_element size in bytes of one element
- * @return pointer to the allocated memory, 0 on error
- */
-void* CipCalloc( unsigned number_of_elements, unsigned size_of_element );
-
-/** @ingroup CIP_CALLBACK_API
- * @brief Free memory allocated by the CIPster
- *
- * emulate the common c-library function free
- * @param pa_poData pointer to the allocated memory
- */
-void CipFree( void* data );
-
-#endif
-
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Inform the application that the Run/Idle State has been changed
@@ -626,7 +566,7 @@ void IApp_CloseSocket_tcp( int socket_handle );
  *   - Receive explicit message data on connected TCP sockets and the UPD socket
  *     for port AF12hex. The received data has to be handed over to Ethernet
  *     encapsulation layer with the functions: \n
- *     int HandleReceivedExplictTcpData( int socket, CipBufUnmutable aCommand, BufWriter aReply ),\n
+ *     int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aReply ),
  *     int HandleReceivedExplictUDPData(int socket_handle, struct sockaddr_in
  * *from_address, EIP_UINT8* buffer, unsigned buffer_length, int
  * *number_of_remaining_bytes).\n

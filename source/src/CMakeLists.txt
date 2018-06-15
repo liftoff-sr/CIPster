@@ -1,8 +1,16 @@
 
 cipster_common_includes()
 
+add_definitions( -D__STDC_FORMAT_MACROS )       # <inttypes.h>'s PRIX32
+add_definitions( -std=c++0x )
+#add_definitions( -Wall )           # TODO
+
+
 set( CIP_SRCS
     cip/appcontype.cc
+    cip/cipattribute.cc
+    cip/cipinstance.cc
+    cip/cipclass.cc
     cip/cipassembly.cc
     cip/cipcommon.cc
     cip/cipconnection.cc
@@ -39,8 +47,6 @@ set( OBJECTS_SRCS )
 
 add_subdirectory( cip_objects )
 
-add_definitions( -D__STDC_FORMAT_MACROS )       # <inttypes.h>'s PRIX32
-add_definitions( -std=c++0x )
 
 #message( "OBJECTS_SRC:${OBJECTS_SRC}" )
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016-2018, SoftPLC Corportion.
  *
  ******************************************************************************/
 
@@ -33,7 +33,11 @@ public:
 
     CipByte*    data() const    { return start; }
     CipByte*    end() const     { return limit; }
-    size_t      size() const    { return limit - start; }
+
+    /// Return the unused size of the buffer, the remaining capacity which is empty.
+    /// A negative value would indicate an overrun, but that also indicates a bug in
+    /// in this class because protections are everywhere to prevent overruns.
+    ssize_t     capacity() const    { return limit - start; }
 
     /// Advance the start of the buffer by the specified number of bytes and trim
     /// the size().
@@ -49,36 +53,36 @@ public:
     /// postfix ++
     BufWriter operator++(int);
 
-    void put8( CipByte aValue );
+    BufWriter& put8( CipByte aValue );
 
-    void put16( EipUint16 aValue );
+    BufWriter& put16( EipUint16 aValue );
 
-    void put32( EipUint32 aValue );
+    BufWriter& put32( EipUint32 aValue );
 
-    void put64( EipUint64 aValue );
+    BufWriter& put64( EipUint64 aValue );
 
-    void put_float( float aValue );
+    BufWriter& put_float( float aValue );
 
-    void put_double( double aValue );
+    BufWriter& put_double( double aValue );
 
     /// Serialize a CIP SHORT_STRING
-    void put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding = true );
+    BufWriter& put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding = true );
 
     /// Serialize a CIP STRING
-    void put_STRING( const std::string& aString, bool doEvenByteCountPadding = true );
+    BufWriter& put_STRING( const std::string& aString, bool doEvenByteCountPadding = true );
 
     /// Serialize a CIP STRING2
-    void put_STRING2( const std::string& aString );
+    BufWriter& put_STRING2( const std::string& aString );
 
     // Put 16 bit integer Big Endian
-    void put16BE( EipUint16 aValue );
+    BufWriter& put16BE( EipUint16 aValue );
 
     // Put 32 bit integer Big Endian
-    void put32BE( EipUint32 aValue );
+    BufWriter& put32BE( EipUint32 aValue );
 
-    void append( const EipByte* aStart, size_t aCount );
+    BufWriter& append( const EipByte* aStart, size_t aCount );
 
-    void fill( size_t aCount, EipByte aValue = 0 );
+    BufWriter& fill( size_t aCount, EipByte aValue = 0 );
 
 protected:
     CipByte*    start;
@@ -116,7 +120,12 @@ public:
 
     const CipByte*  data() const    { return start; }
     const CipByte*  end()  const    { return limit; }
-    size_t          size() const    { return limit - start; }
+
+    /// Return the un-consumed size of the buffer, the count of bytes remaining
+    /// in the buffer.
+    /// A negative value would indicate an overrun, but that also indicates a bug in
+    /// in this class because protections are everywhere to prevent overruns.
+    ssize_t     size() const        { return limit - start; }
 
     /// Advance the start of the buffer by the specified number of bytes and trim
     /// the size().

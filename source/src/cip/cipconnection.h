@@ -3,6 +3,8 @@
  * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
+#ifndef CIPIOCONNECTION_H_
+#define CIPIOCONNECTION_H_
 
 /**
  * @file cipconnection.h
@@ -37,14 +39,9 @@
  *
  */
 
-#ifndef CIPIOCONNECTION_H_
-#define CIPIOCONNECTION_H_
 
-#include "cipster_api.h"
 #include "cipepath.h"
-
-
-EipStatus ConnectionClassInit( EipUint16 unique_connection_id );
+#include "cipclass.h"
 
 
 //* @brief States of a connection
@@ -84,6 +81,40 @@ enum IOConnType
     kIOConnTypeInvalid         = 3,        // reserved
 };
 
+
+/** @ingroup CIP_API
+ * @brief Function prototype for handling the closing of connections
+ *
+ * @param aConn The connection object which is closing the
+ * connection
+ */
+typedef void (* ConnectionCloseFunction)( CipConn* aConn );
+
+/** @ingroup CIP_API
+ * @brief Function prototype for handling the timeout of connections
+ *
+ * @param aConn The connection object which connection timed out
+ */
+typedef void (* ConnectionTimeoutFunction)( CipConn* aConn );
+
+/** @ingroup CIP_API
+ * @brief Function prototype for sending data via a connection
+ *
+ * @param aConn The connection object which connection timed out
+ *
+ * @return EIP stack status
+ */
+typedef EipStatus (* ConnectionSendDataFunction)( CipConn* aConn );
+
+/** @ingroup CIP_API
+ * @brief Function prototype for receiving data via a connection
+ *
+ * @param aConn the connection object which connection timed out
+ * @param aInput the payload of the CIP message with its length
+ *
+ * @return Stack status
+ */
+typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* aConn, BufReader aInput );
 
 /**
  * Class NetCnParams
@@ -135,16 +166,10 @@ public:
         return not_large ? (bits & 0x1ff) : (bits & 0xffff);
     }
 
-    void SetLarge( EipUint32 aNCP )
+    void Set( EipUint32 aNCP, bool isLarge )
     {
         bits = aNCP;
-        not_large = false;
-    }
-
-    void SetNotLarge( EipUint16 aNCP )
-    {
-        bits = aNCP;
-        not_large = true;
+        not_large = !isLarge;
     }
 
 private:
@@ -296,6 +321,8 @@ public:
 
     CipConn();
 
+    static EipStatus Init( EipUint16 unique_connection_id );
+
     void Clear();
 
     CipError parseConnectionPath( BufReader aPath, ConnectionManagerStatusCode* extended_error );
@@ -354,7 +381,7 @@ public:
     NetCnParams t_to_o_ncp;
     NetCnParams o_to_t_ncp;
 
-    TransportTrigger    transport_trigger;          ///< TransportClass_trigger
+    TransportTrigger    trigger;                    ///< TransportClass_trigger
 
     CipConnPath     conn_path;
 
@@ -423,8 +450,8 @@ public:
     CipConn*    next;
     CipConn*    prev;
 
-    EipUint16   correct_originator_to_target_size;
-    EipUint16   correct_target_to_originator_size;
+    EipUint16   corrected_o_to_t_size;
+    EipUint16   corrected_t_to_o_size;
 
 private:
     EipUint32   expected_packet_rate_usecs;

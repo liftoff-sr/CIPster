@@ -7,68 +7,175 @@
 #include <string.h>
 
 #include "appcontype.h"
-#include "cipconnectionmanager.h"
+#include <cipster_api.h>            // CheckIoConnectionEvent()
 
-struct ExclusiveOwnerConnection
+/**
+ * Class ExclusiveOwner
+ * manages exclusive owner connections.  Each ExclusiveOnwer in the collection
+ * is first created by calling ExclusiveOwner::AddExpectation()
+ * [via ConfigureExclusiveOwnerConnectionPoint()].
+ * Then later a call may be made to GetConnection() to match an inbound
+ * connection request with the expectation.  If a match is found, then
+ * this->connnection is marked as in use.
+ */
+class ExclusiveOwner
 {
-    int output_assembly;        ///< the O-to-T point for the connection
-    int input_assembly;         ///< the T-to-O point for the connection
-    int config_assembly;        ///< the config point for the connection
-    CipConn connection_data;    ///< the connection data, only one connection is allowed per O-to-T point
-
-    ExclusiveOwnerConnection( int aOutputAssembly=0, int aInputAssembly=0, int aConfigAssembly=0 ) :
+public:
+    ExclusiveOwner( int aOutputAssembly=0, int aInputAssembly=0, int aConfigAssembly=0 ) :
         output_assembly( aOutputAssembly ),
         input_assembly( aInputAssembly ),
         config_assembly( aConfigAssembly )
     {}
-};
 
+    static CipConn* GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error );
 
-struct InputOnlyConnection
-{
-    int output_assembly;        ///< the O-to-T point for the connection
-    int input_assembly;         ///< the T-to-O point for the connection
-    int config_assembly;        ///< the config point for the connection
-    CipConn connection_data[CIPSTER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH]; ///< the connection data
-
-    InputOnlyConnection( int aOutputAssembly = 0, int aInputAssembly=0, int aConfigAssembly=0 ) :
-        output_assembly( aOutputAssembly ),
-        input_assembly( aInputAssembly ),
-        config_assembly( aConfigAssembly )
-    {}
-};
-
-
-struct ListenOnlyConnection
-{
-    int output_assembly;        ///< the O-to-T point for the connection
-    int input_assembly;         ///< the T-to-O point for the connection
-    int config_assembly;        ///< the config point for the connection
-    CipConn connection_data[CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH];    ///< the connection data
-
-    ListenOnlyConnection( int aOutputAssembly=0, int aInputAssembly=0, int aConfigAssembly=0 ) :
-        output_assembly( aOutputAssembly ),
-        input_assembly( aInputAssembly ),
-        config_assembly( aConfigAssembly )
-    {}
-};
-
-
-static std::vector<ExclusiveOwnerConnection>    g_exclusive_owner;
-static std::vector<InputOnlyConnection>         g_input_only;
-static std::vector<ListenOnlyConnection>        g_listen_only;
-
-
-static CipConn* getExclusiveOwnerConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
-{
-    CipConn* exclusive_owner_connection = NULL;
-
-    for( unsigned i = 0; i < g_exclusive_owner.size();  ++i )
+    static bool AddExpectation( int output_assembly, int input_assembly, int config_assembly )
     {
-        if( g_exclusive_owner[i].output_assembly == aConn->conn_path.consuming_path.GetInstanceOrConnPt()
-         && g_exclusive_owner[i].input_assembly  == aConn->conn_path.producing_path.GetInstanceOrConnPt()
-         && ( g_exclusive_owner[i].config_assembly == aConn->conn_path.config_path.GetInstanceOrConnPt() ||
-            ( g_exclusive_owner[i].config_assembly == -1 && !aConn->conn_path.config_path.HasAny() ) )
+        if( s_exclusive_owner.size() < CIPSTER_CIP_NUM_EXCLUSIVE_OWNER_CONNS )
+        {
+            s_exclusive_owner.push_back(
+                ExclusiveOwner( output_assembly, input_assembly, config_assembly ) );
+            return true;
+        }
+
+        return false;
+    }
+
+    static void Clear()    { s_exclusive_owner.clear(); }
+
+    typedef std::vector<ExclusiveOwner>::iterator     iterator;
+
+private:
+    int output_assembly;        ///< the O-to-T point for the connection
+    int input_assembly;         ///< the T-to-O point for the connection
+    int config_assembly;        ///< the config point for the connection
+    CipConn connection;    ///< the connection data, only one connection is allowed per O-to-T point
+
+    static std::vector<ExclusiveOwner>  s_exclusive_owner;
+};
+
+
+class InputOnlyConnSet
+{
+public:
+    InputOnlyConnSet( int aOutputAssembly = 0, int aInputAssembly=0, int aConfigAssembly=0 ) :
+        output_assembly( aOutputAssembly ),
+        input_assembly( aInputAssembly ),
+        config_assembly( aConfigAssembly )
+    {}
+
+    CipConn* Alloc()
+    {
+        for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
+        {
+            if( kConnectionStateNonExistent == connection[j].state )
+            {
+                connection[j].state = kConnectionStateConfiguring;
+                return &connection[j];
+            }
+        }
+
+        return NULL;
+    }
+
+    static bool AddExpectation( int output_assembly, int input_assembly, int config_assembly )
+    {
+        if( s_input_only.size() < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS )
+        {
+            s_input_only.push_back(
+                    InputOnlyConnSet( output_assembly, input_assembly, config_assembly ) );
+            return true;
+        }
+
+        return false;
+    }
+
+    static CipConn* GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error );
+
+    static void Clear()     { s_input_only.clear(); }
+
+    typedef std::vector<InputOnlyConnSet>::iterator     iterator;
+
+private:
+    int output_assembly;        ///< the O-to-T point for the connection
+    int input_assembly;         ///< the T-to-O point for the connection
+    int config_assembly;        ///< the config point for the connection
+
+    CipConn connection[CIPSTER_CIP_NUM_INPUT_ONLY_CONNS_PER_CON_PATH]; ///< the connection data
+
+    static std::vector<InputOnlyConnSet>    s_input_only;
+};
+
+
+/**
+ * Class ListenOnlyConnSet
+ * manages listen only connections by starting with an expectation of an inbound
+ * connection request via a forward_open request, and then attaches one or more
+ * actual ListenOnly connections to the corresponding expectation.
+ */
+class ListenOnlyConnSet
+{
+public:
+    ListenOnlyConnSet( int aOutputAssembly=0, int aInputAssembly=0, int aConfigAssembly=0 ) :
+        output_assembly( aOutputAssembly ),
+        input_assembly( aInputAssembly ),
+        config_assembly( aConfigAssembly )
+    {}
+
+    CipConn* Alloc()
+    {
+        for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
+        {
+            if( kConnectionStateNonExistent == connection[j].state )
+            {
+                connection[j].state = kConnectionStateConfiguring;
+                return &connection[j];
+            }
+        }
+        return NULL;
+    }
+
+    static bool AddExpectation( int output_assembly, int input_assembly, int config_assembly )
+    {
+        if( s_listen_only.size() < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS )
+        {
+            s_listen_only.push_back(
+                ListenOnlyConnSet( output_assembly, input_assembly, config_assembly ) );
+            return true;
+        }
+
+        return false;
+    }
+
+    static void Clear()     { s_listen_only.clear(); }
+
+    static CipConn* GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error );
+
+    typedef std::vector<ListenOnlyConnSet>::iterator  iterator;
+
+private:
+    int output_assembly;        ///< the O-to-T point for the connection
+    int input_assembly;         ///< the T-to-O point for the connection
+    int config_assembly;        ///< the config point for the connection
+    CipConn connection[CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH];    ///< the connection data
+
+    static std::vector<ListenOnlyConnSet>       s_listen_only;
+};
+
+
+std::vector<ExclusiveOwner>         ExclusiveOwner::s_exclusive_owner;
+std::vector<InputOnlyConnSet>       InputOnlyConnSet::s_input_only;
+std::vector<ListenOnlyConnSet>      ListenOnlyConnSet::s_listen_only;
+
+
+CipConn* ExclusiveOwner::GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+{
+    for( ExclusiveOwner::iterator it = s_exclusive_owner.begin();  it != s_exclusive_owner.end();  ++it )
+    {
+        if( it->output_assembly == aConn->conn_path.consuming_path.GetInstanceOrConnPt()
+         && it->input_assembly  == aConn->conn_path.producing_path.GetInstanceOrConnPt()
+         && ( it->config_assembly == aConn->conn_path.config_path.GetInstanceOrConnPt() ||
+            ( it->config_assembly == -1 && !aConn->conn_path.config_path.HasAny() ) )
           )
         {
             // check if on other connection point with the same output assembly is currently connected
@@ -78,57 +185,49 @@ static CipConn* getExclusiveOwnerConnection( CipConn* aConn, ConnectionManagerSt
                 break;
             }
 
-            exclusive_owner_connection = &g_exclusive_owner[i].connection_data;
-            break;
+            return &it->connection;
         }
     }
 
-    return exclusive_owner_connection;
+    return NULL;
 }
 
 
-static CipConn* getInputOnlyConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipConn* InputOnlyConnSet::GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
 {
-    CipConn* input_only_connection = NULL;
-
-    for( unsigned i = 0; i < g_input_only.size();  ++i )
+    for( InputOnlyConnSet::iterator it = s_input_only.begin();  it != s_input_only.end();  ++it )
     {
         // we have the same output assembly?
-        if( g_input_only[i].output_assembly == aConn->conn_path.consuming_path.GetInstanceOrConnPt() )
+        if( it->output_assembly == aConn->conn_path.consuming_path.GetInstanceOrConnPt() )
         {
-            if( g_input_only[i].input_assembly != aConn->conn_path.producing_path.GetInstanceOrConnPt() )
+            if( it->input_assembly != aConn->conn_path.producing_path.GetInstanceOrConnPt() )
             {
                 *extended_error = kConnectionManagerStatusCodeInvalidProducingApplicationPath;
                 break;
             }
 
-            if( g_input_only[i].config_assembly != aConn->conn_path.config_path.GetInstanceOrConnPt() )
+            if( it->config_assembly != aConn->conn_path.config_path.GetInstanceOrConnPt() )
             {
                 *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
                 break;
             }
 
-            for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
-            {
-                if( kConnectionStateNonExistent == g_input_only[i].connection_data[j].state )
-                {
-                    return &g_input_only[i].connection_data[j];
-                }
-            }
+            CipConn* in = it->Alloc();
+
+            if( in )
+                return in;
 
             *extended_error = kConnectionManagerStatusCodeTargetObjectOutOfConnections;
             break;
         }
     }
 
-    return input_only_connection;
+    return NULL;
 }
 
 
-static CipConn* getListenOnlyConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipConn* ListenOnlyConnSet::GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
 {
-    CipConn* listen_only_connection = NULL;
-
     if( aConn->t_to_o_ncp.ConnectionType() != kIOConnTypeMulticast )
     {
         // a listen only connection has to be a multicast connection.
@@ -138,18 +237,18 @@ static CipConn* getListenOnlyConnection( CipConn* aConn, ConnectionManagerStatus
         return NULL;
     }
 
-    for( unsigned i = 0; i < g_listen_only.size();  ++i )
+    for( ListenOnlyConnSet::iterator it = s_listen_only.begin();  it != s_listen_only.end(); ++it )
     {
-        // we have the same output assembly?
-        if( g_listen_only[i].output_assembly == aConn->conn_path.consuming_path.GetInstanceOrConnPt() )
+                // we have the same output assembly?
+        if( it->output_assembly == aConn->conn_path.consuming_path.GetInstanceOrConnPt() )
         {
-            if( g_listen_only[i].input_assembly != aConn->conn_path.producing_path.GetInstanceOrConnPt() )
+            if( it->input_assembly != aConn->conn_path.producing_path.GetInstanceOrConnPt() )
             {
                 *extended_error = kConnectionManagerStatusCodeInvalidProducingApplicationPath;
                 break;
             }
 
-            if( g_listen_only[i].config_assembly != aConn->conn_path.config_path.GetInstanceOrConnPt() )
+            if( it->config_assembly != aConn->conn_path.config_path.GetInstanceOrConnPt() )
             {
                 *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
                 break;
@@ -161,20 +260,17 @@ static CipConn* getListenOnlyConnection( CipConn* aConn, ConnectionManagerStatus
                 break;
             }
 
-            for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
-            {
-                if( kConnectionStateNonExistent == g_listen_only[i].connection_data[j].state )
-                {
-                    return &g_listen_only[i].connection_data[j];
-                }
-            }
+            CipConn* listener = it->Alloc();
+
+            if( listener )
+                return listener;
 
             *extended_error = kConnectionManagerStatusCodeTargetObjectOutOfConnections;
             break;
         }
     }
 
-    return listen_only_connection;
+    return NULL;
 }
 
 
@@ -183,14 +279,7 @@ bool ConfigureExclusiveOwnerConnectionPoint(
         int input_assembly,
         int config_assembly )
 {
-    if( g_exclusive_owner.size() < CIPSTER_CIP_NUM_EXCLUSIVE_OWNER_CONNS )
-    {
-        g_exclusive_owner.push_back(
-            ExclusiveOwnerConnection( output_assembly, input_assembly, config_assembly ) );
-        return true;
-    }
-
-    return false;
+    return ExclusiveOwner::AddExpectation( output_assembly, input_assembly, config_assembly );
 }
 
 
@@ -199,14 +288,7 @@ bool ConfigureInputOnlyConnectionPoint(
         int input_assembly,
         int config_assembly )
 {
-    if( g_input_only.size() < CIPSTER_CIP_NUM_INPUT_ONLY_CONNS )
-    {
-        g_input_only.push_back(
-                InputOnlyConnection( output_assembly, input_assembly, config_assembly ) );
-        return true;
-    }
-
-    return false;
+    return InputOnlyConnSet::AddExpectation( output_assembly, input_assembly, config_assembly );
 }
 
 
@@ -215,14 +297,7 @@ bool ConfigureListenOnlyConnectionPoint(
         int input_assembly,
         int config_assembly )
 {
-    if( g_listen_only.size() < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS )
-    {
-        g_listen_only.push_back(
-            ListenOnlyConnection( output_assembly, input_assembly, config_assembly ) );
-        return true;
-    }
-
-    return false;
+    return ListenOnlyConnSet::AddExpectation( output_assembly, input_assembly, config_assembly );
 }
 
 
@@ -230,21 +305,21 @@ CipConn* GetIoConnectionForConnectionData( CipConn* aConn,  ConnectionManagerSta
 {
     *extended_error = kConnectionManagerStatusCodeSuccess;
 
-    CipConn* io_connection = getExclusiveOwnerConnection( aConn, extended_error );
+    CipConn* io_connection = ExclusiveOwner::GetConnection( aConn, extended_error );
 
     if( !io_connection )
     {
         if( kConnectionManagerStatusCodeSuccess == *extended_error )
         {
             // we found no connection and don't have an error so try input only next
-            io_connection = getInputOnlyConnection( aConn, extended_error );
+            io_connection = InputOnlyConnSet::GetConnection( aConn, extended_error );
 
             if( !io_connection )
             {
                 if( 0 == *extended_error )
                 {
                     // we found no connection and don't have an error so try listen only next
-                    io_connection = getListenOnlyConnection( aConn, extended_error );
+                    io_connection = ListenOnlyConnSet::GetConnection( aConn, extended_error );
 
                     if( !io_connection &&  0 == *extended_error )
                     {
@@ -403,9 +478,9 @@ void InitializeIoConnectionData()
 
 void DestroyIoConnectionData()
 {
-    g_exclusive_owner.clear();
+    ExclusiveOwner::Clear();
 
-    g_input_only.clear();
+    InputOnlyConnSet::Clear();
 
-    g_listen_only.clear();
+    ListenOnlyConnSet::Clear();
 }

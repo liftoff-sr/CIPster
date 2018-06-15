@@ -4,13 +4,11 @@
  *
  ******************************************************************************/
 
-#include <string.h>    //needed for memcpy
+//#include <string.h>    //needed for memcpy
 
 #include "cipassembly.h"
 
-#include "cipcommon.h"
-//#include "cipster_api.h"
-#include "trace.h"
+#include <cipster_api.h>
 #include "cipconnectionmanager.h"
 
 
@@ -19,11 +17,11 @@
 static EipStatus getAttrAssemblyData( CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    if( attr->data )
+    if( attr->Data() )
     {
         BeforeAssemblyDataSend( attr->Instance() );
 
-        return GetAttrData( attr, request, response );
+        return CipAttribute::GetAttrData( attr, request, response );
     }
 
     return kEipStatusOkSend;
@@ -33,12 +31,12 @@ static EipStatus getAttrAssemblyData( CipAttribute* attr,
 static EipStatus setAttrAssemblyData( CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    if( attr->data )
+    if( attr->Data() )
     {
-        CipByteArray*   byte_array = (CipByteArray*) attr->data;
+        CipByteArray*   byte_array = (CipByteArray*) attr->Data();
         CipInstance*    instance = attr->Instance();
 
-        if( IsConnectedInputAssembly( instance->instance_id ) )
+        if( IsConnectedInputAssembly( instance->Id() ) )
         {
             CIPSTER_TRACE_WARN( "%s: received data for connected input assembly\n", __func__ );
             response->general_status = kCipErrorAttributeNotSetable;
@@ -95,14 +93,14 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
 AssemblyInstance::AssemblyInstance( int aInstanceId, BufWriter aBuffer ) :
     CipInstance( aInstanceId )
 {
-    byte_array.length = aBuffer.size();
+    byte_array.length = aBuffer.capacity();
     byte_array.data   = aBuffer.data();
 
     // Attribute 3 is the byte array transfer of the assembly data itself
-    AttributeInsert( 3, kCipByteArray, kSetAndGetAble, getAttrAssemblyData, setAttrAssemblyData, &byte_array );
+    AttributeInsert( 3, getAttrAssemblyData, false, setAttrAssemblyData, &byte_array );
 
     // Attribute 4 Number of bytes in Attribute 3
-    AttributeInsert( 4, kCipUint, kGetableSingle, &byte_array.length );
+    AttributeInsert( 4, kCipUint, &byte_array.length, true, false );
 }
 
 
@@ -135,8 +133,6 @@ public:
         CipClass( kCipAssemblyClass,
             "Assembly",
             MASK7( 1,2,3,4,5,6,7 ), // common class attributes mask
-            0,                      // assembly class has no get_attribute_all service
-            0,                      // assembly instance has no get_attribute_all service
             2                       // aRevision, according to the CIP spec currently this has to be 2
             )
     {
@@ -168,7 +164,7 @@ EipStatus CipAssemblyInitialize()
 
 EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, BufReader aBuffer )
 {
-    CIPSTER_ASSERT( instance->owning_class->ClassId() == kCipAssemblyClass );
+    CIPSTER_ASSERT( instance->Class()->ClassId() == kCipAssemblyClass );
 
     // empty path (path size = 0) need to be checked and taken care of in future
 
@@ -176,7 +172,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, BufReader 
     CipAttribute* attr3 = instance->Attribute( 3 );
     CIPSTER_ASSERT( attr3 );
 
-    CipByteArray* byte_array = (CipByteArray*) attr3->data;
+    CipByteArray* byte_array = (CipByteArray*) attr3->Data();
     CIPSTER_ASSERT( byte_array );
 
     if( byte_array->length != aBuffer.size() )

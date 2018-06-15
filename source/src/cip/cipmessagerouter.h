@@ -6,9 +6,10 @@
 #ifndef CIPSTER_CIPMESSAGEROUTER_H_
 #define CIPSTER_CIPMESSAGEROUTER_H_
 
-#include "typedefs.h"
+#include <typedefs.h>
 #include "ciptypes.h"
 #include "cipepath.h"
+#include "cipclass.h"
 
 
 /**
@@ -36,13 +37,13 @@ struct CipMessageRouterRequest
     {
         BufWriter out = aOutput;
 
-        *out++ = service;
+        out.put8( service );
         int rplen = request_path.SerializeAppPath( out+1 );
 
         if( rplen < 0 )
             return rplen;
 
-        *out++ = rplen / 2;     // word count = byte_count / 2
+        out.put8( rplen / 2 );     // word count = byte_count / 2
 
         out += rplen;
 
@@ -109,30 +110,44 @@ private:
 };
 
 
-// public functions
 
-/** @brief Initialize the data structures of the message router
- *  @return kEipStatusOk if class was initialized, otherwise kEipStatusError
- */
-EipStatus CipMessageRouterInit();
+class CipMessageRouterClass : public CipClass
+{
+public:
+    CipMessageRouterClass();
+
+    CipError OpenConnection( CipConn* aConn,
+        CipCommonPacketFormatData* cpfd,
+        ConnectionManagerStatusCode* extended_error_code );    // override
+
+    /**
+     * Function NotifyMR
+     * notifies the MessageRouter that an explicit message (connected or unconnected)
+     * has been received. This function is called from the encapsulation layer.
+     *
+     * @param aCommand CPFD data payload which is the CIP part.
+     * @param aReply where to put the reply, must fill in
+     *   CipMessageRouterResponse and its BufWriter 'data' and data_length.  This is
+     *   how caller knows the length.  Should not advance data.data().
+     *
+     * @return EipStatus
+     */
+    static EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply );
+
+    /**
+     * Function CipMessageRouterInit
+     * initializes the data structures of the message router.
+     *  @return kEipStatusOk if class was initialized, otherwise kEipStatusError
+     */
+    static EipStatus Init();
+};
+
+
+// public functions
 
 /** @brief Free all data allocated by the classes created in the CIP stack
  */
 void DeleteAllClasses();
-
-/**
- * Function NotifyMR
- * notifies the MessageRouter that an explicit message (connected or unconnected)
- * has been received. This function is called from the encapsulation layer.
- *
- * @param aCommand CPFD data payload which is the CIP part.
- * @param aReply where to put the reply, must fill in
- *   CipMessageRouterResponse and its BufWriter 'data' and data_length.  This is
- *   how caller knows the length.  Should not advance data.data().
- *
- * @return EipStatus
- */
-EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply );
 
 /**
  * Function RegisterCipClass
