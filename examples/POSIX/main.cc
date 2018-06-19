@@ -10,6 +10,8 @@
 #include "networkhandler.h"
 #include "cipster_api.h"
 
+EipStatus ApplicationInitialization();  // my business.
+
 extern int newfd;
 
 // ****************************************************************************

@@ -38,11 +38,11 @@ EipUint32 g_run_idle_state;    //*< buffer for holding the run idle information.
  */
 static void closeCommunicationChannelsAndRemoveFromActiveConnectionsList( CipConn* aConn )
 {
-    IApp_CloseSocket_udp( aConn->consuming_socket );
+    CloseSocket( aConn->consuming_socket );
 
     aConn->consuming_socket = kEipInvalidSocket;
 
-    IApp_CloseSocket_udp( aConn->producing_socket );
+    CloseSocket( aConn->producing_socket );
 
     aConn->producing_socket = kEipInvalidSocket;
 

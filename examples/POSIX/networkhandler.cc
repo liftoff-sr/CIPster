@@ -370,8 +370,8 @@ EipStatus NetworkHandlerProcessOnce()
                 // if it is still checked it is a TCP receive
                 if( kEipStatusError == HandleDataOnTcpSocket( socket ) ) // if error
                 {
-                    CloseSocket( socket );
-                    CloseSession( socket ); // clean up session and close the socket
+                    // clean up session and close the socket
+                    CloseSession( socket );
                 }
             }
         }
@@ -741,27 +741,15 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
 }
 
 
-void IApp_CloseSocket_udp( int socket_handle )
+void CloseSocket( int aSocket )
 {
-    CloseSocket( socket_handle );
-}
+    CIPSTER_TRACE_INFO( "networkhandler: closing socket %d\n", aSocket );
 
-
-void IApp_CloseSocket_tcp( int socket_handle )
-{
-    CloseSocket( socket_handle );
-}
-
-
-void CloseSocket( int socket_handle )
-{
-    CIPSTER_TRACE_INFO( "networkhandler: closing socket %d\n", socket_handle );
-
-    if( socket_handle >= 0 )
+    if( aSocket >= 0 )
     {
-        FD_CLR( socket_handle, &master_set );
-        shutdown( socket_handle, SHUT_RDWR );
-        close( socket_handle );
+        FD_CLR( aSocket, &master_set );
+        shutdown( aSocket, SHUT_RDWR );
+        close( aSocket );
     }
 }
 
@@ -771,7 +759,7 @@ void CheckAndHandleTcpListenerSocket()
     int new_socket;
 
     // see if this is a connection request to the TCP listener
-    if( true == CheckSocketSet( g_sockets.tcp_listener ) )
+    if( CheckSocketSet( g_sockets.tcp_listener ) )
     {
         CIPSTER_TRACE_INFO( "networkhandler: new TCP connection\n" );
 

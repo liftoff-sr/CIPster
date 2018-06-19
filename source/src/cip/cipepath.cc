@@ -224,6 +224,11 @@ int CipAppPath::deserialize_logical( BufReader aInput, CipAppPath::Stuff aField,
         ++in;
         value = in.get32();
     }
+    else
+    {
+        // should probably return -1.
+        value = 0;
+    }
 
     stuff[aField] = value;
     pbits |= 1 << aField;

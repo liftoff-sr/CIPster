@@ -14,6 +14,7 @@
 #include "cip/cipclass.h"
 #include "cip/cipmessagerouter.h"
 #include "cip/ciptcpipinterface.h"
+#include "enet_encap/encap.h"
 #include "byte_bufs.h"
 
 
@@ -297,15 +298,6 @@ EipStatus ManageConnections();
  */
 EipStatus TriggerConnections( int output_assembly_id, int input_assembly_id );
 
-/** @ingroup CIP_API
- * @brief Inform the encapsulation layer that the remote host has closed the
- * connection.
- *
- * According to the specifications that will clean up and close the session in
- * the encapsulation layer.
- * @param socket_handle the handler to the socket of the closed connection
- */
-void CloseSession( int socket );
 
 /**  @defgroup CIP_CALLBACK_API Callback Functions Demanded by CIPster
  * @ingroup CIP_API
@@ -313,21 +305,6 @@ void CloseSession( int socket );
  * @brief These functions have to implemented in order to give the CIPster a
  * method to inform the application on certain state changes.
  */
-
-/** @ingroup CIP_CALLBACK_API
- * @brief Callback for the application initialization
- *
- * This function will be called by the CIP stack after it has finished its
- * initialization. In this function the user can setup all CIP objects she
- * likes to have.
- *
- * This function is provided for convenience reasons. After the void
- * CipStackInit(void)
- * function has finished it is okay to also generate your CIP objects.
- *  return status EIP_ERROR .. error
- *                EIP_OK ... successful finish
- */
-EipStatus ApplicationInitialization();
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Allow the device specific application to perform its execution
@@ -444,16 +421,17 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
 EipStatus SendUdpData( struct sockaddr_in* socket_data, int socket, BufReader aOutput );
 
 /** @ingroup CIP_CALLBACK_API
- * @brief Close the given socket and clean up the stack
+ * @brief Close the given socket
  *
- * @param socket_handle socket descriptor to close
+ * @param aSocket the socket to close
  */
-void CloseSocket( int socket );
+void CloseSocket( int aSocket );
 
 
-void IApp_CloseSocket_udp( int socket_handle );
-void IApp_CloseSocket_tcp( int socket_handle );
-
+inline void CloseSession( int aSocket )
+{
+    ServerSessionMgr::CloseSession( aSocket );
+}
 
 /** @mainpage CIPster - Open Source EtherNet/IP(TM) Communication Stack
  * Documentation
@@ -585,7 +563,7 @@ void IApp_CloseSocket_tcp( int socket_handle );
  *     with the function EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReader aCommand );
  *   - Close UDP and TCP sockets:
  *      -# Requested by CIPster through the call back function: void
- * CloseSocket(int socket_handle)
+ * CloseSocket(int aSocket)
  *      -# For TCP connection when the peer closed the connection CIPster needs
  *         to be informed to clean up internal data structures. This is done
  * with

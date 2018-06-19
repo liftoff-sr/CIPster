@@ -12,19 +12,19 @@
 
 extern int newfd;
 
-// ****************************************************************************
+EipStatus ApplicationInitialization();  // my business.
+
 /** @brief Signal handler function for ending stack execution
  *
  * @param signal the signal we received
  */
 void LeaveStack( int signal );
 
-// ***************************************************************************
 /** @brief Flag indicating if the stack should end its execution
  */
 volatile bool g_end_stack;
 
-// ****************************************************************************
+
 int main( int argc, char* argv[] )
 {
     int ret = 0;

@@ -853,10 +853,10 @@ void CloseConnection( CipConn* conn )
     if( conn->trigger.Class() != kConnectionTransportClass3 )
     {
         // only close the UDP connection for not class 3 connections
-        IApp_CloseSocket_udp( conn->consuming_socket );
+        CloseSocket( conn->consuming_socket );
         conn->consuming_socket = kEipInvalidSocket;
 
-        IApp_CloseSocket_udp( conn->producing_socket );
+        CloseSocket( conn->producing_socket );
         conn->producing_socket = kEipInvalidSocket;
     }
 

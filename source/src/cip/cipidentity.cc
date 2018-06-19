@@ -182,9 +182,7 @@ EipStatus CipIdentityInit()
     {
         CipClass* clazz = new CipClass( kCipIdentityClass,
                 "Identity",                     // class name
-
-                // conformance tool wants no instance count attribute in the class, omit no. 3
-                MASK6( 1, 2, 4, 5, 6, 7 ),
+                MASK4( 1, 2, 6, 7 ),
                 1                               // class revision
                 );
 

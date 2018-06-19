@@ -400,8 +400,8 @@ EipStatus NetworkHandlerProcessOnce()
                 // if it is still checked it is a TCP receive
                 if( kEipStatusError == HandleDataOnTcpSocket( socket ) ) // if error
                 {
-                    CloseSocket( socket );
-                    CloseSession( socket ); // clean up session and close the socket
+                    // clean up session and close the socket
+                    ServerSessionMgr::CloseSession( socket );
                 }
             }
         }
@@ -771,31 +771,19 @@ int CreateUdpSocket( UdpCommuncationDirection communication_direction,
 }
 
 
-void IApp_CloseSocket_udp( int socket_handle )
+void CloseSocket( int aSocket )
 {
-    CloseSocket( socket_handle );
-}
+    CIPSTER_TRACE_INFO( "networkhandler: closing socket %d\n", aSocket );
 
-
-void IApp_CloseSocket_tcp( int socket_handle )
-{
-    CloseSocket( socket_handle );
-}
-
-
-void CloseSocket( int socket_handle )
-{
-    CIPSTER_TRACE_INFO( "networkhandler: closing socket %d\n", socket_handle );
-
-    if( socket_handle >= 0 )
+    if( aSocket >= 0 )
     {
-        FD_CLR( socket_handle, &master_set );
+        FD_CLR( aSocket, &master_set );
 
 #ifdef _WIN32
-      closesocket( socket_handle );
+        closesocket( aSocket );
 #else
-        shutdown( socket_handle, SHUT_RDWR );
-        close( socket_handle );
+        shutdown( aSocket, SHUT_RDWR );
+        close( aSocket );
 #endif
     }
 }
