@@ -34,11 +34,23 @@ include( ${CIPster_BUILDSUPPORT_DIR}/CIPster.cmake )
 
 include( ${CIPster_BUILDSUPPORT_DIR}/CIPster_function_checks.cmake )
 
-set( CIPster_64_BIT_DATA_TYPES_ENABLED CACHE BOOL "Enable 64-bit data type support" )
+#================================================
+# Doxygen Output
+#================================================
 
-if( CIPster_64_BIT_DATA_TYPES_ENABLED )
-    add_definitions( -DCIPSTER_SUPPORT_64BIT_DATATYPES )
+find_package( Doxygen )
+if( DOXYGEN_FOUND )
+    add_custom_target( doxygen-docs
+        ${CMAKE_COMMAND} -E remove_directory doc/doxygen
+        COMMAND ${DOXYGEN_EXECUTABLE}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        DEPENDS Doxyfile
+        COMMENT "building doxygen docs into directory doc/doxygen/html"
+        )
+else()
+    message( STATUS "WARNING: Doxygen not found - doxygen-docs (Source Docs) target not created" )
 endif()
+
 
 set( CIPster_TRACES OFF CACHE BOOL "Activate CIPster traces" )
 if(CIPster_TRACES)
