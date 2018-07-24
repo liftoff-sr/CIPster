@@ -12,9 +12,14 @@
 
 #include "cip/ciperror.h"
 #include "cip/cipclass.h"
+#include "cip/cipassembly.h"
 #include "cip/cipmessagerouter.h"
+#include "cip/cipethernetlink.h"
 #include "cip/ciptcpipinterface.h"
+#include "cip/cipconnectionmanager.h"
 #include "enet_encap/encap.h"
+#include "enet_encap/cpf.h"
+#include "enet_encap/networkhandler.h"
 #include "byte_bufs.h"
 
 
@@ -34,7 +39,7 @@
  *  @param ip_address    the current IP address of the device
  *  @param subnet_mask  the subnet mask to be used
  *  @param gateway_address     the gateway address
- *  @return EIP_OK if the configuring worked otherwise EIP_ERROR
+ *  @return kEipStatusOk if the configuring worked otherwise EIP_ERROR
  */
 inline EipStatus ConfigureNetworkInterface( const char* ip_address, const char* subnet_mask,
         const char* gateway_address )
@@ -43,13 +48,16 @@ inline EipStatus ConfigureNetworkInterface( const char* ip_address, const char* 
                 1, ip_address, subnet_mask, gateway_address );
 }
 
-
 /** @ingroup CIP_API
  * @brief Configure the MAC address of the device
  *
  *  @param mac_address  the hardware MAC address of the network interface
+ *  @return kEipStatusOk if the configuring worked otherwise EIP_ERROR
  */
-void ConfigureMacAddress( const EipByte* mac_address );
+inline void ConfigureMacAddress( const EipByte* mac_address )
+{
+    CipEthernetLinkClass::ConfigureMacAddress( 1, mac_address );
+}
 
 /** @ingroup CIP_API
  * @brief Configure the domain name of the device
@@ -128,13 +136,13 @@ EipStatus RegisterCipClass( CipClass* aClass );
 /** @ingroup CIP_API
  * @brief Serialize aDataType according to CIP encoding into aBuf
  *
- *  @param int aDataType the cip type to encode
+ *  @param aDataType the cip type to encode
  *  @param cip_data pointer to data value.
  *  @param aBuf where response should be written
  *  @return int - byte count writte into aBuf.
  *          -1 .. error
  */
-int EncodeData( int aDataType, const void* cip_data, BufWriter& aBuf );
+int EncodeData( CipDataType aDataType, const void* cip_data, BufWriter& aBuf );
 
 /** @ingroup CIP_API
  * @brief Retrieve the given data according to CIP encoding from the message
@@ -148,7 +156,7 @@ int EncodeData( int aDataType, const void* cip_data, BufWriter& aBuf );
  *  @return length of taken bytes
  *          -1 .. error
  */
-int DecodeData( int aDataType, void* cip_data, BufReader& aBuf );
+int DecodeData( CipDataType aDataType, void* cip_data, BufReader& aBuf );
 
 /** @ingroup CIP_API
  * @brief Create an instance of an assembly object
@@ -222,49 +230,6 @@ bool ConfigureListenOnlyConnectionPoint(
         int input_assembly_id,
         int configuration_assembly_id );
 
-/**
- * Function HandleReceivedExplicitTcpData
- * notifies the encapsulation layer that an explicit message has been
- * received via TCP.
- *
- * @param socket the BSD socket from which data is received.
- * @param aCommand is the buffer that contains the received data.
- * @param aReply is the buffer that should be used for the reply.
- * @return int - byte count of reply that needs to be sent back
- */
-int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aReply );
-
-/**
- * Function HandleReceivedExplicitUdpData
- * notifies the encapsulation layer that an explicit message has been
- * received via UDP.
- *
- * @param socket BSD socket from which data is received.
- * @param from_address remote address from which the data is received.
- * @param aCommand received data buffer pointing just past the encapsulation header and its length.
- * @param aReply where to put reply and tells its maximum length.
- * @param isUnicast true if unicast, else false.
- * @return int - byte count of reply that need to be sent back
- */
-int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
-        BufReader aCommand,  BufWriter aReply, bool isUnicast );
-
-/**
- * Function HandleReceivedConnectedData
- * notifies the connection manager that data for a connection has been
- * received.
- *
- * This function should be invoked by the network layer.
- * @param from_address address from which the data has been received. Only
- *           data from the connections originator may be accepted. Avoids
- *           connection hijacking
- * @param aCommand received data buffer pointing just past the
- *   encapsulation header and a byte count remaining in frame.
- * @param aReply where to put the reply and tells its maximum length.
- * @return EipStatus
- */
-EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReader aCommand );
-
 /** @ingroup CIP_API
  * @brief Check if any of the connection timers (TransmissionTrigger or
  * WatchdogTimeout) have timed out.
@@ -273,9 +238,12 @@ EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReade
  * function should be called periodically once every CIPSTER_TIMER_TICK
  * milliseconds.
  *
- * @return EIP_OK on success
+ * @return kEipStatusOk on success
  */
-EipStatus ManageConnections();
+inline EipStatus ManageConnections()
+{
+    return CipConnMgrClass::ManageConnections();
+}
 
 /** @ingroup CIP_API
  * @brief Trigger the production of an application triggered connection.
@@ -294,7 +262,7 @@ EipStatus ManageConnections();
  * connection
  * @param input_assembly_id the input assembly connection point of the
  * connection
- * @return EIP_OK on success
+ * @return kEipStatusOk on success
  */
 EipStatus TriggerConnections( int output_assembly_id, int input_assembly_id );
 
@@ -335,7 +303,7 @@ void CheckIoConnectionEvent( int output_assembly_id, int input_assembly_id,
  * This function has to be implemented by the user of the CIP-stack.
  * @param instance pointer to the assembly object data was received for
  * @return Information if the data could be processed
- *     - EIP_OK the received data was ok
+ *     - kEipStatusOk the received data was ok
  *     - EIP_ERROR the received data was wrong (especially needed for
  * configuration data assembly objects)
  *
@@ -427,10 +395,16 @@ EipStatus SendUdpData( struct sockaddr_in* socket_data, int socket, BufReader aO
  */
 void CloseSocket( int aSocket );
 
-
-inline void CloseSession( int aSocket )
+/** @ingroup CIP_API
+ * Function CloseSession
+ * deletes any session associated with the aSocket and closes the socket connection.
+ *
+ * @param aSocket the socket of the session to close.
+ * @return bool - true if aSocket was found in an open session (in which case), else false.
+ */
+inline bool CloseSession( int aSocket )
 {
-    ServerSessionMgr::CloseSession( aSocket );
+    return ServerSessionMgr::CloseSession( aSocket );
 }
 
 /** @mainpage CIPster - Open Source EtherNet/IP(TM) Communication Stack
@@ -612,5 +586,8 @@ inline void CloseSession( int aSocket )
  *
  */
 
+#if defined(DEBUG)
+void byte_dump( const char* aPrompt, CipByte* aBytes, int aCount );
+#endif
 
-#endif //CIPSTER_CIPSTER_API_H_
+#endif  // CIPSTER_CIPSTER_API_H_

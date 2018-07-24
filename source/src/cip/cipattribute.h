@@ -31,7 +31,7 @@ class CipInstance;
  *      extended data.  Do not advance aResponse->data BufWriter, but rather only set
  *      aRequest->data_length to the number of bytes written to aReponse->data.
  *
- * @return EIP_OK_SEND if service could be executed successfully and a response
+ * @return kEipStatusOk_SEND if service could be executed successfully and a response
  *  should be sent
  */
 typedef EipStatus (*AttributeFunc)( CipAttribute* aAttribute,

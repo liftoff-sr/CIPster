@@ -5,6 +5,11 @@
 #ifndef CIPSTER_CIPERROR_H_
 #define CIPSTER_CIPERROR_H_
 
+/**
+ * Enum CipError
+ * is the set of error codes allowed in the general status field of the
+ * message router response field.  It is a single byte field.
+ */
 enum CipError
 {
     kCipErrorSuccess = 0x00,                                    ///< Service was successfully performed by the object specified.

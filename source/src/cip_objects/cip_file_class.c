@@ -260,7 +260,7 @@ EipStatus initiate_upload( CipInstance* instance,
 
     CIPSTER_TRACE_INFO( "The uploading for object #%i has been initiated.", instance->nInstanceNr );
 
-    return EIP_OK_SEND;
+    return kEipStatusOk_SEND;
 }
 
 
@@ -362,7 +362,7 @@ EipStatus upload_transfer( CipInstance* instance,
         }   // else (session->transfer_num  != transfer_number)
     }       // Check the state
 
-    return EIP_OK_SEND;
+    return kEipStatusOk_SEND;
 }
 
 
@@ -449,7 +449,7 @@ EipStatus initiate_download( CipInstance* instance,
 
     cip_string_int_free( file_name );
 
-    return EIP_OK_SEND;
+    return kEipStatusOk_SEND;
 }
 
 
@@ -582,7 +582,7 @@ EipStatus download_transfer( CipInstance* instance,
         }   // Check the sequence of the transfers
     }       // Check the state
 
-    return EIP_OK_SEND;
+    return kEipStatusOk_SEND;
 }
 
 
@@ -640,5 +640,5 @@ EipStatus getAttributeSingleFileObject( CipInstance* instance,
         }
     }
 
-    return EIP_OK_SEND;
+    return kEipStatusOk_SEND;
 }

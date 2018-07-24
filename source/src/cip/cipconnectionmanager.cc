@@ -23,7 +23,7 @@
 
 
 /// List holding all currently active connections
-CipConn* g_active_connection_list;
+CipConnBox g_active_conns;
 
 
 /**
@@ -39,527 +39,61 @@ CipConn* g_active_connection_list;
  *    - NULL if no equal established connection exists
  *    - pointer to the equal connection object
  */
-static CipConn* findExistingMatchingConnection( CipConn* aConn )
+static CipConn* findExistingMatchingConnection( const ConnectionData& params )
 {
-    CipConn* active = g_active_connection_list;
+    CipConnBox::iterator active = g_active_conns.begin();
 
-    while( active )
+    for(  ; active != g_active_conns.end();  ++active )
     {
-        if( active->state == kConnectionStateEstablished )
+        if( active->State() == kConnectionStateEstablished )
         {
-            if( aConn->connection_serial_number == active->connection_serial_number
-             && aConn->originator_vendor_id     == active->originator_vendor_id
-             && aConn->originator_serial_number == active->originator_serial_number )
+            if( params.connection_serial_number == active->connection_serial_number
+             && params.originator_vendor_id     == active->originator_vendor_id
+             && params.originator_serial_number == active->originator_serial_number )
             {
                 return active;
             }
         }
-
-        active = active->next;
     }
 
     return NULL;
 }
 
 
-static CipInstance* check_path( const CipAppPath& aPath, ConnectionManagerStatusCode* extended_error, const char* aCaller )
-{
-    if( !aPath.IsSufficient() )
-    {
-        if( extended_error )
-            *extended_error = kConnectionManagerStatusCodeErrorInvalidSegmentTypeInPath;
-        return NULL;
-    }
-
-    int class_id = aPath.GetClass();
-
-    CipClass* clazz = GetCipClass( class_id );
-    if( !clazz )
-    {
-        CIPSTER_TRACE_ERR( "%s: classid %d not found for %s\n", __func__, class_id, aCaller );
-
-        if( class_id >= 0xc8 )   // reserved range of class ids
-        {
-            if( extended_error )
-                *extended_error =  kConnectionManagerStatusCodeErrorInvalidSegmentTypeInPath;
-        }
-        else
-        {
-            if( extended_error )
-                *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
-        }
-
-        return NULL;
-    }
-
-    int instance_id = aPath.GetInstanceOrConnPt();
-
-    CipInstance* inst = clazz->Instance( instance_id );
-    if( !inst )
-    {
-        CIPSTER_TRACE_ERR( "%s: instance id %d not found for %s\n",
-            __func__, instance_id, aCaller );
-
-        // according to the test tool we should respond with this extended error code
-        if( extended_error )
-            *extended_error = kConnectionManagerStatusCodeErrorInvalidSegmentTypeInPath;
-
-        return NULL;
-    }
-
-    return inst;
-}
-
-
-/**
- * Function parseConnectionPath
- * parses the connection path of a forward open request.
- *
- * @param aPath just _past_ the word count of connection_path
- * @param extended_status where to put the extended error code in case of error
- *
- * @return CipError - indicating success of the parsing
- *    - kCipErrorSuccess on success
- *    - On an error the general status code to be put into the response
- */
-CipError CipConn::parseConnectionPath( BufReader aPath, ConnectionManagerStatusCode* extended_error )
-{
-    int         result;
-    BufReader   in = aPath;
-
-    CipAppPath  app_path1;
-    CipAppPath  app_path2;
-    CipAppPath  app_path3;
-
-    CipInstance* instance1;     // corresponds to app_path1
-    CipInstance* instance2;     // corresponds to app_path2
-    CipInstance* instance3;     // corresponds to app_path3
-
-    // clear all CipAppPaths and later assign those seen below
-    conn_path.Clear();
-
-    config_instance    = 0;
-    consuming_instance = 0;
-    producing_instance = 0;
-
-    if( in.size() )
-    {
-        result = conn_path.port_segs.DeserializePortSegmentGroup( in );
-
-        if( result < 0 )
-        {
-            goto L_exit_invalid;
-        }
-
-        in += result;
-    }
-
-    // electronic key?
-    if( conn_path.port_segs.HasKey() )
-    {
-        ConnectionManagerStatusCode sts = conn_path.port_segs.key.Check();
-
-        if( sts != kConnectionManagerStatusCodeSuccess )
-        {
-            *extended_error = sts;
-            CIPSTER_TRACE_ERR( "%s: checkElectronicKeyData failed\n", __func__ );
-            goto L_exit_error;
-        }
-    }
-
-    /*
-       There can be 1-3 application_paths in a connection_path.  Depending on the
-       O->T_connection_parameters and T->O_connection_parameters fields and the
-       presence of a data segment, one or more encoded application paths shall
-       be specified. In general, the application paths are in the order of
-       Configuration path, Consumption path, and Production path. However, a
-       single encoded path can be used when configuration, consumption, and/or
-       production use the same path.  See table 3-5.13 of CIP Vol1.
-    */
-
-    if( in.size() )
-    {
-        result = app_path1.DeserializeAppPath( in );
-
-        if( result < 0 )
-        {
-            goto L_exit_invalid;
-        }
-
-        in += result;
-    }
-
-    if( in.size() )
-    {
-        result = app_path2.DeserializeAppPath( in, &app_path1 );
-
-        if( result < 0 )
-        {
-            goto L_exit_invalid;
-        }
-
-        in += result;
-    }
-
-    if( in.size() )
-    {
-        result = app_path3.DeserializeAppPath( in, &app_path2 );
-
-        if( result < 0 )
-        {
-            goto L_exit_invalid;
-        }
-
-        in += result;
-    }
-
-    if( in.size() )
-    {
-        // There could be a data segment
-        result = conn_path.data_seg.DeserializeDataSegment( in );
-        in += result;
-    }
-
-    if( in.size() )   // should have consumed all of it by now, 3 app paths max
-    {
-        CIPSTER_TRACE_ERR( "%s: unknown extra segments in forward open connection path\n", __func__ );
-        goto L_exit_invalid;
-    }
-
-    // We don't apply checking rules to the connection_path until done parsing it here.
-
-    instance1 = check_path( app_path1, extended_error, "app_path1" );
-    if( !instance1 )
-    {
-        goto L_exit_error;
-    }
-
-    mgmnt_class = app_path1.GetClass();
-
-    IOConnType o_to_t;
-    IOConnType t_to_o;
-
-    o_to_t = o_to_t_ncp.ConnectionType();
-    t_to_o = t_to_o_ncp.ConnectionType();
-
-    int actual_app_path_count;
-
-    actual_app_path_count = 1 + app_path2.HasAny() + app_path3.HasAny();
-
-    // This 'if else if' block is coded to look like table
-    // 3-5.13; which should reduce risk of error
-    if( o_to_t == kIOConnTypeNull && t_to_o == kIOConnTypeNull )
-    {
-        if( conn_path.data_seg.HasAny() )
-        {
-            // app_path1 is for configuration.
-            conn_path.config_path = app_path1;
-            config_instance = instance1;
-
-            // In this context, it's Ok to ignore app_path2 and app_path3
-            // if present, also reflected in actual_app_path_count.
-        }
-        else
-        {
-            // app_path1 is for pinging via a "not matching" connection.
-            if( actual_app_path_count != 1 )
-            {
-                goto L_exit_invalid;
-            }
-
-            // app_path1 is for pinging, but connection needs to be non-matching and
-            // app_path1 must be Identity instance 1.  Caller can check.  Save
-            // app_path1 in consuming_path for ping handler elsewhere.
-            conn_path.consuming_path = app_path1;
-            consuming_instance = instance1;
-        }
-    }
-
-    // Row 2
-    else if( o_to_t != kIOConnTypeNull && t_to_o == kIOConnTypeNull )
-    {
-        if( conn_path.data_seg.HasAny() )
-        {
-            switch( actual_app_path_count )
-            {
-            case 1:
-                // app_path1 is for both configuration and consumption
-                conn_path.config_path    = app_path1;
-                conn_path.consuming_path = app_path1;
-
-                config_instance    = instance1;
-                consuming_instance = instance1;
-                break;
-
-            case 2:
-                instance2 = check_path( app_path2, NULL, "app_path2 O->T(non-null) T-O(null)" );
-                if( !instance2 )
-                {
-                    *extended_error = kConnectionManagerStatusCodeInvalidConsumingApllicationPath;
-                    goto L_exit_error;
-                }
-
-                // app_path1 is for configuration, app_path2 is for consumption
-                conn_path.config_path    = app_path1;
-                conn_path.consuming_path = app_path2;
-
-                config_instance    = instance1;
-                consuming_instance = instance2;
-                break;
-            case 3:
-                goto L_exit_invalid;
-            }
-        }
-        else
-        {
-            switch( actual_app_path_count )
-            {
-            case 1:
-                // app_path1 is for consumption
-                conn_path.consuming_path = app_path1;
-
-                consuming_instance = instance1;
-                break;
-            case 2:
-            case 3:
-                goto L_exit_invalid;
-            }
-        }
-    }
-
-    // Row 3
-    else if( o_to_t == kIOConnTypeNull && t_to_o != kIOConnTypeNull )
-    {
-        if( conn_path.data_seg.HasAny() )
-        {
-            switch( actual_app_path_count )
-            {
-            case 1:
-                // app_path1 is for both configuration and production
-                conn_path.config_path    = app_path1;
-                conn_path.producing_path = app_path1;
-
-                config_instance    = instance1;
-                producing_instance = instance1;
-                break;
-
-            case 2:
-                instance2 = check_path( app_path2, NULL, "app_path2 O->T(null) T-O(non-null)" );
-                if( !instance2 )
-                {
-                    *extended_error = kConnectionManagerStatusCodeInvalidProducingApplicationPath;
-                    goto L_exit_error;
-                }
-
-                // app_path1 is for configuration, app_path2 is for production
-                conn_path.config_path    = app_path1;
-                conn_path.producing_path = app_path2;
-
-                config_instance    = instance1;
-                producing_instance = instance2;
-                break;
-
-            case 3:
-                goto L_exit_invalid;
-            }
-        }
-        else
-        {
-            switch( actual_app_path_count )
-            {
-            case 1:
-                // app_path1 is for production
-                conn_path.producing_path = app_path1;
-                producing_instance = instance1;
-                break;
-
-            case 2:
-            case 3:
-                goto L_exit_invalid;
-            }
-        }
-    }
-
-    // Row 4
-    else if( o_to_t != kIOConnTypeNull && t_to_o != kIOConnTypeNull )
-    {
-        if( conn_path.data_seg.HasAny() )
-        {
-            switch( actual_app_path_count )
-            {
-            case 1:
-                // app_path1 is for configuration, consumption, and production
-                conn_path.config_path    = app_path1;
-                conn_path.consuming_path = app_path1;
-                conn_path.producing_path = app_path1;
-
-                config_instance    = instance1;
-                consuming_instance = instance1;
-                producing_instance = instance1;
-                break;
-
-            case 2:
-                instance2 = check_path( app_path2, NULL, "app_path2 O->T(non-null) T-O(non-null)" );
-                if( !instance2 )
-                {
-                    *extended_error = kConnectionManagerStatusCodeInvalidConsumingApllicationPath;
-                    goto L_exit_error;
-                }
-
-                // app_path1 is for configuration, app_path2 is for consumption & production
-                conn_path.config_path    = app_path1;
-                conn_path.consuming_path = app_path2;
-                conn_path.producing_path = app_path2;
-
-                config_instance    = instance1;
-                consuming_instance = instance2;
-                producing_instance = instance2;
-                break;
-
-            case 3:
-                instance2 = check_path( app_path2, NULL, "app_path2 O->T(non-null) T-O(non-null)" );
-                if( !instance2 )
-                {
-                    *extended_error = kConnectionManagerStatusCodeInvalidConsumingApllicationPath;
-                    goto L_exit_error;
-                }
-
-                instance3 = check_path( app_path3, NULL, "app_path3 O->T(non-null) T-O(non-null)" );
-                if( !instance3 )
-                {
-                    *extended_error = kConnectionManagerStatusCodeInvalidProducingApplicationPath;
-                    goto L_exit_error;
-                }
-
-                // app_path1 is for configuration, app_path2 is for consumption, app_path3 is for production
-                conn_path.config_path    = app_path1;
-                conn_path.consuming_path = app_path2;
-                conn_path.producing_path = app_path3;
-
-                config_instance    = instance1;
-                consuming_instance = instance2;
-                producing_instance = instance3;
-            }
-        }
-        else
-        {
-            switch( actual_app_path_count )
-            {
-            case 1:
-                // app_path1 is for consumption and production
-                conn_path.consuming_path = app_path1;
-                conn_path.producing_path = app_path1;
-
-                consuming_instance = instance1;
-                producing_instance = instance1;
-                break;
-
-            case 2:
-                // app_path1 is for consumption, app_path2 is for production
-                instance2 = check_path( app_path2, NULL, "app_path2 O->T(non-null) T-O(non-null)" );
-                if( !instance2 )
-                {
-                    *extended_error = kConnectionManagerStatusCodeInvalidProducingApplicationPath;
-                    goto L_exit_error;
-                }
-
-                conn_path.consuming_path = app_path1;
-                conn_path.producing_path = app_path2;
-
-                consuming_instance = instance1;
-                producing_instance = instance2;
-                break;
-
-            case 3:
-                // first path is ignored, app_path2 is for consumption, app_path3 is for production
-                instance2 = check_path( app_path2, NULL, "app_path2 O->T(non-null) T-O(non-null)" );
-                if( !instance2 )
-                {
-                    *extended_error = kConnectionManagerStatusCodeInvalidConsumingApllicationPath;
-                    goto L_exit_error;
-                }
-
-                instance3 = check_path( app_path3, NULL, "app_path3 O->T(non-null) T-O(non-null)" );
-                if( !instance3 )
-                {
-                    *extended_error = kConnectionManagerStatusCodeInvalidProducingApplicationPath;
-                    goto L_exit_error;
-                }
-
-                conn_path.consuming_path = app_path2;
-                conn_path.producing_path = app_path3;
-
-                consuming_instance = instance2;
-                producing_instance = instance3;
-
-                // Since we ignored app_path1, don't assume that class of app_path2 is same:
-                mgmnt_class = app_path2.GetClass();
-                break;
-            }
-        }
-    }
-
-    if( trigger.Class() == kConnectionTransportClass3 )
-    {
-        // connection end point has to be the message router instance 1
-        if( conn_path.consuming_path.GetClass() != kCipMessageRouterClass ||
-            conn_path.consuming_path.GetInstanceOrConnPt() != 1 )
-        {
-            *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
-            goto L_exit_error;
-        }
-    }
-
-    CIPSTER_TRACE_INFO( "%s: forward_open conn_path: %s\n",
-        __func__,
-        conn_path.Format().c_str()
-        );
-
-    return kCipErrorSuccess;
-
-L_exit_invalid:
-
-    // Add CIPSTER_TRACE statements at specific goto sites above, not here.
-    *extended_error = kConnectionManagerStatusCodeErrorInvalidSegmentTypeInPath;
-
-L_exit_error:
-    return kCipErrorConnectionFailure;
-}
-
-
-EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReader aCommand )
+EipStatus CipConnMgrClass::HandleReceivedConnectedData(
+        const sockaddr_in* from_address, BufReader aCommand )
 {
     CIPSTER_TRACE_INFO( "%s:\n", __func__ );
 
-    CipCommonPacketFormatData cpfd;
+    Cpf cpfd;
 
-    if( cpfd.DeserializeCPFD( aCommand ) == kEipStatusError )
+    if( cpfd.DeserializeCpf( aCommand ) <= 0 )
     {
         return kEipStatusError;
     }
 
     // Check if connected address item or sequenced address item  received,
     // otherwise it is no connected message and should not be here.
-    if( cpfd.address_item.type_id == kCipItemIdConnectionAddress
-     || cpfd.address_item.type_id == kCipItemIdSequencedAddressItem )
+    if( cpfd.AddrType() == kCpfIdConnectedAddress
+     || cpfd.AddrType() == kCpfIdSequencedAddress )
     {
         // found connected address item or found sequenced address item
         // -> for now the sequence number will be ignored
 
-        if( cpfd.data_item.type_id == kCipItemIdConnectedDataItem ) // connected data item received
+        if( cpfd.DataType() == kCpfIdConnectedDataItem ) // connected data item received
         {
-            CipConn* conn = GetConnectionByConsumingId( cpfd.address_item.data.connection_identifier );
+            CipConn* conn = GetConnectionByConsumingId( cpfd.AddrConnId() );
 
             if( !conn )
             {
                 CIPSTER_TRACE_INFO( "%s: no consuming connection for conn_id 0x%x\n",
-                    __func__, cpfd.address_item.data.connection_identifier
+                    __func__, cpfd.AddrConnId()
                     );
                 return kEipStatusError;
             }
 
             CIPSTER_TRACE_INFO( "%s: got consuming connection for conn_id 0x%x\n",
-                __func__, cpfd.address_item.data.connection_identifier
+                __func__, cpfd.AddrConnId()
                 );
 
             CIPSTER_TRACE_INFO( "%s: c.s_addr=%08x  f.s_addr=%08x\n",
@@ -573,7 +107,7 @@ EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReade
             {
                 CIPSTER_TRACE_INFO( "%s: g.sn=0x%08x  c.sn=0x%08x\n",
                     __func__,
-                    cpfd.address_item.data.sequence_number,
+                    cpfd.AddrEncapSeqNum(),
                     conn->eip_level_sequence_count_consuming
                     );
 
@@ -582,36 +116,31 @@ EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReade
                 {
                     // put our tracking count within a half cycle of the leader.  Without this
                     // there are many scenarios where the SEQ_GT32 below won't evaluate as true.
-                    conn->eip_level_sequence_count_consuming = cpfd.address_item.data.sequence_number - 1;
+                    conn->eip_level_sequence_count_consuming = cpfd.AddrEncapSeqNum() - 1;
                     conn->eip_level_sequence_count_consuming_first = false;
                 }
 
                 // only inform assembly object if the sequence counter is greater or equal, or
-                if( SEQ_GT32( cpfd.address_item.data.sequence_number,
+                if( SEQ_GT32( cpfd.AddrEncapSeqNum(),
                               conn->eip_level_sequence_count_consuming ) )
                 {
                     // reset the watchdog timer
-                    conn->inactivity_watchdog_timer_usecs =
-                        conn->o_to_t_RPI_usecs << (2 + conn->connection_timeout_multiplier);
+                    conn->inactivity_watchdog_timer_usecs = conn->TimeoutMSecs_o_to_t();
 
                     CIPSTER_TRACE_INFO( "%s: reset inactivity watchdog to %u usecs\n",
                         __func__,
                         conn->inactivity_watchdog_timer_usecs );
 
-                    conn->eip_level_sequence_count_consuming = cpfd.address_item.data.sequence_number;
+                    conn->eip_level_sequence_count_consuming = cpfd.AddrEncapSeqNum();
 
-                    if( conn->connection_receive_data_function )
-                    {
-                        return conn->connection_receive_data_function( conn,
-                            BufReader( cpfd.data_item.data, cpfd.data_item.length ) );
-                    }
+                    return conn->HandleReceivedIoConnectionData( BufReader( cpfd.DataRange() ) );
                 }
                 else
                 {
                     CIPSTER_TRACE_INFO( "%s: received sequence number was not greater, no watchdog reset\n"
                         " received:%08x   connection seqn:%08x\n",
                         __func__,
-                        cpfd.address_item.data.sequence_number,
+                        cpfd.AddrEncapSeqNum(),
                         conn->eip_level_sequence_count_consuming
                         );
                 }
@@ -633,17 +162,19 @@ EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReade
 }
 
 
-EipStatus ManageConnections()
+EipStatus CipConnMgrClass::ManageConnections()
 {
     EipStatus eip_status;
 
-    //Inform application that it can execute
+    // Check for application message triggers
     HandleApplication();
+
     ManageEncapsulationMessages();
 
-    for( CipConn* active = g_active_connection_list;  active;  active = active->next )
+    for( CipConnBox::iterator active = g_active_conns.begin();
+            active != g_active_conns.end();  ++active )
     {
-        if( active->state == kConnectionStateEstablished )
+        if( active->State() == kConnectionStateEstablished )
         {
             // We have a consuming connection check inactivity watchdog timer.
             if( active->consuming_instance ||
@@ -655,28 +186,29 @@ EipStatus ManageConnections()
 
                 if( active->inactivity_watchdog_timer_usecs <= 0 )
                 {
-                    // we have a timed out connection: perform watchdog check
+                    // we have a timed out connection while performing watchdog check
+                    // If this shows -1 as socket values, its because the other end
+                    // closed the transport and we closed it in response already.
                     CIPSTER_TRACE_INFO(
-                        "%s: >>>>>Connection timed out consuming_socket:%d producing_socket:%d\n",
+                        "%s: >>> Connection class: %d timed out consuming_socket:%d producing_socket:%d\n",
                         __func__,
-                        active->consuming_socket,
-                        active->producing_socket
+                        active->trigger.Class(),
+                        active->ConsumingSocket(),
+                        active->ProducingSocket()
                         );
 
-                    CIPSTER_ASSERT( active->connection_timeout_function );
-
-                    active->connection_timeout_function( active );
+                    active->timeOut();
                 }
             }
 
             // only if the connection has not timed out check if data is to be sent
-            if( active->state == kConnectionStateEstablished )
+            if( active->State() == kConnectionStateEstablished )
             {
                 // client connection
-                if( active->GetExpectedPacketRateUSecs() != 0 &&
+                if( active->ExpectedPacketRateUSecs() != 0 &&
 
                     // only produce for the master connection
-                    active->producing_socket != kEipInvalidSocket )
+                    active->ProducingSocket() != kEipInvalidSocket )
                 {
                     if( active->trigger.Trigger() != kConnectionTriggerTypeCyclic )
                     {
@@ -691,9 +223,7 @@ EipStatus ManageConnections()
 
                     if( active->transmission_trigger_timer_usecs <= 0 ) // need to send package
                     {
-                        CIPSTER_ASSERT( active->connection_send_data_function );
-
-                        eip_status = active->connection_send_data_function( active );
+                        eip_status = active->SendConnectedData();
 
                         if( eip_status == kEipStatusError )
                         {
@@ -701,7 +231,7 @@ EipStatus ManageConnections()
                         }
 
                         // reload the timer value
-                        active->transmission_trigger_timer_usecs = active->GetExpectedPacketRateUSecs();
+                        active->transmission_trigger_timer_usecs = active->ExpectedPacketRateUSecs();
 
                         if( active->trigger.Trigger() != kConnectionTriggerTypeCyclic )
                         {
@@ -718,33 +248,24 @@ EipStatus ManageConnections()
 }
 
 
-/**
- * Function assembleForwardOpenResponse
- * serializes a response to a forward_open
- */
-static void assembleForwardOpenResponse( CipConn* aConn,
+void CipConnMgrClass::assembleForwardOpenResponse( ConnectionData* aParams,
         CipMessageRouterResponse* response, CipError general_status,
         ConnectionManagerStatusCode extended_status )
 {
-    CipCommonPacketFormatData cpfd( 0 );
+    //Cpf cpfd( kCpfIdNullAddress, kCpfIdUnconnectedDataItem );
 
-    BufWriter out = response->data;
+    BufWriter out = response->Writer();
 
-    cpfd.SetItemCount( 2 );
-    cpfd.data_item.type_id = kCipItemIdUnconnectedDataItem;
+    response->SetGenStatus( general_status );
 
-    cpfd.AddNullAddressItem();
-
-    response->general_status = general_status;
+    CIPSTER_ASSERT( response->AdditionalStsCount() == 0 );
 
     if( general_status == kCipErrorSuccess )
     {
         CIPSTER_TRACE_INFO( "%s: sending success response\n", __func__ );
 
-        response->size_of_additional_status = 0;
-
-        out.put32( aConn->consuming_connection_id );
-        out.put32( aConn->producing_connection_id );
+        out.put32( aParams->consuming_connection_id );
+        out.put32( aParams->producing_connection_id );
     }
     else
     {
@@ -755,72 +276,66 @@ static void assembleForwardOpenResponse( CipConn* aConn,
             extended_status
             );
 
-        aConn->state = kConnectionStateNonExistent;
-
         switch( general_status )
         {
         case kCipErrorNotEnoughData:
         case kCipErrorTooMuchData:
-            response->size_of_additional_status = 0;
             break;
 
         default:
             switch( extended_status )
             {
             case kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize:
-                response->size_of_additional_status = 2;
-                response->additional_status[0] = extended_status;
-                response->additional_status[1] = aConn->corrected_o_to_t_size;
+                response->AddAdditionalSts( extended_status );
+                response->AddAdditionalSts( aParams->corrected_o_to_t_size );
                 break;
 
             case kConnectionManagerStatusCodeErrorInvalidTToOConnectionSize:
-                response->size_of_additional_status = 2;
-                response->additional_status[0] = extended_status;
-                response->additional_status[1] = aConn->corrected_t_to_o_size;
+                response->AddAdditionalSts( extended_status );
+                response->AddAdditionalSts( aParams->corrected_t_to_o_size );
                 break;
 
             default:
-                response->size_of_additional_status = 1;
-                response->additional_status[0] = extended_status;
+                response->AddAdditionalSts( extended_status );
                 break;
             }
             break;
         }
     }
 
-    out.put16( aConn->connection_serial_number );
-    out.put16( aConn->originator_vendor_id );
-    out.put32( aConn->originator_serial_number );
+    out.put16( aParams->connection_serial_number );
+    out.put16( aParams->originator_vendor_id );
+    out.put32( aParams->originator_serial_number );
 
     if( general_status == kCipErrorSuccess )
     {
         // set the actual packet rate to requested packet rate
-        out.put32( aConn->o_to_t_RPI_usecs );
-        out.put32( aConn->t_to_o_RPI_usecs );
+        out.put32( aParams->o_to_t_RPI_usecs );
+        out.put32( aParams->t_to_o_RPI_usecs );
     }
 
     out.put8( 0 );   // remaining path size - for routing devices relevant
     out.put8( 0 );   // reserved
 
-    response->data_length = out.data() - response->data.data();
+    response->SetWrittenSize( out.data() - response->Writer().data() );
 }
 
 
 CipConn* GetConnectionByConsumingId( int aConnectionId )
 {
-    CipConn* conn = g_active_connection_list;
+    CipConnBox::iterator c = g_active_conns.begin();
 
-    while( conn )
+    while( c != g_active_conns.end() )
     {
-        if( conn->state == kConnectionStateEstablished )
+        if( c->State() == kConnectionStateEstablished )
         {
-            if( conn->consuming_connection_id == aConnectionId )
+            if( c->consuming_connection_id == aConnectionId )
             {
-                return conn;
+                return c;
             }
         }
 
-        conn = conn->next;
+        ++c;
     }
 
     return NULL;
@@ -829,73 +344,48 @@ CipConn* GetConnectionByConsumingId( int aConnectionId )
 
 CipConn* GetConnectedOutputAssembly( int output_assembly_id )
 {
-    CipConn* active = g_active_connection_list;
+    CipConnBox::iterator active = g_active_conns.begin();
 
-    while( active )
+    for(  ; active != g_active_conns.end(); ++active )
     {
-        if( active->state == kConnectionStateEstablished )
+        if( active->State() == kConnectionStateEstablished )
         {
             if( active->conn_path.consuming_path.GetInstanceOrConnPt() == output_assembly_id )
                 return active;
         }
-
-        active = active->next;
     }
 
     return NULL;
 }
 
 
-void CloseConnection( CipConn* conn )
+void CipConnBox::Insert( CipConn* aConn )
 {
-    conn->state = kConnectionStateNonExistent;
-
-    if( conn->trigger.Class() != kConnectionTransportClass3 )
-    {
-        // only close the UDP connection for not class 3 connections
-        CloseSocket( conn->consuming_socket );
-        conn->consuming_socket = kEipInvalidSocket;
-
-        CloseSocket( conn->producing_socket );
-        conn->producing_socket = kEipInvalidSocket;
-    }
-
-    RemoveFromActiveConnections( conn );
-}
-
-
-void AddNewActiveConnection( CipConn* aConn )
-{
-#if defined(DEBUG) || 1
     if( aConn->trigger.Class() == kConnectionTransportClass1 )
     {
-        CIPSTER_TRACE_INFO( "%s: conn->consuming_connection_id:%d\n",
-            __func__, aConn->consuming_connection_id );
+        //CIPSTER_TRACE_INFO( "%s: conn->consuming_connection_id:%d\n", __func__, aConn->consuming_connection_id );
     }
-#endif
 
     aConn->prev = NULL;
-    aConn->next = g_active_connection_list;
+    aConn->next = head;
 
-    if( g_active_connection_list )
+    if( head )
     {
-        g_active_connection_list->prev = aConn;
+        head->prev = aConn;
     }
 
-    g_active_connection_list = aConn;
-    g_active_connection_list->state = kConnectionStateEstablished;
+    head = aConn;
+
+    aConn->SetState( kConnectionStateEstablished );
 }
 
 
-void RemoveFromActiveConnections( CipConn* aConn )
+void CipConnBox::Remove( CipConn* aConn )
 {
-#if defined(DEBUG) || 1
     if( aConn->trigger.Class() == kConnectionTransportClass1 )
     {
-        CIPSTER_TRACE_INFO( "%s: conn->consuming_connection_id:%d\n",
-            __func__, aConn->consuming_connection_id );
+        //CIPSTER_TRACE_INFO( "%s: consuming_connection_id:%d\n", __func__, consuming_connection_id );
     }
-#endif
 
     if( aConn->prev )
     {
@@ -903,7 +393,7 @@ void RemoveFromActiveConnections( CipConn* aConn )
     }
     else
     {
-        g_active_connection_list = aConn->next;
+        head = aConn->next;
     }
 
     if( aConn->next )
@@ -913,21 +403,18 @@ void RemoveFromActiveConnections( CipConn* aConn )
 
     aConn->prev  = NULL;
     aConn->next  = NULL;
-    aConn->state = kConnectionStateNonExistent;
+    aConn->SetState( kConnectionStateNonExistent );
 }
-
 
 
 bool IsConnectedInputAssembly( int aInstanceId )
 {
-    CipConn* conn = g_active_connection_list;
+    CipConn* c = g_active_conns.begin();
 
-    while( conn )
+    for(  ; c != g_active_conns.end();  ++c )
     {
-        if( aInstanceId == conn->conn_path.producing_path.GetInstanceOrConnPt() )
+        if( aInstanceId == c->conn_path.producing_path.GetInstanceOrConnPt() )
             return true;
-
-        conn = conn->next;
     }
 
     return false;
@@ -936,14 +423,12 @@ bool IsConnectedInputAssembly( int aInstanceId )
 
 bool IsConnectedOutputAssembly( int aInstanceId )
 {
-    CipConn* conn = g_active_connection_list;
+    CipConnBox::iterator c = g_active_conns.begin();
 
-    while( conn )
+    for( ; c != g_active_conns.end(); ++c )
     {
-        if( aInstanceId == conn->conn_path.consuming_path.GetInstanceOrConnPt() )
+        if( aInstanceId == c->conn_path.consuming_path.GetInstanceOrConnPt() )
             return true;
-
-        conn = conn->next;
     }
 
     return false;
@@ -952,77 +437,65 @@ bool IsConnectedOutputAssembly( int aInstanceId )
 
 EipStatus TriggerConnections( int aOutputAssembly, int aInputAssembly )
 {
-    EipStatus nRetVal = kEipStatusError;
+    EipStatus ret = kEipStatusError;
 
-    CipConn* conn = g_active_connection_list;
+    CipConnBox::iterator c = g_active_conns.begin();
 
-    while( conn )
+    for(  ; c != g_active_conns.end(); ++c )
     {
-        if( aOutputAssembly == conn->conn_path.consuming_path.GetInstanceOrConnPt()
-         && aInputAssembly  == conn->conn_path.producing_path.GetInstanceOrConnPt() )
+        if( aOutputAssembly == c->conn_path.consuming_path.GetInstanceOrConnPt()
+         && aInputAssembly  == c->conn_path.producing_path.GetInstanceOrConnPt() )
         {
-            if( conn->trigger.Trigger() == kConnectionTriggerTypeApplication )
+            if( c->trigger.Trigger() == kConnectionTriggerTypeApplication )
             {
                 // produce at the next allowed occurrence
-                conn->transmission_trigger_timer_usecs = conn->production_inhibit_timer_usecs;
-                nRetVal = kEipStatusOk;
+                c->transmission_trigger_timer_usecs = c->production_inhibit_timer_usecs;
+                ret = kEipStatusOk;
             }
 
             break;
         }
     }
 
-    return nRetVal;
+    return ret;
 }
 
 
-/**
- * Function forward_open_common
- * checks if resources for new connection are available, and
- * generates a ForwardOpen Reply message.
- *
- * @param instance CIP object instance
- * @param request CipMessageRouterRequest.
- * @param response CipMessageRouterResponse.
- * @param isLarge is true when called from largeForwardOpen(), false when called from forwardOpen()
- *  and the distinction is whether to expect 32 or 16 bits of "network connection parameters".
- *
- * @return EipStatus
- *     -  >0 .. success, 0 .. no reply to send back
- *     -  -1 .. error
- */
-static EipStatus forward_open_common( CipInstance* instance,
+EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response, bool isLarge )
 {
     ConnectionManagerStatusCode connection_status = kConnectionManagerStatusCodeSuccess;
 
+    BufReader in = request->Data();
+
     (void) instance;        // suppress compiler warning
 
-    static CipConn dummy;
+    ConnectionData    params;
 
-    BufReader in = request->data;
+    try
+    {
+        in += params.DeserializeConnectionData( in, isLarge );
+    }
+    catch( const std::range_error& e )
+    {
+        // do not even send a reply, the params where not all supplied in the request.
+        return kEipStatusError;
+    }
+    catch( const std::exception& e )
+    {
+        // currently cannot happen.
+        return kEipStatusError;
+    }
 
-    dummy.priority_timetick = in.get8();
-    dummy.timeout_ticks     = in.get8();
-
-    dummy.consuming_connection_id = in.get32();     // O_to_T
-    dummy.producing_connection_id = in.get32();     // T_to_O
-
-    // The Connection Triad used in the Connection Manager specification relates
-    // to the combination of Connection Serial Number, Originator Vendor ID and
-    // Originator Serial Number parameters.
-    dummy.connection_serial_number = in.get16();
-    dummy.originator_vendor_id     = in.get16();
-    dummy.originator_serial_number = in.get32();
 
     // first check if we have already a connection with the given params
-    if( findExistingMatchingConnection( &dummy ) )
+    if( findExistingMatchingConnection( params ) )
     {
         // TODO this test is  incorrect, see CIP spec 3-5.5.2 re: duplicate forward open
         // it should probably be testing the connection type fields
         // TODO think on how a reconfiguration request could be handled correctly.
-        if( !dummy.consuming_connection_id && !dummy.producing_connection_id )
+        if( !params.consuming_connection_id && !params.producing_connection_id )
         {
             // TODO implement reconfiguration of connection
 
@@ -1032,183 +505,158 @@ static EipStatus forward_open_common( CipInstance* instance,
         }
 
         assembleForwardOpenResponse(
-                &dummy, response,
+                &params, response,
                 kCipErrorConnectionFailure,
                 kConnectionManagerStatusCodeErrorConnectionInUse );
 
-        return kEipStatusOkSend; // send reply
+        return kEipStatusOkSend;
     }
 
-    // keep it to non-existent until the setup is done, this eases error handling and
-    // the state changes within the forward open request can not be detected from
-    // the application or from outside (reason we are single threaded)
-    dummy.state = kConnectionStateNonExistent;
-
-    dummy.sequence_count_producing = 0; // set the sequence count to zero
-
-    dummy.connection_timeout_multiplier = in.get8();
-
-    if( dummy.connection_timeout_multiplier > 7 )
+    if( params.connection_timeout_multiplier > 7 )
     {
         // 3-5.4.1.4
        CIPSTER_TRACE_INFO( "%s: invalid connection timeout multiplier: %u\n",
-           __func__, dummy.connection_timeout_multiplier );
+           __func__, params.connection_timeout_multiplier );
 
         assembleForwardOpenResponse(
-                &dummy, response,
+                &params, response,
                 kCipErrorConnectionFailure,
                 kConnectionManagerStatusCodeErrorInvalidOToTConnectionType );
 
-        return kEipStatusOkSend;    // send reply
+        return kEipStatusOkSend;
     }
 
-    in += 3;         // skip over 3 reserved bytes.
-
     CIPSTER_TRACE_INFO(
-        "%s: ConConnID:0x%08x, ProdConnID:0x%08x, ConnSerNo:%u\n",
-        __func__,
-        dummy.consuming_connection_id,
-        dummy.producing_connection_id,
-        dummy.connection_serial_number
+        "ForwardOpen : ConnSerNo %d ConConnID:0x%08x, ProdConnID:0x%08x\n",
+        params.connection_serial_number,
+        params.consuming_connection_id,
+        params.producing_connection_id
         );
-
-    dummy.o_to_t_RPI_usecs = in.get32();
-
-    dummy.o_to_t_ncp.Set( isLarge ? in.get32() : in.get16(), isLarge );
-    dummy.t_to_o_RPI_usecs = in.get32();
 
     // The requested packet interval parameter needs to be a multiple of
     // kOpenerTimerTickInMicroSeconds from the header file
-    EipUint32 temp = dummy.t_to_o_RPI_usecs % kOpenerTimerTickInMicroSeconds;
-
-    // round up to slower nearest integer multiple of our timer.
-    if( temp )
+    if( params.t_to_o_RPI_usecs % kOpenerTimerTickInMicroSeconds )
     {
-        dummy.t_to_o_RPI_usecs = (EipUint32) ( dummy.t_to_o_RPI_usecs / kOpenerTimerTickInMicroSeconds )
+        // round up to slower nearest integer multiple of our timer.
+        params.t_to_o_RPI_usecs = (EipUint32) ( params.t_to_o_RPI_usecs / kOpenerTimerTickInMicroSeconds )
             * kOpenerTimerTickInMicroSeconds + kOpenerTimerTickInMicroSeconds;
     }
 
-
-    dummy.t_to_o_ncp.Set( isLarge ? in.get32() : in.get16(), isLarge );
-
-    // check if Network connection parameters are ok
-    if( dummy.o_to_t_ncp.ConnectionType() == kIOConnTypeInvalid )
+    if( params.o_to_t_ncp.ConnectionType() == kIOConnTypeInvalid )
     {
         CIPSTER_TRACE_INFO( "%s: invalid O to T connection type\n", __func__ );
 
         assembleForwardOpenResponse(
-                &dummy, response,
+                &params, response,
                 kCipErrorConnectionFailure,
                 kConnectionManagerStatusCodeErrorInvalidOToTConnectionType );
 
-        return kEipStatusOkSend;    // send reply
+        return kEipStatusOkSend;
     }
 
-    if( dummy.t_to_o_ncp.ConnectionType() == kIOConnTypeInvalid )
+    if( params.t_to_o_ncp.ConnectionType() == kIOConnTypeInvalid )
     {
         CIPSTER_TRACE_INFO( "%s: invalid T to O connection type\n", __func__ );
 
         assembleForwardOpenResponse(
-                &dummy, response,
+                &params, response,
                 kCipErrorConnectionFailure,
                 kConnectionManagerStatusCodeErrorInvalidTToOConnectionType );
 
-        return kEipStatusOkSend;    // send reply
+        return kEipStatusOkSend;
     }
 
-    int trigger = in.get8();
-
     // check for undocumented trigger bits
-    if( 0x4c & trigger )
+    if( 0x4c & params.trigger.Bits() )
     {
         CIPSTER_TRACE_INFO( "%s: trigger 0x%02x not supported\n",
-            __func__, trigger );
+            __func__, params.trigger.Bits() );
 
         assembleForwardOpenResponse(
-                &dummy, response,
+                &params, response,
                 kCipErrorConnectionFailure,
                 kConnectionManagerStatusCodeErrorTransportTriggerNotSupported );
 
-        return kEipStatusOkSend;    // send reply
+        return kEipStatusOkSend;
     }
-
-    dummy.trigger.Set( trigger );
 
     unsigned conn_path_byte_count = in.get8() * 2;
 
     if( conn_path_byte_count < in.size() )
     {
-        assembleForwardOpenResponse( &dummy, response, kCipErrorTooMuchData, connection_status );
-        return kEipStatusOkSend;    // send reply
+        assembleForwardOpenResponse( &params, response, kCipErrorTooMuchData, connection_status );
+        return kEipStatusOkSend;
     }
 
     if( conn_path_byte_count > in.size() )
     {
-        assembleForwardOpenResponse( &dummy, response, kCipErrorNotEnoughData, connection_status );
+        assembleForwardOpenResponse( &params, response, kCipErrorNotEnoughData, connection_status );
         return kEipStatusOkSend;
     }
 
-    CipError result = dummy.parseConnectionPath( in, &connection_status );
+    // At this point "in" has the exact correct size() for the connection path in bytes.
+
+    CipError result = params.DeserializeConnectionPath( in, &connection_status );
 
     if( result != kCipErrorSuccess )
     {
         CIPSTER_TRACE_INFO( "%s: unable to parse connection path\n", __func__ );
 
-        assembleForwardOpenResponse( &dummy, response, result, connection_status );
+        assembleForwardOpenResponse( &params, response, result, connection_status );
         return kEipStatusOkSend;
     }
 
-    CIPSTER_TRACE_INFO( "%s: trigger_class:%d\n", __func__, dummy.trigger.Class() );
+    CIPSTER_TRACE_INFO( "%s: trigger_class:%d\n", __func__, params.trigger.Class() );
 
-    CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, dummy.o_to_t_RPI_usecs );
-    CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, dummy.o_to_t_ncp.ConnectionSize() );
-    CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, dummy.o_to_t_ncp.Priority() );
-    CIPSTER_TRACE_INFO( "%s: o_to_t type:%d\n", __func__, dummy.o_to_t_ncp.ConnectionType() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, params.o_to_t_RPI_usecs );
+    CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, params.o_to_t_ncp.ConnectionSize() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, params.o_to_t_ncp.Priority() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t type:%d\n", __func__, params.o_to_t_ncp.ConnectionType() );
 
-    CIPSTER_TRACE_INFO( "%s: t_to_o RPI_usecs:%u\n", __func__, dummy.t_to_o_RPI_usecs );
-    CIPSTER_TRACE_INFO( "%s: t_to_o size:%d\n", __func__, dummy.t_to_o_ncp.ConnectionSize() );
-    CIPSTER_TRACE_INFO( "%s: t_to_o priority:%d\n", __func__, dummy.t_to_o_ncp.Priority() );
-    CIPSTER_TRACE_INFO( "%s: t_to_o type:%d\n", __func__, dummy.t_to_o_ncp.ConnectionType() );
+    CIPSTER_TRACE_INFO( "%s: t_to_o RPI_usecs:%u\n", __func__, params.t_to_o_RPI_usecs );
+    CIPSTER_TRACE_INFO( "%s: t_to_o size:%d\n", __func__, params.t_to_o_ncp.ConnectionSize() );
+    CIPSTER_TRACE_INFO( "%s: t_to_o priority:%d\n", __func__, params.t_to_o_ncp.Priority() );
+    CIPSTER_TRACE_INFO( "%s: t_to_o type:%d\n", __func__, params.t_to_o_ncp.ConnectionType() );
 
-    CipClass* clazz = GetCipClass( dummy.mgmnt_class );
+    CipClass* clazz = GetCipClass( params.mgmnt_class );
 
-    result = clazz->OpenConnection( &dummy, response->CPFD(), &connection_status );
+    result = clazz->OpenConnection( &params, response->CPF(), &connection_status );
 
     if( result != kCipErrorSuccess )
     {
         CIPSTER_TRACE_INFO( "%s: OpenConnection() failed. status:0x%x\n", __func__, connection_status );
 
         // in case of error the dummy contains all necessary information
-        assembleForwardOpenResponse( &dummy, response, result, connection_status );
+        assembleForwardOpenResponse( &params, response, result, connection_status );
         return kEipStatusOkSend;
     }
     else
     {
         CIPSTER_TRACE_INFO( "%s: OpenConnection() succeeded\n", __func__ );
 
-        // in case of success, g_active_connection_list points to the new connection
-        assembleForwardOpenResponse( g_active_connection_list,
+        // in case of success, g_active_conns holds to the new connection at begin()
+        assembleForwardOpenResponse( g_active_conns.begin(),
                 response, kCipErrorSuccess, kConnectionManagerStatusCodeSuccess );
         return kEipStatusOkSend;
     }
 }
 
 
-static EipStatus forward_open_service( CipInstance* instance,
+EipStatus CipConnMgrClass::forward_open_service( CipInstance* instance,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     return forward_open_common( instance, request, response, false );
 }
 
 
-static EipStatus large_forward_open_service( CipInstance* instance,
+EipStatus CipConnMgrClass::large_forward_open_service( CipInstance* instance,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     return forward_open_common( instance, request, response, true );
 }
 
 
-static EipStatus forward_close_service( CipInstance* instance,
+EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
@@ -1219,42 +667,39 @@ static EipStatus forward_close_service( CipInstance* instance,
     ConnectionManagerStatusCode connection_status =
         kConnectionManagerStatusCodeErrorConnectionNotFoundAtTargetApplication;
 
-    BufReader in = request->data;
+    BufReader in = request->Data();
 
     in += 2;        // ignore Priority/Time_tick and Time-out_ticks
 
-    EipUint16 connection_serial_number = in.get16();
-    EipUint16 originator_vendor_id     = in.get16();
-    EipUint32 originator_serial_number = in.get32();
-    EipUint8  connection_path_size     = in.get8();
+    CipUint     connection_serial_number = in.get16();
+    CipUint     originator_vendor_id     = in.get16();
+    CipUdint    originator_serial_number = in.get32();
+    CipByte     connection_path_size     = in.get8();
 
     CIPSTER_TRACE_INFO( "ForwardClose: ConnSerNo %d\n", connection_serial_number );
 
-    CipConn* active = g_active_connection_list;
+    CipConnBox::iterator active = g_active_conns.begin();
 
-    while( active )
+    for( ; active != g_active_conns.end();  ++active )
     {
         // This check should not be necessary as only established connections
         // should be in the active connection list
-        if( active->state == kConnectionStateEstablished ||
-            active->state == kConnectionStateTimedOut )
+        if( active->State() == kConnectionStateEstablished ||
+            active->State() == kConnectionStateTimedOut )
         {
             if( active->connection_serial_number == connection_serial_number
              && active->originator_vendor_id     == originator_vendor_id
              && active->originator_serial_number == originator_serial_number )
             {
-                // found the corresponding connection object -> close it
-                CIPSTER_ASSERT( active->connection_close_function );
-                active->connection_close_function( active );
+                // found the corresponding connection -> close it
+                active->Close();
                 connection_status = kConnectionManagerStatusCodeSuccess;
                 break;
             }
         }
-
-        active = active->next;
     }
 
-    BufWriter out = response->data;
+    BufWriter out = response->Writer();
 
     out.put16( connection_serial_number );
     out.put16( originator_vendor_id );
@@ -1269,15 +714,16 @@ static EipStatus forward_close_service( CipInstance* instance,
     else
     {
         // Vol1 Table 3-5.23
-        out.put8( connection_path_size );
-        response->general_status = kCipErrorConnectionFailure;
-        response->additional_status[0] = connection_status;
-        response->size_of_additional_status = 1;
+        response->SetGenStatus( kCipErrorConnectionFailure );
+        response->AddAdditionalSts( connection_status );
 
+        out.put8( 0 );  // out.put8( connection_path_size );
         out.put8( 0 );         // reserved
     }
 
-    response->data_length = out.data() - response->data.data();
+    (void) connection_path_size;
+
+    response->SetWrittenSize( out.data() - response->Writer().data() );
 
     return kEipStatusOkSend;
 }

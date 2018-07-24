@@ -69,9 +69,14 @@ endif()
 
 
 if( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
-    set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Werror=implicit-function-declaration" )
 
-    if( NOT WIN32 )
+    set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g3 -ggdb3 -DDEBUG" )
+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -Wall -Wno-reorder -Wno-sign-compare" )
+
+    if( WIN32 )
+        # https://sourceforge.net/p/mingw-w64/bugs/295/
+        add_definitions( -D__USE_MINGW_ANSI_STDIO )
+    else()
         add_definitions( -fPIC )        # The static library might eventually be linked into a DSO
 
         # enable clock_gettime:

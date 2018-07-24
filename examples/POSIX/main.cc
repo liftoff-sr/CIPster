@@ -44,32 +44,29 @@ int main( int argc, char* argv[] )
         ret = 1;
         goto exit;
     }
-    else
-    {
-        // fetch Internet address info from the platform
-        ConfigureNetworkInterface( argv[1], argv[2], argv[3] );
-        ConfigureDomainName( argv[4] );
-        ConfigureHostName( argv[5] );
 
-        my_mac_address[0]   = (EipUint8) strtoul( argv[6], NULL, 16 );
-        my_mac_address[1]   = (EipUint8) strtoul( argv[7], NULL, 16 );
-        my_mac_address[2]   = (EipUint8) strtoul( argv[8], NULL, 16 );
-        my_mac_address[3]   = (EipUint8) strtoul( argv[9], NULL, 16 );
-        my_mac_address[4]   = (EipUint8) strtoul( argv[10], NULL, 16 );
-        my_mac_address[5]   = (EipUint8) strtoul( argv[11], NULL, 16 );
-        ConfigureMacAddress( my_mac_address );
-    }
+    // unique_connection_id should be sufficiently random or incremented
+    // and stored in non-volatile memory each time the device boots.
+    unique_connection_id = rand();
+
+    // Setup the CIP stack early, before calling any stack Configuration functions.
+    CipStackInit( unique_connection_id );
+
+    // fetch Internet address info from the platform
+    ConfigureNetworkInterface( argv[1], argv[2], argv[3] );
+    ConfigureDomainName( argv[4] );
+    ConfigureHostName( argv[5] );
+
+    my_mac_address[0]   = (EipUint8) strtoul( argv[6], NULL, 16 );
+    my_mac_address[1]   = (EipUint8) strtoul( argv[7], NULL, 16 );
+    my_mac_address[2]   = (EipUint8) strtoul( argv[8], NULL, 16 );
+    my_mac_address[3]   = (EipUint8) strtoul( argv[9], NULL, 16 );
+    my_mac_address[4]   = (EipUint8) strtoul( argv[10], NULL, 16 );
+    my_mac_address[5]   = (EipUint8) strtoul( argv[11], NULL, 16 );
+    ConfigureMacAddress( my_mac_address );
 
     // for a real device the serial number should be unique per device
     SetDeviceSerialNumber( 123456789 );
-
-    /* nUniqueConnectionID should be sufficiently random or incremented and stored
-     *  in non-volatile memory each time the device boots.
-     */
-    unique_connection_id = rand();
-
-    // Setup the CIP Layer
-    CipStackInit( unique_connection_id );
 
     if( ApplicationInitialization() != kEipStatusOk )
     {

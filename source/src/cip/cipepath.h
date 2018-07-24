@@ -6,6 +6,7 @@
 #define CIPEPATH_H_
 
 #include "ciptypes.h"
+#include "cipcommon.h"
 
 typedef std::vector<EipByte>    Bytes;
 typedef std::vector<CipWord>    Words;
@@ -13,11 +14,13 @@ typedef std::vector<CipWord>    Words;
 
 /**
  * Class SegmentGroup
- * is a base class for a couple of domain specific segment groups (aka paths) that
- * uses a bitmap 'pbits' to indicate which segment types are in this
- * segment group container.  This is all hidden behind public accessors.
+ * is an abstract base class for a couple of domain specific segment groups
+ * (aka paths) that uses a bitmap 'pbits' to indicate which segment types
+ * are in this segment group container.
+ *
+ * This is all hidden behind public accessors.
  */
-class SegmentGroup
+class SegmentGroup : public Serializeable
 {
 public:
     SegmentGroup()
@@ -72,6 +75,11 @@ public:
      */
     int DeserializeDataSegment( BufReader aInput );
 
+    //-----<Serializeable>------------------------------------------------------
+    int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
+    int SerializedCount( int aCtl = 0 ) const;
+    //-----</Serializeable>-----------------------------------------------------
+
     Words       words;
 };
 
@@ -97,6 +105,15 @@ public:
     {
     }
 
+    CipAppPath( int aClassId, int aInstanceId, int aAttributeId = 0 )
+    {
+        SetClass( aClassId );
+        SetInstance( aInstanceId );
+        if( aAttributeId )
+            SetAttribute( aAttributeId );
+    }
+
+
     /**
      * Function DeserializeAppPath
      * deserializes an application_path
@@ -118,56 +135,58 @@ public:
      */
     int DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom = NULL );
 
-    /**
-     * Function SerializePadded
-     * serializes this application_path according to grammar on page C-17 of Vol1.
-     *
-     * @param aOutput where to serialize into.
-     * @return int - the number of bytes consumed
-     * @throw whatever BufWriter throws on buffer overrun.
-     */
-    int SerializeAppPath( BufWriter aOutput );
+    //-----<Serializeable>------------------------------------------------------
+    int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
+    int SerializedCount( int aCtl = 0 ) const;
+    //-----</Serializeable>-----------------------------------------------------
 
-    void SetClass( int aClass )
+    CipAppPath& SetClass( int aClass )
     {
         stuff[CLASS] = aClass;
         pbits |= 1 << CLASS;
+        return *this;
     }
 
-    void SetInstance( int aInstance )
+    CipAppPath& SetInstance( int aInstance )
     {
         stuff[INSTANCE] = aInstance;
         pbits |= 1 << INSTANCE;
+        return *this;
     }
 
-    void SetAttribute( int aAttribute )
+    CipAppPath& SetAttribute( int aAttribute )
     {
         stuff[ATTRIBUTE] = aAttribute;
         pbits |= 1 << ATTRIBUTE;
+        return *this;
     }
 
-    void SetConnPoint( int aConnPt )
+    CipAppPath& SetConnPoint( int aConnPt )
     {
         stuff[CONN_PT] = aConnPt;
         pbits |= 1 << CONN_PT;
+        return *this;
     }
 
-    void SetMember1( int aMember )
+    CipAppPath& SetMember1( int aMember )
     {
         stuff[MEMBER1] = aMember;
         pbits |= 1 << MEMBER1;
+        return *this;
     }
 
-    void SetMember2( int aMember )
+    CipAppPath& SetMember2( int aMember )
     {
         stuff[MEMBER2] = aMember;
         pbits |= 1 << MEMBER2;
+        return *this;
     }
 
-    void SetMember3( int aMember )
+    CipAppPath& SetMember3( int aMember )
     {
         stuff[MEMBER3] = aMember;
         pbits |= 1 << MEMBER3;
+        return *this;
     }
 
     bool SetSymbol( const char* aSymbol );
@@ -258,7 +277,7 @@ public:
 
     CipAppPath& operator = ( const CipAppPath& other );
 
-    const std::string Format() const;
+    std::string Format() const;
 
 private:
 
@@ -312,13 +331,17 @@ struct CipElectronicKeySegment
     /**
      * Function DeserializeElectronicKey
      * parses an electronic key into this structure.
+     *
      * @param aSource gives the bytes to parse and their length.
      * @return int - number of bytes consumed.  If zero, this means bytes
      *  given by aSource were not an electronic key.
-     *
-     * @throw whatever BufReader throws on buffer overrun.
      */
     int DeserializeElectronicKey( BufReader aSource );
+
+    //-----<Serializeable>------------------------------------------------------
+    int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
+    int SerializedCount( int aCtl = 0 ) const;
+    //-----</Serializeable>-----------------------------------------------------
 
     /**
      * Function Check
@@ -331,7 +354,7 @@ struct CipElectronicKeySegment
 };
 
 
-class CipPortSegment
+class CipPortSegment : public Serializeable
 {
 public:
     int         port;            ///< if == -1, means not used
@@ -356,6 +379,13 @@ public:
         while( aByteCount-- > 0 )
             link_address.push_back( *aSrc++ );
     }
+
+    int DeserializePortSegment( BufReader aInput );
+
+    //-----<Serializeable>------------------------------------------------------
+    int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
+    int SerializedCount( int aCtl = 0 ) const;
+    //-----</Serializeable>-----------------------------------------------------
 };
 
 
@@ -369,7 +399,11 @@ public:
 class CipPortSegmentGroup : public SegmentGroup
 {
 public:
-    CipPortSegmentGroup()  { Clear(); }
+    CipPortSegmentGroup()
+    {
+        // Base class and contained objects all properly initialize
+        // themselves with help of the C++ compiler.
+    }
 
     void Clear()
     {
@@ -394,15 +428,10 @@ public:
      */
     int DeserializePortSegmentGroup( BufReader aInput );
 
-    /**
-     * Function SerializePortSegmentGroup
-     * encodes a padded EPATH according to fields which are present in this object and
-     * by a sequence given by grammar on page C-17 of Vol1.
-     * @param aOutput is a buffer to serialize into.
-     * @return int - the number of bytes consumed
-     * @throw whatever BufWriter throws on buffer overrun.
-    int SerializePortSegmentGroup( BufWriter aOutput );
-     */
+    //-----<Serializeable>------------------------------------------------------
+    int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
+    int SerializedCount( int aCtl = 0 ) const;
+    //-----</Serializeable>-----------------------------------------------------
 
     bool HasPortSeg() const             { return pbits & (1<<PORT); }
 
@@ -418,6 +447,7 @@ public:
     }
 
     unsigned GetPIT_USecs() const       { return HasPIT() ? pit_usecs : 0; }
+    unsigned GetPIT_MSecs() const       { return HasPIT() ? pit_usecs/1000 : 0; }
 
     void SetPIT_USecs( unsigned aUSECS )
     {
@@ -431,11 +461,13 @@ public:
         pit_usecs = aMSECS * 1000;
     }
 
+    const CipElectronicKeySegment& Key() const  { return key; }
+
+protected:
+
     // stuff we might expect in a CipPortSegmentGroup, pbits tells what we got
     CipElectronicKeySegment key;
     CipPortSegment          port;
-
-protected:
 
     unsigned                pit_usecs;
 

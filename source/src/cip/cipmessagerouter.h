@@ -10,97 +10,172 @@
 #include "ciptypes.h"
 #include "cipepath.h"
 #include "cipclass.h"
+#include "cipcommon.h"
 
 
 /**
  * Struct CipMessageRouterRequest
  * See Vol1 - 2-4.1
  */
-struct CipMessageRouterRequest
+class CipMessageRouterRequest : public Serializeable
 {
-    CipUsint    service;
-    CipAppPath  request_path;
-    BufReader   data;
+public:
+
+    CipMessageRouterRequest() :
+        service( CIPServiceCode( 0 ) )
+    {}
+
+    CipMessageRouterRequest(
+            CIPServiceCode aService,
+            const CipAppPath& aPath,
+            const BufReader& aData ) :
+        service( aService ),
+        path( aPath ),
+        data( aData )
+    {}
+
+    CIPServiceCode Service() const              { return service; }
+    void SetService( CIPServiceCode aService )  { service = aService; }
+
+    const CipAppPath& Path() const              { return path; }
+    void SetPathAttribute( int aId )            { path.SetAttribute( aId ); }
+
+    const BufReader& Data() const               { return data; }
+    void SetData( const BufReader& aRdr )       { data = aRdr; }
 
     /**
-     * Function DeserializeMRR
+     * Function DeserializeMRReq
      * parses the UCMM header consisting of: service, IOI size, IOI,
      * data into a request structure
      *
      * @param aCommand the serialized CPFD data item, i.e. CIP command
      * @return int - number of bytes consumed or -1 if error.
      */
-    int DeserializeMRR( BufReader aCommand );
+    int DeserializeMRReq( BufReader aCommand );
 
-    // Not used anywhere yet, inlined so that no code is generated.
-    int SerializeMRR( BufWriter aOutput )
-    {
-        BufWriter out = aOutput;
+    //-----<Serializeable>------------------------------------------------------
+    int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
+    int SerializedCount( int aCtl = 0) const;
+    //-----</Serializeable>-----------------------------------------------------
 
-        out.put8( service );
-        int rplen = request_path.SerializeAppPath( out+1 );
+protected:
 
-        if( rplen < 0 )
-            return rplen;
-
-        out.put8( rplen / 2 );     // word count = byte_count / 2
-
-        out += rplen;
-
-        out.append( data.data(), data.size() );
-
-        return out.data() - aOutput.data();
-    }
+    CIPServiceCode  service;
+    CipAppPath      path;
+    BufReader       data;
 };
 
 
-class CipCommonPacketFormatData;
+class Cpf;
 
 /**
  * Class CipMessageRouterResponse
  *
  */
-class CipMessageRouterResponse
+class CipMessageRouterResponse : public Serializeable
 {
 public:
-    CipMessageRouterResponse( CipCommonPacketFormatData* cpfd );
+    CipMessageRouterResponse( Cpf* aCpf );
 
     void Clear();
 
-    /// Return a BufReader holding the serialized CIP response.
-    BufReader Payload() const
+    Cpf* CPF() const                { return cpf; }
+    void SetCPF( Cpf* aCpf )        { cpf = aCpf; }
+
+    int DeserializeMRRes( BufReader aReply );
+
+    //-----<Serializeable>------------------------------------------------------
+    int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
+    int SerializedCount( int aCtl = 0 ) const;
+    //-----</Serializeable>-----------------------------------------------------
+
+
+    //-----<Status Values>------------------------------------------------------
+
+    CipMessageRouterResponse& SetService( CIPServiceCode aService )
     {
-        return BufReader( data.data(), data_length );
+        reply_service = aService;
+        return *this;
     }
 
-    CipCommonPacketFormatData* CPFD() const     { return cpfd; }
+    CIPServiceCode Service() const  { return reply_service; }
 
-    /// Serialize this CipMessageRouterResponse, return byte count consumed.
-    int SerializeMRResponse( BufWriter aOutput );
+    CipMessageRouterResponse& SetGenStatus( CipError aError )
+    {
+        general_status = aError;
+        return *this;
+    }
 
-    CipUsint reply_service;             ///< Reply service code, the requested service code + 0x80
-    CipOctet reserved;                  ///< Reserved; Shall be zero
-
-    CipError general_status;            ///< One of the General Status codes listed in CIP
-                                        ///< Specification Volume 1, Appendix B
-
-    CipUsint size_of_additional_status; ///< Number of additional 16 bit words in Additional Status Array
-
-    EipUint16 additional_status[2];     ///< Array of 16 bit words; Additional status;
-                                        ///< If SizeOfAdditionalStatus is 0. there is no
-                                        ///< Additional Status
-
-    BufWriter   data;                   ///< where to put CIP reply with data.size() limit
-    int         data_length;            ///< how many bytes actually filled at data.data().
+    CipError GenStatus() const      { return general_status; }
 
 
-private:
+    /// Append an additional status word to response
+    CipMessageRouterResponse& AddAdditionalSts( CipUint aStsWord )
+    {
+        if( size_of_additional_status < DIM( additional_status ) )
+        {
+            additional_status[ size_of_additional_status++ ] = aStsWord;
+        }
+        return *this;
+    }
 
-    CipCommonPacketFormatData*  cpfd;
+    int AdditionalStsCount() const  { return size_of_additional_status; }
 
-    // The common packet format makes it impossible to avoid copying the
-    // reply payload because there's no way to know length in advance.
-    // So the message router response is generated into a temporary location
+    //-----<Data buffer stuff >------------------------------------------------
+
+    /// Return a BufWriter which defines a buffer to be filled with the
+    /// serialized reply.
+    BufWriter  Writer() const               { return data; }
+
+    void WriterAdvance( int aCount )
+    {
+        BufWriter b( data );
+        b += aCount;        // advance using BufWriter which protects against overruns
+        data = ByteBuf( b.data(), b.capacity() );
+    }
+
+    void SetWriter( const BufWriter& w )    { data = ByteBuf( w.data(), w.capacity() ); }
+
+    void SetWrittenSize( int aSize )        { written_size = aSize; }
+    int WrittenSize() const                 { return written_size; }
+
+    void Show() const
+    {
+        CIPSTER_TRACE_INFO( "CipMessageRouterResponse:\n" );
+        CIPSTER_TRACE_INFO( " reply_service:0x%02x\n", reply_service );
+        CIPSTER_TRACE_INFO( " general_status:0x%02x\n", general_status );
+        //CIPSTER_TRACE_INFO( " size_of_additional_status:%d\n", size_of_additional_status );
+
+        for( int i=0; i<size_of_additional_status; ++i )
+        {
+            CIPSTER_TRACE_INFO( " additional_status[%d]:0x%x\n", i, additional_status[i] );
+        }
+
+        CIPSTER_TRACE_INFO( " msg len:%zd\n", Reader().size() );
+    }
+
+    /// Return a BufReader holding the Serialize()d CIP reply minus the status info.
+    BufReader   Reader() const                  { return BufReader( data.data(), written_size ); }
+
+protected:
+
+    CIPServiceCode  reply_service;              // Reply service code, the requested service code + 0x80
+
+    CipError        general_status;             // One of the General Status codes listed in CIP
+                                                // Specification Volume 1, Appendix B
+
+    CipInt          size_of_additional_status;  // Number of additional 16 bit words in additional_status[]
+    CipUint         additional_status[2];
+
+    ByteBuf         data;                       // data portion of the response
+    int             written_size;               // how many bytes actually filled at data.data().
+
+    Cpf*            cpf;
+
+    // The common packet format makes it difficult to avoid copying the
+    // reply data payload because SockAddrInfo can trails it and getting
+    // accurate length info early enough is tough.
+    // So for now the message router response is generated into a temporary location
     // and then copied to the final buffer for sending on the wire.  Since we
     // are single threaded, we can use a common temporary buffer for all
     // messages.  However, hide that strategy so it can be easily changed in
@@ -116,8 +191,8 @@ class CipMessageRouterClass : public CipClass
 public:
     CipMessageRouterClass();
 
-    CipError OpenConnection( CipConn* aConn,
-        CipCommonPacketFormatData* cpfd,
+    CipError OpenConnection( ConnectionData* aConn,
+        Cpf* cpfd,
         ConnectionManagerStatusCode* extended_error_code );    // override
 
     /**
@@ -155,7 +230,7 @@ void DeleteAllClasses();
  * In order that the message router can deliver
  * explicit messages each class has to register.
  * @param aClass CIP class to be registered
- * @return EIP_OK on success
+ * @return kEipStatusOk on success
  */
 EipStatus RegisterCipClass( CipClass* aClass );
 

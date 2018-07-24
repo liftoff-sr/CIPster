@@ -13,7 +13,7 @@
 
 /**
  * Class AssemblyInstance
- * is extended from CipInstance with an extra CipByteArray at the end.
+ * is extended from CipInstance with an extra kCipByteArray at the end.
  * That byte array has no ownership of the low level array, which for an
  * assembly is owned by the application program and passed into
  * CreateAssemblyInstance().
@@ -24,7 +24,7 @@ public:
     AssemblyInstance( int aInstanceId, BufWriter aBuf );
 
 //protected:
-    CipByteArray    byte_array;
+    ByteBuf     byte_array;
 };
 
 
@@ -47,7 +47,7 @@ EipStatus CipAssemblyInitialize();
  *  @param aInstance the assembly instance for which the data was received
  *  @param aInput the byte data received and its length
  *  @return
- *     - EIP_OK the received data was okay
+ *     - kEipStatusOk the received data was okay
  *     - EIP_ERROR the received data was wrong
  */
 EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* aInstance, BufReader aInput );

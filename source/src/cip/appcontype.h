@@ -11,20 +11,25 @@ void InitializeIoConnectionData();
 
 void DestroyIoConnectionData();
 
-/** @brief check if for the given connection data received in a forward_open request
- *  a suitable connection is available.
+/**
+ * Function GetIoConnectionForConnectionData
+ * checks if for the given connection data received in a forward_open request
+ * whether a suitable connection is available, because it was registered previously or
+ * opened previously.
  *
  *  If a suitable connection is found the connection data is transfered the
  *  application connection type is set (i.e., EConnType).
- *  @param cip_conn connection data to be used
- *  @param extended_error if an error occurred this value has the according
- *     error code for the response
- *  @return
+ *
+ *  @param aParams holds the connection data describing the needed connection
+ *  @param extended_error is where to put an error
+ *
+ *  @return CipConn* -
  *        - on success: A pointer to the connection object already containing the connection
- *          data given in pa_pstConnData.
+ *          data given in @a aParams.
  *        - on error: NULL
  */
-CipConn* GetIoConnectionForConnectionData( CipConn* cip_conn, ConnectionManagerStatusCode* extended_error );
+CipConn* GetIoConnectionForConnectionData( ConnectionData* aParams,
+        ConnectionManagerStatusCode* extended_error );
 
 /** @brief Check if there exists already an exclusive owner or listen only connection
  *         which produces the input assembly.

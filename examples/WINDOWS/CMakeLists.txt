@@ -76,7 +76,6 @@ set( PGM sample )     # name of program
 
 set( PGM_SRCS
     main.cc
-    networkhandler.cc
     sample_application/sampleapplication.cc
     )
 

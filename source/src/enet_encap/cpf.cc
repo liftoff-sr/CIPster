@@ -3,7 +3,7 @@
  * Copyright (C) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
-#include <string.h>
+//#include <string.h>
 
 #include "cpf.h"
 
@@ -16,53 +16,45 @@
 #include "trace.h"
 
 
-SocketAddressInfoItem::SocketAddressInfoItem( CipItemId aType, CipUdint aIP, int aPort ) :
+SockAddrInfoItem::SockAddrInfoItem( CpfId aType, CipUdint aIP, int aPort ) :
     type_id( aType ),
     length( 16 ),
     sin_family( AF_INET ),
     sin_port( aPort ),
-    sin_addr( aIP )
+    sin_addr( aIP ),
+    nasin_zero()
 {
-    memset( nasin_zero, 0, sizeof nasin_zero );
 }
 
 
-CipCommonPacketFormatData::CipCommonPacketFormatData( int aSocket ) :
-    socket( aSocket )
-{
-    Clear();
-}
-
-
-int CipCommonPacketFormatData::NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply )
+int Cpf::NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply )
 {
     CipMessageRouterResponse    response( this );
 
-    int result = DeserializeCPFD( aCommand );
+    int result = DeserializeCpf( aCommand );
 
     if( result <= 0 )
         return -kEncapsulationProtocolIncorrectData;
 
-    // Check if NullAddressItem received, otherwise it is no unconnected
+    // Check if NullAddressItem received, otherwise it is not an unconnected
     // message and should not be here
-    if( AddressItemType() == kCipItemIdNullAddress )
+    if( AddrType() == kCpfIdNullAddress )
     {
-        if( DataItemType() == kCipItemIdUnconnectedDataItem )
+        if( DataType() == kCpfIdUnconnectedDataItem )
         {
-            // unconnected data item received
             result = CipMessageRouterClass::NotifyMR( DataItemPayload(), &response );
 
             if( result < 0 )
                 return -kEncapsulationProtocolIncorrectData;
 
-            result = SerializeCPFD( &response, aReply );
+            SetPayload( &response );
+            result = Serialize( aReply );
         }
         else
         {
-            // wrong data item detected
             CIPSTER_TRACE_ERR(
-                "%s: got something besides the expected CIP_ITEM_ID_UNCONNECTEDMESSAGE\n",
-                __func__
+                "%s: got DataItemType():%d and not the expected kCpfIdUnconnectedDataItem\n",
+                __func__, DataType()
                 );
             return -kEncapsulationProtocolIncorrectData;
         }
@@ -70,8 +62,8 @@ int CipCommonPacketFormatData::NotifyCommonPacketFormat( BufReader aCommand, Buf
     else
     {
         CIPSTER_TRACE_ERR(
-            "%s: got something besides the expected CIP_ITEM_ID_NULL\n",
-            __func__
+            "%s: got AddressItemType():%d and not the expected kCpfIdNullAddress\n",
+            __func__, AddrType()
             );
         return -kEncapsulationProtocolIncorrectData;
     }
@@ -80,16 +72,16 @@ int CipCommonPacketFormatData::NotifyCommonPacketFormat( BufReader aCommand, Buf
 }
 
 
-int CipCommonPacketFormatData::NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply )
+int Cpf::NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply )
 {
-    int result = DeserializeCPFD( aCommand );
+    int result = DeserializeCpf( aCommand );
 
     if( result <= 0 )
         return -kEncapsulationProtocolIncorrectData;
 
     // Check if ConnectedAddressItem received, otherwise it is no connected
     // message and should not be here
-    if( AddressItemType() != kCipItemIdConnectionAddress )
+    if( AddrType() != kCpfIdConnectedAddress )
     {
         CIPSTER_TRACE_ERR(
                 "notifyConnectedCPF: got something besides the expected CIP_ITEM_ID_NULL\n" );
@@ -97,54 +89,56 @@ int CipCommonPacketFormatData::NotifyConnectedCommonPacketFormat( BufReader aCom
     }
 
     // ConnectedAddressItem item
-    CipConn* conn = GetConnectionByConsumingId( address_item.data.connection_identifier );
+    CipConn* conn = GetConnectionByConsumingId( address_item.connection_identifier );
 
     if( conn )
     {
         // reset the watchdog timer
-        conn->inactivity_watchdog_timer_usecs =
-            conn->o_to_t_RPI_usecs << ( 2 + conn->connection_timeout_multiplier );
+        conn->inactivity_watchdog_timer_usecs = conn->TimeoutMSecs_o_to_t();
 
         // TODO check connection id  and sequence count
-        if( DataItemType() == kCipItemIdConnectedDataItem )
+        if( DataType() == kCpfIdConnectedDataItem )
         {
             // connected data item received
 
             BufReader command( data_item.data, data_item.length );
 
-            address_item.data.sequence_number = command.get16();
+            address_item.encap_sequence_number = command.get16();
 
             CipMessageRouterResponse response( this );
 
-            // command is advanced by 2 here
-            EipStatus s = CipMessageRouterClass::NotifyMR( command, &response );
+            // command is advanced by 2 here because of the get16() above
+            result = CipMessageRouterClass::NotifyMR( command, &response );
 
-            if( s != kEipStatusError )
-            {
-            }
+            if( result < 0 )
+                return -kEncapsulationProtocolIncorrectData;
 
-            address_item.data.connection_identifier = conn->producing_connection_id;
+            address_item.connection_identifier = conn->producing_connection_id;
 
-            result = SerializeCPFD( &response, aReply );
+            SetPayload( &response );
+            result = Serialize( aReply );
         }
         else
         {
             // wrong data item detected
             CIPSTER_TRACE_ERR(
-                    "notifyConnectedCPF: got something besides the expected CIP_ITEM_ID_UNCONNECTEDMESSAGE\n" );
+                    "%s: got DataItemType()=%d instead of expected kCpfIdConnectedDataItem\n",
+                    __func__, DataType() );
         }
     }
     else
     {
         CIPSTER_TRACE_ERR(
-                "notifyConnectedCPF: connection with given ID could not be found\n" );
+                "%s: connection with given ID:%d could not be found\n",
+                __func__,
+                address_item.connection_identifier );
     }
 
     return result;
 }
 
 
-int CipCommonPacketFormatData::DeserializeCPFD( BufReader aSrc )
+int Cpf::DeserializeCpf( BufReader aSrc )
 {
     BufReader in = aSrc;
 
@@ -154,36 +148,35 @@ int CipCommonPacketFormatData::DeserializeCPFD( BufReader aSrc )
 
     for( int item=0; item < received_item_count;  ++item )
     {
-        CipItemId type_id = (CipItemId) in.get16();
-        int length = in.get16();
+        CpfId   type_id = (CpfId) in.get16();
+        int     length  = in.get16();
 
         switch( type_id )
         {
-        //case kCipItemIdListIdentityResponse
-        //case kCipItemIdListServiceResponse:
-        case kCipItemIdNullAddress:
-        case kCipItemIdConnectionAddress:
-        case kCipItemIdSequencedAddressItem:
+        //case kCpfIdListIdentityResponse
+        //case kCpfIdListServiceResponse:
+        case kCpfIdNullAddress:
+        case kCpfIdConnectedAddress:
+        case kCpfIdSequencedAddress:
             address_item.type_id = type_id;
             address_item.length  = length;
             if( length >= 4 )
-                address_item.data.connection_identifier = in.get32();
+                address_item.connection_identifier = in.get32();
             if( length == 8 )
-                address_item.data.sequence_number = in.get32();
+                address_item.encap_sequence_number = in.get32();
             break;
 
-        case kCipItemIdConnectedDataItem:
-        case kCipItemIdUnconnectedDataItem:
-            data_item.type_id = type_id;
-            data_item.length  = length;
-            data_item.data = in.data();
+        case kCpfIdConnectedDataItem:
+        case kCpfIdUnconnectedDataItem:
+            SetDataType( type_id );
+            SetDataRange( ByteBuf( (CipByte*) in.data(), length ) );
             in += length;               // might throw exception
             break;
 
-        case kCipItemIdSocketAddressInfoOriginatorToTarget:
-        case kCipItemIdSocketAddressInfoTargetToOriginator:
+        case kCpfIdSockAddrInfo_O_to_T:
+        case kCpfIdSockAddrInfo_T_to_O:
             {
-                SocketAddressInfoItem saii;
+                SockAddrInfoItem saii;
 
                 saii.type_id    = type_id;
                 saii.length     = length;
@@ -209,6 +202,7 @@ int CipCommonPacketFormatData::DeserializeCPFD( BufReader aSrc )
             goto error;
         }
     }
+
     item_count = received_item_count;
 
     return in.data() - aSrc.data();
@@ -219,121 +213,155 @@ error:
 }
 
 
-static void encodeConnectedDataItemLength( CipMessageRouterResponse* response, BufWriter& out )
+int Cpf::SerializedCount( int aCtl ) const
 {
-    out.put16( response->data_length + 4 + 2 + (2 * response->size_of_additional_status) );
+    int count = 2;      // item_count fills 2 bytes
+
+    switch( address_item.type_id )
+    {
+    case kCpfIdNullAddress:
+        count += 4;
+        break;
+
+    case kCpfIdConnectedAddress:
+        count += 8;
+        break;
+
+    case kCpfIdSequencedAddress:
+        count += 12;
+        break;
+
+    default:
+        ;   // maybe no address?
+    }
+
+    // process Data Item
+    if( data_item.type_id == kCpfIdUnconnectedDataItem ||
+        data_item.type_id == kCpfIdConnectedDataItem )
+    {
+        count += 4;     // size of data_item.type_id + data_item.length
+
+        if( payload )
+        {
+            if( data_item.type_id == kCpfIdConnectedDataItem ) // Connected Item
+            {
+                // +2 for the sequence number
+                count += payload->SerializedCount() + 2;
+            }
+            else // Unconnected Item
+            {
+                count += payload->SerializedCount();
+            }
+        }
+        else // connected IO Message to send
+        {
+            count += 4 + data_item.length;
+        }
+    }
+
+    for( int type = kCpfIdSockAddrInfo_O_to_T;
+         type <= kCpfIdSockAddrInfo_T_to_O;  ++type )
+    {
+        const SockAddrInfoItem* saii = SearchTx( CpfId(type) );
+
+        if( saii )
+        {
+            count += 20;
+        }
+    }
+
+    return count;
 }
 
 
-static void encodeUnconnectedDataItemLength( CipMessageRouterResponse* response, BufWriter& out )
-{
-    // Unconnected Item
-    out.put16( response->data_length + 4 + (2 * response->size_of_additional_status) );
-}
-
-
-int CipCommonPacketFormatData::SerializeCPFD( CipMessageRouterResponse* aResponse, BufWriter aDst )
+int Cpf::Serialize( BufWriter aDst, int aCtl ) const
 {
     BufWriter   out = aDst;
 
-    try {
+    out.put16( item_count + TxSockAddrInfoItemCount() - RxSockAddrInfoItemCount() );
 
-        if( aResponse )
-        {
-            // add Interface Handle and Timeout = 0 -> only for SendRRData and SendUnitData
-            out.put32( 0 );
-            out.put16( 0 );
-        }
-
-        out.put16( item_count + TxSocketAddressInfoItemCount() - RxSocketAddressInfoItemCount() );
-
-        // process Address Item
-        switch( address_item.type_id )
-        {
-        case kCipItemIdNullAddress:
-            out.put16( kCipItemIdNullAddress );
-            out.put16( 0 );
-            break;
-
-        case kCipItemIdConnectionAddress:
-            // connected data item -> address length set to 4 and copy ConnectionIdentifier
-            out.put16( kCipItemIdConnectionAddress );
-            out.put16( 4 );
-            out.put32( address_item.data.connection_identifier );
-            break;
-
-        case kCipItemIdSequencedAddressItem:
-            // sequenced address item -> address length set to 8 and copy ConnectionIdentifier and SequenceNumber
-            out.put16( kCipItemIdSequencedAddressItem );
-            out.put16( 8 );
-            out.put32( address_item.data.connection_identifier );
-            out.put32( address_item.data.sequence_number );
-            break;
-
-        default:
-            ;   // TODO
-        }
-
-        // process Data Item
-        if( data_item.type_id == kCipItemIdUnconnectedDataItem ||
-            data_item.type_id == kCipItemIdConnectedDataItem )
-        {
-            if( aResponse )
-            {
-                out.put16( data_item.type_id );
-
-                if( data_item.type_id == kCipItemIdConnectedDataItem ) // Connected Item
-                {
-                    encodeConnectedDataItemLength( aResponse, out );
-
-                    // sequence number
-                    out.put16( address_item.data.sequence_number );
-                }
-                else // Unconnected Item
-                {
-                    encodeUnconnectedDataItemLength( aResponse, out );
-                }
-
-                // serialize message router response
-                out += aResponse->SerializeMRResponse( out );
-
-                out.append( aResponse->data.data(), aResponse->data_length );
-            }
-            else // connected IO Message to send
-            {
-                out.put16( data_item.type_id );
-                out.put16( data_item.length );
-                out.append( data_item.data, data_item.length );
-            }
-        }
-
-        /*
-            Process SockAddr Info Items. Make sure first the O->T and then T->O
-            appears on the wire. EtherNet/IP specification doesn't demand it, but
-            there are EIP devices which depend on CPF items to appear in the order
-            of their ID number
-        */
-        for( int type = kCipItemIdSocketAddressInfoOriginatorToTarget;
-             type <= kCipItemIdSocketAddressInfoTargetToOriginator;  ++type )
-        {
-            SocketAddressInfoItem* saii = SearchTx( CipItemId(type) );
-
-            if( saii )
-            {
-                out.put16( saii->type_id );
-                out.put16( saii->length );
-                out.put16BE( saii->sin_family );
-                out.put16BE( saii->sin_port );
-                out.put32BE( saii->sin_addr );
-                out.append( saii->nasin_zero, 8 );
-            }
-        }
-
-        return out.data() - aDst.data();
-    }
-    catch( const std::overflow_error& e )
+    // process Address Item
+    switch( address_item.type_id )
     {
-        return -1;      // buffer overrun indication to caller
+    case kCpfIdNullAddress:
+        out.put16( address_item.type_id ).put16( 0 );
+        break;
+
+    case kCpfIdConnectedAddress:
+        // connected data item -> address length set to 4 and copy
+        // ConnectionIdentifier
+        out.put16( address_item.type_id ).put16( 4 )
+
+        .put32( address_item.connection_identifier );
+        break;
+
+    case kCpfIdSequencedAddress:
+        // sequenced address item -> address length set to 8 and copy
+        // ConnectionIdentifier and SequenceNumber
+        out.put16( address_item.type_id ).put16( 8 )
+
+        .put32( address_item.connection_identifier )
+        .put32( address_item.encap_sequence_number );
+        break;
+
+    default:
+        ;   // maybe no address?
     }
+
+    // process Data Item
+    if( data_item.type_id == kCpfIdUnconnectedDataItem ||
+        data_item.type_id == kCpfIdConnectedDataItem )
+    {
+        if( payload )
+        {
+            out.put16( data_item.type_id );
+
+            if( data_item.type_id == kCpfIdConnectedDataItem ) // Connected Item
+            {
+                // +2 for the sequence number, supplied just below here.
+                out.put16( payload->SerializedCount() + 2 );
+
+                // sequence number
+                out.put16( address_item.encap_sequence_number );
+            }
+            else // Unconnected Item
+            {
+                out.put16( payload->SerializedCount() );
+            }
+
+            // serialize payload, either message router response or reply
+            out += payload->Serialize( out );
+        }
+        else // connected IO Message to send
+        {
+            out.put16( data_item.type_id ).put16( data_item.length )
+
+            .append( data_item.data, data_item.length );
+        }
+    }
+
+    /*
+        Process SockAddr Info Items. Make sure first the O->T and then T->O
+        appears on the wire. EtherNet/IP specification doesn't demand it, but
+        there are EIP devices which depend on CPF items to appear in the order
+        of their ID number
+    */
+    for( int type = kCpfIdSockAddrInfo_O_to_T;
+         type <= kCpfIdSockAddrInfo_T_to_O;  ++type )
+    {
+        const SockAddrInfoItem* saii = SearchTx( CpfId(type) );
+
+        if( saii )
+        {
+            out.put16( saii->type_id ).put16( saii->length )
+
+            .put16BE( saii->sin_family )
+            .put16BE( saii->sin_port )
+            .put32BE( saii->sin_addr )
+            .append( saii->nasin_zero, 8 );
+        }
+    }
+
+    return out.data() - aDst.data();
 }
 

@@ -77,7 +77,7 @@ EipStatus ApplicationInitialization()
 
 void HandleApplication()
 {
-    // check if application needs to trigger an connection
+    // check if application needs to trigger a connection
 }
 
 

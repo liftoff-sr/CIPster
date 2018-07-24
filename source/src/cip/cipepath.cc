@@ -5,7 +5,6 @@
  ******************************************************************************/
 
 #include <string.h>
-#include <stdarg.h>
 
 #include <cipster_api.h>
 #include <cipepath.h>
@@ -128,8 +127,10 @@ CipAttribute* CipAppPath::Attribute( int aAttrId ) const
 
 
 // make static so compiler has option of inlining this
-static void serialize( BufWriter& out, int seg_type, unsigned aValue )
+static int serialize( BufWriter& out, int seg_type, unsigned aValue )
 {
+    EipByte* start = out.data();
+
     if( aValue < 256 )
     {
         out.put8( seg_type );
@@ -145,10 +146,12 @@ static void serialize( BufWriter& out, int seg_type, unsigned aValue )
         out.put8( seg_type | 2 );
         out.put32( aValue );
     }
+
+    return out.data() - start;
 }
 
 
-int CipAppPath::SerializeAppPath( BufWriter aOutput )
+int CipAppPath::Serialize( BufWriter aOutput, int aCtl ) const
 {
     BufWriter out = aOutput;
 
@@ -199,6 +202,17 @@ int CipAppPath::SerializeAppPath( BufWriter aOutput )
     }
 
     return out.data() - aOutput.data();
+}
+
+
+int CipAppPath::SerializedCount( int aCtl ) const
+{
+    EipByte stack_buf[200];
+
+    // For this class, its not that much runtime overhead to simply serialize
+    // and then measure the consumption.  This strategy uses small code space.
+
+    return Serialize( BufWriter( stack_buf, sizeof stack_buf ), aCtl );
 }
 
 
@@ -408,50 +422,7 @@ logical_exit:
 }
 
 
-static int vprint( std::string* result, const char* format, va_list ap )
-{
-    char    msg[512];
-    size_t  len = vsnprintf( msg, sizeof(msg), format, ap );
-
-    if( len < sizeof(msg) )     // the output fit into msg
-    {
-        result->append( msg, msg + len );
-        return len;
-    }
-    else
-        return 0;       // increase size of msg[], or shorten prints
-}
-
-
-static int StrPrintf( std::string* result, const char* format, ... )
-{
-    va_list     args;
-
-    va_start( args, format );
-    int ret = vprint( result, format, args );
-    va_end( args );
-
-    return ret;
-}
-
-
-/* not needed yet
-static std::string StrPrintf( const char* aFormat, ... )
-{
-    std::string ret;
-    va_list     args;
-
-    va_start( args, aFormat );
-    int ignore = vprint( &ret, aFormat, args );
-    (void) ignore;
-    va_end( args );
-
-    return ret;
-}
-*/
-
-
-const std::string CipAppPath::Format() const
+std::string CipAppPath::Format() const
 {
     std::string dest;
 
@@ -530,24 +501,24 @@ void CipAppPath::inherit_assembly( int aStart, CipAppPath* aPreviousToInheritFro
 
 // Only called from a context which is certain of segment type, so eating first
 // is handled a bit differently, advancing 'in' with read is ok.
-static int parsePortSegment( BufReader aInput, CipPortSegment* aSegment )
+int CipPortSegment::DeserializePortSegment( BufReader aInput )
 {
     BufReader   in = aInput;
     int         first = in.get8();
 
-    // p points to 2nd byte here.
-    int link_addrz = (first & 0x10) ? in.get8() : 0;
+    // in points to 2nd byte here.
+    int link_addrz = (first & 0x10) ? in.get8() : 1;
 
     if( (first & 0xf) == 15 )
-        aSegment->port = in.get16();
+        port = in.get16();
     else
-        aSegment->port = first & 0xf;
+        port = first & 0xf;
 
-    aSegment->link_address.clear();
+    link_address.clear();
 
     while( link_addrz-- )
     {
-        aSegment->link_address.push_back( in.get8() );
+        link_address.push_back( in.get8() );
     }
 
     // skip a byte if not an even number of them have been consumed.
@@ -555,6 +526,67 @@ static int parsePortSegment( BufReader aInput, CipPortSegment* aSegment )
         ++in;
 
     return in.data() - aInput.data();
+}
+
+
+int CipPortSegment::Serialize( BufWriter aOutput, int aCtl ) const
+{
+    BufWriter out = aOutput;
+
+    if( link_address.size() > 255 )
+    {
+        throw std::overflow_error(
+            "CipPortSegment::Serialize() cannot encode a link_address with length > 255" );
+    }
+
+    if( link_address.size() == 1 )
+    {
+        if( port <= 15 )
+        {
+            out.put8( port );
+        }
+        else
+        {
+            out.put8( 0x0f );
+            out.put16( port );
+        }
+    }
+    else    // link_address.size() == 0 or > 1
+    {
+        if( port <= 15 )
+        {
+            out.put8( 0x10 | port );
+            out.put8( link_address.size() );
+        }
+        else
+        {
+            out.put8( 0x1f );
+            out.put8( link_address.size() );
+            out.put16( port );
+        }
+    }
+
+    for( unsigned i = 0; i < link_address.size();  ++i )
+        out.put8( link_address[i] );
+
+    // output a pad if odd number so far
+    int byte_count = out.data() - aOutput.data();
+
+    if( byte_count & 1 )
+    {
+        out.put8( 0 );
+        ++byte_count;
+    }
+
+    return byte_count;
+}
+
+
+int CipPortSegment::SerializedCount( int aCtl ) const
+{
+    EipByte stack_buf[256];
+
+    return Serialize( BufWriter( stack_buf, sizeof stack_buf ), aCtl );
 }
 
 
@@ -586,6 +618,28 @@ int CipElectronicKeySegment::DeserializeElectronicKey( BufReader aInput )
     }
 
     return in.data() - aInput.data();
+}
+
+
+int CipElectronicKeySegment::Serialize( BufWriter aOutput, int aCtl ) const
+{
+    BufWriter out = aOutput;
+
+    out.put8( 0x34 )
+    .put8( 4 )
+    .put16( vendor_id )
+    .put16( device_type )
+    .put16( product_code )
+    .put8( major_revision )
+    .put8( minor_revision );
+
+    return out.data() - aOutput.data();
+}
+
+
+int CipElectronicKeySegment::SerializedCount( int aCtl ) const
+{
+    return 10;
 }
 
 
@@ -651,7 +705,7 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
 
         if( (first & 0xe0) == kSegmentTypePort )
         {
-            in += parsePortSegment( in, &port );
+            in += port.DeserializePortSegment( in );
             pbits |= (1<<PORT);
         }
         else
@@ -668,12 +722,14 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
                 pbits |= (1<<KEY);
                 break;
 
+            // Vol1 C-1.4.3.3 Network Segment
             case 0x43:      // PIT msecs
                 ++in;
                 value = in.get8();
                 SetPIT_MSecs( value );  // convert to usecs
                 break;
 
+            // Vol1 C-1.4.3.3 Network Segment
             case 0x51:      // PIT usecs
                 ++in;
 
@@ -707,6 +763,69 @@ exit:
 }
 
 
+int CipPortSegmentGroup::Serialize( BufWriter aOutput, int aCtl ) const
+{
+    BufWriter out = aOutput;
+
+    if( HasKey() )
+    {
+        out += key.Serialize( out, aCtl );
+    }
+
+    // output the network segments first (before the port segment which is last),
+    // which are PIT_USECS and/or PIT_MSECS
+
+    // Vol1 C-1.4.3.3 Network Segment
+    if( HasPIT_USecs() )
+    {
+        out.put8( 0x51 );
+        out.put8( 2 );
+        out.put32( GetPIT_USecs() );
+    }
+
+    // Vol1 C-1.4.3.3 Network Segment
+    if( HasPIT_MSecs() )
+    {
+        unsigned msecs = GetPIT_MSecs();
+
+        if( msecs > 255 )
+            throw std::overflow_error(
+                "CipPortSegmentGroup::Serialize() cannot encode PIT msecs > 255" );
+
+        out.put8( 0x43 );
+        out.put8( msecs );
+    }
+
+    if( HasPortSeg() )
+    {
+        out += port.Serialize( out, aCtl );
+    }
+
+    return out.data() - aOutput.data();
+}
+
+
+int CipPortSegmentGroup::SerializedCount( int aCtl ) const
+{
+    int count = 0;
+
+    if( HasKey() )
+        count += key.SerializedCount( aCtl );
+
+    if( HasPIT_USecs() )
+        count += 6;
+
+    if( HasPIT_MSecs() )
+        count += 2;
+
+    if( HasPortSeg() )
+        count += port.SerializedCount( aCtl );
+
+    return count;
+}
+
+
+// Vol1 C-1.4.5.1
 int CipSimpleDataSegment::DeserializeDataSegment( BufReader aInput )
 {
     BufReader in = aInput;
@@ -733,3 +852,29 @@ int CipSimpleDataSegment::DeserializeDataSegment( BufReader aInput )
     return in.data() - aInput.data();
 }
 
+
+// Vol1 C-1.4.5.1
+int CipSimpleDataSegment::Serialize( BufWriter aOutput, int aCtl ) const
+{
+    BufWriter out = aOutput;
+
+    if( words.size() > 255 )
+    {
+        throw std::overflow_error( StrPrintf(
+                "CipSimpleDataSegment::Serialize() got %u words; too big to encode",
+                (unsigned) words.size() )
+                );
+    }
+
+    out.put8( kDataSegmentTypeSimpleDataMessage );
+    out.put8( words.size() );
+    for( unsigned i = 0; i < words.size();  ++i )
+        out.put16( words[i] );
+
+    return out.data() - aOutput.data();
+}
+
+int CipSimpleDataSegment::SerializedCount( int aCtl ) const
+{
+    return 1 + 1 + 2 * words.size();
+}

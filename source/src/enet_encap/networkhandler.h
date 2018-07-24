@@ -1,18 +1,18 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * All rights reserved.
+ * Copyright (c) 2016-2018, SoftPLC Corportion.
  *
  ******************************************************************************/
-#ifndef CIPSTER_NETWORKHANDLER_H_
-#define CIPSTER_NETWORKHANDLER_H_
+
+#ifndef NETWORKHANDLER_H_
+#define NETWORKHANDLER_H_
 
 
 #include "typedefs.h"
 
-/** @brief Start a TCP/UDP listening socket, accept connections, receive data
-*    in select loop, call manageConnections periodically.
- *  @return status
- *          EIP_ERROR .. error
+/**
+ * Function NetworkHandlerInitialize
+ * starts a TCP/UDP listening socket to accept connections.
  */
 EipStatus NetworkHandlerInitialize();
 
@@ -20,4 +20,5 @@ EipStatus NetworkHandlerProcessOnce();
 
 EipStatus NetworkHandlerFinish();
 
-#endif // CIPSTER_NETWORKHANDLER_H_
+
+#endif  // NETWORKHANDLER_H_

@@ -90,7 +90,8 @@ protected:
     /// #5 IP, network mask, gateway, name server 1 & 2, domain name
     CipTcpIpInterfaceConfiguration interface_configuration;
 
-    std::string hostname;       //*< #6 Hostname
+    /// #6 Hostname, static so its shared betweeen instances of this class.
+    static std::string hostname;
 
     /**
     * #8 the time to live value to be used for multi-cast connections
@@ -182,6 +183,9 @@ public:
 
     static EipByte TTL( int aInstanceId );
 
+    static CipUdint IpAddress( int aInstanceId );
+
+
     /** @ingroup CIP_API
      * @brief Configure the data of the network interface of the device
      *
@@ -193,7 +197,7 @@ public:
      *  @param ip_address    the current IP address of the device
      *  @param subnet_mask  the subnet mask to be used
      *  @param gateway_address     the gateway address
-     *  @return EIP_OK if the configuring worked otherwise EIP_ERROR
+     *  @return kEipStatusOk if the configuring worked otherwise EIP_ERROR
      */
     static EipStatus ConfigureNetworkInterface( int aInstanceId, const char* ip_address,
             const char* subnet_mask, const char* gateway_address );
@@ -202,13 +206,13 @@ public:
      * @brief Configure the domain name of the device
      * @param domain_name the domain name to be used
      */
-    static void ConfigureDomainName( int aInstanceId, const char* domain_name );
+    static void ConfigureDomainName( int aInstanceId, const char* aDomainName );
 
     /** @ingroup CIP_API
      * @brief Configure the host name of the device
-     * @param host_name the host name to be used
+     * @param aHostName the host name to be used
      */
-    static void ConfigureHostName( int aInstanceId, const char* host_name );
+    static void ConfigureHostName( int aInstanceId, const char* aHostName );
 };
 
 #endif    // CIPTCPIPINTERFACE_H_

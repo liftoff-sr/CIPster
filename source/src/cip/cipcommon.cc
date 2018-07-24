@@ -35,7 +35,7 @@ void CipStackInit( EipUint16 unique_connection_id )
 {
     EipStatus eip_status;
 
-    EncapsulationInit();
+    Encapsulation::Init();
 
     // The message router is the first CIP object be initialized!!!
     eip_status = CipMessageRouterClass::Init();
@@ -47,7 +47,7 @@ void CipStackInit( EipUint16 unique_connection_id )
     eip_status = CipTCPIPInterfaceClass::Init();
     CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
-    eip_status = CipEthernetLinkInit();
+    eip_status = CipEthernetLinkClass::Init();
     CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
     eip_status = ConnectionManagerInit();
@@ -75,7 +75,7 @@ void ShutdownCipStack()
     CloseAllConnections();
 
     // Than free the sockets of currently active encapsulation sessions
-    EncapsulationShutDown();
+    Encapsulation::ShutDown();
 
     CipTCPIPInterfaceClass::Shutdown();
 
@@ -86,13 +86,11 @@ void ShutdownCipStack()
 }
 
 
-
-int EncodeData( int aDataType, const void* input, BufWriter& aBuf )
+int EncodeData( CipDataType aDataType, const void* input, BufWriter& aBuf )
 {
-    EipByte*            start = aBuf.data();
+    EipByte*    start = aBuf.data();
 
     switch( aDataType )
-    // check the data type of attribute
     {
     case kCipBool:
     case kCipSint:
@@ -162,22 +160,23 @@ int EncodeData( int aDataType, const void* input, BufWriter& aBuf )
         break;
 
     case kCip6Usint:
-        {
-            aBuf.append( (const EipByte*) input, 6 );
-        }
+        aBuf.append( (const EipByte*) input, 6 );
         break;
 
     case kCipMemberList:
         break;
 
+    // The CipByteArray is implemented using a ByteBuf instance.
     case kCipByteArray:
         {
-            CIPSTER_TRACE_INFO( "%s: CipByteArray\n", __func__ );
-            CipByteArray* cip_byte_array = (CipByteArray*) input;
+            BufReader rdr = *(ByteBuf*) input;
 
-            // the array length is not encoded for CipByteArray.
-            aBuf.append( cip_byte_array->data, cip_byte_array->length );
+            aBuf.append( rdr );
         }
+        break;
+
+    case kCipByteArrayLength:
+        aBuf.put16( ((ByteBuf*) input)->size() );
         break;
 
     default:
@@ -190,11 +189,10 @@ int EncodeData( int aDataType, const void* input, BufWriter& aBuf )
 }
 
 
-int DecodeData( int aDataType, void* data, BufReader& aBuf )
+int DecodeData( CipDataType aDataType, void* data, BufReader& aBuf )
 {
     const EipByte* start = aBuf.data();
 
-    // check the data type of attribute
     switch( aDataType )
     {
     case kCipBool:
@@ -222,17 +220,21 @@ int DecodeData( int aDataType, void* data, BufReader& aBuf )
         *(EipUint64*) data = aBuf.get64();
         break;
 
+    // The CipByteArray is implemented using a ByteBuf instance.
     case kCipByteArray:
-        // this code has no notion of buffer overrun protection or memory ownership, be careful.
         {
-            CIPSTER_TRACE_INFO( "%s: kCipByteArray\n", __func__ );
+            BufWriter w = *(ByteBuf*) data;
 
-            // The CipByteArray's length must be set by caller, i.e. known
-            // in advance and set in advance by caller.  And the data field
-            // must point to a buffer large enough for this.
-            CipByteArray* byte_array = (CipByteArray*) data;
-            memcpy( byte_array->data, aBuf.data(), byte_array->length );
-            aBuf += byte_array->length;   // no length field
+            w.append( aBuf );
+            aBuf += ((ByteBuf*)data)->size();
+        }
+        break;
+
+    case kCipByteArrayLength:
+        {
+            ByteBuf* bb = (ByteBuf*) data;
+
+            *bb = ByteBuf( bb->data(), aBuf.get16() );
         }
         break;
 

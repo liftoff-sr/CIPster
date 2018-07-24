@@ -100,14 +100,31 @@ std::string BufReader::get_STRING2()
     std::string ret;
     unsigned    len = get16();
 
+    /* get16() below will protect instead of this
     if( len * 2 > size() )
         overrun();
+    */
 
     // todo, this needs to be encoded into UTF8 instead of this MSbyte truncation.
     for( unsigned i = 0; i < len; ++i )
         ret += (char) get16();
 
     return ret;
+}
+
+
+//-----<ByteSerializer>---------------------------------------------------------
+
+int ByteSerializer::Serialize( BufWriter aOutput, int aCtl ) const
+{
+    aOutput.append( BufReader(*this) );
+    return size();
+}
+
+
+int ByteSerializer::SerializedCount( int aCtl ) const
+{
+    return size();
 }
 
 

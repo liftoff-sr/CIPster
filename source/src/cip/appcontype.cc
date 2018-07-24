@@ -27,7 +27,7 @@ public:
         config_assembly( aConfigAssembly )
     {}
 
-    static CipConn* GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error );
+    static CipConn* GetConnection( ConnectionData* aConn, ConnectionManagerStatusCode* extended_error );
 
     static bool AddExpectation( int output_assembly, int input_assembly, int config_assembly )
     {
@@ -68,9 +68,9 @@ public:
     {
         for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
         {
-            if( kConnectionStateNonExistent == connection[j].state )
+            if( kConnectionStateNonExistent == connection[j].State() )
             {
-                connection[j].state = kConnectionStateConfiguring;
+                connection[j].SetState( kConnectionStateConfiguring );
                 return &connection[j];
             }
         }
@@ -90,7 +90,7 @@ public:
         return false;
     }
 
-    static CipConn* GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error );
+    static CipConn* GetConnection( ConnectionData* aConn, ConnectionManagerStatusCode* extended_error );
 
     static void Clear()     { s_input_only.clear(); }
 
@@ -126,9 +126,9 @@ public:
     {
         for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
         {
-            if( kConnectionStateNonExistent == connection[j].state )
+            if( kConnectionStateNonExistent == connection[j].State() )
             {
-                connection[j].state = kConnectionStateConfiguring;
+                connection[j].SetState( kConnectionStateConfiguring );
                 return &connection[j];
             }
         }
@@ -149,7 +149,7 @@ public:
 
     static void Clear()     { s_listen_only.clear(); }
 
-    static CipConn* GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error );
+    static CipConn* GetConnection( ConnectionData* aConn, ConnectionManagerStatusCode* extended_error );
 
     typedef std::vector<ListenOnlyConnSet>::iterator  iterator;
 
@@ -168,7 +168,7 @@ std::vector<InputOnlyConnSet>       InputOnlyConnSet::s_input_only;
 std::vector<ListenOnlyConnSet>      ListenOnlyConnSet::s_listen_only;
 
 
-CipConn* ExclusiveOwner::GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipConn* ExclusiveOwner::GetConnection( ConnectionData* aConn, ConnectionManagerStatusCode* extended_error )
 {
     for( ExclusiveOwner::iterator it = s_exclusive_owner.begin();  it != s_exclusive_owner.end();  ++it )
     {
@@ -193,7 +193,7 @@ CipConn* ExclusiveOwner::GetConnection( CipConn* aConn, ConnectionManagerStatusC
 }
 
 
-CipConn* InputOnlyConnSet::GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipConn* InputOnlyConnSet::GetConnection( ConnectionData* aConn, ConnectionManagerStatusCode* extended_error )
 {
     for( InputOnlyConnSet::iterator it = s_input_only.begin();  it != s_input_only.end();  ++it )
     {
@@ -226,14 +226,13 @@ CipConn* InputOnlyConnSet::GetConnection( CipConn* aConn, ConnectionManagerStatu
 }
 
 
-CipConn* ListenOnlyConnSet::GetConnection( CipConn* aConn, ConnectionManagerStatusCode* extended_error )
+CipConn* ListenOnlyConnSet::GetConnection( ConnectionData* aConn, ConnectionManagerStatusCode* extended_error )
 {
     if( aConn->t_to_o_ncp.ConnectionType() != kIOConnTypeMulticast )
     {
         // a listen only connection has to be a multicast connection.
         *extended_error = kConnectionManagerStatusCodeNonListenOnlyConnectionNotOpened;
 
-        // maybe not the best error message however there is no suitable definition in the cip spec
         return NULL;
     }
 
@@ -301,8 +300,10 @@ bool ConfigureListenOnlyConnectionPoint(
 }
 
 
-CipConn* GetIoConnectionForConnectionData( CipConn* aConn,  ConnectionManagerStatusCode* extended_error )
+CipConn* GetIoConnectionForConnectionData( ConnectionData* aConn,  ConnectionManagerStatusCode* extended_error )
 {
+    ConnInstanceType    conn_type;
+
     *extended_error = kConnectionManagerStatusCodeSuccess;
 
     CipConn* io_connection = ExclusiveOwner::GetConnection( aConn, extended_error );
@@ -316,37 +317,41 @@ CipConn* GetIoConnectionForConnectionData( CipConn* aConn,  ConnectionManagerSta
 
             if( !io_connection )
             {
-                if( 0 == *extended_error )
+                if( kConnectionManagerStatusCodeSuccess == *extended_error )
                 {
                     // we found no connection and don't have an error so try listen only next
                     io_connection = ListenOnlyConnSet::GetConnection( aConn, extended_error );
 
-                    if( !io_connection &&  0 == *extended_error )
+                    if( !io_connection )
                     {
-                        // no application connection type was found that suits the given data
-                        // TODO check error code VS
-                        *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
+                        if( kConnectionManagerStatusCodeSuccess == *extended_error )
+                        {
+                            // no application connection type was found that suits the given data
+                            // TODO check error code VS
+                            *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
+                        }
                     }
                     else
                     {
-                        aConn->instance_type = kConnInstanceTypeIoListenOnly;
+                        conn_type = kConnInstanceTypeIoListenOnly;
                     }
                 }
             }
             else
             {
-                aConn->instance_type = kConnInstanceTypeIoInputOnly;
+                conn_type = kConnInstanceTypeIoInputOnly;
             }
         }
     }
     else
     {
-        aConn->instance_type = kConnInstanceTypeIoExclusiveOwner;
+        conn_type = kConnInstanceTypeIoExclusiveOwner;
     }
 
     if( io_connection )
     {
         CopyConnectionData( io_connection, aConn );
+        io_connection->SetInstanceType( conn_type );
     }
 
     return io_connection;
@@ -355,16 +360,16 @@ CipConn* GetIoConnectionForConnectionData( CipConn* aConn,  ConnectionManagerSta
 
 CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
 {
-    CipConn* producer_multicast_connection = g_active_connection_list;
+    CipConnBox::iterator producer_multicast_connection = g_active_conns.begin();
 
-    while( producer_multicast_connection )
+    while( producer_multicast_connection != g_active_conns.end() )
     {
-        if( producer_multicast_connection->instance_type == kConnInstanceTypeIoExclusiveOwner
-         || producer_multicast_connection->instance_type == kConnInstanceTypeIoInputOnly )
+        if( producer_multicast_connection->InstanceType() == kConnInstanceTypeIoExclusiveOwner
+         || producer_multicast_connection->InstanceType() == kConnInstanceTypeIoInputOnly )
         {
             if( input_point == producer_multicast_connection->conn_path.producing_path.GetInstanceOrConnPt()
                 && producer_multicast_connection->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
-                && kEipInvalidSocket != producer_multicast_connection->producing_socket )
+                && kEipInvalidSocket != producer_multicast_connection->ProducingSocket() )
             {
                 // we have a connection that produces the same input assembly,
                 // is a multicast producer and manages the connection.
@@ -372,7 +377,7 @@ CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
             }
         }
 
-        producer_multicast_connection = producer_multicast_connection->next;
+        ++producer_multicast_connection;
     }
 
     return producer_multicast_connection;
@@ -381,56 +386,52 @@ CipConn* GetExistingProducerMulticastConnection( EipUint32 input_point )
 
 CipConn* GetNextNonControlMasterConnection( EipUint32 input_point )
 {
-    CipConn* next_non_control_master_connection = g_active_connection_list;
+    CipConnBox::iterator c = g_active_conns.begin();
 
-    while( next_non_control_master_connection )
+    for( ;  c != g_active_conns.end();  ++c )
     {
-        if( next_non_control_master_connection->instance_type == kConnInstanceTypeIoExclusiveOwner
-         || next_non_control_master_connection->instance_type == kConnInstanceTypeIoInputOnly )
+        if( c->InstanceType() == kConnInstanceTypeIoExclusiveOwner
+         || c->InstanceType() == kConnInstanceTypeIoInputOnly )
         {
-            if( input_point == next_non_control_master_connection->conn_path.producing_path.GetInstanceOrConnPt()
-             && next_non_control_master_connection->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
-             && next_non_control_master_connection->producing_socket == kEipInvalidSocket )
+            if( input_point == c->conn_path.producing_path.GetInstanceOrConnPt()
+             && c->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
+             && c->ProducingSocket() == kEipInvalidSocket )
             {
                 // we have a connection that produces the same input assembly,
                 // is a multicast producer and does not manages the connection.
-                break;
+                return c;
             }
         }
-
-        next_non_control_master_connection = next_non_control_master_connection
-                                             ->next;
     }
 
-    return next_non_control_master_connection;
+    return NULL;
 }
 
 
-void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,  ConnInstanceType instance_type )
+void CloseAllConnectionsForInputWithSameType(
+        EipUint32 input_point,  ConnInstanceType instance_type )
 {
-    CipConn* connection = g_active_connection_list;
-    CipConn* connection_to_delete;
+    CipConnBox::iterator c = g_active_conns.begin();
 
-    while( connection )
+    while( c != g_active_conns.end() )
     {
-        if( instance_type == connection->instance_type &&
-            input_point   == connection->conn_path.producing_path.GetInstanceOrConnPt() )
+        if( instance_type == c->InstanceType() &&
+            input_point   == c->conn_path.producing_path.GetInstanceOrConnPt() )
         {
-            connection_to_delete = connection;
-            connection = connection->next;
-
             CheckIoConnectionEvent(
-                    connection_to_delete->conn_path.consuming_path.GetInstanceOrConnPt(),
-                    connection_to_delete->conn_path.producing_path.GetInstanceOrConnPt(),
+                    c->conn_path.consuming_path.GetInstanceOrConnPt(),
+                    c->conn_path.producing_path.GetInstanceOrConnPt(),
                     kIoConnectionEventClosed );
 
-            // FIXME check if this is ok
-            connection_to_delete->connection_close_function( connection_to_delete );
-            // closeConnection(pstToDelete); will remove the connection from the active connection list
+            CipConn* to_close = c;
+
+            ++c;
+
+            to_close->Close();
         }
         else
         {
-            connection = connection->next;
+            ++c;
         }
     }
 }
@@ -438,35 +439,28 @@ void CloseAllConnectionsForInputWithSameType( EipUint32 input_point,  ConnInstan
 
 void CloseAllConnections()
 {
-    CipConn* connection = g_active_connection_list;
-
-    while( connection )
+    while( g_active_conns.begin() )
     {
-        // FIXME check if m_pfCloseFunc would be suitable
-        CloseConnection( connection );
+        g_active_conns.begin()->Close();
 
-        // Close connection will remove the connection from the list therefore we
-        // need to get again the start until there is no connection left
-        connection = g_active_connection_list;
+        // Close() removes the connection from the list.
     }
 }
 
 
 bool ConnectionWithSameConfigPointExists( EipUint32 config_point )
 {
-    CipConn* connection = g_active_connection_list;
+    CipConnBox::iterator c = g_active_conns.begin();
 
-    while( connection )
+    for( ; c != g_active_conns.end(); ++c )
     {
-        if( config_point == connection->conn_path.config_path.GetInstanceOrConnPt() )
+        if( config_point == c->conn_path.config_path.GetInstanceOrConnPt() )
         {
             break;
         }
-
-        connection = connection->next;
     }
 
-    return NULL != connection;
+    return c;
 }
 
 

@@ -1,5 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
+ * Copyright (c) 2016, SoftPLC Corportion.
  *
  ******************************************************************************/
 #include <string.h>
@@ -14,59 +15,58 @@
 #include <cipclass.h>
 
 
-struct CipEthernetLinkObject
+
+CipEthernetLinkInstance* CipEthernetLinkClass::CreateInstance()
 {
-    EipUint32   interface_speed;
-    EipUint32   interface_flags;
-    EipUint8    physical_address[6];
-};
+    CipEthernetLinkInstance* i = new CipEthernetLinkInstance( Instances().size() + 1 );
 
-static CipEthernetLinkObject g_ethernet_link;
+    i->AttributeInsert( 1, kCipUdint,  &i->interface_speed );
+    i->AttributeInsert( 2, kCipDword,  &i->interface_flags );
+    i->AttributeInsert( 3, kCip6Usint, &i->physical_address );
 
-void ConfigureMacAddress( const EipUint8* mac_address )
-{
-    memcpy( &g_ethernet_link.physical_address, mac_address,
-            sizeof(g_ethernet_link.physical_address) );
-}
-
-
-static CipInstance* createEthernetLinkInstance()
-{
-    CipClass*   clazz = GetCipClass( kCipEthernetLinkClass );
-
-    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
-
-    i->AttributeInsert( 1, kCipUdint,  &g_ethernet_link.interface_speed );
-    i->AttributeInsert( 2, kCipDword,  &g_ethernet_link.interface_flags );
-    i->AttributeInsert( 3, kCip6Usint, &g_ethernet_link.physical_address );
-
-    clazz->InstanceInsert( i );
+    InstanceInsert( i );
 
     return i;
 }
 
 
-EipStatus CipEthernetLinkInit()
-{
-    if( !GetCipClass( kCipEthernetLinkClass ) )
-    {
-        // set attributes to initial values
-        g_ethernet_link.interface_speed = 100;
-
-        // successful speed and duplex neg, full duplex active link,
-        // TODO in future it should be checked if link is active
-        g_ethernet_link.interface_flags = 0xF;
-
-        CipClass* clazz = new CipClass( kCipEthernetLinkClass,
+CipEthernetLinkClass::CipEthernetLinkClass() :
+    CipClass( kCipEthernetLinkClass,
               "Ethernet Link",
               MASK7(1,2,3,4,5,6,7), // common class attributes mask
               1                     // version
-              );
+              )
+{
+}
+
+
+EipStatus CipEthernetLinkClass::Init()
+{
+    if( !GetCipClass( kCipEthernetLinkClass ) )
+    {
+        CipEthernetLinkClass* clazz = new CipEthernetLinkClass();
 
         RegisterCipClass( clazz );
 
-        createEthernetLinkInstance();
+        // create instance 1
+        clazz->CreateInstance();
     }
 
     return kEipStatusOk;
+}
+
+
+void CipEthernetLinkClass::ConfigureMacAddress( int aInstanceId, const EipUint8* mac_address )
+{
+    CipClass* clazz = GetCipClass( kCipEthernetLinkClass );
+
+    if( clazz )
+    {
+        CipEthernetLinkInstance* i = static_cast<CipEthernetLinkInstance*>( clazz->Instance( aInstanceId ) );
+
+        if( i )
+        {
+            memcpy( &i->physical_address, mac_address, sizeof i->physical_address );
+        }
+    }
 }

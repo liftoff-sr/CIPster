@@ -6,94 +6,106 @@
 #ifndef CIPSTER_CPF_H_
 #define CIPSTER_CPF_H_
 
-#include "typedefs.h"
-#include "ciptypes.h"
+#include "../typedefs.h"
+#include "../cip/ciptypes.h"
 #include "encap.h"
 
 
 /** @ingroup ENCAP
- * @brief CPF is Common Packet Format
- * CPF packet := <number of items> {<items>}
- * item := <TypeID> <Length> <data>
- * <number of items> := two bytes
- * <TypeID> := two bytes
- * <Length> := two bytes
- * <data> := <the number of bytes specified by Length>
+ * CPF is Common Packet Format
  */
 
 
 /**
- * Enum CipItemId
+ * Enum CpfId
  * is the set of Item ID numbers used for address and data items in CPF structures
  */
-enum CipItemId
+enum CpfId
 {
-    kCipItemIdNullAddress = 0x0000,                             ///< Type: Address; Indicates that encapsulation routing is not needed.
-    kCipItemIdListIdentityResponse = 0x000C,
-    kCipItemIdConnectionAddress = 0x00A1,                       ///< Type: Address; Connection-based, used for connected messages, see Vol.2, p.42
-    kCipItemIdConnectedDataItem = 0x00B1,                       ///< Type: Data; Connected data item, see Vol.2, p.43
-    kCipItemIdUnconnectedDataItem   = 0x00B2,                   ///< Type: Data; Unconnected message
-    kCipItemIdListServiceResponse   = 0x0100,
-    kCipItemIdSocketAddressInfoOriginatorToTarget   = 0x8000,   ///< Type: Data; Sockaddr info item originator to target
-    kCipItemIdSocketAddressInfoTargetToOriginator   = 0x8001,   ///< Type: Data; Sockaddr info item target to originator
-    kCipItemIdSequencedAddressItem = 0x8002                     ///< Sequenced Address item
+    kCpfIdNullAddress                   = 0x0000,   ///< Address: encapsulation routing is not needed.
+    kCpfIdListIdentityResponse          = 0x000C,
+    kCpfIdConnectedAddress              = 0x00A1,   ///< Address: connection-based, used for connected messages, see Vol2 2-6.22
+    kCpfIdConnectedDataItem             = 0x00B1,   ///< Data: connected data item, see Vol.2, p.43
+    kCpfIdUnconnectedDataItem           = 0x00B2,   ///< Data: Unconnected message
+    kCpfIdListServiceResponse           = 0x0100,
+    kCpfIdSockAddrInfo_O_to_T           = 0x8000,   ///< Data: Sockaddr Info Item originator to target
+    kCpfIdSockAddrInfo_T_to_O           = 0x8001,   ///< Data: Sockaddr Info Item target to originator
+    kCpfIdSequencedAddress              = 0x8002    ///< Address: Sequenced Address Item
 };
 
 
-struct AddressData
-{
-    AddressData() :
-        connection_identifier( 0 ),
-        sequence_number( 0 )
-    {}
-
-    EipUint32   connection_identifier;
-    EipUint32   sequence_number;
-};
-
-
+/**
+ * Struct AddressItem
+ * is storage for the first part of the Common Packet Format.
+ * @see #Cpf
+ */
 struct AddressItem
 {
-    AddressItem() :
-        type_id( kCipItemIdNullAddress ),
-        length( 0 )
-    {}
+    AddressItem(
+            CpfId aAddrType = kCpfIdNullAddress,
+            CipUdint aConnId = 0,
+            CipUdint aEncapSeqNum = 0
+            ) :
+        type_id( aAddrType ),
+        connection_identifier( aConnId ),
+        encap_sequence_number( aEncapSeqNum )
+    {
+        if( aAddrType == kCpfIdNullAddress )
+            length = 4;
+        else if( aAddrType == kCpfIdConnectedAddress )
+            length = 8;
+        else if( aAddrType == kCpfIdSequencedAddress )
+            length = 12;
+        else
+            length = 0;
+    }
 
-    CipItemId   type_id;
+    CpfId       type_id;
     CipUint     length;
-    AddressData data;
+    EipUint32   connection_identifier;
+    EipUint32   encap_sequence_number;
 };
 
 
+/**
+ * Struct DataItem
+ * is storage for the second part of the Common Packet Format.
+ * @see #Cpf
+ */
 struct DataItem
 {
-    DataItem() :
-        type_id( kCipItemIdNullAddress ),
+    DataItem( CpfId aType = kCpfIdUnconnectedDataItem ) :
+        type_id( aType ),
         length( 0 ),
         data( 0 )
     {}
 
-    CipItemId       type_id;
-    EipUint16       length;
-    const EipByte*  data;
+    CpfId       type_id;
+    EipUint16   length;
+    EipByte*    data;
 };
 
 
-struct SocketAddressInfoItem
+/**
+ * Struct SockAddrInfoItem
+ * is storage for the last part of the Common Packet Format.
+ * @see #Cpf
+ */
+struct SockAddrInfoItem
 {
-    SocketAddressInfoItem( CipItemId aType, CipUdint aIP, int aPort );
+    SockAddrInfoItem( CpfId aType, CipUdint aIP, int aPort );
 
-    SocketAddressInfoItem() :
-        type_id( kCipItemIdNullAddress ),
+    SockAddrInfoItem() :
+        type_id( kCpfIdNullAddress ),
         length( 16 ),
         sin_family( AF_INET ),
         sin_port( 0 ),
-        sin_addr( 0 )
+        sin_addr( 0 ),
+        nasin_zero()
     {
-        memset( nasin_zero, 0, sizeof nasin_zero );
     }
 
-    CipItemId   type_id;
+    CpfId       type_id;
     CipUint     length;
     CipInt      sin_family;
     CipUint     sin_port;
@@ -101,7 +113,7 @@ struct SocketAddressInfoItem
     CipUsint    nasin_zero[8];
 
     /// assign from a sockaddr_in to this
-    SocketAddressInfoItem& operator=( sockaddr_in& rhs )
+    SockAddrInfoItem& operator=( sockaddr_in& rhs )
     {
         sin_family  = rhs.sin_family;
         sin_port    = ntohs( rhs.sin_port );
@@ -125,15 +137,40 @@ struct SocketAddressInfoItem
 };
 
 
-
-class CipCommonPacketFormatData
+/**
+ * Class Cpf
+ * helps serializing and deserializing Common Packet Format packet payload wrappers.
+ */
+class Cpf : public Serializeable
 {
 public:
 
-    CipCommonPacketFormatData( int aSocket = -1 );
+    Cpf() :
+        payload( 0 )
+    {
+        Clear();
+    }
+
+    Cpf( CpfId aAddrType, CpfId aDataType, Serializeable* aPayload = NULL ) :
+        address_item( aAddrType, aDataType ),
+        data_item( aDataType ),
+        payload( aPayload ),
+        rx_aii_count( 0 ),
+        tx_aii_count( 0 ),
+        item_count( 2 )
+    {}
+
+    Cpf( const AddressItem& aAddr, CpfId aDataType = kCpfIdConnectedDataItem ) :
+        address_item( aAddr ),
+        data_item( aDataType ),
+        payload( 0 ),
+        rx_aii_count( 0 ),
+        tx_aii_count( 0 ),
+        item_count( 2 )
+    {}
 
     /**
-     * Function DeserializeCPFD
+     * Function DeserializeCpf
      * sets fields in this object from the provided serialized data.
      * Create CPF structure out of the received data.
      *
@@ -143,30 +180,12 @@ public:
      *     - >  0 : the number of bytes consumed
      *     - <= 0 : the negative offset of the problem byte
      */
-    int DeserializeCPFD( BufReader aSrc );
+    int DeserializeCpf( BufReader aSrc );
 
-    /**
-     * Function SerializeCPFD
-     * serializes this object.
-     *
-     * @param  aResponse message router response or NULL if implicit response.
-     * @param  aDst destination byte buffer
-     * @return int - serialized byte count or -1 if error.
-     */
-    int SerializeCPFD( CipMessageRouterResponse* aResponse, BufWriter aDst );
-
-    /**
-     * Function SerializeForIO
-     * serializes this object into a byte array for transmission as an implicit message.
-     *
-     * @param  aDataItem is the CIP response payload to serialize.
-     * @param  aDst a byte buffer which is where to serialize this object
-     * @return int - count of serialized bytes, or -1 if error.
-     */
-    int SerializeForIO( BufWriter aDst )
-    {
-        return SerializeCPFD( NULL, aDst );
-    }
+    //-----<Serializeable>------------------------------------------------------
+    int SerializedCount( int aCtl = 0 ) const;
+    int Serialize( BufWriter aDst, int aCtl = 0 ) const;
+    //-----</Serializeable>-----------------------------------------------------
 
     /**
      * Function NotifyConnectedCommonPacketFormat
@@ -204,15 +223,8 @@ public:
         tx_aii_count = 0;
     }
 
-    void ClearTx()
-    {
-        tx_aii_count = 0;
-    }
-
-    void ClearRx()
-    {
-        rx_aii_count = 0;
-    }
+    void ClearTx()                          { tx_aii_count = 0; }
+    void ClearRx()                          { rx_aii_count = 0; }
 
     /**
      * Function AddNullAddressItem
@@ -221,33 +233,33 @@ public:
     void AddNullAddressItem()
     {
         // Precondition: Null Address Item only valid in unconnected messages
-        CIPSTER_ASSERT( data_item.type_id == kCipItemIdUnconnectedDataItem );
+        CIPSTER_ASSERT( data_item.type_id == kCpfIdUnconnectedDataItem );
 
-        address_item.type_id    = kCipItemIdNullAddress;
-        address_item.length     = 0;
+        address_item.type_id = kCpfIdNullAddress;
+        address_item.length  = 0;
     }
 
-    bool AppendRx( const SocketAddressInfoItem& aSocketAddressInfoItem )
+    bool AppendRx( const SockAddrInfoItem& aSockAddrInfoItem )
     {
         if( rx_aii_count < DIM( rx_aii ) )
         {
-            rx_aii[rx_aii_count++] = aSocketAddressInfoItem;
+            rx_aii[rx_aii_count++] = aSockAddrInfoItem;
             return true;
         }
         return false;
     }
 
-    bool AppendTx( const SocketAddressInfoItem& aSocketAddressInfoItem )
+    bool AppendTx( const SockAddrInfoItem& aSockAddrInfoItem )
     {
         if( tx_aii_count < DIM( tx_aii ) )
         {
-            tx_aii[tx_aii_count++] = aSocketAddressInfoItem;
+            tx_aii[tx_aii_count++] = aSockAddrInfoItem;
             return true;
         }
         return false;
     }
 
-    SocketAddressInfoItem* SearchRx( CipItemId aType )
+    const SockAddrInfoItem* SearchRx( CpfId aType ) const
     {
         for( int i=0; i<rx_aii_count;  ++i )
         {
@@ -257,7 +269,7 @@ public:
         return NULL;
     }
 
-    SocketAddressInfoItem* SearchTx( CipItemId aType )
+    const SockAddrInfoItem* SearchTx( CpfId aType ) const
     {
         for( int i=0; i<tx_aii_count;  ++i )
         {
@@ -267,10 +279,10 @@ public:
         return NULL;
     }
 
-    int RxSocketAddressInfoItemCount() const    { return rx_aii_count; }
-    int TxSocketAddressInfoItemCount() const    { return tx_aii_count; }
+    int RxSockAddrInfoItemCount() const    { return rx_aii_count; }
+    int TxSockAddrInfoItemCount() const    { return tx_aii_count; }
 
-    SocketAddressInfoItem* RxSocketAddressInfoItem( int aIndex )
+    SockAddrInfoItem* RxSockAddrInfoItem( int aIndex )
     {
         if( aIndex < rx_aii_count )
         {
@@ -279,7 +291,7 @@ public:
         return NULL;
     }
 
-    SocketAddressInfoItem* TxSocketAddressInfoItem( int aIndex )
+    SockAddrInfoItem* TxSockAddrInfoItem( int aIndex )
     {
         if( aIndex < tx_aii_count )
         {
@@ -293,28 +305,76 @@ public:
         return BufReader( data_item.data, data_item.length );
     }
 
-    CipItemId DataItemType() const      { return CipItemId( data_item.type_id ); }
-    CipItemId AddressItemType() const   { return CipItemId( address_item.type_id ); }
+    CpfId DataType() const              { return data_item.type_id; }
+    Cpf&  SetDataType( CpfId aType )
+    {
+        data_item.type_id = aType;
+        return *this;
+    }
 
-    int Socket() const                  { return socket; }
+    CpfId AddrType() const              { return address_item.type_id; }
+    Cpf& SetAddrType( CpfId aType )
+    {
+        address_item.type_id = aType;
+        return *this;
+    }
 
-    // @todo make these private too
-    AddressItem address_item;
-    DataItem    data_item;
+    Cpf& SetAddrLen( CipUint aLength )
+    {
+        address_item.length = aLength;
+        return *this;
+    }
+
+    CipUdint AddrConnId() const     { return address_item.connection_identifier; }
+    Cpf& SetAddrConnId( CipUdint aConnId )
+    {
+        address_item.connection_identifier = aConnId;
+        return *this;
+    }
+
+    CipUdint AddrEncapSeqNum() const        { return address_item.encap_sequence_number; }
+    Cpf& SetAddrEncapSeqNum( CipUdint aSeqNum )
+    {
+        address_item.encap_sequence_number = aSeqNum;
+        return *this;
+    }
+
+    Cpf& SetPayload( Serializeable* aPayload )
+    {
+        payload = aPayload;
+        return *this;
+    }
+
+    ByteBuf  DataRange() const
+    {
+        return ByteBuf( data_item.data, data_item.length );
+    }
+
+    Cpf& SetDataRange( const ByteBuf& aRange )
+    {
+        data_item.data   = aRange.data();
+        data_item.length = aRange.size();
+        return *this;
+    }
+
+protected:
+
+
+    int             item_count;
+
+    AddressItem     address_item;
+    DataItem        data_item;
+
+    Serializeable*  payload;
+
+    int         rx_aii_count;
+    SockAddrInfoItem rx_aii[2];
+
+    int         tx_aii_count;
+    SockAddrInfoItem tx_aii[2];
 
 private:
-
-    int         socket;     // BSD socket the current request came in on
-
-    int         item_count;
-
-    int rx_aii_count;
-    SocketAddressInfoItem rx_aii[2];
-
-    int tx_aii_count;
-    SocketAddressInfoItem tx_aii[2];
-
-    CipCommonPacketFormatData( const CipCommonPacketFormatData& );  // not implemented
+    Cpf( const Cpf& );  // not implemented
 };
 
 

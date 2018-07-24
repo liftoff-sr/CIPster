@@ -15,10 +15,10 @@ static EipUint16 Zero = 0;
 
 
 CipClass::CipClass(
-        EipUint32   aClassId,
+        int         aClassId,
         const char* aClassName,
         int         aClassAttributesMask,
-        EipUint16   aRevision
+        int         aRevision
         ) :
     CipInstance( 0 ),       // instance_id of public class is always 0
     class_id( aClassId ),
@@ -142,8 +142,8 @@ CipClass::~CipClass()
 }
 
 
-CipError CipClass::OpenConnection( CipConn* aConn,
-        CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
+CipError CipClass::OpenConnection( ConnectionData* aParams,
+        Cpf* cpfd, ConnectionManagerStatusCode* extended_error )
 {
     CIPSTER_TRACE_INFO( "%s: NOT implemented for class '%s'\n", __func__, ClassName().c_str() );
     *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
@@ -322,7 +322,10 @@ CipService* CipClass::ServiceRemove( int aServiceId )
         if( aServiceId == (*it)->Id() )
         {
             CIPSTER_TRACE_INFO(
-                "%s: removing service '%s'.\n", __func__, (*it)->ServiceName().c_str() );
+                "%s: removing service '%s' from class '%s'.\n",
+                __func__, (*it)->ServiceName().c_str(),
+                ClassName().c_str()
+                );
 
             ret = *it;              // pass ownership to ret
             services.erase( it );   // close gap
@@ -347,10 +350,10 @@ EipStatus CipClass::getInstanceCount( CipAttribute* attr,
     {
         EipUint16 instance_count = clazz->InstanceCount();
 
-        BufWriter out = response->data;
+        BufWriter out = response->Writer();
 
         out.put16( instance_count );
-        response->data_length = 2;
+        response->SetWrittenSize( 2 );
 
         return kEipStatusOkSend;
     }
@@ -376,10 +379,10 @@ EipStatus CipClass::getLargestInstanceId( CipAttribute* attr,
             largest_id = clazz->Instances().back()->Id();
         }
 
-        BufWriter out = response->data;
+        BufWriter out = response->Writer();
 
         out.put16( largest_id );
-        response->data_length = 2;
+        response->SetWrittenSize( 2 );
 
         return kEipStatusOkSend;
     }
@@ -402,10 +405,10 @@ EipStatus CipClass::getLargestInstanceAttributeId( CipAttribute* attr,
             largest_id = inst->Attributes().back()->Id();
         }
 
-        BufWriter out = response->data;
+        BufWriter out = response->Writer();
 
         out.put16( largest_id );
-        response->data_length = 2;
+        response->SetWrittenSize( 2 );
 
         return kEipStatusOkSend;
     }
@@ -431,10 +434,10 @@ EipStatus CipClass::getLargestClassAttributeId( CipAttribute* attr,
             largest_id = clazz->Attributes().back()->Id();
         }
 
-        BufWriter out = response->data;
+        BufWriter out = response->Writer();
 
         out.put16( largest_id );
-        response->data_length = 2;
+        response->SetWrittenSize( 2 );
 
         return kEipStatusOkSend;
     }
@@ -451,7 +454,7 @@ EipStatus CipClass::GetAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    int     attribute_id = request->request_path.GetAttribute();
+    int     attribute_id = request->Path().GetAttribute();
 
 #if 0
     if( instance->Id() == 0 && instance->Class()->ClassId() == 1 && attribute_id == 3 )
@@ -463,7 +466,7 @@ EipStatus CipClass::GetAttributeSingle( CipInstance* instance,
     CipAttribute* attribute = instance->Attribute( attribute_id );
     if( !attribute )
     {
-        response->general_status = kCipErrorAttributeNotSupported;
+        response->SetGenStatus( kCipErrorAttributeNotSupported );
         return kEipStatusOkSend;
     }
 
@@ -475,8 +478,9 @@ EipStatus CipClass::GetAttributeAll( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    BufWriter start = response->data;
+    BufWriter start = response->Writer();
 
+    // Implement GetAttributeAll() by calling GetAttributeSingle() in a loop.
     CipService* service = instance->Class()->Service( kGetAttributeSingle );
 
     if( !service )
@@ -497,7 +501,7 @@ EipStatus CipClass::GetAttributeAll( CipInstance* instance,
     if( !attributes.size() )
     {
         // there are no attributes to be sent back
-        response->general_status = kCipErrorServiceNotSupported;
+        response->SetGenStatus( kCipErrorServiceNotSupported );
     }
     else
     {
@@ -508,31 +512,33 @@ EipStatus CipClass::GetAttributeAll( CipInstance* instance,
         {
             int attribute_id = (*it)->Id();
 
-            // only return attributes that are flagged as being part of GetAttributeAll
+            // only do attributes that are flagged as being part of GetAttributeAll
             if( attribute_id < 32 && (get_mask & (1 << attribute_id)) )
             {
                 // change the attribute id in the request path
-                request->request_path.SetAttribute( attribute_id );
+                request->SetPathAttribute( attribute_id );
 
                 EipStatus result = service->service_function( instance, request, response );
 
                 if( result != kEipStatusOkSend )
                 {
-                    response->data = start;
+                    response->SetWriter( start );
                     return kEipStatusError;
                 }
 
-                response->data += response->data_length;
-                response->data_length = 0;
-                response->general_status = kCipErrorSuccess;    // clear non-readable from GetAttributeSingle()
+                response->WriterAdvance( response->WrittenSize() );
+                response->SetWrittenSize( 0 );
+
+                // clear non-readable from GetAttributeSingle()
+                response->SetGenStatus( kCipErrorSuccess );
             }
         }
 
-        response->data_length = response->data.data() - start.data();
+        response->SetWrittenSize( response->Writer().data() - start.data() );
 
-        CIPSTER_TRACE_INFO( "%s: response->data_length:%d\n", __func__, response->data_length );
+        CIPSTER_TRACE_INFO( "%s: response->WrittenSize():%d\n", __func__, response->WrittenSize() );
 
-        response->data = start;
+        response->SetWriter( start );
     }
 
     return kEipStatusOkSend;
@@ -543,11 +549,11 @@ EipStatus CipClass::SetAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    CipAttribute* attribute = instance->Attribute( request->request_path.GetAttribute() );
+    CipAttribute* attribute = instance->Attribute( request->Path().GetAttribute() );
 
     if( !attribute )
     {
-        response->general_status = kCipErrorAttributeNotSupported;
+        response->SetGenStatus( kCipErrorAttributeNotSupported );
         return kEipStatusOkSend;
     }
 

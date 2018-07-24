@@ -35,7 +35,9 @@
 #include <cipclass.h>
 
 
-// attributes in CIP Identity Object
+
+// attributes in CIP Identity Object, some are public so they can be examined
+// when testing electronic key validity.
 
 EipUint16 vendor_id_ = CIPSTER_DEVICE_VENDOR_ID;         //*< Attribute 1: Vendor ID
 
@@ -57,18 +59,12 @@ EipUint32 serial_number_ = 0;        //*< Attribute 6: Serial Number, has to be 
 std::string product_name_ = CIPSTER_DEVICE_NAME;
 
 
-/** Private functions, sets the devices serial number
- * @param serial_number The serial number of the device
- */
 void SetDeviceSerialNumber( EipUint32 serial_number )
 {
     serial_number_ = serial_number;
 }
 
 
-/** Private functions, sets the devices status
- * @param status The serial number of the deivce
- */
 void SetDeviceStatus( EipUint16 status )
 {
     status_ = status;
@@ -92,12 +88,12 @@ static EipStatus reset_service( CipInstance* instance,
 
     eip_status = kEipStatusOkSend;
 
-    if( request->data.size() == 1 )
+    if( request->Data().size() == 1 )
     {
-        int value = request->data.data()[0];
+        int value = request->Data().data()[0];
 
         CIPSTER_TRACE_INFO( "%s: request->data_length=%d value=%d\n",
-            __func__, (int) request->data.size(), value );
+            __func__, (int) request->Data().size(), value );
 
         switch( value )
         {
@@ -106,7 +102,7 @@ static EipStatus reset_service( CipInstance* instance,
             {
                 // in this case there is no response since I am rebooting.
             }
-            response->general_status = kCipErrorDeviceStateConflict;
+            response->SetGenStatus( kCipErrorDeviceStateConflict );
             break;
 
         case 1:     // Reset type 1 -> reset to device settings
@@ -114,7 +110,7 @@ static EipStatus reset_service( CipInstance* instance,
             {
                 // in this case there is no response since I am rebooting.
             }
-            response->general_status = kCipErrorDeviceStateConflict;
+            response->SetGenStatus( kCipErrorDeviceStateConflict );
             break;
 
         case 2:     // Reset type 2 -> Return to factory defaults except communications parameters
@@ -122,15 +118,15 @@ static EipStatus reset_service( CipInstance* instance,
             {
                 // in this case there is no response since I am rebooting.
             }
-            response->general_status = kCipErrorDeviceStateConflict;
+            response->SetGenStatus( kCipErrorDeviceStateConflict );
             break;
 
         default:
-            response->general_status = kCipErrorInvalidParameter;
+            response->SetGenStatus( kCipErrorInvalidParameter );
             break;
         }
     }
-    else if( request->data.size() == 0 )
+    else if( request->Data().size() == 0 )
     {
         CIPSTER_TRACE_INFO( "%s: request->data_length=0\n", __func__ );
 
@@ -139,11 +135,11 @@ static EipStatus reset_service( CipInstance* instance,
         {
             // in this case there is no response since I am rebooting.
         }
-        response->general_status = kCipErrorDeviceStateConflict;
+        response->SetGenStatus( kCipErrorDeviceStateConflict );
     }
     else
     {
-        response->general_status = kCipErrorInvalidParameter;
+        response->SetGenStatus( kCipErrorInvalidParameter );
     }
 
     return eip_status;
@@ -172,17 +168,20 @@ static CipInstance* createIdentityInstance()
 }
 
 
-/** @brief CIP Identity object constructor
- *
- * @returns EIP_ERROR if the class could not be created, otherwise EIP_OK
- */
 EipStatus CipIdentityInit()
 {
     if( !GetCipClass( kCipIdentityClass ) )
     {
-        CipClass* clazz = new CipClass( kCipIdentityClass,
+        CipClass* clazz = new CipClass(
+                kCipIdentityClass,
                 "Identity",                     // class name
+                // Vol1 5A-2.1 says class attributes 3 thru 7 are optional.
                 MASK4( 1, 2, 6, 7 ),
+
+                // 24-Jul-2018: conformance tool whines erroneously when we
+                // report kCipErrorAttributeNotSupported for GetAttributeSingle
+                // against attributes 3, 4, 5.  I think this is their bug.
+
                 1                               // class revision
                 );
 
@@ -199,4 +198,3 @@ EipStatus CipIdentityInit()
 
     return kEipStatusOk;
 }
-

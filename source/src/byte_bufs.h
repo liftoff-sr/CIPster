@@ -11,6 +11,36 @@
 
 #include "typedefs.h"
 
+
+/**
+ * Class ByteBuf
+ * delimits the starting point, ending point, and size of a byte array.
+ * It does not take ownership of such memory, merely points to it.
+ * There are no setters among the accessors because it is simple enough
+ * to use the assignment operator and overwrite this object with a newly
+ * constructed one.
+ */
+class ByteBuf
+{
+public:
+    ByteBuf( CipByte* aStart, size_t aSize ) :
+        start( aStart ),
+        limit( aStart + aSize )
+    {}
+
+    CipByte*    data() const    { return start; }
+    CipByte*    end() const     { return limit; }
+    ssize_t     size() const    { return limit - start; }
+
+protected:
+    CipByte*    start;
+    CipByte*    limit;          // points to one past last byte
+};
+
+
+class BufReader;
+
+
 /**
  * Class BufWriter
  * outlines a writable byte buffer with little endian putters.  It protects
@@ -26,8 +56,14 @@ public:
         limit( aStart + aCount )
     {}
 
+    BufWriter( const ByteBuf& aBuf ) :
+        start( aBuf.data() ),
+        limit( aBuf.end() )
+    {}
+
     BufWriter() :
-        start( 0 ), limit( 0 )
+        start( 0 ),
+        limit( 0 )
     {}
 
     CipByte*    data() const    { return start; }
@@ -52,6 +88,13 @@ public:
     /// postfix ++
     BufWriter operator++(int);
 
+    BufWriter& operator=( const ByteBuf& aRange )
+    {
+        start = aRange.data();
+        limit = aRange.end();
+        return *this;
+    }
+
     BufWriter& put8( CipByte aValue );
 
     BufWriter& put16( EipUint16 aValue );
@@ -65,10 +108,10 @@ public:
     BufWriter& put_double( double aValue );
 
     /// Serialize a CIP SHORT_STRING
-    BufWriter& put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding = true );
+    BufWriter& put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding = false );
 
     /// Serialize a CIP STRING
-    BufWriter& put_STRING( const std::string& aString, bool doEvenByteCountPadding = true );
+    BufWriter& put_STRING( const std::string& aString, bool doEvenByteCountPadding = false );
 
     /// Serialize a CIP STRING2
     BufWriter& put_STRING2( const std::string& aString );
@@ -81,13 +124,14 @@ public:
 
     BufWriter& append( const EipByte* aStart, size_t aCount );
 
+    BufWriter& append( const BufReader& aReader );
+
     BufWriter& fill( size_t aCount, EipByte aValue = 0 );
 
 protected:
     CipByte*    start;
     CipByte*    limit;          // points to one past last byte
 
-private:
     void        overrun() const;
 };
 
@@ -112,9 +156,14 @@ public:
         limit( aStart + aCount )
     {}
 
-    BufReader( const BufWriter& m ):
-        start( m.data() ),
-        limit( m.end() )
+    BufReader( const BufWriter& aWriter ):
+        start( aWriter.data() ),
+        limit( aWriter.end() )
+    {}
+
+    BufReader( const ByteBuf& aBuf ) :
+        start( aBuf.data() ),
+        limit( aBuf.end() )
     {}
 
     const CipByte*  data() const    { return start; }
@@ -139,6 +188,13 @@ public:
     BufReader operator++(int);
 
     CipByte operator * () const;
+
+    BufReader& operator=( const ByteBuf& aRange )
+    {
+        start = aRange.data();
+        limit = aRange.end();
+        return *this;
+    }
 
     CipByte get8();
 
@@ -171,9 +227,85 @@ protected:
     const CipByte*  start;
     const CipByte*  limit;          // points to one past last byte
 
-private:
     void overrun() const;
 };
+
+
+// this one is always inline
+inline BufWriter& BufWriter::append( const BufReader& aReader )
+{
+    return append( aReader.data(), aReader.size() );
+}
+
+/// Control bits for Serializeable::Serialize(), or SerializeCount()'s aCtl
+enum
+{
+    CTL_INCLUDE_CONN_PATH       = (1<<0),
+};
+
+
+/**
+ * Class Serializeable
+ * is an interface (aka abstract class) which can be implemented by any class
+ * that intends to be either encoded in a message or simply supply a range of
+ * bytes to be copied to a BufWriter.
+ */
+class Serializeable
+{
+public:
+
+    /**
+     * Function SerializedCount
+     * returns the total byte count of this item if it were to be Serialize()ed, but does
+     * the calculation without actually doing the serialization.
+     *
+     * @param aCtl is set of class specific bits that act as boolean flags to
+     *      tune the nature of the serialization.
+     * @return int - the number of bytes consumed should this object be serialized
+     *      using the same provided aCtl flags.
+     */
+    virtual int SerializedCount( int aCtl = 0 ) const = 0;
+
+    /**
+     * Function Serialize
+     * encodes this object into aWriter and returns the consumed byte count in that
+     * destination BufWriter.
+     *
+     * @param aWriter is a BufWriter indicating size and location of a place to
+     *      put the serialized bytes.
+     * @param aCtl is set of class specific bits that act as boolean flags to
+     *      tune the nature of the serialization.
+     * @return int - the number of bytes consumed during the serialization.
+     */
+    virtual int Serialize( BufWriter aWriter, int aCtl = 0 ) const = 0;
+};
+
+
+/**
+ * Class ByteSerializer
+ * add a Serializeable interface to a ByteBuf
+ */
+class ByteSerializer : public ByteBuf, public Serializeable
+{
+public:
+    ByteSerializer( const ByteBuf& aRange ) :
+        ByteBuf( aRange )
+    {}
+
+/*
+    ByteSerializer& SetRange( const ByteBuf& aRange )
+    {
+        *(ByteBuf*)this = aRange;
+        return *this;
+    }
+*/
+
+    //-----<Serializeable>------------------------------------------------------
+    int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
+    int SerializedCount( int aCtl = 0 ) const;
+    //-----</Serializeable>-----------------------------------------------------
+};
+
 
 #if BYTEBUFS_INLINE
  #include "byte_bufs.impl"

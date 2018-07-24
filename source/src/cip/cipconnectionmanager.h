@@ -13,51 +13,94 @@
 #include "cipconnection.h"
 
 
-
 class CipConnMgrClass : public CipClass
 {
 public:
     CipConnMgrClass();
+
+    static EipStatus ManageConnections();
+
+    /**
+     * Function HandleReceivedConnectedData
+     * notifies the connection manager that data for a connection has been
+     * received.
+     *
+     * This function should be invoked by the network layer.
+     * @param from_address address from which the data has been received. Only
+     *           data from the connections originator may be accepted. Avoids
+     *           connection hijacking
+     * @param aCommand received data buffer pointing just past the
+     *   encapsulation header and a byte count remaining in frame.
+     * @param aReply where to put the reply and tells its maximum length.
+     * @return EipStatus
+     */
+    static EipStatus HandleReceivedConnectedData(
+        const sockaddr_in* from_address, BufReader aCommand );
+
+    //-----<CipServiceFunctions>------------------------------------------------
+    static EipStatus forward_open_service( CipInstance* instance,
+            CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+
+
+    static EipStatus large_forward_open_service( CipInstance* instance,
+            CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+
+    static EipStatus forward_close_service( CipInstance* instance,
+            CipMessageRouterRequest* request,
+            CipMessageRouterResponse* response );
+
+    //-----</CipServiceFunctions>-----------------------------------------------
+
+protected:
+
+    /**
+     * Function forward_open_common
+     * checks if resources for new connection are available, and
+     * generates a ForwardOpen Reply message.
+     *
+     * @param instance CIP object instance
+     * @param request CipMessageRouterRequest.
+     * @param response CipMessageRouterResponse.
+     * @param isLarge is true when called from largeForwardOpen(), false when called from forwardOpen()
+     *  and the distinction is whether to expect 32 or 16 bits of "network connection parameters".
+     *
+     * @return EipStatus
+     *     -  >0 .. success, 0 .. no reply to send back
+     *     -  -1 .. error
+     */
+    static EipStatus forward_open_common( CipInstance* instance,
+            CipMessageRouterRequest* request,
+            CipMessageRouterResponse* response, bool isLarge );
+
+    /**
+     * Function assembleForwardOpenResponse
+     * serializes a response to a forward_open
+     */
+    static void assembleForwardOpenResponse( ConnectionData* aParams,
+            CipMessageRouterResponse* response, CipError general_status,
+            ConnectionManagerStatusCode extended_status );
 };
 
 
-
-/** @brief macros for comparing sequence numbers according to CIP spec vol
- * 2 3-4.2 for int type variables
+/**
+ * Macros for comparing 32 bit sequence numbers according to CIP spec Vol2 3-4.2.
  * @define SEQ_LEQ32(a, b) Checks if sequence number a is less or equal than b
  * @define SEQ_GEQ32(a, b) Checks if sequence number a is greater or equal than
- *  b
- *  @define SEQ_GT32(a, b) Checks if sequence number a is greater than b
+ * @define SEQ_GT32(a, b) Checks if sequence number a is greater than b
  */
 #define SEQ_LEQ32( a, b )   ( (int) ( (a) - (b) ) <= 0 )
 #define SEQ_GEQ32( a, b )   ( (int) ( (a) - (b) ) >= 0 )
 #define SEQ_GT32( a, b )    ( (int) ( (a) - (b) ) > 0 )
 
-/** @brief similar macros for comparing 16 bit sequence numbers
+
+/**
+ * Macros for comparing 16 bit sequence numbers.
  * @define SEQ_LEQ16(a, b) Checks if sequence number a is less or equal than b
  * @define SEQ_GEQ16(a, b) Checks if sequence number a is greater or equal than
- *  b
  */
 #define SEQ_LEQ16( a, b )   ( (short) ( (a) - (b) ) <= 0 )
 #define SEQ_GEQ16( a, b )   ( (short) ( (a) - (b) ) >= 0 )
 
-
-struct CipUnconnectedSendParameter
-{
-    EipByte         priority;
-    EipUint8        timeout_ticks;
-    EipUint16       message_request_size;
-
-    CipMessageRouterRequest     message_request;
-    CipMessageRouterResponse*   message_response;
-
-    EipUint8        reserved;
-    // CipRoutePath    route_path;      CipPortSegment?
-    void*           data;
-};
-
-
-// public functions
 
 /** @brief Initialize the data of the connection manager object
  */
@@ -93,34 +136,81 @@ CipConn* GetConnectionByProducingId( int aConnectionId );
 CipConn* GetConnectedOutputAssembly( int output_assembly_id );
 
 
-/** @brief Close the given connection
- *
- * This function will take the data form the connection and correctly closes the
- * connection (e.g., open sockets)
- * @param aConn the connection to be closed
- */
-void CloseConnection( CipConn* aConn );
-
 bool IsConnectedInputAssembly( int aInstanceId );
 
 // TODO: Missing documentation
 bool IsConnectedOutputAssembly( int aInstanceId );
 
-/** @brief Insert the given connection object to the list of currently active
- *  and managed connections.
- *
- * By adding a connection to the active connection list the connection manager
- * will perform the supervision and handle the timing (e.g., timeout,
- * production inhibit, etc).
- *
- * @param aConn the connection to be added.
+/**
+ * Class CipConnBox
+ * is a containter for CipConns, likely to be replace with std::vector someday.
+ * Used to hold an active list of CipConns, using CipConn->prev and ->next.
  */
-void AddNewActiveConnection( CipConn* aConn );
+class CipConnBox
+{
+public:
 
-// TODO: Missing documentation
-void RemoveFromActiveConnections( CipConn* aConn );
+    CipConnBox() :
+        head( NULL )
+    {}
 
-/// @brief External globals needed from connectionmanager.c
-extern CipConn* g_active_connection_list;
+    class iterator
+    {
+    public:
+        iterator( CipConn* aConn ) : p( aConn ) {}
+
+        iterator& operator ++()
+        {
+            p = p->next;
+            return *this;
+        }
+
+        iterator operator ++( int ) // post-increment and return initial position
+        {
+            iterator ret( p );
+            p = p->next;
+            return ret;
+        }
+
+        bool operator == ( const iterator& other ) const
+        {
+            return p == other.p;
+        }
+
+        bool operator != ( const iterator& other ) const
+        {
+            return p != other.p;
+        }
+
+        CipConn* operator->() const     { return p; }
+        CipConn* operator*() const      { return p; }
+        operator CipConn* () const      { return p; }
+
+    private:
+        CipConn*    p;
+    };
+
+    /**
+     * Function Insert
+     * inserts the given connection object to this list.
+     *
+     * By adding a connection to the active connection list the connection manager
+     * will perform the supervision and handle the timing (e.g., timeout,
+     * production inhibit, etc).
+     *
+     * @param aConn the connection to be added at the beginning.
+     */
+    void Insert( CipConn* aConn );
+
+    void Remove( CipConn* aConn );
+
+    iterator end()      const   { return iterator( NULL ); }
+    iterator begin()    const   { return iterator( head ); }
+
+protected:
+    CipConn* head;
+};
+
+extern CipConnBox g_active_conns;
 
 #endif // CIPSTER_CIPCONNECTIONMANAGER_H_

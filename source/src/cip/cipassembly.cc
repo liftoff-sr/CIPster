@@ -33,34 +33,34 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
 {
     if( attr->Data() )
     {
-        CipByteArray*   byte_array = (CipByteArray*) attr->Data();
+        ByteBuf*        byte_array = (ByteBuf*) attr->Data();
         CipInstance*    instance = attr->Instance();
 
         if( IsConnectedInputAssembly( instance->Id() ) )
         {
             CIPSTER_TRACE_WARN( "%s: received data for connected input assembly\n", __func__ );
-            response->general_status = kCipErrorAttributeNotSetable;
+            response->SetGenStatus( kCipErrorAttributeNotSetable );
         }
-        else if( request->data.size() < byte_array->length )
+        else if( request->Data().size() < byte_array->size() )
         {
             CIPSTER_TRACE_INFO( "%s: not enough data received.\n", __func__ );
-            response->general_status = kCipErrorNotEnoughData;
+            response->SetGenStatus( kCipErrorNotEnoughData );
         }
-        else if( request->data.size() > byte_array->length )
+        else if( request->Data().size() > byte_array->size() )
         {
             CIPSTER_TRACE_INFO( "%s: too much data received.\n", __func__ );
-            response->general_status = kCipErrorTooMuchData;
+            response->SetGenStatus( kCipErrorTooMuchData );
         }
         else
         {
             CIPSTER_TRACE_INFO(
                 "%s: writing %d bytes to assembly_id: %d.\n",
                 __func__,
-                (int) request->data.size(),
+                (int) request->Data().size(),
                 instance->Id()
                 );
 
-            memcpy( byte_array->data, request->data.data(), byte_array->length );
+            memcpy( byte_array->data(), request->Data().data(), byte_array->size() );
 
             if( AfterAssemblyDataReceived( instance ) != kEipStatusOk )
             {
@@ -72,18 +72,18 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
                  * take the data. In addition we have to inform the sender that the
                  * data was not ok.
                  */
-                response->general_status = kCipErrorInvalidAttributeValue;
+                response->SetGenStatus( kCipErrorInvalidAttributeValue );
             }
             else
             {
-                response->general_status = kCipErrorSuccess;
+                response->SetGenStatus( kCipErrorSuccess );
             }
         }
     }
     else
     {
         // attr->data was zero; this is a heartbeat assembly
-        response->general_status = kCipErrorTooMuchData;
+        response->SetGenStatus( kCipErrorTooMuchData );
     }
 
     return kEipStatusOkSend;
@@ -91,16 +91,14 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
 
 
 AssemblyInstance::AssemblyInstance( int aInstanceId, BufWriter aBuffer ) :
-    CipInstance( aInstanceId )
+    CipInstance( aInstanceId ),
+    byte_array( aBuffer.data(), aBuffer.capacity() )
 {
-    byte_array.length = aBuffer.capacity();
-    byte_array.data   = aBuffer.data();
-
     // Attribute 3 is the byte array transfer of the assembly data itself
     AttributeInsert( 3, getAttrAssemblyData, false, setAttrAssemblyData, &byte_array );
 
     // Attribute 4 Number of bytes in Attribute 3
-    AttributeInsert( 4, kCipUint, &byte_array.length, true, false );
+    AttributeInsert( 4, kCipByteArrayLength, &byte_array, true, false );
 }
 
 
@@ -138,14 +136,14 @@ public:
     {
     }
 
-    CipError OpenConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error ); // override
+    CipError OpenConnection( ConnectionData* aConn, Cpf* cpfd, ConnectionManagerStatusCode* extended_error ); // override
 };
 
 
-CipError CipAssemblyClass::OpenConnection( CipConn* aConn,
-    CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
+CipError CipAssemblyClass::OpenConnection( ConnectionData* aParams,
+    Cpf* cpfd, ConnectionManagerStatusCode* extended_error )
 {
-    return CipConnectionClass::OpenIO( aConn, cpfd, extended_error );
+    return CipConnectionClass::OpenIO( aParams, cpfd, extended_error );
 }
 
 
@@ -172,10 +170,10 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, BufReader 
     CipAttribute* attr3 = instance->Attribute( 3 );
     CIPSTER_ASSERT( attr3 );
 
-    CipByteArray* byte_array = (CipByteArray*) attr3->Data();
+    ByteBuf* byte_array = (ByteBuf*) attr3->Data();
     CIPSTER_ASSERT( byte_array );
 
-    if( byte_array->length != aBuffer.size() )
+    if( byte_array->size() != aBuffer.size() )
     {
         CIPSTER_TRACE_ERR( "%s: wrong amount of data arrived for assembly object\n", __func__ );
         return kEipStatusError;
@@ -185,7 +183,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, BufReader 
     }
     else
     {
-        memcpy( byte_array->data, aBuffer.data(), aBuffer.size() );
+        memcpy( byte_array->data(), aBuffer.data(), aBuffer.size() );
     }
 
     // notify application that new data arrived

@@ -38,9 +38,9 @@ CipAttribute::~CipAttribute()
 EipStatus CipAttribute::GetAttrData( CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    BufWriter out = response->data; // always copy response->data so it is not advanced.
+    BufWriter out = response->Writer();
 
-    response->data_length = EncodeData( attr->Type(), attr->Data(), out );
+    response->SetWrittenSize( EncodeData( attr->Type(), attr->Data(), out ) );
 
     return kEipStatusOkSend;
 }
@@ -49,7 +49,7 @@ EipStatus CipAttribute::GetAttrData( CipAttribute* attr,
 EipStatus CipAttribute::SetAttrData( CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    BufReader in = request->data;
+    BufReader in = request->Data();
 
     int out_count = DecodeData( attr->Type(), attr->Data(), in );
 
@@ -64,12 +64,12 @@ EipStatus CipAttribute::Get( CipMessageRouterRequest* request, CipMessageRouterR
 {
     if( !IsGetableSingle() )
     {
-        response->general_status = kCipErrorAttributeNotGettable;
+        response->SetGenStatus( kCipErrorAttributeNotGettable );
         return kEipStatusOkSend;
     }
-    else if( request->service == kGetAttributeAll && !IsGetableAll() )
+    else if( request->Service() == kGetAttributeAll && !IsGetableAll() )
     {
-        response->general_status = kCipErrorAttributeNotGettable;
+        response->SetGenStatus( kCipErrorAttributeNotGettable );
         return kEipStatusOkSend;
     }
     else
@@ -77,7 +77,7 @@ EipStatus CipAttribute::Get( CipMessageRouterRequest* request, CipMessageRouterR
         CIPSTER_TRACE_INFO(
             "%s: attribute:%d  class:'%s'  instance:%d\n",
             __func__,
-            request->request_path.GetAttribute(),
+            request->Path().GetAttribute(),
             Instance()->Id() == 0 ? ((CipClass*)Instance())->ClassName().c_str() :
                                     Instance()->Class()->ClassName().c_str(),
             Instance()->Id()
@@ -85,8 +85,8 @@ EipStatus CipAttribute::Get( CipMessageRouterRequest* request, CipMessageRouterR
 
         EipStatus ret = getter( this, request, response );
 
-        CIPSTER_TRACE_INFO( "%s: attribute_id:%d  len:%d\n",
-            __func__, Id(), response->data_length );
+        CIPSTER_TRACE_INFO( "%s: attribute_id:%d  len:%u\n",
+            __func__, Id(), response->WrittenSize() );
 
         return ret;
     }
@@ -98,7 +98,7 @@ EipStatus CipAttribute::Set( CipMessageRouterRequest* request, CipMessageRouterR
     if( !IsSetableSingle() )
     {
         // it is an attribute we have, however this attribute is not setable
-        response->general_status = kCipErrorAttributeNotSetable;
+        response->SetGenStatus( kCipErrorAttributeNotSetable );
         return kEipStatusOkSend;
     }
     else

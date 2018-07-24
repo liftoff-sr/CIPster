@@ -102,14 +102,82 @@ CipClass* GetCipClass( int class_id )
 
 
 
-//-----------------------------------------------------------------------------
+//-----<CipMessageRounterRequest>-----------------------------------------------
 
+int CipMessageRouterRequest::Serialize( BufWriter aOutput, int aCtl ) const
+{
+    BufWriter out = aOutput;
+
+    out.put8( service );
+
+    // out + 1 skips over unset word count byte.
+    int rplen = path.Serialize( out + 1, aCtl );
+
+    out.put8( rplen / 2 );     // set word count = byte_count / 2
+
+    out += rplen;   // skip over path
+
+    out.append( Data().data(), Data().size() );
+
+    return out.data() - aOutput.data();
+}
+
+
+int CipMessageRouterRequest::SerializedCount( int aCtl ) const
+{
+    return 2 + path.SerializedCount( aCtl ) + Data().size();
+}
+
+
+int CipMessageRouterRequest::DeserializeMRReq( BufReader aRequest )
+{
+    BufReader in = aRequest;
+
+    service = (CIPServiceCode) in.get8();
+
+    unsigned byte_count = in.get8() * 2;     // word count x 2
+
+    if( byte_count > in.size() )
+    {
+        return -1;
+    }
+
+    // limit the length of the request input so it pertains only to request path
+    BufReader rpath( in.data(), byte_count );
+
+    // Vol1 2-4.1.1
+    CipElectronicKeySegment key;
+
+    int result = key.DeserializeElectronicKey( rpath );
+
+    if( result < 0 )
+        return result;
+
+    rpath += result;
+
+    result = path.DeserializeAppPath( rpath );
+
+    if( result < 0 )
+        return result;
+
+    int bytes_consumed = rpath.data() - aRequest.data() + result;
+
+    // set this->data for service functions, it consists of the remaining
+    // part of the message, the part identified as "Request_Data" in Vol1 2-4.1
+    data = aRequest + bytes_consumed;
+
+    return bytes_consumed;
+}
+
+
+
+//-----<CipMessageRounterResponse>----------------------------------------------
 
 std::vector<EipByte> CipMessageRouterResponse::mmr_temp( CIPSTER_MESSAGE_DATA_REPLY_BUFFER );
 
-CipMessageRouterResponse::CipMessageRouterResponse( CipCommonPacketFormatData* aCPFD ) :
+CipMessageRouterResponse::CipMessageRouterResponse( Cpf* aCpf ) :
     data ( mmr_temp.data(), mmr_temp.size() ),
-    cpfd( aCPFD )
+    cpf( aCpf )
 {
     Clear();
 }
@@ -117,30 +185,65 @@ CipMessageRouterResponse::CipMessageRouterResponse( CipCommonPacketFormatData* a
 
 void CipMessageRouterResponse::Clear()
 {
-    reply_service = 0;
-    reserved = 0;
+    reply_service = CIPServiceCode( 0 );
     general_status = kCipErrorSuccess,
     size_of_additional_status = 0;
-
-    data_length = 0;
-
-    // shared resizeable response buffer.
+    written_size = 0;
 
     memset( additional_status, 0, sizeof additional_status );
 }
 
 
-int CipMessageRouterResponse::SerializeMRResponse( BufWriter aOutput )
+int CipMessageRouterResponse::DeserializeMRRes( BufReader aReply )
+{
+    BufReader in = aReply;
+
+    reply_service = CIPServiceCode( in.get8() & 0x7f );
+
+    in.get8();      // gobble "reserved"
+
+    SetGenStatus( (CipError) in.get8() );
+
+    size_of_additional_status = in.get8();
+
+    for( int i = 0; i < size_of_additional_status;  ++i )
+    {
+        if( i == DIM(additional_status) )
+            throw std::overflow_error(
+                "CipMessageRouterRespoinse::DeserializeMRRes(): too many additional status words" );
+
+        additional_status[i] = in.get16();
+    }
+
+    // all of the remaining bytes are considered response_data
+    SetWriter( BufWriter( (CipByte*) in.data(), in.size() ) );
+    SetWrittenSize( in.size() );
+
+    return aReply.size();
+}
+
+
+int CipMessageRouterResponse::SerializedCount( int aCtl ) const
+{
+    return      + 4                                 // at least 4 bytes of status
+                + (2 * size_of_additional_status)   // optional additional status
+                + WrittenSize();                    // actual reply data which is in "data"
+}
+
+
+int CipMessageRouterResponse::Serialize( BufWriter aOutput, int aCtl ) const
 {
     BufWriter out = aOutput;
 
     out.put8( reply_service | 0x80 );
-    out.put8( reserved );
+    out.put8( 0 );                      // reserved
     out.put8( general_status );
     out.put8( size_of_additional_status );
 
     for( int i = 0;  i < size_of_additional_status;  ++i )
         out.put16( additional_status[i] );
+
+    out.append( Reader() );
 
     return out.data() - aOutput.data();
 }
@@ -163,9 +266,9 @@ CipMessageRouterClass::CipMessageRouterClass() :
 
 static CipConn* getFreeExplicitConnection()
 {
-    for( int i = 0; i < CIPSTER_CIP_NUM_EXPLICIT_CONNS; i++ )
+    for( int i = 0; i < DIM( g_explicit_connections );  ++i )
     {
-        if( g_explicit_connections[i].state == kConnectionStateNonExistent )
+        if( g_explicit_connections[i].State() == kConnectionStateNonExistent )
             return &g_explicit_connections[i];
     }
 
@@ -173,45 +276,44 @@ static CipConn* getFreeExplicitConnection()
 }
 
 
-CipError CipMessageRouterClass::OpenConnection( CipConn* aConn,
-            CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error )
+CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConn,
+            Cpf* cpfd, ConnectionManagerStatusCode* extended_error )
 {
     CipError ret = kCipErrorSuccess;
-
-    EipUint32 producing_connection_id_buffer;
 
     // TODO add check for transport type trigger
     // if (0x03 == (g_stDummyCipConn.TransportTypeClassTrigger & 0x03))
 
-    CipConn* explicit_connection = getFreeExplicitConnection();
+    CipConn* ex_conn = getFreeExplicitConnection();
 
-    if( !explicit_connection )
+    if( !ex_conn )
     {
         ret = kCipErrorConnectionFailure;
 
         *extended_error = kConnectionManagerStatusCodeErrorNoMoreConnectionsAvailable;
     }
+
     else
     {
-        CopyConnectionData( explicit_connection, aConn );
+        CopyConnectionData( ex_conn, aConn );
 
-        producing_connection_id_buffer = explicit_connection->producing_connection_id;
+        EipUint32 saved = ex_conn->producing_connection_id;
 
-        GeneralConnectionConfiguration( explicit_connection );
+        ex_conn->GeneralConnectionConfiguration();
 
-        explicit_connection->producing_connection_id = producing_connection_id_buffer;
-        explicit_connection->instance_type = kConnInstanceTypeExplicit;
+        ex_conn->producing_connection_id = saved;
 
-        explicit_connection->consuming_socket = kEipInvalidSocket;
-        explicit_connection->producing_socket = kEipInvalidSocket;
+        ex_conn->SetInstanceType( kConnInstanceTypeExplicit );
 
-        // set the connection call backs
-        explicit_connection->connection_close_function = RemoveFromActiveConnections;
+#if 1
+        CIPSTER_ASSERT( ex_conn->ConsumingSocket() == kEipInvalidSocket );
+        CIPSTER_ASSERT( ex_conn->ProducingSocket() == kEipInvalidSocket );
+#else
+        ex_conn->SetConsumingSocket( kEipInvalidSocket );
+        ex_conn->SetProducingSocket( kEipInvalidSocket );
+#endif
 
-        // explicit connection have to be closed on time out
-        explicit_connection->connection_timeout_function = RemoveFromActiveConnections;
-
-        AddNewActiveConnection( explicit_connection );
+        g_active_conns.Insert( ex_conn );
     }
 
     return ret;
@@ -252,14 +354,14 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
 
     CipMessageRouterRequest request;
 
-    int result = request.DeserializeMRR( aCommand );
+    int result = request.DeserializeMRReq( aCommand );
 
-    aResponse->reply_service = request.service;
+    aResponse->SetService( request.Service() );
 
     if( result <= 0 )
     {
         CIPSTER_TRACE_ERR( "notifyMR: error from createMRRequeststructure\n" );
-        aResponse->general_status = kCipErrorPathSegmentError;
+        aResponse->SetGenStatus( kCipErrorPathSegmentError );
         return kEipStatusOkSend;
     }
 
@@ -267,7 +369,7 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
 
     int instance_id;
 
-    if( request.request_path.HasSymbol() )
+    if( request.Path().HasSymbol() )
     {
         instance_id = 0;   // talk to class 06b instance 0
 
@@ -289,17 +391,17 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
 #endif
 
     }
-    else if( request.request_path.HasInstance() )
+    else if( request.Path().HasInstance() )
     {
-        instance_id = request.request_path.GetInstance();
-        clazz = GetCipClass( request.request_path.GetClass() );
+        instance_id = request.Path().GetInstance();
+        clazz = GetCipClass( request.Path().GetClass() );
     }
     else
     {
         CIPSTER_TRACE_WARN( "%s: no instance specified\n", __func__ );
 
         // instance_id was not in the request
-        aResponse->general_status = kCipErrorPathDestinationUnknown;
+        aResponse->SetGenStatus( kCipErrorPathDestinationUnknown );
         return kEipStatusOkSend;
     }
 
@@ -308,20 +410,25 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
         CIPSTER_TRACE_ERR(
             "%s: un-registered class in request path:'%s'\n",
             __func__,
-            request.request_path.Format().c_str()
+            request.Path().Format().c_str()
             );
 
-        // According to the test tool this should be the correct error flag
-        // instead of CIP_ERROR_OBJECT_DOES_NOT_EXIST;
-        aResponse->general_status = kCipErrorPathDestinationUnknown;
+        aResponse->SetGenStatus( kCipErrorPathDestinationUnknown );
         return kEipStatusOkSend;
     }
 
-    CipService* service = clazz->Service( request.service );
+    // The conformance tool wants to know about kCipErrorServiceNotSupported errors
+    // before wanting to know about kCipErrorPathDestinationUnknown errors, so
+    // the order of these next two if() tests is very important.
+
+    CipService* service = instance_id == 0 ?
+            clazz->Class()->Service( request.Service() ) :  // meta-class
+            clazz->Service( request.Service() );
+
     if( !service )
     {
 #if 0
-        if( request.service == kGetAttributeAll && instance_id == 0 && clazz->ClassId() == 6 )
+        if( request.Service() == kGetAttributeSingle && instance_id == 1 && clazz->ClassId() == 1 )
         {
             int break_here = 1;
         }
@@ -329,9 +436,9 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
 
         CIPSTER_TRACE_WARN( "%s: service 0x%02x not found\n",
                 __func__,
-                request.service );
+                request.Service() );
 
-        aResponse->general_status = kCipErrorServiceNotSupported;
+        aResponse->SetGenStatus( kCipErrorServiceNotSupported );
         return kEipStatusOkSend;
     }
 
@@ -340,7 +447,7 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
     {
         CIPSTER_TRACE_WARN( "%s: instance %d does not exist\n", __func__, instance_id );
 
-        aResponse->general_status = kCipErrorPathDestinationUnknown;
+        aResponse->SetGenStatus( kCipErrorPathDestinationUnknown );
         return kEipStatusOkSend;
     }
 
@@ -348,7 +455,7 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
         "%s: targeting instance %d of class %s with service %s\n",
         __func__,
         instance_id,
-        instance->Class()->ClassName().c_str(),
+        clazz->ClassName().c_str(),
         service->ServiceName().c_str()
         );
 
@@ -366,44 +473,3 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
 
     return status;
 }
-
-
-int CipMessageRouterRequest::DeserializeMRR( BufReader aRequest )
-{
-    BufReader in = aRequest;
-
-    service = in.get8();
-
-    unsigned byte_count = in.get8() * 2;     // word count x 2
-
-    if( byte_count > in.size() )
-    {
-        return -1;
-    }
-
-    // limit the length of the request input so it pertains only to request path
-    BufReader rpath( in.data(), byte_count );
-
-    // Vol1 2-4.1.1
-    CipElectronicKeySegment key;
-
-    int result = key.DeserializeElectronicKey( rpath );
-
-    if( result < 0 )
-        return result;
-
-    rpath += result;
-
-    result = request_path.DeserializeAppPath( rpath );
-
-    if( result < 0 )
-        return result;
-
-    int bytes_consumed = rpath.data() - aRequest.data() + result;
-
-    // set this->data for service functions
-    data = aRequest + bytes_consumed;
-
-    return bytes_consumed;
-}
-

@@ -30,8 +30,11 @@ typedef int32_t     EipInt32;   ///< 32-bit signed number
 typedef uint8_t     EipUint8;   ///< 8-bit unsigned number
 typedef uint16_t    EipUint16;  ///< 16-bit unsigned number
 typedef uint32_t    EipUint32;  ///< 32-bit unsigned number
+typedef int64_t     EipInt64;   ///< 64-bit signed number
+typedef uint64_t    EipUint64;  ///< 64-bit unsigned number
 typedef float       EipFloat;   ///< IEEE 754 32-bit floating point number
 typedef double      EipDfloat;  ///< IEEE 754 64-bit floating point number
+
 
 /** @brief Data types as defined in the CIP Specification Vol 1 Appendix C
  */
@@ -48,9 +51,6 @@ typedef int16_t     CipInt;     ///< 16-bit signed integer
 typedef int32_t     CipDint;    ///< 32-bit signed integer
 typedef float       CipReal;    ///< 32-bit IEEE 754 floating point
 typedef double      CipLreal;   ///< 64-bit IEEE 754 floating point
-
-typedef int64_t     EipInt64;   ///< 64-bit signed number
-typedef uint64_t    EipUint64;  ///< 64-bit unsigned number
 
 typedef int64_t     CipLint;    ///< 64-bit signed integer
 typedef uint64_t    CipUlint;   ///< 64-bit unsignedeger
@@ -80,19 +80,22 @@ static const int kEipInvalidSocket = -1;
  */
 
 
-/** @brief EIP stack status enum
- *
+/**
+ * Enum EipStatus
+ * is a set of status values which are returned by API functions.
  */
 enum EipStatus
 {
-    kEipStatusOk      = 0,  ///< Stack is ok
-    kEipStatusOkSend  = 1,  ///< Stack is ok, after send
-    kEipStatusError   = -1  ///< Stack is in error
+    kEipStatusOk      = 0,
+    kEipStatusOkSend  = 1,
+    kEipStatusError   = -1,
 };
 
 
-/** @brief Communication direction of an UDP socket; consuming is receiver,
- * producing is sender
+/**
+ * Enum UdpCommunicationDirection
+ * is a set of two directions: inbound or outbound data in the parlance of
+ * CIP which returns to them as consuming or producing.
  *
  * These are used as array indexes, watch out if changing these values
  */

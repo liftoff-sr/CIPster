@@ -20,13 +20,13 @@
 //* @brief Assembly Class Code
 enum ClassIds
 {
-    kCipIdentityClass = 0x01,
-    kCipMessageRouterClass = 0x02,
-    kCipAssemblyClass = 0x04,
-    kCipConnectionClass = 0x05,
-    kCipConnectionManagerClass = 0x06,
-    kCipTcpIpInterfaceClass = 0xF5,
-    kCipEthernetLinkClass = 0xF6,
+    kCipIdentityClass           = 0x01,
+    kCipMessageRouterClass      = 0x02,
+    kCipAssemblyClass           = 0x04,
+    kCipConnectionClass         = 0x05,
+    kCipConnectionManagerClass  = 0x06,
+    kCipTcpIpInterfaceClass     = 0xF5,
+    kCipEthernetLinkClass       = 0xF6,
 };
 
 
@@ -121,13 +121,16 @@ enum CipDataType
     kCip6Usint = 0xA2,                          ///< Struct for MAC Address (six USINTs)
     kCipMemberList  = 0xA3,                     ///<
     kCipByteArray   = 0xA4,                     ///<
+
+    // non standard, could assign any value here
+    kCipByteArrayLength = 0xA5,
 };
 
 
 /**
  * Enum CIPServiceCode
  * is the set of CIP service codes.
- * Common services codes range from 0x01 to 0x1c.  Beyond that there can
+ * Common service codes range from 0x01 to 0x1c.  Beyond that there can
  * be class or instance specific service codes and some may overlap.
  */
 enum CIPServiceCode
@@ -165,18 +168,6 @@ enum CIPServiceCode
 };
 
 
-/// Definition of Get and Set Flags for CIP Attributes
-enum CIPAttributeFlag           // TODO: Rework
-{
-    kNotSetOrGetable= 0,        ///< Neither set-able nor get-able
-    kGetAll         = 1<<0,     ///< Get-able via CipClass::GetAttributeAll()
-    kGetSingle      = 1<<1,     ///< Get-able via CipClass::GetAttribute()
-    kSetSingle      = 1<<2,     ///< Set-able via CipClass::SetAttribute()
-
-    kSetAndGet      = kGetAll | kGetSingle | kSetSingle,
-};
-
-
 enum IoConnectionEvent
 {
     kIoConnectionEventOpened,
@@ -185,15 +176,13 @@ enum IoConnectionEvent
 };
 
 
-struct CipByteArray
-{
-    EipUint16   length;     ///< Length of the Byte Array
-    EipByte*    data;       ///< Pointer to the data
-};
-
-
 struct CipRevision
 {
+    CipRevision( EipUint8 aMajor = 0, EipUint8 aMinor = 0 ) :
+        major_revision( aMajor ),
+        minor_revision( aMinor )
+    {}
+
     EipUint8    major_revision;
     EipUint8    minor_revision;
 };
@@ -207,11 +196,10 @@ class CipMessageRouterResponse;
 class CipConn;
 
 
-class CipCommonPacketFormatData;
+class Cpf;
 
 
-// these are used for creating the getAttributeAll masks
-// TODO there might be a way simplifying this using __VARARGS__ in #define
+// Macros to create integer with bitfields
 #define MASK1( a )          ( 1 << (a) )
 #define MASK2( a, b )       ( 1 << (a) | 1 << (b) )
 #define MASK3( a, b, c )    ( 1 << (a) | 1 << (b) | 1 << (c) )
@@ -229,7 +217,4 @@ class CipCommonPacketFormatData;
     ( 1 << (a) | 1 << (b) | 1 << (c) | 1 << (d) | 1 << (e) | 1 << (f) | \
       1 << (g) | 1 << (h) )
 
-#define OR7( a, b, c, d, e, f, g ) \
-    ( (a)<<6 | (b)<<5 | (c)<<4 | (d)<<3 | (e)<<2 || (f)<<1 || (g) )
-
-#endif // CIPSTER_CIPTYPES_H_
+#endif  // CIPSTER_CIPTYPES_H_

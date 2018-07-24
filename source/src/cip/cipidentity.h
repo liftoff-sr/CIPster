@@ -43,14 +43,16 @@ enum CipIdentityExtendedStatus
 };
 
 
-/** @brief CIP Identity object constructor
+/**
+ * Function CipIdentityInit
+ * sets up the CIP Identity class and instance.
  *
- * @returns EipError if the class could not be created, otherwise EipOk
+ * @return EipStatus - EipError if failure, else EipOk
  */
 EipStatus CipIdentityInit();
 
 
-// values needed from the CIP identity object
+// Publics from the CIP identity object
 extern EipUint16        vendor_id_;
 extern EipUint16        device_type_;
 extern EipUint16        product_code_;

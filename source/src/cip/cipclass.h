@@ -10,6 +10,8 @@
 #include "cipinstance.h"
 #include "cipservice.h"
 
+class ConnectionData;
+
 /**
  * Class CipClass
  * implements the CIP class spec.
@@ -30,7 +32,7 @@ public:
      * @param aClassId ID of the class
      * @param aClassName name of class
      *
-     * @param aClassAttributesMask is a bit map of common class attributes desired
+     * @param aClassAttributesMask is a bit map of desired common class attributes
      *  in this class.
      *
      * @param a_get_attribute_all_mask mask of which attribute Ids are included in the
@@ -44,10 +46,10 @@ public:
      * @param aRevision class revision
      */
     CipClass(
-        EipUint32   aClassId,
+        int         aClassId,
         const char* aClassName,
         int         aClassAttributesMask,
-        EipUint16   aRevision = 1
+        int         aRevision = 1
         );
 
     virtual ~CipClass();
@@ -177,12 +179,14 @@ public:
      * These include "Message Router" and "Assembly" classes at this time, but
      * user defined CipClasses can also override this function.
      *
-     * @param aConn The connection object which is opening the connection
+     * @param aParams Holds connection service parameters that identify how to
+     *   construction the connection.
      *
      * @param extended_error_code The returned error code of the connection object
      * @return CIPError
      */
-    virtual     CipError OpenConnection( CipConn* aConn, CipCommonPacketFormatData* cpfd, ConnectionManagerStatusCode* extended_error_code );
+    virtual     CipError OpenConnection( ConnectionData* aConn,
+        Cpf* cpfd, ConnectionManagerStatusCode* extended_error_code );
 
 protected:
 

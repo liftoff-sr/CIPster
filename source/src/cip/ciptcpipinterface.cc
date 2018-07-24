@@ -23,6 +23,8 @@ static CipTCPIPInterfaceClass* s_tcp;
 
 static CipUint s_inactivity_timeout = 120;  // spec default
 
+std::string CipTCPIPInterfaceInstance::hostname;
+
 
 CipTCPIPInterfaceInstance::CipTCPIPInterfaceInstance( int aInstanceId ) :
     CipInstance( aInstanceId ),
@@ -66,20 +68,20 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_4( CipAttribute* attribute,
         CipMessageRouterResponse* aResponse )
 {
     EipStatus   status = kEipStatusOkSend;
-    BufWriter   out = aResponse->data;
+    BufWriter   out = aResponse->Writer();
 
     CipAppPath app_path;
 
     app_path.SetClass( kCipEthernetLinkClass );
     app_path.SetInstance( attribute->Instance()->Id() );
 
-    int result = app_path.SerializeAppPath( out + 2 );
+    int result = app_path.Serialize( out + 2 );
 
     out.put16( result/2 );      // word count as 16 bits
 
     out += result;
 
-    aResponse->data_length = out.data() - aResponse->data.data();
+    aResponse->SetWrittenSize( out.data() - aResponse->Writer().data() );
 
     return status;
 }
@@ -89,7 +91,7 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_5( CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
-    BufWriter   out = aResponse->data;
+    BufWriter   out = aResponse->Writer();
 
     CipTCPIPInterfaceInstance* inst = static_cast<CipTCPIPInterfaceInstance*>( attribute->Instance() );
 
@@ -102,7 +104,7 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_5( CipAttribute* attribute,
     out.put32( ntohl( c.name_server_2 ) );
     out.put_STRING( c.domain_name );
 
-    aResponse->data_length = out.data() - aResponse->data.data();
+    aResponse->SetWrittenSize( out.data() - aResponse->Writer().data() );
 
     return kEipStatusOkSend;
 }
@@ -115,7 +117,7 @@ EipStatus CipTCPIPInterfaceInstance::get_multicast_config( CipAttribute* attribu
         CipMessageRouterResponse* aResponse )
 {
     EipStatus   status = kEipStatusOkSend;
-    BufWriter   out = aResponse->data;
+    BufWriter   out = aResponse->Writer();
 
     CipTCPIPInterfaceInstance* i = static_cast<CipTCPIPInterfaceInstance*>( attribute->Instance() );
 
@@ -126,7 +128,7 @@ EipStatus CipTCPIPInterfaceInstance::get_multicast_config( CipAttribute* attribu
     EipUint32 ma = ntohl( i->multicast_configuration.starting_multicast_address );
     out.put32( ma );
 
-    aResponse->data_length = out.data() - aResponse->data.data();
+    aResponse->SetWrittenSize( out.data() - aResponse->Writer().data() );
     return status;
 }
 
@@ -135,7 +137,7 @@ EipStatus CipTCPIPInterfaceInstance::set_multicast_config( CipAttribute* attribu
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
-    BufReader   in = aRequest->data;
+    BufReader   in = aRequest->Data();
     CipTCPIPInterfaceInstance* i = static_cast<CipTCPIPInterfaceInstance*>( attribute->Instance() );
     MulticastAddressConfiguration* mc = &i->multicast_configuration;
 
@@ -152,13 +154,13 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_7( CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
-    BufWriter out = aResponse->data;
+    BufWriter out = aResponse->Writer();
 
     // insert 6 zeros for the required empty safety network number
     // according to Table 5-4.15
     out.fill( 6 );
 
-    aResponse->data_length = 6;
+    aResponse->SetWrittenSize( 6 );
 
     return kEipStatusOkSend;
 }
@@ -169,8 +171,7 @@ EipStatus CipTCPIPInterfaceInstance::set_attr_13( CipAttribute* attribute,
         CipMessageRouterResponse* aResponse )
 {
     // all instances are sharing a common value for this attribute so ignore instance
-
-    s_inactivity_timeout = aRequest->data.get16();
+    s_inactivity_timeout = BufReader( aRequest->Data() ).get16();
 
     // [write it to disk here?]
 
@@ -183,10 +184,10 @@ EipStatus CipTCPIPInterfaceInstance::set_TTL( CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
-    uint8_t ttl = aRequest->data.get8();
+    uint8_t ttl  = BufReader( aRequest->Data() ).get8();
 
     if( ttl == 0 )
-        aResponse->general_status = kCipErrorInvalidAttributeValue;
+        aResponse->SetGenStatus( kCipErrorInvalidAttributeValue );
     else
         *(uint8_t*)attribute->Data() = ttl;
 
@@ -270,7 +271,7 @@ EipStatus CipTCPIPInterfaceClass::get_all( CipInstance* aInstance,
 {
     CipTCPIPInterfaceInstance* i = static_cast< CipTCPIPInterfaceInstance* >( aInstance );
 
-    BufWriter out = aResponse->data;
+    BufWriter out = aResponse->Writer();
 
     // output attributes 1, 2, & 3
     out.put32( i->tcp_status )
@@ -281,7 +282,7 @@ EipStatus CipTCPIPInterfaceClass::get_all( CipInstance* aInstance,
     CipAppPath app_path;
     app_path.SetClass( kCipEthernetLinkClass );
     app_path.SetInstance( i->Id() );
-    int path_len = app_path.SerializeAppPath( out + 2 );
+    int path_len = app_path.Serialize( out + 2 );
     out.put16( path_len/2 );      // word count as 16 bits
     out += path_len;
 
@@ -322,7 +323,7 @@ EipStatus CipTCPIPInterfaceClass::get_all( CipInstance* aInstance,
     // attribute 13
     out.put16( s_inactivity_timeout );
 
-    aResponse->data_length = out.data() - aResponse->data.data();
+    aResponse->SetWrittenSize( out.data() - aResponse->Writer().data() );
 
     return kEipStatusOk;
 }
@@ -354,6 +355,13 @@ EipByte CipTCPIPInterfaceClass::TTL( int aInstanceId )
 }
 
 
+CipUdint CipTCPIPInterfaceClass::IpAddress( int aInstanceId )
+{
+    CipTCPIPInterfaceInstance* inst = s_tcp->Instance( aInstanceId );
+    return inst->interface_configuration.ip_address;
+}
+
+
 EipStatus CipTCPIPInterfaceClass::ConfigureNetworkInterface( int aInstanceId,
         const char* ip_address,
         const char* subnet_mask,
@@ -365,19 +373,25 @@ EipStatus CipTCPIPInterfaceClass::ConfigureNetworkInterface( int aInstanceId,
 }
 
 
-void CipTCPIPInterfaceClass::ConfigureDomainName( int aInstanceId, const char* domain_name )
+void CipTCPIPInterfaceClass::ConfigureDomainName( int aInstanceId, const char* aDomainName )
 {
     CipTCPIPInterfaceInstance* inst = s_tcp->Instance( aInstanceId );
 
-    inst->interface_configuration.domain_name = domain_name;
+    inst->interface_configuration.domain_name = aDomainName;
 }
 
 
-void CipTCPIPInterfaceClass::ConfigureHostName( int aInstanceId, const char* hostname )
+void CipTCPIPInterfaceClass::ConfigureHostName( int aInstanceId, const char* aHostName )
 {
+#if 0
+    CipTCPIPInterfaceInstance::hostname = aHostName;
+#else
+
+    // should be equivalent to above
     CipTCPIPInterfaceInstance* inst = s_tcp->Instance( aInstanceId );
 
-    inst->hostname = hostname;
+    inst->hostname = aHostName;
+#endif
 }
 
 

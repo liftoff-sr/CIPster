@@ -16,9 +16,6 @@
 #include <ciptcpipinterface.h>
 
 
-const int kSupportedProtocolVersion = 1;                ///< Supported Encapsulation protocol version
-
-
 int ServerSessionMgr::sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];
 
 
@@ -62,13 +59,149 @@ static DelayedMsg s_delayed_messages[ENCAP_NUMBER_OF_SUPPORTED_DELAYED_ENCAP_MES
 
 
 //   @brief Initializes session list and interface information.
-void EncapsulationInit()
+void Encapsulation::Init()
 {
     int stack_var;
 
     srand( (unsigned) (uintptr_t) &stack_var );
 
     ServerSessionMgr::Init();
+}
+
+
+void Encapsulation::ShutDown()
+{
+    ServerSessionMgr::Shutdown();
+}
+
+
+int Encapsulation::EnsuredTcpRecv( int aSocket, EipByte* aDest, int aByteCount )
+{
+    int i;
+    int numRead;
+
+    for( i=0;  i < aByteCount;  i += numRead )
+    {
+        numRead = recv( aSocket, (char*) aDest+i, aByteCount - i, 0 );
+        if( numRead == 0 )
+            break;
+
+        else if( numRead == -1 )
+        {
+            i = -1;
+            break;
+        }
+    }
+
+    return i;
+}
+
+
+static int disposeOfLargePacket( int aSocket, size_t aByteCount )
+{
+    EipByte junk_buf[256];
+
+    // toss in chunks.
+
+    while( aByteCount )
+    {
+        int readz = std::min( aByteCount, sizeof junk_buf );
+
+        int num_read = Encapsulation::EnsuredTcpRecv( aSocket, junk_buf, readz );
+
+        if( num_read != readz )
+            return -1;
+
+#if defined(DEBUG)
+        byte_dump( "bigTCP", junk_buf, num_read );
+#endif
+
+        aByteCount -= num_read;
+    }
+
+    return 0;
+}
+
+
+int Encapsulation::ReceiveTcpMsg( int aSocket, BufWriter aMsg )
+{
+    EipByte* start = aMsg.data();
+
+    CIPSTER_TRACE_INFO( "%s[%d]:\n", __func__, aSocket );
+
+    if( aMsg.capacity() < ENCAPSULATION_HEADER_LENGTH )
+    {
+        CIPSTER_TRACE_ERR( "%s[%d]: aMsg size is too small\n", __func__, aSocket );
+        return -1;
+    }
+
+    int num_read = EnsuredTcpRecv( aSocket, aMsg.data(), ENCAPSULATION_HEADER_LENGTH );
+
+    if( num_read == 0 )
+    {
+        CIPSTER_TRACE_ERR( "%s[%d]: other end of socket closed by client\n",
+                __func__, aSocket );
+        return -1;
+    }
+
+    if( num_read < ENCAPSULATION_HEADER_LENGTH )
+    {
+        CIPSTER_TRACE_ERR( "%s[%d]: recv() error: %s\n",
+                __func__, aSocket, strerror(errno) );
+        return -1;
+    }
+
+    unsigned remaining = start[2] | (start[3] << 8);
+
+    // advance BufWriter's pointer
+    aMsg += ENCAPSULATION_HEADER_LENGTH;
+
+    if( remaining > aMsg.capacity() )
+    {
+#if defined(DEBUG)
+        byte_dump( "rBAD", start, ENCAPSULATION_HEADER_LENGTH );
+#endif
+
+        CIPSTER_TRACE_ERR(
+                "%s[%d]: packet len=%u is too big for #defined CIPSTER_ETHERNET_BUFFER_SIZE,\n"
+                "ignoring entire packet with Encap.command=0x%x\n",
+                __func__, aSocket, remaining + CIPSTER_ETHERNET_BUFFER_SIZE,
+                start[0] | (start[1] << 8)
+                );
+
+        return disposeOfLargePacket( aSocket, remaining );
+    }
+
+    num_read = EnsuredTcpRecv( aSocket, aMsg.data(), remaining );
+
+    if( num_read < 0 )
+    {
+        CIPSTER_TRACE_ERR( "%s[%d]: error on recv: %s\n",
+                __func__, aSocket, strerror(errno) );
+        return kEipStatusError;
+    }
+
+    if( num_read < remaining )      // connection closed by client
+    {
+        CIPSTER_TRACE_ERR( "%s[%d]: connection closed by client: %s\n",
+                __func__, aSocket, strerror(errno) );
+        return kEipStatusError;
+    }
+
+    num_read += ENCAPSULATION_HEADER_LENGTH;
+
+#if defined(DEBUG)
+    byte_dump( "rTCP", start, num_read );
+#endif
+
+    (void) start;
+
+    CIPSTER_TRACE_INFO( "%s[%d]: received %d TCP bytes, command=0x%x\n",
+            __func__, aSocket, num_read,
+            start[0] | (start[1] << 8)
+            );
+
+    return num_read;
 }
 
 
@@ -107,7 +240,8 @@ static unsigned determineDelayTimeMSecs( unsigned aMaxMSecs )
 }
 
 
-EncapsulationProtocolErrorCode ServerSessionMgr::RegisterSession( int aSocket, CipUdint* aSessionHandleResult )
+EncapsulationProtocolErrorCode ServerSessionMgr::RegisterSession(
+        int aSocket, CipUdint* aSessionHandleResult )
 {
     for( int i = 0; i < DIM(sessions); ++i )
     {
@@ -115,7 +249,7 @@ EncapsulationProtocolErrorCode ServerSessionMgr::RegisterSession( int aSocket, C
         {
             // The socket has already registered a session. This is not allowed.
             // Return the already assigned session back, the cip spec is
-            // not clear about this needs to be tested.
+            // not clear about this.
             *aSessionHandleResult = i + 1;
             return  kEncapsulationProtocolInvalidOrUnsupportedCommand;
         }
@@ -143,7 +277,7 @@ EncapsulationProtocolErrorCode ServerSessionMgr::RegisterSession( int aSocket, C
  * @param aReply where to put reply
  * @return int - num bytes serialized into aReply
  */
-static int registerSession( int socket, BufReader aCommand, BufWriter aReply,
+int Encapsulation::registerSession( int socket, BufReader aCommand, BufWriter aReply,
         EncapsulationProtocolErrorCode* aEncapError, CipUdint* aSessionHandleResult )
 {
     *aEncapError = kEncapsulationProtocolSuccess;
@@ -172,7 +306,6 @@ static int registerSession( int socket, BufReader aCommand, BufWriter aReply,
 
     return out.data() - aReply.data();
 }
-
 
 
 void ServerSessionMgr::Init()
@@ -213,22 +346,27 @@ bool ServerSessionMgr::CheckRegisteredSession( CipUdint aSessionHandle )
 }
 
 
-void ServerSessionMgr::CloseSession( int aSocket )
+bool ServerSessionMgr::CloseSession( int aSocket )
 {
+    CIPSTER_TRACE_INFO( "%s: %d\n", __func__, aSocket );
     for( int i = 0; i < DIM(sessions); ++i )
     {
         if( sessions[i] == aSocket )
         {
             CloseSocket( aSocket );
             sessions[i] = kEipInvalidSocket;
-            break;
+            return true;
         }
     }
+
+    return false;
 }
 
 
 EncapsulationProtocolErrorCode ServerSessionMgr::UnregisterSession( CipUdint aSessionHandle )
 {
+    CIPSTER_TRACE_INFO( "%s: handle:%d\n",  __func__, aSessionHandle );
+
     if( aSessionHandle && aSessionHandle <= CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS )
     {
         int ndx = aSessionHandle - 1;
@@ -246,12 +384,12 @@ EncapsulationProtocolErrorCode ServerSessionMgr::UnregisterSession( CipUdint aSe
 }
 
 
-static int encapsulateListIdentyResponseMessage( BufWriter aReply )
+int Encapsulation::serializeListIdentityResponse( BufWriter aReply )
 {
     BufWriter out = aReply;
 
     out.put16( 1 );       // Item count: one item
-    out.put16( kCipItemIdListIdentityResponse );
+    out.put16( kCpfIdListIdentityResponse );
 
     // at this byte offset the real length will be inserted below
     BufWriter id_length = out;
@@ -261,7 +399,7 @@ static int encapsulateListIdentyResponseMessage( BufWriter aReply )
     out.put16( kSupportedProtocolVersion );
 
     out.put16BE( AF_INET );
-    out.put16BE( kOpenerEthernetPort );
+    out.put16BE( kEthernet_IP_Port );
     out.put32BE( ntohl( CipTCPIPInterfaceClass::InterfaceConf( 1 ).ip_address ) );
 
     out.fill( 8 );
@@ -284,12 +422,13 @@ static int encapsulateListIdentyResponseMessage( BufWriter aReply )
 }
 
 
-static int handleReceivedListIdentityCommandImmediate( BufWriter aReply )
+int Encapsulation::handleReceivedListIdentityCommandImmediate( BufWriter aReply )
 {
-    return encapsulateListIdentyResponseMessage( aReply );
+    return serializeListIdentityResponse( aReply );
 }
 
-static int handleReceivedListIdentityCommandDelayed( int socket, const sockaddr_in* from_address,
+
+int Encapsulation::handleReceivedListIdentityCommandDelayed( int socket, const sockaddr_in* from_address,
         unsigned aMSecDelay, BufReader aCommand )
 {
     DelayedMsg* delayed = NULL;
@@ -314,7 +453,7 @@ static int handleReceivedListIdentityCommandDelayed( int socket, const sockaddr_
 
         out.append( aCommand.data(), ENCAPSULATION_HEADER_LENGTH );
 
-        delayed->message_size = encapsulateListIdentyResponseMessage( out );
+        delayed->message_size = serializeListIdentityResponse( out );
 
         BufWriter len( delayed->message + 2, 2 );
 
@@ -327,11 +466,11 @@ static int handleReceivedListIdentityCommandDelayed( int socket, const sockaddr_
 }
 
 
-static int handleReceivedListInterfacesCommand( BufWriter aReply )
+int Encapsulation::handleReceivedListInterfacesCommand( BufWriter aReply )
 {
     BufWriter out = aReply;
 
-    // vOL2 2-4.3.3 At present no public items are defined for the ListInterfaces reply.
+    // Vol2 2-4.3.3 At present no public items are defined for the ListInterfaces reply.
     out.put16( 0 );
 
     return out.data() - aReply.data();
@@ -344,7 +483,7 @@ static int handleReceivedListInterfacesCommand( BufWriter aReply )
  * @param aReply where to put the reply
  * @return int - the number of bytes put into aReply or -1 if buffer overrun.
  */
-static int handleReceivedListServicesCommand( BufWriter aReply )
+int Encapsulation::handleReceivedListServicesCommand( BufWriter aReply )
 {
     BufWriter out = aReply;
 
@@ -353,7 +492,7 @@ static int handleReceivedListServicesCommand( BufWriter aReply )
     try
     {
         out.put16( 1 );
-        out.put16( kCipItemIdListServiceResponse );
+        out.put16( kCpfIdListServiceResponse );
         out.put16( 20 );    // length of following command specific data is fixed
         out.put16( 1 );     // protocol version
         out.put16( kCapabilityFlagsCipTcp | kCapabilityFlagsCipUdpClass0or1 ); // capability_flags
@@ -368,21 +507,30 @@ static int handleReceivedListServicesCommand( BufWriter aReply )
 }
 
 
-int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aReply )
+int Encapsulation::HandleReceivedExplictTcpData( int socket,
+        BufReader aCommand, BufWriter aReply )
 {
     CIPSTER_ASSERT( aReply.capacity() >= ENCAPSULATION_HEADER_LENGTH ); // caller bug
 
     int result = -1;
 
     if( aCommand.size() < ENCAPSULATION_HEADER_LENGTH )
+    {
+        CIPSTER_TRACE_INFO( "%s: aCommand too small\n", __func__ );
         return -1;
+    }
 
-    EncapsulationData encap;
+    Encapsulation encap;
 
-    if( encap.DeserializeEncap( aCommand ) != ENCAPSULATION_HEADER_LENGTH )
+    int headerz = encap.DeserializeEncap( aCommand );
+
+    if( headerz != encap.HeaderLength() )
+    {
+        CIPSTER_TRACE_INFO( "%s: Deserialized header size invalid\n", __func__ );
         return -1;
+    }
 
-    if( encap.Command() == kEncapsulationCommandNoOperation )
+    if( encap.Command() == kEncapCmdNoOperation )
     {
         /*  Either an originator or a target may send a NOP command. No reply
             shall be generated by this command. The data portion of the command
@@ -390,38 +538,46 @@ int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aRep
             data that is contained in the message. A NOP command does not
             require that a session be established.
         */
+
+        CIPSTER_TRACE_INFO( "%s: NOP\n", __func__ );
         return -1;
     }
 
     if( encap.Status() )  // all commands have 0 in status, else ignore
+    {
+        CIPSTER_TRACE_INFO( "%s: header status != 0\n", __func__ );
         return -1;
+    }
 
-    encap.SetLength( 0 );  // aCommand.Length() has our length, establish default for reply
+    // aCommand.size() has our length, establish default for reply
+    encap.SetPayloadLength( 0 );
 
-    // Adjust locally for fixed length encapsulation header which is both
-    // consumed in the command and reserved in the reply.
-    BufReader   command = aCommand + ENCAPSULATION_HEADER_LENGTH;
-    BufWriter   reply = aReply + ENCAPSULATION_HEADER_LENGTH;
+    // Adjust for encapsulation header which is both consumed in the command
+    // and reserved in the reply, i.e. skip over these bytes for both.
+    BufReader   command = aCommand + headerz;
+    BufWriter   reply   = aReply + headerz;
+
+    CIPSTER_TRACE_INFO( "%s: command = 0x%x\n", __func__, encap.Command() );
 
     // most of these functions need a reply to be sent
     switch( encap.Command() )
     {
-    case kEncapsulationCommandListServices:
+    case kEncapCmdListServices:
         if( !encap.Options() )
             result = handleReceivedListServicesCommand( reply );
         break;
 
-    case kEncapsulationCommandListIdentity:
+    case kEncapCmdListIdentity:
         if( !encap.Options() )
             result = handleReceivedListIdentityCommandImmediate( reply );
         break;
 
-    case kEncapsulationCommandListInterfaces:
+    case kEncapCmdListInterfaces:
         if( !encap.Options() )
             result = handleReceivedListInterfacesCommand( reply );
         break;
 
-    case kEncapsulationCommandRegisterSession:
+    case kEncapCmdRegisterSession:
         if( !encap.Options() )
         {
             EncapsulationProtocolErrorCode status;
@@ -433,23 +589,23 @@ int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aRep
         }
         break;
 
-    case kEncapsulationCommandUnregisterSession:
-        encap.SetStatus( ServerSessionMgr::UnregisterSession( encap.SessionHandle() ) );
-        result = 0;
+    case kEncapCmdUnregisterSession:
+        ServerSessionMgr::UnregisterSession( encap.SessionHandle() );
+        CIPSTER_TRACE_INFO( "%s: no reply required for encap UnregisterSession\n", __func__ );
+        // result = -1;    // no reply
         break;
 
-    case kEncapsulationCommandSendRequestReplyData:
-        if( !encap.Options() && aCommand.size() >= 6 )
+    case kEncapCmdSendRRData:
+        if( !encap.Options() && command.size() )
         {
             if( ServerSessionMgr::CheckRegisteredSession( encap.SessionHandle() ) )
             {
-                CipCommonPacketFormatData cpfd( socket );
+                Cpf cpfd;
 
                 result = cpfd.NotifyCommonPacketFormat(
-                    command + 6,    // skip null interface handle + timeout value
-                                    // which follow encap header.
-                    reply           // again, this is past encap header
-                    );
+                            command,    // past encap header (headerz)
+                            reply       // past encap header (headerz)
+                            );
 
                 if( result < 0 )
                 {
@@ -467,16 +623,16 @@ int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aRep
         }
         break;
 
-    case kEncapsulationCommandSendUnitData:
-        if( !encap.Options() && command.size() >= 6 )
+    case kEncapCmdSendUnitData:
+        if( !encap.Options() && command.size() )
         {
             if( ServerSessionMgr::CheckRegisteredSession( encap.SessionHandle() ) )
             {
-                CipCommonPacketFormatData   cpfd( socket );
+                Cpf   cpfd;
 
                 result = cpfd.NotifyConnectedCommonPacketFormat(
-                            command + 6, // skip null interface handle + timeout value
-                            reply
+                            command,    // past encap header
+                            reply       // past encap header
                             );
             }
             else    // received a packet with non registered session handle
@@ -488,6 +644,8 @@ int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aRep
         break;
 
     default:
+        CIPSTER_TRACE_INFO( "%s: unexpected command:0x%x\n", __func__, encap.Command() );
+
         // Vol2 2-3.2
         encap.SetStatus( kEncapsulationProtocolInvalidOrUnsupportedCommand );
         result = 0;
@@ -496,16 +654,15 @@ int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aRep
 
     if( result >= 0 )
     {
-        encap.SetLength( result );
-        encap.Serialize( aReply );
-        result += ENCAPSULATION_HEADER_LENGTH;
+        encap.SetPayloadLength( result );
+        result += encap.Serialize( aReply );
     }
 
     return result;
 }
 
 
-int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
+int Encapsulation::HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
         BufReader aCommand, BufWriter aReply, bool isUnicast )
 {
     CIPSTER_ASSERT( aReply.capacity() >= ENCAPSULATION_HEADER_LENGTH ); // caller bug
@@ -516,7 +673,7 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
         return -1;
     }
 
-    EncapsulationData encap;
+    Encapsulation encap;
 
     int result = encap.DeserializeEncap( aCommand );
 
@@ -526,7 +683,7 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
         return -1;
     }
 
-    if( encap.Command() == kEncapsulationCommandNoOperation )
+    if( encap.Command() == kEncapCmdNoOperation )
     {
         CIPSTER_TRACE_INFO( "%s: NOP ignored\n",  __func__ );
         return -1;
@@ -541,7 +698,7 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
         return -1;
     }
 
-    encap.SetLength( 0 );  // aCommand.size() has our length, establish default for reply
+    encap.SetPayloadLength( 0 );  // aCommand.size() has our length, establish default for reply
 
     // Adjust locally for encapsulation header which is both consumed in the
     // the command and reserved in the reply.
@@ -550,12 +707,12 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
 
     switch( encap.Command() )
     {
-    case kEncapsulationCommandListServices:
+    case kEncapCmdListServices:
         if( !encap.Options() )
             result = handleReceivedListServicesCommand( reply );
         break;
 
-    case kEncapsulationCommandListIdentity:
+    case kEncapCmdListIdentity:
         if( isUnicast )
         {
             result = handleReceivedListIdentityCommandImmediate( reply );
@@ -570,17 +727,17 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
         }
         break;
 
-    case kEncapsulationCommandListInterfaces:
+    case kEncapCmdListInterfaces:
         if( !encap.Options() )
             result = handleReceivedListInterfacesCommand( reply );
         break;
 
     // The following commands are not to be sent via UDP
-    case kEncapsulationCommandNoOperation:
-    case kEncapsulationCommandRegisterSession:
-    case kEncapsulationCommandUnregisterSession:
-    case kEncapsulationCommandSendRequestReplyData:
-    case kEncapsulationCommandSendUnitData:
+    case kEncapCmdNoOperation:
+    case kEncapCmdRegisterSession:
+    case kEncapCmdUnregisterSession:
+    case kEncapCmdSendRRData:
+    case kEncapCmdSendUnitData:
     default:
         result = -1;
         encap.SetStatus( kEncapsulationProtocolInvalidOrUnsupportedCommand );
@@ -592,7 +749,7 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
     // call and should not send now but will send later.
     if( result > 0 )
     {
-        encap.SetLength( result );
+        encap.SetPayloadLength( result );
         encap.Serialize( aReply );
         result += ENCAPSULATION_HEADER_LENGTH;
     }
@@ -603,7 +760,7 @@ int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
 }
 
 
-int EncapsulationData::DeserializeEncap( BufReader aCommand )
+int Encapsulation::DeserializeEncap( BufReader aCommand )
 {
     BufReader in = aCommand;
 
@@ -619,30 +776,61 @@ int EncapsulationData::DeserializeEncap( BufReader aCommand )
 
     options = in.get32();
 
+    if( IsBigHdr() )
+    {
+        interface_handle = in.get32();
+        timeout = in.get16();
+    }
+    else
+    {
+        interface_handle = 0;
+        timeout = 0;
+    }
+
     int byte_count = in.data() - aCommand.data();
 
     return byte_count;
 }
 
 
-int EncapsulationData::Serialize( BufWriter aDst )
+int Encapsulation::SerializedCount( int aCtl ) const
+{
+    return HeaderLength();
+}
+
+
+int Encapsulation::Serialize( BufWriter aDst, int aCtl ) const
 {
     BufWriter out = aDst;
+    CipUint   len = length; // plan to adjust length based on payload
+
+    if( payload )
+    {
+        len = payload->SerializedCount( aCtl );
+
+        if( IsBigHdr() )
+            len += 6;
+    }
 
     out.put16( command )
-    .put16( length )
+    .put16( len )
     .put32( session_handle )
     .put32( status )
     .append( (EipByte*) sender_context, 8 )
     .put32( options );
 
+    if( IsBigHdr() )
+    {
+        out.put32( interface_handle );
+        out.put16( timeout );
+    }
+
+    if( payload )
+    {
+        out += payload->Serialize( out, aCtl );
+    }
+
     return out.data() - aDst.data();
-}
-
-
-void EncapsulationShutDown()
-{
-    ServerSessionMgr::Shutdown();
 }
 
 
