@@ -40,7 +40,7 @@ static EipByte s_packet[CIPSTER_ETHERNET_BUFFER_SIZE];
 
 #define MAX_NO_OF_TCP_SOCKETS           10
 
-typedef unsigned  MicroSeconds;
+typedef uint32_t    USECS;
 
 static fd_set master_set;
 static fd_set read_set;
@@ -54,22 +54,20 @@ static int highest_socket_handle;
  */
 static int g_current_active_tcp_socket;
 
-static MicroSeconds g_actual_time_usecs;
-static MicroSeconds g_last_time_usecs;
+static USECS g_last_time_usecs;
 
 
 struct NetworkStatus
 {
-    int tcp_listener;
-    int udp_unicast_listener;
-    int udp_local_broadcast_listener;
-    int udp_global_broadcast_listener;
-    MicroSeconds elapsed_time_usecs;
+    int     tcp_listener;
+    int     udp_unicast_listener;
+    int     udp_local_broadcast_listener;
+    int     udp_global_broadcast_listener;
+    USECS   elapsed_time_usecs;
 };
 
 
 static NetworkStatus s_sockets;
-
 
 
 const std::string strerrno()
@@ -93,7 +91,6 @@ static void master_set_add( const char* aType, int aSocket )
 
     FD_SET( aSocket, &master_set );
 
-    // add newfd to master set
     if( aSocket > highest_socket_handle )
     {
         highest_socket_handle = aSocket;
@@ -110,7 +107,7 @@ static void master_set_rem( int aSocket )
 
     if( aSocket == highest_socket_handle && aSocket > 0 )
     {
-        highest_socket_handle = aSocket - 1;
+        --highest_socket_handle;
     }
 }
 
@@ -476,15 +473,15 @@ EipStatus HandleDataOnTcpSocket( int aSocket )
     return kEipStatusOk;
 }
 
-
-MicroSeconds GetMicroSeconds()
+/// Return a monotonically increasing usecs time that wraps around after overflow.
+static USECS usecs_now()
 {
 #if defined(__linux__)
     struct timespec	now;
 
     clock_gettime( CLOCK_MONOTONIC, &now );
 
-    MicroSeconds usecs = ((MicroSeconds)now.tv_nsec)/1000 + (MicroSeconds)now.tv_sec * 1000 * 1000;
+    USECS usecs = USECS( now.tv_nsec/1000 + now.tv_sec * 1000000 );
 
 #elif defined(_WIN32)
 
@@ -501,7 +498,7 @@ MicroSeconds GetMicroSeconds()
             frequency = lfrequency.QuadPart;
         }
 
-        unsigned long long frequency;
+        uint64_t frequency;
 
     } clock;
 
@@ -509,7 +506,7 @@ MicroSeconds GetMicroSeconds()
 
     QueryPerformanceCounter( &performance_counter );
 
-    MicroSeconds usecs = MicroSeconds( performance_counter.QuadPart * 1000000LL / clock.frequency );
+    USECS usecs = USECS( performance_counter.QuadPart * 1000000LL / clock.frequency );
 #endif
 
     return usecs;
@@ -718,7 +715,7 @@ EipStatus NetworkHandlerInitialize()
         s_sockets.udp_global_broadcast_listener
         );
 
-    g_last_time_usecs = GetMicroSeconds();    // initialize time keeping
+    g_last_time_usecs = usecs_now();    // initialize time keeping
     s_sockets.elapsed_time_usecs = 0;
 
     return kEipStatusOk;
@@ -779,9 +776,9 @@ EipStatus NetworkHandlerProcessOnce()
         }
     }
 
-    g_actual_time_usecs = GetMicroSeconds();
-    s_sockets.elapsed_time_usecs += g_actual_time_usecs - g_last_time_usecs;
-    g_last_time_usecs = g_actual_time_usecs;
+    USECS now = usecs_now();
+    s_sockets.elapsed_time_usecs += now - g_last_time_usecs;
+    g_last_time_usecs = now;
 
     /*  check if we had been not able to update the connection manager for
         several CIPSTER_TIMER_TICK.
