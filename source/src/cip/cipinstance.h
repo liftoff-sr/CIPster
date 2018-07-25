@@ -43,7 +43,7 @@ public:
      *  may be overrridden, so any existing CipAttribute in this instance with the
      *  same attribute_id will be deleted in favour of this one.
      */
-    bool AttributeInsert( CipAttribute* aAttributes );
+    bool AttributeInsert( CipAttribute* aAttribute );
 
     CipAttribute* AttributeInsert( int aAttributeId,
         CipDataType     aCipType,
@@ -61,9 +61,10 @@ public:
      *  later be passed to either AttributeFunc provided.  It can point to anything
      *  convenient.
      *
-     * @return CipAttribute* - the dynamically allocated attribute, or NULL if failure.
-     * Currently attributes may be overrridden, so any existing CipAttribute in
-     * this instance with the same attribute_id will be deleted in favour of this one.
+     * @return CipAttribute* - dynamically allocated by this function,
+     * or NULL if failure. Currently attributes may be overrridden, so any
+     * existing CipAttribute in this instance with the same attribute id
+     * will be deleted in favour of this one.
      */
     CipAttribute* AttributeInsert( int aAttributeId,
         AttributeFunc   aGetter,

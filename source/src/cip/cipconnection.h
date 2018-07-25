@@ -60,10 +60,10 @@ enum ConnectionState
 //* @brief instance_type attributes
 enum ConnInstanceType
 {
-    kConnInstanceTypeExplicit = 0,
-    kConnInstanceTypeIoExclusiveOwner = 0x01,
-    kConnInstanceTypeIoInputOnly  = 0x11,
-    kConnInstanceTypeIoListenOnly = 0x21
+    kConnInstanceTypeExplicit           = 0x00,
+    kConnInstanceTypeIoExclusiveOwner   = 0x01,
+    kConnInstanceTypeIoInputOnly        = 0x11,
+    kConnInstanceTypeIoListenOnly       = 0x21
 };
 
 
@@ -490,12 +490,6 @@ public:
     int SerializedCount( int aCtl = 0 ) const;
     //-----</Serializeable>-----------------------------------------------------
 
-    bool IsIOConnection() const
-    {
-        return trigger.Class() == kConnectionTransportClass0
-            || trigger.Class() == kConnectionTransportClass1;
-    }
-
     void Clear()
     {
         priority_timetick = 0;
@@ -609,6 +603,12 @@ public:
     }
 
     ConnInstanceType InstanceType() const   { return instance_type; }
+
+    bool IsIOConnection() const
+    {
+        // bit 0 is a 1 for all I/O connections, see enum ConnInstanceType
+        return instance_type & 1;
+    }
 
     EipUint32   ExpectedPacketRateUSecs() const
     {

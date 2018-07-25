@@ -17,7 +17,11 @@
 #include "ciperror.h"
 #include "byte_bufs.h"
 
-//* @brief Assembly Class Code
+
+/**
+ * Enum ClassIds
+ * is a set of common classs ids.
+ */
 enum ClassIds
 {
     kCipIdentityClass           = 0x01,
@@ -194,8 +198,6 @@ class CipClass;
 class CipMessageRouterRequest;
 class CipMessageRouterResponse;
 class CipConn;
-
-
 class Cpf;
 
 
