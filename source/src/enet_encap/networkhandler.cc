@@ -54,7 +54,7 @@ static int highest_socket_handle;
  */
 static int g_current_active_tcp_socket;
 
-static USECS g_last_time_usecs;
+static USECS s_last_time_usecs;
 
 
 struct NetworkStatus
@@ -506,7 +506,7 @@ static USECS usecs_now()
 
     QueryPerformanceCounter( &performance_counter );
 
-    USECS usecs = USECS( performance_counter.QuadPart * 1000000LL / clock.frequency );
+    USECS usecs = USECS( performance_counter.QuadPart * 1000000 / clock.frequency );
 #endif
 
     return usecs;
@@ -644,8 +644,8 @@ EipStatus NetworkHandlerInitialize()
 
     address.sin_addr.s_addr = c.ip_address | ~c.network_mask;
 
-    if( ( bind( s_sockets.udp_local_broadcast_listener,
-                  (sockaddr*) &address, sizeof(address) ) ) == -1 )
+    if( bind( s_sockets.udp_local_broadcast_listener,
+                  (sockaddr*) &address, sizeof(address) ) == -1 )
     {
         CIPSTER_TRACE_ERR(
                 "error with udp_local_broadcast_listener bind: %s\n",
@@ -677,8 +677,8 @@ EipStatus NetworkHandlerInitialize()
     address.sin_port = htons( kEthernet_IP_Port );
     address.sin_addr.s_addr = c.ip_address;
 
-    if( ( bind( s_sockets.udp_unicast_listener,
-                  (sockaddr*) &address, sizeof(address) ) ) == -1 )
+    if( bind( s_sockets.udp_unicast_listener,
+                  (sockaddr*) &address, sizeof(address) ) == -1 )
     {
         CIPSTER_TRACE_ERR(
             "error with udp_unicast_listener bind: %s\n",
@@ -689,7 +689,7 @@ EipStatus NetworkHandlerInitialize()
     //-----</udp_unicast_listener>---------------------------------------------
 
     // switch socket in listen mode
-    if( ( listen( s_sockets.tcp_listener, MAX_NO_OF_TCP_SOCKETS ) ) == -1 )
+    if( listen( s_sockets.tcp_listener, MAX_NO_OF_TCP_SOCKETS ) == -1 )
     {
         CIPSTER_TRACE_ERR( "%s: error with listen: %s\n",
                 __func__, strerrno().c_str() );
@@ -715,7 +715,7 @@ EipStatus NetworkHandlerInitialize()
         s_sockets.udp_global_broadcast_listener
         );
 
-    g_last_time_usecs = usecs_now();    // initialize time keeping
+    s_last_time_usecs = usecs_now();    // initialize time keeping
     s_sockets.elapsed_time_usecs = 0;
 
     return kEipStatusOk;
@@ -777,8 +777,8 @@ EipStatus NetworkHandlerProcessOnce()
     }
 
     USECS now = usecs_now();
-    s_sockets.elapsed_time_usecs += now - g_last_time_usecs;
-    g_last_time_usecs = now;
+    s_sockets.elapsed_time_usecs += now - s_last_time_usecs;
+    s_last_time_usecs = now;
 
     /*  check if we had been not able to update the connection manager for
         several CIPSTER_TIMER_TICK.
@@ -787,6 +787,9 @@ EipStatus NetworkHandlerProcessOnce()
     while( s_sockets.elapsed_time_usecs >= kOpenerTimerTickInMicroSeconds )
     {
         ManageConnections();
+
+        // Since we qualified this in the while() test, this will never go
+        // below zero.
         s_sockets.elapsed_time_usecs -= kOpenerTimerTickInMicroSeconds;
     }
 

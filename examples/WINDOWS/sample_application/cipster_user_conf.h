@@ -87,7 +87,13 @@ typedef unsigned short in_port_t;
  */
 #define CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS 20
 
- /** @brief  The time in usecs of the timer used in this implementations
+/**
+ * The time in usecs of the timer used in this implementation, but make it a
+ * multiple of milliseconds expressed in microseconds.  i.e. the last 3 digits
+ * *should* be zero because of Vol1 3-4.4.9 Expected_packet_rate is expressed
+ * in milliseconds.  However, whether this is mandatory given the jitter
+ * associated with the call frequency to NetworkHandlerProcessOnce()
+ * seems questionable.
  */
 static const unsigned kOpenerTimerTickInMicroSeconds = 10000;
 

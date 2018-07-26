@@ -41,7 +41,6 @@ public:
     static EipStatus forward_open_service( CipInstance* instance,
             CipMessageRouterRequest* request, CipMessageRouterResponse* response );
 
-
     static EipStatus large_forward_open_service( CipInstance* instance,
             CipMessageRouterRequest* request, CipMessageRouterResponse* response );
 

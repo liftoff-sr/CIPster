@@ -91,6 +91,22 @@ enum ConnPriority
 };
 
 
+/**
+ * Enum ConnTimeoutMultiplier
+ * is the set of legal values for the right column of Vol1 Table 3-5.12
+ */
+enum ConnTimeoutMultiplier
+{
+    kConnTimeoutMultiplier4     = 4,
+    kConnTimeoutMultiplier8     = 8,
+    kConnTimeoutMultiplier16    = 16,
+    kConnTimeoutMultiplier32    = 32,
+    kConnTimeoutMultiplier64    = 64,
+    kConnTimeoutMultiplier128   = 128,
+    kConnTimeoutMultiplier256   = 256,
+    kConnTimeoutMultiplier512   = 512,
+};
+
 
 /** @ingroup CIP_API
  * @brief Function prototype for handling the closing of connections
@@ -193,6 +209,17 @@ public:
     bool IsNull() const
     {
         return ConnectionType() == kIOConnTypeNull;
+    }
+
+    const char* ShowConnectionType() const
+    {
+        switch( ConnectionType() )
+        {
+        case kIOConnTypeNull:           return "Null";
+        case kIOConnTypeMulticast:      return "Multicast";
+        case kIOConnTypePointToPoint:   return "PointToPoint";
+        default:                        return "Invalid";
+        }
     }
 
     ConnPriority Priority() const
@@ -428,7 +455,7 @@ public:
             CipUint aConnectionSerialNumber = 0,
             CipUint aOriginatorVendorId = 0,
             CipUdint aOriginatorSerialNumber = 0,
-            CipByte aConnectionTimeoutMultiplier = 0,
+            ConnTimeoutMultiplier aConnectionTimeoutMultiplier = kConnTimeoutMultiplier4,
             CipUdint a_O_to_T_RPI_usecs = 0,
             CipUdint a_T_to_O_RPI_usecs = 0
             );
@@ -445,23 +472,18 @@ public:
     CipUint             originator_vendor_id;
     CipUdint            originator_serial_number;
 
-    CipByte             connection_timeout_multiplier;
+    ConnectionData& SetTimeoutMultiplier( ConnTimeoutMultiplier aMultiplier );
+
+    ConnTimeoutMultiplier TimeoutMultiplier() const
+    {
+        return ConnTimeoutMultiplier( 1 << (2 + connection_timeout_multiplier_value) );
+    }
 
     CipUdint            o_to_t_RPI_usecs;
     NetCnParams         o_to_t_ncp;
 
     CipUdint            t_to_o_RPI_usecs;
     NetCnParams         t_to_o_ncp;
-
-    CipUdint TimeoutMSecs_o_to_t() const
-    {
-        return o_to_t_RPI_usecs << (2 + connection_timeout_multiplier);
-    }
-
-    CipUdint TimeoutMSecs_t_to_o() const
-    {
-        return t_to_o_RPI_usecs << (2 + connection_timeout_multiplier);
-    }
 
     TransportTrigger    trigger;
 
@@ -499,7 +521,7 @@ public:
         connection_serial_number = 0;
         originator_vendor_id = 0;
         originator_serial_number = 0;
-        connection_timeout_multiplier = 0;
+        connection_timeout_multiplier_value = 0;
 
         o_to_t_RPI_usecs = 0;
         t_to_o_RPI_usecs = 0;
@@ -519,8 +541,11 @@ public:
         mgmnt_class = 0;
     }
 
+private:
+    CipByte             connection_timeout_multiplier_value;
 
 protected:
+
 
     // The following variables do not come from the forward open request,
     // but are held here for the benefit of the deriving CipConn class and for
@@ -617,9 +642,63 @@ public:
 
     CipConn& SetExpectedPacketRateUSecs( EipUint32 aRateUSecs )
     {
-        CIPSTER_TRACE_INFO( "%s( %d )\n", __func__, aRateUSecs );
-        expected_packet_rate_usecs = aRateUSecs;
+        EipUint32   adjusted = aRateUSecs;
+
+        // The requested packet interval parameter needs to be a multiple of
+        // kOpenerTimerTickInMicroSeconds from the user's header file
+        if( adjusted % kOpenerTimerTickInMicroSeconds )
+        {
+            // Vol1 3-4.4.9 Since we are not an exact multiple, round up to
+            // slower nearest integer multiple of our timer.
+            adjusted = ( adjusted / kOpenerTimerTickInMicroSeconds )
+                * kOpenerTimerTickInMicroSeconds + kOpenerTimerTickInMicroSeconds;
+        }
+
+        CIPSTER_TRACE_INFO( "%s( %d ) adjusted=%d\n", __func__, aRateUSecs, adjusted );
+        expected_packet_rate_usecs = adjusted;
         return *this;
+    }
+
+    EipUint32   TimeoutUSecs() const
+    {
+        return expected_packet_rate_usecs * TimeoutMultiplier();
+    }
+
+    EipInt32 TransmissionTriggerTimerUSecs() const
+    {
+        return transmission_trigger_timer_usecs;
+    }
+
+    CipConn& SetTransmissionTriggerTimerUSecs( EipInt32 aValue )
+    {
+        CIPSTER_TRACE_INFO( "%s( %d )\n", __func__, aValue );
+        transmission_trigger_timer_usecs = aValue;
+        return *this;
+    }
+
+    EipInt32 InactivityWatchDogTimerUSecs() const
+    {
+        return inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
+    }
+
+    CipConn& SetInactivityWatchDogTimerUSecs( EipInt32 aUSecs )
+    {
+        CIPSTER_TRACE_INFO( "%s( %d )\n", __func__, aUSecs );
+        inactivity_watchdog_timer_usecs = aUSecs;
+        return *this;
+    }
+
+    CipConn& AddToInactivityWatchDogTimerUSecs( EipInt32 aUSecs )
+    {
+        return SetInactivityWatchDogTimerUSecs( inactivity_watchdog_timer_usecs + aUSecs );
+    }
+
+    bool HasInactivityWatchDogTimer() const
+    {
+        // Vol 1 3-4.5.3
+        return( expected_packet_rate_usecs      // if zero, no inactivity timer
+            &&  (consuming_instance              // a consuming connection in play
+                || trigger.IsServer() ));
     }
 
     /**
@@ -678,9 +757,6 @@ public:
     /// sequence Count for Class 1 consuming connections
     EipUint16 sequence_count_consuming;
 
-    EipInt32    transmission_trigger_timer_usecs;   // signed 32 bits, in usecs
-    EipInt32    inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
-
     /**
      * Function GetProductionInhibitTimeUSecs
      * returns the minimal time between the production of two application triggered
@@ -730,6 +806,9 @@ protected:
     ConnectionState     state;
 
     EipUint32   expected_packet_rate_usecs;
+
+    EipInt32    inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
+    EipInt32    transmission_trigger_timer_usecs;   // signed 32 bits, in usecs
 
     int consuming_socket;
     int producing_socket;

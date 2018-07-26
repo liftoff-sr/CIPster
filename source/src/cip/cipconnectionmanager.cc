@@ -125,11 +125,7 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
                               conn->eip_level_sequence_count_consuming ) )
                 {
                     // reset the watchdog timer
-                    conn->inactivity_watchdog_timer_usecs = conn->TimeoutMSecs_o_to_t();
-
-                    CIPSTER_TRACE_INFO( "%s: reset inactivity watchdog to %u usecs\n",
-                        __func__,
-                        conn->inactivity_watchdog_timer_usecs );
+                    conn->SetInactivityWatchDogTimerUSecs( conn->TimeoutUSecs() );
 
                     conn->eip_level_sequence_count_consuming = cpfd.AddrEncapSeqNum();
 
@@ -176,15 +172,12 @@ EipStatus CipConnMgrClass::ManageConnections()
     {
         if( active->State() == kConnectionStateEstablished )
         {
-            // We have a consuming connection check inactivity watchdog timer.
-            if( active->consuming_instance ||
-
-                // All server connections have to maintain an inactivity watchdog timer
-                active->trigger.IsServer() )
+            // maybe check inactivity watchdog timer.
+            if( active->HasInactivityWatchDogTimer() )
             {
-                active->inactivity_watchdog_timer_usecs -= kOpenerTimerTickInMicroSeconds;
+                active->AddToInactivityWatchDogTimerUSecs( -kOpenerTimerTickInMicroSeconds );
 
-                if( active->inactivity_watchdog_timer_usecs <= 0 )
+                if( active->InactivityWatchDogTimerUSecs() <= 0 )
                 {
                     // we have a timed out connection while performing watchdog check
                     // If this shows -1 as socket values, its because the other end
@@ -204,16 +197,18 @@ EipStatus CipConnMgrClass::ManageConnections()
             // only if the connection has not timed out check if data is to be sent
             if( active->State() == kConnectionStateEstablished )
             {
-                // client connection
-                if( active->ExpectedPacketRateUSecs() != 0 &&
+                // client connection, not server
+                if( !active->trigger.IsServer()
+
+                    && active->ExpectedPacketRateUSecs() != 0
 
                     // only produce for the master connection
-                    active->ProducingSocket() != kEipInvalidSocket )
+                    && active->ProducingSocket() != kEipInvalidSocket )
                 {
                     if( active->trigger.Trigger() != kConnectionTriggerTypeCyclic )
                     {
                         // non cyclic connections have to decrement production inhibit timer
-                        if( 0 <= active->production_inhibit_timer_usecs )
+                        if( active->production_inhibit_timer_usecs >= 0 )
                         {
                             active->production_inhibit_timer_usecs -= kOpenerTimerTickInMicroSeconds;
                         }
@@ -309,7 +304,8 @@ void CipConnMgrClass::assembleForwardOpenResponse( ConnectionData* aParams,
 
     if( general_status == kCipErrorSuccess )
     {
-        // set the actual packet rate to requested packet rate
+        // Set the actual packet rates to caller's unadjusted rates.
+        // Vol1 3-5.4.1.2 & Vol1 3-5.4.3 are not clear enough here.
         out.put32( aParams->o_to_t_RPI_usecs );
         out.put32( aParams->t_to_o_RPI_usecs );
     }
@@ -449,7 +445,7 @@ EipStatus TriggerConnections( int aOutputAssembly, int aInputAssembly )
             if( c->trigger.Trigger() == kConnectionTriggerTypeApplication )
             {
                 // produce at the next allowed occurrence
-                c->transmission_trigger_timer_usecs = c->production_inhibit_timer_usecs;
+                c->SetTransmissionTriggerTimerUSecs( c->production_inhibit_timer_usecs );
                 ret = kEipStatusOk;
             }
 
@@ -488,7 +484,6 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         return kEipStatusError;
     }
 
-
     // first check if we have already a connection with the given params
     if( findExistingMatchingConnection( params ) )
     {
@@ -512,11 +507,11 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         return kEipStatusOkSend;
     }
 
-    if( params.connection_timeout_multiplier > 7 )
+    if( params.connection_timeout_multiplier_value > 7 )
     {
         // 3-5.4.1.4
        CIPSTER_TRACE_INFO( "%s: invalid connection timeout multiplier: %u\n",
-           __func__, params.connection_timeout_multiplier );
+           __func__, params.connection_timeout_multiplier_value );
 
         assembleForwardOpenResponse(
                 &params, response,
@@ -532,15 +527,6 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         params.consuming_connection_id,
         params.producing_connection_id
         );
-
-    // The requested packet interval parameter needs to be a multiple of
-    // kOpenerTimerTickInMicroSeconds from the header file
-    if( params.t_to_o_RPI_usecs % kOpenerTimerTickInMicroSeconds )
-    {
-        // round up to slower nearest integer multiple of our timer.
-        params.t_to_o_RPI_usecs = (EipUint32) ( params.t_to_o_RPI_usecs / kOpenerTimerTickInMicroSeconds )
-            * kOpenerTimerTickInMicroSeconds + kOpenerTimerTickInMicroSeconds;
-    }
 
     if( params.o_to_t_ncp.ConnectionType() == kIOConnTypeInvalid )
     {
@@ -611,12 +597,12 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, params.o_to_t_RPI_usecs );
     CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, params.o_to_t_ncp.ConnectionSize() );
     CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, params.o_to_t_ncp.Priority() );
-    CIPSTER_TRACE_INFO( "%s: o_to_t type:%d\n", __func__, params.o_to_t_ncp.ConnectionType() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t type:%s\n", __func__, params.o_to_t_ncp.ShowConnectionType() );
 
     CIPSTER_TRACE_INFO( "%s: t_to_o RPI_usecs:%u\n", __func__, params.t_to_o_RPI_usecs );
     CIPSTER_TRACE_INFO( "%s: t_to_o size:%d\n", __func__, params.t_to_o_ncp.ConnectionSize() );
     CIPSTER_TRACE_INFO( "%s: t_to_o priority:%d\n", __func__, params.t_to_o_ncp.Priority() );
-    CIPSTER_TRACE_INFO( "%s: t_to_o type:%d\n", __func__, params.t_to_o_ncp.ConnectionType() );
+    CIPSTER_TRACE_INFO( "%s: t_to_o type:%s\n", __func__, params.t_to_o_ncp.ShowConnectionType() );
 
     CipClass* clazz = GetCipClass( params.mgmnt_class );
 

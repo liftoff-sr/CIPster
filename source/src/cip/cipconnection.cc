@@ -78,7 +78,7 @@ ConnectionData::ConnectionData(
         CipUint aConnectionSerialNumber,
         CipUint aOriginatorVendorId,
         CipUdint aOriginatorSerialNumber,
-        CipByte aConnectionTimeoutMultiplier,
+        ConnTimeoutMultiplier aConnectionTimeoutMultiplier,
         CipUdint a_O_to_T_RPI_usecs,
         CipUdint a_T_to_O_RPI_usecs
         ) :
@@ -89,7 +89,6 @@ ConnectionData::ConnectionData(
     connection_serial_number( aConnectionSerialNumber ),
     originator_vendor_id( aOriginatorVendorId ),
     originator_serial_number( aOriginatorSerialNumber ),
-    connection_timeout_multiplier( aConnectionTimeoutMultiplier ),
     o_to_t_RPI_usecs( a_O_to_T_RPI_usecs ),
     t_to_o_RPI_usecs( a_T_to_O_RPI_usecs ),
     corrected_o_to_t_size( 0 ),
@@ -98,6 +97,26 @@ ConnectionData::ConnectionData(
     producing_instance( 0 ),
     config_instance( 0 )
 {
+    SetTimeoutMultiplier( aConnectionTimeoutMultiplier );
+}
+
+
+ConnectionData& ConnectionData::SetTimeoutMultiplier( ConnTimeoutMultiplier aMultiplier )
+{
+    EipByte value = 0;
+
+    unsigned m = aMultiplier >> 3;
+
+    while( m )
+    {
+        ++value;
+        m >>= 1;
+    }
+
+    CIPSTER_TRACE_INFO( "%s: value=%d\n", __func__, value );
+
+    connection_timeout_multiplier_value = value;
+    return *this;
 }
 
 
@@ -167,7 +186,7 @@ int ConnectionData::DeserializeConnectionData( BufReader aInput, bool isLarge )
     originator_vendor_id     = in.get16();
     originator_serial_number = in.get32();
 
-    connection_timeout_multiplier = in.get8();
+    connection_timeout_multiplier_value = in.get8();
 
     in += 3;         // skip over 3 reserved bytes.
 
@@ -609,7 +628,7 @@ int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
     .put16( originator_vendor_id )
     .put32( originator_serial_number )
 
-    .put8( connection_timeout_multiplier )
+    .put8( connection_timeout_multiplier_value )
 
     .fill( 3 )      // output 3 reserved bytes.
 
@@ -780,9 +799,7 @@ void CipConn::GeneralConnectionConfiguration()
 
     sequence_count_consuming = 0;
 
-    watchdog_timeout_action = kWatchdogTimeoutActionAutoDelete;  // the default for all connections on EIP
-
-    SetExpectedPacketRateUSecs( 0 );    // default value
+    watchdog_timeout_action = kWatchdogTimeoutActionAutoDelete;
 
     if( !trigger.IsServer() )  // Client Type Connection requested
     {
@@ -804,11 +821,17 @@ void CipConn::GeneralConnectionConfiguration()
 
     SetPIT_USecs( 0 );
 
-    // setup the preconsuption timer: max(ConnectionTimeoutMultiplier * EpectetedPacketRate, 10s)
-    inactivity_watchdog_timer_usecs = std::max( TimeoutMSecs_o_to_t(), 10000000u );
-
-    CIPSTER_TRACE_INFO( "%s: inactivity_watchdog_timer_usecs:%u\n", __func__,
-            inactivity_watchdog_timer_usecs );
+    // Vol1 3-4.5.2, says to set *initial* value to greater of 10 seconds or
+    // "expected_packet_rate x connection_timeout_multiplier".  Initial value
+    // is called a "pre-consumption" timeout value.
+    if( TimeoutUSecs() )
+        SetInactivityWatchDogTimerUSecs( std::max( TimeoutUSecs(), 10000000u ) );
+    else
+    {
+        CIPSTER_TRACE_INFO(
+            "%s: no inactivity/Watchdog activated; epected_packet_rate is zero\n",
+            __func__ );
+    }
 }
 
 

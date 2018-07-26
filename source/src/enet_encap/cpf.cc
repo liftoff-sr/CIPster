@@ -94,7 +94,7 @@ int Cpf::NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply
     if( conn )
     {
         // reset the watchdog timer
-        conn->inactivity_watchdog_timer_usecs = conn->TimeoutMSecs_o_to_t();
+        conn->SetInactivityWatchDogTimerUSecs( conn->TimeoutUSecs() );
 
         // TODO check connection id  and sequence count
         if( DataType() == kCpfIdConnectedDataItem )
