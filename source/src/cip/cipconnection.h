@@ -578,7 +578,17 @@ public:
 
     static EipStatus Init( EipUint16 unique_connection_id );
 
-    CipError OpenCommunicationChannels( Cpf* cpfd );
+    /**
+     * Function OpenCommunicationChannels
+     * takes the data given in this CipConn and opens the necessary
+     * communication channels.
+     *
+     * @param aCpf
+     * @return general status on the open process
+     *    - kEipStatusOk ... on success
+     *    - On an error the general status code to be put into the response
+     */
+    CipError OpenCommunicationChannels( Cpf* aCpf );
 
     /**
      * Function OpenConsumingPointToPointConnection
@@ -607,7 +617,6 @@ public:
     EipStatus OpenMulticastConnection( UdpCommuncationDirection direction, Cpf* cpfd );
 
     EipStatus OpenProducingMulticastConnection( Cpf* cpfd );
-
 
     void Clear( bool doConnectionDataToo = true );
 
@@ -675,6 +684,12 @@ public:
         transmission_trigger_timer_usecs = aValue;
         return *this;
     }
+
+    CipConn& AddToTransmissionTriggerTimerUSecs( EipInt32 aUSecs )
+    {
+        return SetTransmissionTriggerTimerUSecs( transmission_trigger_timer_usecs + aUSecs );
+    }
+
 
     EipInt32 InactivityWatchDogTimerUSecs() const
     {
@@ -818,20 +833,6 @@ private:
     CipConn*    next;
     CipConn*    prev;
 };
-
-
-/**
- * Function OpenCommunicationChannels
- * takes the data given in the connection object structure and opens
- * the necessary communication channels
- *
- * This function will use the g_stCPFDataItem!
- * @param aConn the connection object data
- * @return general status on the open process
- *    - kEipStatusOk ... on success
- *    - On an error the general status code to be put into the response
-CipError OpenCommunicationChannels( CipConn* aConn );
- */
 
 
 /**

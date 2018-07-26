@@ -214,9 +214,9 @@ EipStatus CipConnMgrClass::ManageConnections()
                         }
                     }
 
-                    active->transmission_trigger_timer_usecs -= kOpenerTimerTickInMicroSeconds;
+                    active->AddToTransmissionTriggerTimerUSecs( -kOpenerTimerTickInMicroSeconds );
 
-                    if( active->transmission_trigger_timer_usecs <= 0 ) // need to send package
+                    if( active->TransmissionTriggerTimerUSecs() <= 0 ) // need to send package
                     {
                         eip_status = active->SendConnectedData();
 
@@ -225,8 +225,7 @@ EipStatus CipConnMgrClass::ManageConnections()
                             CIPSTER_TRACE_ERR( "sending of UDP data in manage Connection failed\n" );
                         }
 
-                        // reload the timer value
-                        active->transmission_trigger_timer_usecs = active->ExpectedPacketRateUSecs();
+                        active->SetTransmissionTriggerTimerUSecs( active->ExpectedPacketRateUSecs() );
 
                         if( active->trigger.Trigger() != kConnectionTriggerTypeCyclic )
                         {

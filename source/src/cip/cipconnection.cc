@@ -777,17 +777,20 @@ void CipConn::GeneralConnectionConfiguration()
     if( o_to_t_ncp.ConnectionType() == kIOConnTypePointToPoint )
     {
         // if we have a point to point connection for the O to T direction
-        // the target shall choose the connection ID.
+        // the target shall choose the connection Id.
         consuming_connection_id = CipConn::NewConnectionId();
+
+        CIPSTER_TRACE_INFO( "%s: new consuming PointToPoint connection_id:0x%x\n",
+            __func__, consuming_connection_id );
     }
 
     if( t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast )
     {
         // if we have a multi-cast connection for the T to O direction the
-        // target shall choose the connection ID.
-
+        // target shall choose the connection Id.
         producing_connection_id = CipConn::NewConnectionId();
-        CIPSTER_TRACE_INFO( "%s: new producing multicast connection_id:0x%08x\n",
+
+        CIPSTER_TRACE_INFO( "%s: new producing Multicast connection_id:0x%x\n",
             __func__, producing_connection_id );
     }
 
@@ -805,11 +808,10 @@ void CipConn::GeneralConnectionConfiguration()
     {
         SetExpectedPacketRateUSecs( t_to_o_RPI_usecs );
 
-        /* As soon as we are ready we should produce the connection. With the 0
-         * here we will produce with the next timer tick
-         * which should be sufficient.
-         */
-        transmission_trigger_timer_usecs = 0;
+        // As soon as we are ready we should produce on the connection.
+        // With the 0 here we will produce with the next timer tick
+        // which should be sufficiently soon.
+        SetTransmissionTriggerTimerUSecs( 0 );
     }
     else
     {
@@ -828,6 +830,7 @@ void CipConn::GeneralConnectionConfiguration()
         SetInactivityWatchDogTimerUSecs( std::max( TimeoutUSecs(), 10000000u ) );
     else
     {
+        // this is not an erro
         CIPSTER_TRACE_INFO(
             "%s: no inactivity/Watchdog activated; epected_packet_rate is zero\n",
             __func__ );
@@ -870,8 +873,8 @@ void CipConn::Close()
 
                     SetProducingSocket( kEipInvalidSocket );
 
-                    next_non_control_master->transmission_trigger_timer_usecs =
-                        transmission_trigger_timer_usecs;
+                    next_non_control_master->SetTransmissionTriggerTimerUSecs(
+                        TransmissionTriggerTimerUSecs() );
                 }
 
                 else
@@ -924,10 +927,12 @@ EipStatus CipConn::SendConnectedData()
 
     // Notify the application that Assembly data pertinent to provided instance
     // will be sent immediately after the call.  If application returns true,
-    // this means the Assembly data has changed or should be reported as having changed.
+    // this means the Assembly data has changed or should be reported as been
+    // having updated depending on transportation class.
     if( BeforeAssemblyDataSend( producing_instance ) )
     {
-        // the data has changed, increase sequence counter
+        // notify consumer the data has changed or updated as the case may
+        // be by requirement of this connection's transportation class.
         ++sequence_count_producing;
     }
 
@@ -1067,8 +1072,8 @@ void CipConn::timeOut()
                         next_non_control_master->SetProducingSocket( ProducingSocket() );
                         SetProducingSocket( kEipInvalidSocket );
 
-                        next_non_control_master->transmission_trigger_timer_usecs =
-                            transmission_trigger_timer_usecs;
+                        next_non_control_master->SetTransmissionTriggerTimerUSecs(
+                            TransmissionTriggerTimerUSecs() );
                     }
 
                     // this was the last master connection close all listen only
