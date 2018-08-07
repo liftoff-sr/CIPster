@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPASSEMBLY_H_

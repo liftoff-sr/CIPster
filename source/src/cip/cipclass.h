@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (C) 2016-2018, SoftPLC Corportion.
+ * Copyright (C) 2016-2018, SoftPLC Corporation.
  *
  ******************************************************************************/
 
@@ -11,6 +11,7 @@
 #include "cipservice.h"
 
 class ConnectionData;
+
 
 /**
  * Class CipClass
@@ -55,6 +56,23 @@ public:
     virtual ~CipClass();
 
     /**
+     * Delete all instances and classes the CIP stack
+     */
+    static void DeleteAll();
+
+    /**
+     * Function Register
+     * registers  @a aClass in the stack.
+     * @param aClass CIP class to be registered
+     * @return kEipStatusOk on success
+     */
+    static EipStatus Register( CipClass* aClass );
+
+    static CipClass* Get( int aClassId );
+
+    //-----<CipServiceFunctions>------------------------------------------------
+
+    /**
      * Function GetAttributeSingle
      * is a CipService that provides an attribute fetch service.
      *
@@ -87,6 +105,20 @@ public:
     static EipStatus GetAttributeAll( CipInstance* instance,
             CipMessageRouterRequest* request,
             CipMessageRouterResponse* response );
+
+    /**
+     * Function Reset (ServiceId = kReset )
+     * is a common service which is a dummy place holder so the proper
+     * error code of kCipErrorInvalidParameter can be returned rather
+     * than kCipErrorServiceNotSupported. Individual classes are expected
+     * to override this base class behaviour.
+     */
+    static EipStatus Reset( CipInstance* instance,
+            CipMessageRouterRequest* request,
+            CipMessageRouterResponse* response );
+
+    //-----</CipServiceFunctions>-----------------------------------------------
+
 
     /// Return true if this is a meta-class, false if public.
     bool IsMetaClass() const    { return !owning_class; }
@@ -186,7 +218,7 @@ public:
      * @return CIPError
      */
     virtual     CipError OpenConnection( ConnectionData* aConn,
-        Cpf* cpfd, ConnectionManagerStatusCode* extended_error_code );
+        Cpf* cpfd, ConnMgrStatus* extended_error_code );
 
 protected:
 

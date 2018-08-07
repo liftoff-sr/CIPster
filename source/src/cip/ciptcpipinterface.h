@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016-2018, SoftPLC Corportion.
+ * Copyright (c) 2016-2018, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPTCPIPINTERFACE_H_
@@ -72,12 +72,14 @@ class CipTCPIPInterfaceInstance : public CipInstance
 public:
     CipTCPIPInterfaceInstance( int aInstanceId );
 
+    static CipUint inactivity_timeout_secs;
+
 protected:
     // Attributes of a TCP/IP Interface instance are numbered #
 
     /// #1  TCP status with 1 we indicate that we got a valid
     /// configuration from DHCP or BOOTP or non volatile storage
-    CipDword tcp_status;
+    CipDword status;
 
     /// #2  This is a default value meaning that it is a DHCP client
     /// see Vol2 5-4.3.2.2:
@@ -112,7 +114,6 @@ protected:
             const char* ip_address,
             const char* subnet_mask,
             const char* gateway );
-
 
     //-----<AttrubuteFuncs>-----------------------------------------------------
 
@@ -183,8 +184,9 @@ public:
 
     static EipByte TTL( int aInstanceId );
 
+    /// Return an instance's IP address in network byte oder.  The instance
+    /// ids for this class must be allocated contiguously starting at 1.
     static CipUdint IpAddress( int aInstanceId );
-
 
     /** @ingroup CIP_API
      * @brief Configure the data of the network interface of the device

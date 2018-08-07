@@ -1,51 +1,38 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 #include <string.h>
 
-#include "cipconnectionmanager.h"
+#include <byte_bufs.h>
+#include <trace.h>
+#include <cipster_api.h>
+#include <cipster_user_conf.h>
 
-#include "cipster_user_conf.h"
+#include "cipconnectionmanager.h"
 #include "cipcommon.h"
 #include "cipmessagerouter.h"
 #include "ciperror.h"
-#include "byte_bufs.h"
-#include "cipster_api.h"
-#include "encap.h"
-#include "trace.h"
 #include "cipconnection.h"
 #include "cipassembly.h"
-#include "cpf.h"
 #include "appcontype.h"
-#include "encap.h"
+#include "../enet_encap/encap.h"
+//#include "../enet_encap/networkhandler.h"   // IpAddrStr()
+#include "../enet_encap/encap.h"
+#include "../enet_encap/cpf.h"
 
 
 /// List holding all currently active connections
 CipConnBox g_active_conns;
 
 
-/**
- * Function findExsitingMatchingConnection
- * finds an existing matching established connection.
- *
- * The comparison is done according to the definitions in the CIP specification Section 3-5.5.2:
- * The following elements have to be equal: Vendor ID, Connection Serial Number, Originator Serial Number
- *
- * @param aConn connection instance containing the comparison elements from the forward open request
- *
- * @return CipConn*
- *    - NULL if no equal established connection exists
- *    - pointer to the equal connection object
- */
-static CipConn* findExistingMatchingConnection( const ConnectionData& params )
+CipConn* CipConnMgrClass::FindExistingMatchingConnection( const ConnectionData& params )
 {
-    CipConnBox::iterator active = g_active_conns.begin();
-
-    for(  ; active != g_active_conns.end();  ++active )
+    for( CipConnBox::iterator active = g_active_conns.begin();
+            active != g_active_conns.end();  ++active )
     {
-        if( active->State() == kConnectionStateEstablished )
+        if( active->State() == kConnStateEstablished )
         {
             if( params.connection_serial_number == active->connection_serial_number
              && params.originator_vendor_id     == active->originator_vendor_id
@@ -61,9 +48,9 @@ static CipConn* findExistingMatchingConnection( const ConnectionData& params )
 
 
 EipStatus CipConnMgrClass::HandleReceivedConnectedData(
-        const sockaddr_in* from_address, BufReader aCommand )
+        const SockAddr& from_address, BufReader aCommand )
 {
-    CIPSTER_TRACE_INFO( "%s:\n", __func__ );
+    CIPSTER_TRACE_INFO( "%s: %zd bytes\n", __func__, aCommand.size() );
 
     Cpf cpfd;
 
@@ -92,21 +79,26 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
                 return kEipStatusError;
             }
 
+            /*
             CIPSTER_TRACE_INFO( "%s: got consuming connection for conn_id 0x%x\n",
                 __func__, cpfd.AddrConnId()
                 );
 
-            CIPSTER_TRACE_INFO( "%s: c.s_addr=%08x  f.s_addr=%08x\n",
+            CIPSTER_TRACE_INFO( "%s: recv_address:%s:%d  from_address:%s:%d\n",
                 __func__,
-                (unsigned) conn->originator_address.sin_addr.s_addr,
-                (unsigned) from_address->sin_addr.s_addr
+                IpAddrStr( conn->recv_address.sin_addr ).c_str(),
+                ntohs( conn->recv_address.sin_port ),
+                IpAddrStr( from_address->sin_addr ).c_str(),
+                ntohs( from_address->sin_port )
                 );
+            */
 
             // only handle the data if it is coming from the originator
-            if( conn->originator_address.sin_addr.s_addr == from_address->sin_addr.s_addr )
+            if( conn->recv_address.Addr() == from_address.Addr() )
             {
-                CIPSTER_TRACE_INFO( "%s: g.sn=0x%08x  c.sn=0x%08x\n",
+                CIPSTER_TRACE_INFO( "%s: CID:0x%08x  cpf.seq=0x%08x  encap.seq=0x%08x\n",
                     __func__,
+                    conn->consuming_connection_id,
                     cpfd.AddrEncapSeqNum(),
                     conn->eip_level_sequence_count_consuming
                     );
@@ -144,11 +136,11 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
             else
             {
                 CIPSTER_TRACE_WARN(
-                        "%s: connected data received with wrong originator address.\n"
-                        " from:%08x   connection originator:%08x\n",
+                        "%s: I/O data received with wrong originator address.\n"
+                        " from:%s   connection originator:%s\n",
                         __func__,
-                        (unsigned) from_address->sin_addr.s_addr,
-                        (unsigned) conn->originator_address.sin_addr.s_addr
+                        from_address.AddrStr().c_str(),
+                        conn->recv_address.AddrStr().c_str()
                         );
             }
         }
@@ -170,7 +162,7 @@ EipStatus CipConnMgrClass::ManageConnections()
     for( CipConnBox::iterator active = g_active_conns.begin();
             active != g_active_conns.end();  ++active )
     {
-        if( active->State() == kConnectionStateEstablished )
+        if( active->State() == kConnStateEstablished )
         {
             // maybe check inactivity watchdog timer.
             if( active->HasInactivityWatchDogTimer() )
@@ -180,22 +172,35 @@ EipStatus CipConnMgrClass::ManageConnections()
                 if( active->InactivityWatchDogTimerUSecs() <= 0 )
                 {
                     // we have a timed out connection while performing watchdog check
-                    // If this shows -1 as socket values, its because the other end
-                    // closed the transport and we closed it in response already.
-                    CIPSTER_TRACE_INFO(
-                        "%s: >>> Connection class: %d timed out consuming_socket:%d producing_socket:%d\n",
-                        __func__,
-                        active->trigger.Class(),
-                        active->ConsumingSocket(),
-                        active->ProducingSocket()
-                        );
+
+                    if( active->trigger.Class() == kConnTransportClass3 )
+                    {
+                        CIPSTER_TRACE_INFO(
+                            "%s: >>> Connection class:%d timeOut on session with handle:%d\n",
+                            __func__,
+                            active->trigger.Class(),
+                            active->encap_session
+                            );
+                    }
+                    else
+                    {
+                        // If this shows -1 as socket values, its because the other end
+                        // closed the transport and we closed it in response already.
+                        CIPSTER_TRACE_INFO(
+                            "%s: >>> Connection class:%d timeOut w/ consuming_socket:%d producing_socket:%d\n",
+                            __func__,
+                            active->trigger.Class(),
+                            active->ConsumingSocket(),
+                            active->ProducingSocket()
+                            );
+                    }
 
                     active->timeOut();
                 }
             }
 
             // only if the connection has not timed out check if data is to be sent
-            if( active->State() == kConnectionStateEstablished )
+            if( active->State() == kConnStateEstablished )
             {
                 // client connection, not server
                 if( !active->trigger.IsServer()
@@ -205,7 +210,7 @@ EipStatus CipConnMgrClass::ManageConnections()
                     // only produce for the master connection
                     && active->ProducingSocket() != kEipInvalidSocket )
                 {
-                    if( active->trigger.Trigger() != kConnectionTriggerTypeCyclic )
+                    if( active->trigger.Trigger() != kConnTriggerTypeCyclic )
                     {
                         // non cyclic connections have to decrement production inhibit timer
                         if( active->production_inhibit_timer_usecs >= 0 )
@@ -227,7 +232,7 @@ EipStatus CipConnMgrClass::ManageConnections()
 
                         active->SetTransmissionTriggerTimerUSecs( active->ExpectedPacketRateUSecs() );
 
-                        if( active->trigger.Trigger() != kConnectionTriggerTypeCyclic )
+                        if( active->trigger.Trigger() != kConnTriggerTypeCyclic )
                         {
                             // non cyclic connections have to reload the production inhibit timer
                             active->production_inhibit_timer_usecs = active->GetPIT_USecs();
@@ -242,9 +247,34 @@ EipStatus CipConnMgrClass::ManageConnections()
 }
 
 
+void CipConnMgrClass::CloseClass3Connections( CipUdint aSessionId )
+{
+    CipConnBox::iterator it = g_active_conns.begin();
+
+    while( it != g_active_conns.end() )
+    {
+        if( it->trigger.Class() == kConnTransportClass3 &&
+            it->encap_session   == aSessionId )
+        {
+            CIPSTER_TRACE_INFO( "%s: closing class 3 on session:%d\n",
+                __func__, aSessionId );
+
+            CipConnBox::iterator to_close = it;
+
+            ++it;
+
+            to_close->Close();
+        }
+
+        else
+            ++it;
+    }
+}
+
+
 void CipConnMgrClass::assembleForwardOpenResponse( ConnectionData* aParams,
         CipMessageRouterResponse* response, CipError general_status,
-        ConnectionManagerStatusCode extended_status )
+        ConnMgrStatus extended_status )
 {
     //Cpf cpfd( kCpfIdNullAddress, kCpfIdUnconnectedDataItem );
 
@@ -279,12 +309,12 @@ void CipConnMgrClass::assembleForwardOpenResponse( ConnectionData* aParams,
         default:
             switch( extended_status )
             {
-            case kConnectionManagerStatusCodeErrorInvalidOToTConnectionSize:
+            case kConnMgrStatusErrorInvalidOToTConnectionSize:
                 response->AddAdditionalSts( extended_status );
                 response->AddAdditionalSts( aParams->corrected_o_to_t_size );
                 break;
 
-            case kConnectionManagerStatusCodeErrorInvalidTToOConnectionSize:
+            case kConnMgrStatusErrorInvalidTToOConnectionSize:
                 response->AddAdditionalSts( extended_status );
                 response->AddAdditionalSts( aParams->corrected_t_to_o_size );
                 break;
@@ -303,15 +333,31 @@ void CipConnMgrClass::assembleForwardOpenResponse( ConnectionData* aParams,
 
     if( general_status == kCipErrorSuccess )
     {
-        // Set the actual packet rates to caller's unadjusted rates.
+        // Set the APIs (actual packet intervals) to caller's unadjusted rates.
         // Vol1 3-5.4.1.2 & Vol1 3-5.4.3 are not clear enough here.
         out.put32( aParams->o_to_t_RPI_usecs );
         out.put32( aParams->t_to_o_RPI_usecs );
+
+        out.put8( 0 );   // Application Reply Size
+    }
+    else
+    {
+        // Vol1 Table 3-5.20 Unsuccessful Forward_Open Response
+
+        // Remaining Path Size: "The number of words in the
+        // Connection_Path parameter of the request as received
+        // by the router that detects the error."
+
+        // In the failure response, the remaining remaining_path_size shall be
+        // the “pre-stripped” size. This shall be the size of the path when the
+        // node first receives the request and has not yet started processing
+        // it. A target node may return either the “pre-stripped” size or 0 for
+        // the remaining remaining_path_size.
+
+        out.put8( 0 );
     }
 
-    out.put8( 0 );   // remaining path size - for routing devices relevant
     out.put8( 0 );   // reserved
-
     response->SetWrittenSize( out.data() - response->Writer().data() );
 }
 
@@ -322,7 +368,7 @@ CipConn* GetConnectionByConsumingId( int aConnectionId )
 
     while( c != g_active_conns.end() )
     {
-        if( c->State() == kConnectionStateEstablished )
+        if( c->State() == kConnStateEstablished )
         {
             if( c->consuming_connection_id == aConnectionId )
             {
@@ -343,7 +389,7 @@ CipConn* GetConnectedOutputAssembly( int output_assembly_id )
 
     for(  ; active != g_active_conns.end(); ++active )
     {
-        if( active->State() == kConnectionStateEstablished )
+        if( active->State() == kConnStateEstablished )
         {
             if( active->conn_path.consuming_path.GetInstanceOrConnPt() == output_assembly_id )
                 return active;
@@ -356,7 +402,7 @@ CipConn* GetConnectedOutputAssembly( int output_assembly_id )
 
 void CipConnBox::Insert( CipConn* aConn )
 {
-    if( aConn->trigger.Class() == kConnectionTransportClass1 )
+    if( aConn->trigger.Class() == kConnTransportClass1 )
     {
         //CIPSTER_TRACE_INFO( "%s: conn->consuming_connection_id:%d\n", __func__, aConn->consuming_connection_id );
     }
@@ -371,13 +417,13 @@ void CipConnBox::Insert( CipConn* aConn )
 
     head = aConn;
 
-    aConn->SetState( kConnectionStateEstablished );
+    aConn->SetState( kConnStateEstablished );
 }
 
 
 void CipConnBox::Remove( CipConn* aConn )
 {
-    if( aConn->trigger.Class() == kConnectionTransportClass1 )
+    if( aConn->trigger.Class() == kConnTransportClass1 )
     {
         //CIPSTER_TRACE_INFO( "%s: consuming_connection_id:%d\n", __func__, consuming_connection_id );
     }
@@ -398,7 +444,7 @@ void CipConnBox::Remove( CipConn* aConn )
 
     aConn->prev  = NULL;
     aConn->next  = NULL;
-    aConn->SetState( kConnectionStateNonExistent );
+    aConn->SetState( kConnStateNonExistent );
 }
 
 
@@ -441,7 +487,7 @@ EipStatus TriggerConnections( int aOutputAssembly, int aInputAssembly )
         if( aOutputAssembly == c->conn_path.consuming_path.GetInstanceOrConnPt()
          && aInputAssembly  == c->conn_path.producing_path.GetInstanceOrConnPt() )
         {
-            if( c->trigger.Trigger() == kConnectionTriggerTypeApplication )
+            if( c->trigger.Trigger() == kConnTriggerTypeApplication )
             {
                 // produce at the next allowed occurrence
                 c->SetTransmissionTriggerTimerUSecs( c->production_inhibit_timer_usecs );
@@ -460,7 +506,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response, bool isLarge )
 {
-    ConnectionManagerStatusCode connection_status = kConnectionManagerStatusCodeSuccess;
+    ConnMgrStatus connection_status = kConnMgrStatusSuccess;
 
     BufReader in = request->Data();
 
@@ -479,14 +525,14 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     }
     catch( const std::exception& e )
     {
-        // currently cannot happen.
+        // currently cannot happen except under Murphy's law.
         return kEipStatusError;
     }
 
     // first check if we have already a connection with the given params
-    if( findExistingMatchingConnection( params ) )
+    if( FindExistingMatchingConnection( params ) )
     {
-        // TODO this test is  incorrect, see CIP spec 3-5.5.2 re: duplicate forward open
+        // TODO this test is incorrect, see CIP spec 3-5.5.2 re: duplicate forward open
         // it should probably be testing the connection type fields
         // TODO think on how a reconfiguration request could be handled correctly.
         if( !params.consuming_connection_id && !params.producing_connection_id )
@@ -501,7 +547,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         assembleForwardOpenResponse(
                 &params, response,
                 kCipErrorConnectionFailure,
-                kConnectionManagerStatusCodeErrorConnectionInUse );
+                kConnMgrStatusErrorConnectionInUse );
 
         return kEipStatusOkSend;
     }
@@ -515,14 +561,16 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         assembleForwardOpenResponse(
                 &params, response,
                 kCipErrorConnectionFailure,
-                kConnectionManagerStatusCodeErrorInvalidOToTConnectionType );
+                kConnMgrStatusErrorInvalidOToTConnectionType );
 
         return kEipStatusOkSend;
     }
 
     CIPSTER_TRACE_INFO(
-        "ForwardOpen : ConnSerNo %d ConConnID:0x%08x, ProdConnID:0x%08x\n",
+        "ForwardOpen: ConnSerNo:%x VendorId:%x OriginatorSerNum:%x CID:0x%08x PID:0x%08x\n",
         params.connection_serial_number,
+        params.originator_vendor_id,
+        params.originator_serial_number,
         params.consuming_connection_id,
         params.producing_connection_id
         );
@@ -534,7 +582,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         assembleForwardOpenResponse(
                 &params, response,
                 kCipErrorConnectionFailure,
-                kConnectionManagerStatusCodeErrorInvalidOToTConnectionType );
+                kConnMgrStatusErrorInvalidOToTConnectionType );
 
         return kEipStatusOkSend;
     }
@@ -546,7 +594,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         assembleForwardOpenResponse(
                 &params, response,
                 kCipErrorConnectionFailure,
-                kConnectionManagerStatusCodeErrorInvalidTToOConnectionType );
+                kConnMgrStatusErrorInvalidTToOConnectionType );
 
         return kEipStatusOkSend;
     }
@@ -560,7 +608,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         assembleForwardOpenResponse(
                 &params, response,
                 kCipErrorConnectionFailure,
-                kConnectionManagerStatusCodeErrorTransportTriggerNotSupported );
+                kConnMgrStatusErrorTransportTriggerNotSupported );
 
         return kEipStatusOkSend;
     }
@@ -621,7 +669,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
 
         // in case of success, g_active_conns holds to the new connection at begin()
         assembleForwardOpenResponse( g_active_conns.begin(),
-                response, kCipErrorSuccess, kConnectionManagerStatusCodeSuccess );
+                response, kCipErrorSuccess, kConnMgrStatusSuccess );
         return kEipStatusOkSend;
     }
 }
@@ -649,19 +697,27 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
     (void) instance;
 
     // check connection_serial_number && originator_vendor_id && originator_serial_number if connection is established
-    ConnectionManagerStatusCode connection_status =
-        kConnectionManagerStatusCodeErrorConnectionNotFoundAtTargetApplication;
+    ConnMgrStatus connection_status =
+        kConnMgrStatusErrorConnectionNotFoundAtTargetApplication;
 
     BufReader in = request->Data();
 
     in += 2;        // ignore Priority/Time_tick and Time-out_ticks
 
+    //-----<ConnectionTriad>----------------------------------------------------
     CipUint     connection_serial_number = in.get16();
     CipUint     originator_vendor_id     = in.get16();
     CipUdint    originator_serial_number = in.get32();
+    //-----</ConnectionTriad>---------------------------------------------------
+
     CipByte     connection_path_size     = in.get8();
 
-    CIPSTER_TRACE_INFO( "ForwardClose: ConnSerNo %d\n", connection_serial_number );
+    CIPSTER_TRACE_INFO(
+        "ForwardClose: ConnSerNo:%x VendorId:%x OriginatorSerNum:%x\n",
+        connection_serial_number,
+        originator_vendor_id,
+        originator_serial_number
+        );
 
     CipConnBox::iterator active = g_active_conns.begin();
 
@@ -669,8 +725,8 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
     {
         // This check should not be necessary as only established connections
         // should be in the active connection list
-        if( active->State() == kConnectionStateEstablished ||
-            active->State() == kConnectionStateTimedOut )
+        if( active->State() == kConnStateEstablished ||
+            active->State() == kConnStateTimedOut )
         {
             if( active->connection_serial_number == connection_serial_number
              && active->originator_vendor_id     == originator_vendor_id
@@ -678,7 +734,7 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
             {
                 // found the corresponding connection -> close it
                 active->Close();
-                connection_status = kConnectionManagerStatusCodeSuccess;
+                connection_status = kConnMgrStatusSuccess;
                 break;
             }
         }
@@ -690,11 +746,11 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
     out.put16( originator_vendor_id );
     out.put32( originator_serial_number );
 
-    if( connection_status == kConnectionManagerStatusCodeSuccess )
+    if( connection_status == kConnMgrStatusSuccess )
     {
         // Vol1 Table 3-5.22
-        out.put8( 0 );         // application data word count
-        out.put8( 0 );         // reserved
+        out.put8( 0 );      // application data word count
+        out.put8( 0 );      // reserved
     }
     else
     {
@@ -702,8 +758,8 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
         response->SetGenStatus( kCipErrorConnectionFailure );
         response->AddAdditionalSts( connection_status );
 
-        out.put8( 0 );  // out.put8( connection_path_size );
-        out.put8( 0 );         // reserved
+        out.put8( 0 );      // out.put8( connection_path_size );
+        out.put8( 0 );      // reserved
     }
 
     (void) connection_path_size;
@@ -724,27 +780,26 @@ CipConnMgrClass::CipConnMgrClass() :
     // There are no attributes in instance of this class yet, so nothing to set.
     delete ServiceRemove( kSetAttributeSingle );
 
-    ServiceInsert( kForwardOpen, forward_open_service, "ForwardOpen" );
-    ServiceInsert( kLargeForwardOpen, large_forward_open_service, "LargeForwardOpen" );
-
-    ServiceInsert( kForwardClose, forward_close_service, "ForwardClose" );
+    ServiceInsert( kForwardOpen,        forward_open_service,       "ForwardOpen" );
+    ServiceInsert( kLargeForwardOpen,   large_forward_open_service, "LargeForwardOpen" );
+    ServiceInsert( kForwardClose,       forward_close_service,      "ForwardClose" );
 
     // Vol1 Table 3-5.4 limits what GetAttributeAll returns, but I want to support
     // attribute 3 also, so remove 3 from the auto generated
     // (via CipInstance::AttributeInsert()) bitmap.
     getable_all_mask = MASK4( 1,2,6,7 );
-
-    InitializeIoConnectionData();
 }
 
 
-static CipInstance* createConnectionManagerInstance()
+CipInstance* CipConnMgrClass::CreateInstance( int aInstanceId )
 {
-    CipClass* clazz = GetCipClass( kCipConnectionManagerClass );
+    CipInstance* i = new CipInstance( aInstanceId );
 
-    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
-
-    clazz->InstanceInsert( i );
+    if( !InstanceInsert( i ) )
+    {
+        delete i;
+        i = NULL;
+    }
 
     return i;
 }
@@ -754,12 +809,12 @@ EipStatus ConnectionManagerInit()
 {
     if( !GetCipClass( kCipConnectionManagerClass ) )
     {
-        CipClass* clazz = new CipConnMgrClass();
+        CipConnMgrClass* clazz = new CipConnMgrClass();
 
         RegisterCipClass( clazz );
 
-        // add one instance
-        createConnectionManagerInstance();
+        // add only one instance
+        clazz->CreateInstance( clazz->Instances().size() + 1 );;
     }
 
     return kEipStatusOk;

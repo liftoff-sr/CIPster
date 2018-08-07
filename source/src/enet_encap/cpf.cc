@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (C) 2016, SoftPLC Corportion.
+ * Copyright (C) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 //#include <string.h>
@@ -16,14 +16,37 @@
 #include "trace.h"
 
 
-SockAddrInfoItem::SockAddrInfoItem( CpfId aType, CipUdint aIP, int aPort ) :
-    type_id( aType ),
-    length( 16 ),
-    sin_family( AF_INET ),
-    sin_port( aPort ),
-    sin_addr( aIP ),
-    nasin_zero()
+Cpf::Cpf( const SockAddr* aClient ) :
+    payload( 0 ),
+    client_addr( aClient )
 {
+    Clear();
+}
+
+
+Cpf::Cpf( CpfId aAddrType, CpfId aDataType, Serializeable* aPayload ) :
+    address_item( aAddrType, aDataType ),
+    data_item( aDataType ),
+    payload( aPayload ),
+    client_addr( 0 )
+{
+    ClearRx_O_T();
+    ClearRx_T_O();
+    ClearTx_O_T();
+    ClearTx_T_O();
+}
+
+
+Cpf::Cpf( const AddressItem& aAddr, CpfId aDataType ) :
+    address_item( aAddr ),
+    data_item( aDataType ),
+    payload( 0 ),
+    client_addr( 0 )
+{
+    ClearRx_O_T();
+    ClearRx_T_O();
+    ClearTx_O_T();
+    ClearTx_T_O();
 }
 
 
@@ -34,7 +57,7 @@ int Cpf::NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply )
     int result = DeserializeCpf( aCommand );
 
     if( result <= 0 )
-        return -kEncapsulationProtocolIncorrectData;
+        return -kEncapErrorIncorrectData;
 
     // Check if NullAddressItem received, otherwise it is not an unconnected
     // message and should not be here
@@ -42,10 +65,22 @@ int Cpf::NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply )
     {
         if( DataType() == kCpfIdUnconnectedDataItem )
         {
-            result = CipMessageRouterClass::NotifyMR( DataItemPayload(), &response );
+            CipMessageRouterRequest request;
 
-            if( result < 0 )
-                return -kEncapsulationProtocolIncorrectData;
+            int consumed = request.DeserializeMRReq( DataItemPayload() );
+
+            if( consumed <= 0 )
+            {
+                CIPSTER_TRACE_ERR( "%s: error from DeserializeMRReq()\n", __func__ );
+                response.SetGenStatus( kCipErrorPathSegmentError );
+            }
+            else
+            {
+                EipStatus s = CipMessageRouterClass::NotifyMR( &request, &response );
+
+                if( s == kEipStatusError )
+                    return -kEncapErrorIncorrectData;
+            }
 
             SetPayload( &response );
             result = Serialize( aReply );
@@ -56,7 +91,7 @@ int Cpf::NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply )
                 "%s: got DataItemType():%d and not the expected kCpfIdUnconnectedDataItem\n",
                 __func__, DataType()
                 );
-            return -kEncapsulationProtocolIncorrectData;
+            return -kEncapErrorIncorrectData;
         }
     }
     else
@@ -65,7 +100,7 @@ int Cpf::NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply )
             "%s: got AddressItemType():%d and not the expected kCpfIdNullAddress\n",
             __func__, AddrType()
             );
-        return -kEncapsulationProtocolIncorrectData;
+        return -kEncapErrorIncorrectData;
     }
 
     return result;
@@ -77,7 +112,7 @@ int Cpf::NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply
     int result = DeserializeCpf( aCommand );
 
     if( result <= 0 )
-        return -kEncapsulationProtocolIncorrectData;
+        return -kEncapErrorIncorrectData;
 
     // Check if ConnectedAddressItem received, otherwise it is no connected
     // message and should not be here
@@ -85,7 +120,7 @@ int Cpf::NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply
     {
         CIPSTER_TRACE_ERR(
                 "notifyConnectedCPF: got something besides the expected CIP_ITEM_ID_NULL\n" );
-        return -kEncapsulationProtocolIncorrectData;
+        return -kEncapErrorIncorrectData;
     }
 
     // ConnectedAddressItem item
@@ -100,23 +135,34 @@ int Cpf::NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply
         if( DataType() == kCpfIdConnectedDataItem )
         {
             // connected data item received
-
-            BufReader command( data_item.data, data_item.length );
+            BufReader   command( DataItemPayload() );
 
             address_item.encap_sequence_number = command.get16();
 
-            CipMessageRouterResponse response( this );
+            CipMessageRouterResponse response( this );  // give Cpf to response
+            CipMessageRouterRequest  request;
 
-            // command is advanced by 2 here because of the get16() above
-            result = CipMessageRouterClass::NotifyMR( command, &response );
+            // command is advanced by 2 here because of above get16().
+            int consumed = request.DeserializeMRReq( command );
 
-            if( result < 0 )
-                return -kEncapsulationProtocolIncorrectData;
+            if( consumed <= 0 )
+            {
+                CIPSTER_TRACE_ERR( "%s: error from DeserializeMRReq()\n", __func__ );
+                response.SetGenStatus( kCipErrorPathSegmentError );
+            }
+            else
+            {
+                EipStatus s = CipMessageRouterClass::NotifyMR( &request, &response );
 
-            address_item.connection_identifier = conn->producing_connection_id;
+                if( s == kEipStatusError )
+                    return -kEncapErrorIncorrectData;
+
+                address_item.connection_identifier = conn->producing_connection_id;
+            }
 
             SetPayload( &response );
-            result = Serialize( aReply );
+
+            result = Serialize( aReply );  // this Cpf
         }
         else
         {
@@ -124,14 +170,18 @@ int Cpf::NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply
             CIPSTER_TRACE_ERR(
                     "%s: got DataItemType()=%d instead of expected kCpfIdConnectedDataItem\n",
                     __func__, DataType() );
+
+            return -kEncapErrorIncorrectData;
         }
     }
     else
     {
         CIPSTER_TRACE_ERR(
-                "%s: connection with given ID:%d could not be found\n",
+                "%s: CID:0x%08x could not be found\n",
                 __func__,
                 address_item.connection_identifier );
+
+        return -kEncapErrorIncorrectData;
     }
 
     return result;
@@ -173,26 +223,18 @@ int Cpf::DeserializeCpf( BufReader aSrc )
             in += length;               // might throw exception
             break;
 
-        case kCpfIdSockAddrInfo_O_to_T:
-        case kCpfIdSockAddrInfo_T_to_O:
+        case kCpfIdSockAddrInfo_O_T:
+        case kCpfIdSockAddrInfo_T_O:
             {
-                SockAddrInfoItem saii;
-
-                saii.type_id    = type_id;
-                saii.length     = length;
-                saii.sin_family = in.get16BE();
-                saii.sin_port   = in.get16BE();
-                saii.sin_addr   = in.get32BE();
-
-                if( saii.length != 16 )
-                    goto error;
-
-                for( int i = 0; i < 8;  ++i )
+                if( length == 16 )
                 {
-                    saii.nasin_zero[i] = in.get8();
-                }
+                    SockAddr saii;
 
-                AppendRx( saii );
+                    in += deserialize_sockaddr( &saii, in );
+                    AddRx( SockAddrId( type_id ), saii );
+                }
+                else
+                    goto error;
             }
             break;
 
@@ -202,8 +244,6 @@ int Cpf::DeserializeCpf( BufReader aSrc )
             goto error;
         }
     }
-
-    item_count = received_item_count;
 
     return in.data() - aSrc.data();
 
@@ -232,7 +272,7 @@ int Cpf::SerializedCount( int aCtl ) const
         break;
 
     default:
-        ;   // maybe no address?
+        ;   // maybe no address
     }
 
     // process Data Item
@@ -259,12 +299,9 @@ int Cpf::SerializedCount( int aCtl ) const
         }
     }
 
-    for( int type = kCpfIdSockAddrInfo_O_to_T;
-         type <= kCpfIdSockAddrInfo_T_to_O;  ++type )
+    for( int type = kSockAddr_O_T;  type <= kSockAddr_T_O;  ++type )
     {
-        const SockAddrInfoItem* saii = SearchTx( CpfId(type) );
-
-        if( saii )
+        if( SaiiTx( SockAddrId( type ) ) )
         {
             count += 20;
         }
@@ -277,8 +314,9 @@ int Cpf::SerializedCount( int aCtl ) const
 int Cpf::Serialize( BufWriter aDst, int aCtl ) const
 {
     BufWriter   out = aDst;
+    int         item_count = HasAddr() + HasData() + HasTx_O_T() + HasTx_T_O();
 
-    out.put16( item_count + TxSockAddrInfoItemCount() - RxSockAddrInfoItemCount() );
+    out.put16( item_count );
 
     // process Address Item
     switch( address_item.type_id )
@@ -305,7 +343,7 @@ int Cpf::Serialize( BufWriter aDst, int aCtl ) const
         break;
 
     default:
-        ;   // maybe no address?
+        ;   // maybe no address
     }
 
     // process Data Item
@@ -335,33 +373,47 @@ int Cpf::Serialize( BufWriter aDst, int aCtl ) const
         else // connected IO Message to send
         {
             out.put16( data_item.type_id ).put16( data_item.length )
-
             .append( data_item.data, data_item.length );
         }
     }
 
-    /*
-        Process SockAddr Info Items. Make sure first the O->T and then T->O
-        appears on the wire. EtherNet/IP specification doesn't demand it, but
-        there are EIP devices which depend on CPF items to appear in the order
-        of their ID number
-    */
-    for( int type = kCpfIdSockAddrInfo_O_to_T;
-         type <= kCpfIdSockAddrInfo_T_to_O;  ++type )
+    // Do O_T before T_O
+
+    if( const SockAddr* saii = SaiiTx( kSockAddr_O_T ) )
     {
-        const SockAddrInfoItem* saii = SearchTx( CpfId(type) );
+        out.put16( kSockAddr_O_T ).put16( 16 );
+        out += serialize_sockaddr( *saii, out );
+    }
 
-        if( saii )
-        {
-            out.put16( saii->type_id ).put16( saii->length )
-
-            .put16BE( saii->sin_family )
-            .put16BE( saii->sin_port )
-            .put32BE( saii->sin_addr )
-            .append( saii->nasin_zero, 8 );
-        }
+    if( const SockAddr* saii = SaiiTx( kSockAddr_T_O ) )
+    {
+        out.put16( kSockAddr_T_O ).put16( 16 );
+        out += serialize_sockaddr( *saii, out );
     }
 
     return out.data() - aDst.data();
 }
 
+int Cpf::serialize_sockaddr( const SockAddr& aSockAddr, BufWriter aOutput )
+{
+    BufWriter out = aOutput;
+
+    out.put16BE( aSockAddr.Family() )
+    .put16BE( aSockAddr.Port() )
+    .put32BE( aSockAddr.Addr() )
+
+    .fill( 8 );     // ignore sin_zero
+
+    return out.data() - aOutput.data();
+}
+
+int Cpf::deserialize_sockaddr( SockAddr* aSockAddr, BufReader aInput )
+{
+    BufReader in = aInput;
+
+    aSockAddr->SetFamily( in.get16BE() );
+    aSockAddr->SetPort( in.get16BE() );
+    aSockAddr->SetAddr( in.get32BE() );
+
+    return in.data() - aInput.data();
+}

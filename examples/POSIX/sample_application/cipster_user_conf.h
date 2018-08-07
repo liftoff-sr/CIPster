@@ -88,24 +88,25 @@
 #define CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS 20
 
 /**
- * The time in usecs of the timer used in this implementation, but make it a
- * multiple of milliseconds expressed in microseconds.  i.e. the last 3 digits
- * *should* be zero because of Vol1 3-4.4.9 Expected_packet_rate is expressed
+ * The clock period in usecs of the timer used in this implementation.
+ * It should be a multiple of milliseconds expressed in microseconds,
+ * i.e. the last 3 digits *should* be zero because of
+ * Vol1 3-4.4.9 Expected_packet_rate is expressed
  * in milliseconds.  However, whether this is mandatory given the jitter
  * associated with the call frequency to NetworkHandlerProcessOnce()
  * seems questionable.
  */
-static const unsigned kOpenerTimerTickInMicroSeconds = 10000;
+const unsigned kOpenerTimerTickInMicroSeconds = 10000;
 
-/** @brief Define if RUN IDLE data is sent with consumed data
+/**
+ * If RUN IDLE data is expected in consumed data
  */
-static const int kOpenerConsumedDataHasRunIdleHeader = 1;
+const int kOpenerConsumedDataHasRunIdleHeader = 1;
 
-/** @brief Define if RUN IDLE data is to be sent with produced data
- *
- * Per default we don't send run idle headers with produced data
+/**
+ * If RUN IDLE data is to be sent with produced data
  */
-static const int kOpenerProducedDataHasRunIdleHeader = 0;
+const int kOpenerProducedDataHasRunIdleHeader = 0;
 
 
 #ifdef CIPSTER_WITH_TRACES

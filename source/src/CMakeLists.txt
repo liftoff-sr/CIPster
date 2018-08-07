@@ -22,6 +22,7 @@ set( ENCAP_SRCS
     enet_encap/cpf.cc
     enet_encap/encap.cc
     enet_encap/networkhandler.cc
+    enet_encap/sockaddr.cc
     )
 
 if( BYTEBUFS_INLINE )

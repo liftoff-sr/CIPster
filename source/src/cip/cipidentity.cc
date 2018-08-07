@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 
@@ -82,11 +82,9 @@ static EipStatus reset_service( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response )
 {
-    EipStatus eip_status;
-
     (void) instance;
 
-    eip_status = kEipStatusOkSend;
+    EipStatus eip_status = kEipStatusOkSend;
 
     if( request->Data().size() == 1 )
     {

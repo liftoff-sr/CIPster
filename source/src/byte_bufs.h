@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016-2018, SoftPLC Corportion.
+ * Copyright (c) 2016-2018, SoftPLC Corporation.
  *
  ******************************************************************************/
 
@@ -108,10 +108,10 @@ public:
     BufWriter& put_double( double aValue );
 
     /// Serialize a CIP SHORT_STRING
-    BufWriter& put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding = false );
+    BufWriter& put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding );
 
     /// Serialize a CIP STRING
-    BufWriter& put_STRING( const std::string& aString, bool doEvenByteCountPadding = false );
+    BufWriter& put_STRING( const std::string& aString, bool doEvenByteCountPadding );
 
     /// Serialize a CIP STRING2
     BufWriter& put_STRING2( const std::string& aString );

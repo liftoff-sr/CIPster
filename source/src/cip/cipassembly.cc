@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 
@@ -136,14 +136,14 @@ public:
     {
     }
 
-    CipError OpenConnection( ConnectionData* aConn, Cpf* cpfd, ConnectionManagerStatusCode* extended_error ); // override
+    CipError OpenConnection( ConnectionData* aConn, Cpf* cpfd, ConnMgrStatus* extended_error ); // override
 };
 
 
 CipError CipAssemblyClass::OpenConnection( ConnectionData* aParams,
-    Cpf* cpfd, ConnectionManagerStatusCode* extended_error )
+    Cpf* aCpf, ConnMgrStatus* extended_error )
 {
-    return CipConnectionClass::OpenIO( aParams, cpfd, extended_error );
+    return CipConnectionClass::OpenIO( aParams, aCpf, extended_error );
 }
 
 

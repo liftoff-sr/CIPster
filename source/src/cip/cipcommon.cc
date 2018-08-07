@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 #include <string.h>
@@ -24,6 +24,9 @@
 
 
 int g_CIPSTER_TRACE_LEVEL = CIPSTER_TRACE_LEVEL;
+
+//int g_my_io_udp_port = kEIP_IoUdpPort;
+int g_my_io_udp_port = 2200;
 
 
 // global public variables
@@ -79,10 +82,8 @@ void ShutdownCipStack()
 
     CipTCPIPInterfaceClass::Shutdown();
 
-    // clear all the instances and classes
-    DeleteAllClasses();
-
-    DestroyIoConnectionData();
+    // destroy all the instances and classes
+    CipClass::DeleteAll();
 }
 
 
@@ -126,12 +127,12 @@ int EncodeData( CipDataType aDataType, const void* input, BufWriter& aBuf )
         break;
 
     case kCipString:
-        aBuf.put_STRING( * static_cast<const std::string*>(input) );
+        aBuf.put_STRING( * static_cast<const std::string*>(input), false );
         break;
 
 
     case kCipShortString:
-        aBuf.put_SHORT_STRING( * static_cast<const std::string*>(input) );
+        aBuf.put_SHORT_STRING( * static_cast<const std::string*>(input), false );
         break;
 
     case kCipString2:

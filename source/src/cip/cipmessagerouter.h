@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPMESSAGEROUTER_H_
@@ -173,9 +173,9 @@ protected:
     Cpf*            cpf;
 
     // The common packet format makes it difficult to avoid copying the
-    // reply data payload because SockAddrInfo can trails it and getting
+    // reply data payload because SockAddrInfo can trail it and getting
     // accurate length info early enough is tough.
-    // So for now the message router response is generated into a temporary location
+    // So for now the message router response is sometimes generated into a temporary location
     // and then copied to the final buffer for sending on the wire.  Since we
     // are single threaded, we can use a common temporary buffer for all
     // messages.  However, hide that strategy so it can be easily changed in
@@ -185,53 +185,40 @@ protected:
 };
 
 
-
 class CipMessageRouterClass : public CipClass
 {
 public:
     CipMessageRouterClass();
 
-    CipError OpenConnection( ConnectionData* aConn,
-        Cpf* cpfd,
-        ConnectionManagerStatusCode* extended_error_code );    // override
+    CipError OpenConnection( ConnectionData* aConn, Cpf* aCpf,
+                ConnMgrStatus* extended_error_code );    // override
 
     /**
      * Function NotifyMR
      * notifies the MessageRouter that an explicit message (connected or unconnected)
      * has been received. This function is called from the encapsulation layer.
      *
-     * @param aCommand CPFD data payload which is the CIP part.
-     * @param aReply where to put the reply, must fill in
-     *   CipMessageRouterResponse and its BufWriter 'data' and data_length.  This is
-     *   how caller knows the length.  Should not advance data.data().
+     * @param aRequest is a parsed CipMessageRouterRequest
+     * @param aResponse is where to put the reply, must fill in
+     *   CipMessageRouterResponse and its BufWriter (provided by Writer() ).
+     *   Then call SetWrittenSize, which is how caller knows the length.
+     *   Should not advance data.data().
      *
-     * @return EipStatus
+     * @return EipStatus - kEipStatusError if error and caller is not to send any reply.
+     *                     kEipStatusOkSend if caller is to send reply, which may contain
+     *                      an error indication in general status field.
      */
-    static EipStatus NotifyMR( BufReader aCommand, CipMessageRouterResponse* aReply );
+    static EipStatus NotifyMR(  CipMessageRouterRequest*  aRequest,
+                                CipMessageRouterResponse* aResponse );
 
     /**
-     * Function CipMessageRouterInit
-     * initializes the data structures of the message router.
+     * Function Init
+     * initializes the message router support.
      *  @return kEipStatusOk if class was initialized, otherwise kEipStatusError
      */
     static EipStatus Init();
+
+    CipInstance* CreateInstance( int aInstanceId );
 };
-
-
-// public functions
-
-/** @brief Free all data allocated by the classes created in the CIP stack
- */
-void DeleteAllClasses();
-
-/**
- * Function RegisterCipClass
- * registers class at the message router.
- * In order that the message router can deliver
- * explicit messages each class has to register.
- * @param aClass CIP class to be registered
- * @return kEipStatusOk on success
- */
-EipStatus RegisterCipClass( CipClass* aClass );
 
 #endif // CIPSTER_CIPMESSAGEROUTER_H_

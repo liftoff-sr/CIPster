@@ -1,6 +1,15 @@
-*) Class 3 connection size should be used to limit size of reply buffers now
-   that buffer overruns are impossible.
+*) Get rid of Eip integer typedefs.  They seem needless given the Cip typedefs.
 
+*)  Vol2 2-5.5.2
 
+    Close TCP connection when all originated IO connections generated from it
+    timeout.
 
+    In the condition where a target’s CIP connections from an originator all
+    time out, the target shall close the TCP connection from that originator
+    immediately. The purpose of this behavior is to help prevent half-open CIP
+    connections that can result from TCP retries at the originator due to
+    link-lost conditions.
+
+    (The inactivity timer in same section is already working.)
 

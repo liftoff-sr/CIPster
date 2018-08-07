@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPEPATH_H_
@@ -347,10 +347,10 @@ struct CipElectronicKeySegment
      * Function Check
      * compares this electronic key with this device's global data.
      *
-     * @return ConnectionManagerStatusCode - kConnectionManagerStatusCodeSuccess
+     * @return ConnMgrStatus - kConnMgrStatusSuccess
      *  on success, other value from this enum on error.
      */
-    ConnectionManagerStatusCode Check() const;
+    ConnMgrStatus Check() const;
 };
 
 

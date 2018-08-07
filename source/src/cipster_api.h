@@ -23,7 +23,6 @@
 #include "byte_bufs.h"
 
 
-
 /**  @defgroup CIP_API CIPster User interface
  * @brief This is the public interface of the CIPster. It provides all function
  * needed to implement an EtherNet/IP enabled slave-device.
@@ -115,14 +114,17 @@ void CipStackInit( EipUint16 unique_connection_id );
 void ShutdownCipStack();
 
 /** @ingroup CIP_API
- * @brief Get a pointer to a CIP object with given class code
+ * Function GetCipClass
+ * returns a pointer to a CipClass given @a aClassId
  *
- * @param class_id class ID of the object to retrieve
- * @return pointer to CIP Object
- *          0 if object is not present in the stack
+ * @param aClassId the class ID of the CipClass to return
+ *
+ * @return CipClass* - non-NULL if success, else NULL if not found.
  */
-CipClass* GetCipClass( int class_id );
-
+inline CipClass* GetCipClass( int aClassId )
+{
+    return CipClass::Get( aClassId );
+}
 
 /** @ingroup CIP_API
  * @brief Register a CipClass into the CIP class registry.  This may only be
@@ -130,8 +132,10 @@ CipClass* GetCipClass( int class_id );
  *
  * @param aClass which CIP class to register.
  */
-EipStatus RegisterCipClass( CipClass* aClass );
-
+inline EipStatus RegisterCipClass( CipClass* aClass )
+{
+    return CipClass::Register( aClass );
+}
 
 /** @ingroup CIP_API
  * @brief Serialize aDataType according to CIP encoding into aBuf
@@ -278,7 +282,7 @@ EipStatus TriggerConnections( int output_assembly_id, int input_assembly_id );
  * @brief Allow the device specific application to perform its execution
  *
  * This function will be executed by the stack at the beginning of each
- * execution of EIP_STATUS ManageConnections(void). It allows to implement
+ * execution of EipStatus ManageConnections(void). It allows to implement
  * device specific application functions. Execution within this function should
  * be short.
  */
@@ -359,34 +363,16 @@ EipStatus ResetDeviceToInitialConfiguration( bool also_reset_comm_parameters );
  */
 void RunIdleChanged( EipUint32 run_idle_value );
 
-/** @ingroup CIP_CALLBACK_API
- * @brief create a producing or consuming UDP socket
- *
- * @param communication_direction PRODCUER or CONSUMER
- * @param socket_data pointer to the address holding structure
- *     Attention: For producing point-to-point connection the
- *     *pa_pstAddr->sin_addr.s_addr member is set to 0 by CIPster. The network
- *     layer of the application has to set the correct address of the
- *     originator.
- *     Attention: For consuming connection the network layer has to set the
- * pa_pstAddr->sin_addr.s_addr to the correct address of the originator.
- * FIXME add an additional parameter that can be used by the CIP stack to
- * request the originators sockaddr_in data.
- * @return socket identifier on success
- *         -1 on error
- */
-int CreateUdpSocket( UdpCommuncationDirection communication_direction,
-        struct sockaddr_in* socket_data );
 
 /** @ingroup CIP_CALLBACK_API
  * @brief create a producing or consuming UDP socket
  *
- * @param socket_data pointer to the "send to" address
- * @param socket_handle socket descriptor to send on
+ * @param aSockAddr the "send to" address
+ * @param aSocket socket descriptor to send on
  * @param aOutput the data to send and its length
  * @return  EIP_SUCCESS on success
  */
-EipStatus SendUdpData( struct sockaddr_in* socket_data, int socket, BufReader aOutput );
+EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput );
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Close the given socket
@@ -404,7 +390,7 @@ void CloseSocket( int aSocket );
  */
 inline bool CloseSession( int aSocket )
 {
-    return ServerSessionMgr::CloseSession( aSocket );
+    return ServerSessionMgr::Close( aSocket );
 }
 
 /** @mainpage CIPster - Open Source EtherNet/IP(TM) Communication Stack
@@ -475,7 +461,7 @@ inline bool CloseSession( int aSocket )
  *   -# Configure the network properties:\n
  *       With the following functions the network interface of CIPster is
  *       configured:
- *        - EIP_STATUS ConfigureNetworkInterface(const char *ip_address,
+ *        - EipStatus ConfigureNetworkInterface(const char *ip_address,
  *        const char *subnet_mask, const char *gateway_address)
  *        - void ConfigureMACAddress(const EIP_UINT8 *mac_address)
  *        - void ConfigureDomainName(const char *domain_name)
@@ -518,23 +504,22 @@ inline bool CloseSession( int aSocket )
  *   - Receive explicit message data on connected TCP sockets and the UPD socket
  *     for port AF12hex. The received data has to be handed over to Ethernet
  *     encapsulation layer with the functions: \n
- *     int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aReply ),
- *     int HandleReceivedExplictUDPData(int socket_handle, struct sockaddr_in
- * *from_address, EIP_UINT8* buffer, unsigned buffer_length, int
+ *     int Encapsulation::HandleReceivedExplicitTcpData( int socket, BufReader aCommand, BufWriter aReply ),
+ *     int Encapsulation::HandleReceivedExplicitUdpData(int socket_handle, const SockAddr&
+ *  from_address, EIP_UINT8* buffer, unsigned buffer_length, int
  * *number_of_remaining_bytes).\n
  *     Depending if the data has been received from a TCP or from a UDP socket.
  *     As a result of this function a response may have to be sent. The data to
  *     be sent is in the given buffer pa_buf.
  *   - Create UDP sending and receiving sockets for implicit connected
  * messages\n
- *     CIPster will use to call-back function int CreateUdpSocket(
- *     UdpCommuncationDirection connection_direction,
- *     struct sockaddr_in *pa_pstAddr)
+ *     CIPster will use function int CreateUdpSocket(
+ *     UdpDirection aDirection, const SockAddr& aSockAddr)
  *     for informing the platform specific code that a new connection is
  *     established and new sockets are necessary
  *   - Receive implicit connected data on a receiving UDP socket\n
  *     The received data has to be hand over to the Connection Manager Object
- *     with the function EipStatus HandleReceivedConnectedData( const sockaddr_in* from_address, BufReader aCommand );
+ *     with the function EipStatus HandleReceivedConnectedData( const SockAddr& from_address, BufReader aCommand );
  *   - Close UDP and TCP sockets:
  *      -# Requested by CIPster through the call back function: void
  * CloseSocket(int aSocket)
@@ -547,7 +532,7 @@ inline bool CloseSession( int aSocket )
  *     In order that CIPster can determine when to produce new data on
  *     connections or that a connection timed out every @ref CIPSTER_TIMER_TICK
  * milliseconds the
- *     function EIP_STATUS ManageConnections(void) has to be called.
+ *     function EipStatus ManageConnections(void) has to be called.
  *
  * @section callback_funcs_sec Callback Functions
  * In order to make CIPster more platform independent and in order to inform the

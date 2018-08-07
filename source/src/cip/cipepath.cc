@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  *
  ******************************************************************************/
@@ -643,7 +643,7 @@ int CipElectronicKeySegment::SerializedCount( int aCtl ) const
 }
 
 
-ConnectionManagerStatusCode CipElectronicKeySegment::Check() const
+ConnMgrStatus CipElectronicKeySegment::Check() const
 {
     bool compatiblity_mode = major_revision & 0x80;
 
@@ -654,7 +654,7 @@ ConnectionManagerStatusCode CipElectronicKeySegment::Check() const
     if( ( vendor_id != 0     && vendor_id    != vendor_id_ )
      || ( product_code != 0  && product_code != product_code_ ) )
     {
-        return kConnectionManagerStatusCodeErrorVendorIdOrProductcodeError;
+        return kConnMgrStatusErrorVendorIdOrProductcodeError;
     }
 
     // VendorID and ProductCode are correct
@@ -662,7 +662,7 @@ ConnectionManagerStatusCode CipElectronicKeySegment::Check() const
     // Check DeviceType, must match or 0
     if( device_type != 0 && device_type != device_type_ )
     {
-        return kConnectionManagerStatusCodeErrorDeviceTypeError;
+        return kConnMgrStatusErrorDeviceTypeError;
     }
 
     // VendorID, ProductCode and DeviceType are correct
@@ -671,7 +671,7 @@ ConnectionManagerStatusCode CipElectronicKeySegment::Check() const
         if( ( mjr_revision   != 0 && mjr_revision   != revision_.major_revision )
          || ( minor_revision != 0 && minor_revision != revision_.minor_revision ) )
         {
-            return kConnectionManagerStatusCodeErrorRevisionMismatch;
+            return kConnMgrStatusErrorRevisionMismatch;
         }
     }
 
@@ -682,11 +682,11 @@ ConnectionManagerStatusCode CipElectronicKeySegment::Check() const
          || minor_revision == 0
          || minor_revision > revision_.minor_revision )
         {
-            return kConnectionManagerStatusCodeErrorRevisionMismatch;
+            return kConnMgrStatusErrorRevisionMismatch;
         }
     }
 
-    return kConnectionManagerStatusCodeSuccess;
+    return kConnMgrStatusSuccess;
 }
 
 

@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (C) 2016-2018, SoftPLC Corportion.
+ * Copyright (C) 2016-2018, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPCONNECTIONMANAGER_H_
@@ -18,7 +18,34 @@ class CipConnMgrClass : public CipClass
 public:
     CipConnMgrClass();
 
+    CipInstance* CreateInstance( int aInstanceId );
+
     static EipStatus ManageConnections();
+
+    /**
+     * Function CloseClass3Connections
+     * closes all class 3 connections having @a aSessionId.
+     * Since multiple CIP Class 3 connections can be instantiated all on the
+     * same TCP connection, we could be deleting more than one here.
+     *
+     * @param aSessionId which session id to match against.
+     */
+    static void CloseClass3Connections( CipUdint aSessionId );
+
+    /**
+     * Function FindExsitingMatchingConnection
+     * finds an existing matching established connection.
+     *
+     * The comparison is done according to the definitions in the CIP specification Section 3-5.5.2:
+     * The following elements have to be equal: Vendor ID, Connection Serial Number, Originator Serial Number
+     *
+     * @param aConn connection instance containing the comparison elements from the forward open request
+     *
+     * @return CipConn*
+     *    - NULL if no equal established connection exists
+     *    - pointer to the equal connection object
+     */
+    static CipConn* FindExistingMatchingConnection( const ConnectionData& params );
 
     /**
      * Function HandleReceivedConnectedData
@@ -35,7 +62,7 @@ public:
      * @return EipStatus
      */
     static EipStatus HandleReceivedConnectedData(
-        const sockaddr_in* from_address, BufReader aCommand );
+        const SockAddr& from_address, BufReader aCommand );
 
     //-----<CipServiceFunctions>------------------------------------------------
     static EipStatus forward_open_service( CipInstance* instance,
@@ -77,7 +104,7 @@ protected:
      */
     static void assembleForwardOpenResponse( ConnectionData* aParams,
             CipMessageRouterResponse* response, CipError general_status,
-            ConnectionManagerStatusCode extended_status );
+            ConnMgrStatus extended_status );
 };
 
 
@@ -142,7 +169,7 @@ bool IsConnectedOutputAssembly( int aInstanceId );
 
 /**
  * Class CipConnBox
- * is a containter for CipConns, likely to be replace with std::vector someday.
+ * is a containter for CipConns (likely to be replace with std::vector some day).
  * Used to hold an active list of CipConns, using CipConn->prev and ->next.
  */
 class CipConnBox
@@ -153,6 +180,8 @@ public:
         head( NULL )
     {}
 
+    /// Class CipConnBox::iterator walks the linked list and mimics a pointer
+    /// when the dereferencing operators and cast are used.
     class iterator
     {
     public:

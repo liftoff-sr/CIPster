@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPCOMMON_H_
@@ -69,5 +69,9 @@ std::string StrPrintf( const char* aFormat, ... );
  *    2. I/O Connections will use this buffer for the produced data
  */
 extern EipByte g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
+
+/// Set this to other than kEIP_IoUdpPort if your system receives consumes I/O
+/// messages on other than the standard port number.
+extern int g_my_io_udp_port;
 
 #endif    // CIPSTER_CIPCOMMON_H_

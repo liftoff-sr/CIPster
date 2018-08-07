@@ -56,9 +56,13 @@ typedef int64_t     CipLint;    ///< 64-bit signed integer
 typedef uint64_t    CipUlint;   ///< 64-bit unsignedeger
 typedef uint64_t    CipLword;   ///< 64-bit bit string
 
-/** @brief Constant identifying if a socket descriptor is invalid
- */
-static const int kEipInvalidSocket = -1;
+
+typedef uint32_t    USECS_T;
+
+
+
+/// Constant identifying an invalid socket
+const int kEipInvalidSocket = -1;
 
 /**
  *
@@ -71,7 +75,7 @@ static const int kEipInvalidSocket = -1;
  *  0 ..  success and there is no reply to send
  *  1 ... success and there is a reply to send
  *
- *  For both of these cases EIP_STATUS is the return type.
+ *  For both of these cases EipStatus is the return type.
  *
  *  Other return type are:
  *  -- return pointer to thing, 0 if error (return type is "pointer to thing")
@@ -91,19 +95,6 @@ enum EipStatus
     kEipStatusError   = -1,
 };
 
-
-/**
- * Enum UdpCommunicationDirection
- * is a set of two directions: inbound or outbound data in the parlance of
- * CIP which returns to them as consuming or producing.
- *
- * These are used as array indexes, watch out if changing these values
- */
-enum UdpCommuncationDirection
-{
-    kUdpConsuming  = 0,    ///< Consuming direction; receiver
-    kUdpProducing  = 1     ///< Producing direction; sender
-};
 
 /// The count of elements in a single dimension array:
 #define DIM(x)          int( sizeof(x)/sizeof(x[0]) )

@@ -1,7 +1,7 @@
 
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (C) 2016-2018, SoftPLC Corportion.
+ * Copyright (C) 2016-2018, SoftPLC Corporation.
  *
  ******************************************************************************/
 
@@ -18,7 +18,7 @@ class CipInstance;
 
 
 /** @ingroup CIP_API
- * @typedef  EIP_STATUS (*AttributeFunc)( CipAttribute *,
+ * @typedef  EipStatus (*AttributeFunc)( CipAttribute *,
  *    CipMessageRouterRequest*, CipMessageRouterResponse*)
  *
  * @brief Signature definition for the implementation of CIP services.

@@ -1,15 +1,15 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (C) 2016, SoftPLC Corportion.
+ * Copyright (C) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPSTER_ENCAP_H_
 #define CIPSTER_ENCAP_H_
 
 //#include <string>
+#include "sockaddr.h"
 #include "typedefs.h"
 #include "../cip/cipcommon.h"
-
 
 /** @file encap.h
  * @brief This file contains the public interface of the encapsulation layer
@@ -23,28 +23,34 @@
 #define ENCAPSULATION_HEADER_LENGTH         24
 #define ENCAPSULATION_HEADER_LENGTHX        (24+6)  // SendRRData & SendUnitData
 
-static const int kSupportedProtocolVersion  = 1;        ///< Supported Encapsulation protocol version
-static const int kEthernet_IP_Port          = 0xAF12;   ///< Ethernet/IP standard port (44818)
+const int kSupportedProtocolVersion = 1;        ///< Supported Encapsulation protocol version
 
 
-/** @brief definition of status codes in encapsulation protocol
- * All other codes are either legacy codes, or reserved for future use
+/// Ethernet/IP standard port (44818) that all Ethernet/IP devices must support.
+/// This may not be moved: Vol2 2-2
+const int kEIP_Reserved_Port        = 0xAF12;
+
+
+/**
+ * Enum EncapError
+ * is the set of status codes in defined in the encapsulation protocol.
  *
+ * All other codes are either legacy codes, or reserved for future use
  */
-enum EncapsulationProtocolErrorCode
+enum EncapError
 {
-    kEncapsulationProtocolSuccess = 0x0000,
-    kEncapsulationProtocolInvalidOrUnsupportedCommand = 0x0001,
-    kEncapsulationProtocolInsufficientMemory = 0x0002,
-    kEncapsulationProtocolIncorrectData = 0x0003,
-    kEncapsulationProtocolInvalidSessionHandle = 0x0064,
-    kEncapsulationProtocolInvalidLength = 0x0065,
-    kEncapsulationProtocolUnsupportedProtocol = 0x0069
+    kEncapErrorSuccess                      = 0x0000,
+    kEncapErrorInvalidOrUnsupportedCommand  = 0x0001,
+    kEncapErrorInsufficientMemory           = 0x0002,
+    kEncapErrorIncorrectData                = 0x0003,
+    kEncapErrorInvalidSessionHandle         = 0x0064,
+    kEncapErrorInvalidLength                = 0x0065,
+    kEncapErrorUnsupportedProtocol          = 0x0069
 };
 
 
 /// Encapsulation commands
-enum EncapsulationCommand
+enum EncapCmd
 {
     kEncapCmdNoOperation        = 0x00, ///< only allowed for TCP
     kEncapCmdListServices       = 0x04, ///< allowed for both UDP and TCP
@@ -59,6 +65,7 @@ enum EncapsulationCommand
 
 /**
  * Class Encapsulation
+ * helps with the Ethernet/IP encapsulation protocol, its header, and its state.
  */
 class Encapsulation : public Serializeable
 {
@@ -69,7 +76,7 @@ public:
     {}
 
     Encapsulation(
-            EncapsulationCommand aCommand,
+            EncapCmd aCommand,
             CipUdint aServerSessionHandle = 0,
             Cpf* aPayload = 0
             ) :
@@ -85,13 +92,15 @@ public:
     {
     }
 
-    /** @ingroup ENCAP
-     * @brief Initialize the encapsulation layer.
+    /**
+     * Function Init
+     * initializes the encapsulation layer.
      */
     static void Init();
 
-    /** @ingroup ENCAP
-     * @brief Shutdown the encapsulation layer.
+    /**
+     * Function ShutDown
+     * stops the encapsulation layer.
      *
      * This means that all open sessions including their sockets are closed.
      */
@@ -109,8 +118,8 @@ public:
 
     /**
      * Function ReceiveTcpMsg
-     * reads an Encapsulation message in on a TCP socket into caller's aMessage buffer.
-     * @param aSocket is the open socket to read from, data is know to be available.
+     * reads an Encapsulation message in from a TCP socket into caller's aMessage buffer.
+     * @param aSocket is the open socket to read from, data is known to be available.
      * @param aMessage is where to put the Encapsulation header and payload.
      * @return int - the number of bytes in the total message or -1 if error.
      */
@@ -121,14 +130,15 @@ public:
      * notifies the encapsulation layer that an explicit message has been
      * received via UDP.
      *
-     * @param socket BSD socket from which data is received.
-     * @param from_address remote address from which the data is received.
-     * @param aCommand received data buffer pointing just past the encapsulation header and its length.
-     * @param aReply where to put reply and tells its maximum length.
+     * @param aSocket BSD socket from which data is received.
+     * @param aSockAddr where to put the remote address from which the data is received.
+     * @param aCommand points to a received data buffer pointing just past the
+     *   encapsulation header; aCommand includes length.
+     * @param aReply where to put a reply and also tells length of this buffer.
      * @param isUnicast true if unicast, else false.
      * @return int - byte count of reply that need to be sent back
      */
-    static int HandleReceivedExplictUdpData( int socket, const sockaddr_in* from_address,
+    static int HandleReceivedExplicitUdpData( int aSocket, const SockAddr* aSockAddr,
         BufReader aCommand,  BufWriter aReply, bool isUnicast );
 
     /**
@@ -136,15 +146,16 @@ public:
      * notifies the encapsulation layer that an explicit message has been
      * received via TCP.
      *
-     * @param socket the BSD socket from which data is received.
+     * @param aSocket the BSD socket from which data is received.
      * @param aCommand is the buffer that contains the received data.
      * @param aReply is the buffer that should be used for the reply.
      * @return int - byte count of reply that needs to be sent back
      */
-    static int HandleReceivedExplictTcpData( int socket, BufReader aCommand, BufWriter aReply );
+    static int HandleReceivedExplicitTcpData( int aSocket,
+                    BufReader aCommand, BufWriter aReply );
 
-    EncapsulationCommand Command() const            { return command; }
-    void SetCommand( EncapsulationCommand aCmd )    { command = aCmd; }
+    EncapCmd Command() const            { return command; }
+    void SetCommand( EncapCmd aCmd )    { command = aCmd; }
 
     CipUdint    Status() const              { return status; }
     void        SetStatus( CipUdint s )     { status = s; }
@@ -212,15 +223,26 @@ protected:
 
     static int serializeListIdentityResponse( BufWriter aReply );
 
-    static int handleReceivedListIdentityCommandDelayed( int socket, const sockaddr_in* from_address,
+    static int handleReceivedListIdentityCommandDelayed( int socket, const SockAddr* from_address,
             unsigned aMSecDelay, BufReader aCommand );
 
-    static int registerSession( int socket, BufReader aCommand, BufWriter aReply,
-            EncapsulationProtocolErrorCode* aEncapError,
+    /**
+     * Function registerSession
+     * checks supported protocol, generates a session handle, and serializes a reply.
+     * @param aSocket which socket this request is associated with.
+     * @param aCommand
+     * @param aReply where to put reply
+     * @param aEncapError where to put the kEncapError
+     * @param aSessionHandleResult where to put the session handle.
+     *
+     * @return int - num bytes serialized into aReply
+     */
+    static int registerSession( int aSocket, BufReader aCommand, BufWriter aReply,
+            EncapError* aEncapError,
             CipUdint* aSessionHandleResult );
 
 
-    EncapsulationCommand    command;
+    EncapCmd    command;
     unsigned                length;
     CipUdint                session_handle;
     CipUdint                status;
@@ -246,7 +268,7 @@ public:
             CipUdint aSerialNum, const std::string& aProductName, CipByte aState ) :
         protocol_ver( kSupportedProtocolVersion ),
         sin_family( AF_INET ),
-        sin_port( kEthernet_IP_Port ),
+        sin_port( kEIP_Reserved_Port ),
         sin_addr( aIPAddress ),
         sin_zero(),
         vendor_id( aVendorId ),
@@ -313,9 +335,50 @@ public:
 
 
 /**
+ * Struct EncapSession
+ * holds data for an Encapsulation Protocol Session, as well as
+ * any TCP connections which have yet to be registered using encapsultation
+ * protocol.  That is, an instance of this class holds either:
+ *
+ * 1) a registered TCP session, or
+ * 2) a TCP connection which has yet to be registered as a session.
+ *
+ * We intend to keep track of all TCP connections using one of these for each.
+ * if the client does register a session, we only have to change m_is_registered
+ * from false to true.
+ */
+struct EncapSession
+{
+    EncapSession()
+    {
+        Clear();
+    }
+
+    void Clear()
+    {
+        m_socket   = kEipInvalidSocket;
+        m_peeraddr = SockAddr();
+        m_last_activity_usecs = 0;
+        m_is_registered = false;
+    }
+
+    int         m_socket;
+    SockAddr    m_peeraddr;             // peer's IP address, port, etc.
+    USECS_T     m_last_activity_usecs;
+    bool        m_is_registered;
+};
+
+
+/**
  * Class ServerSessionMgr
- * manages Ethernet/IP sessions originated by clients to this node, of course
- * in such a role this node is a CIP server.
+ * manages TCP connections and Ethernet/IP encapsulation sessions originated
+ * TCP by clients to this node, of course in such a role this node is a server.
+ * <p>
+ * Before a TCP connection can graduate to a registered EncapSession, it must
+ * be registered as a mere TCP connection here.  Not every TCP connection will become
+ * a registered EncapSession, and can remain as a registered TCP connection.
+ * A registered TCP connection is stored as an EncapSesssion instance with the
+ * m_is_registered bool set to false.
  */
 class ServerSessionMgr
 {
@@ -326,34 +389,62 @@ public:
     static void Shutdown();
 
     /**
-     * Function CheckRegisteredSession
-     * checks if received package belongs to registered session.
-     *
-     * @param receive_data Received data.
-     * @return bool - true if session is already registered, else false
+     * Function RegisterTcpConnection
+     * must be called for aSocket before calling RegisterSession()
      */
-    static bool CheckRegisteredSession( CipUdint aSessionHandle );
+    static EncapError RegisterTcpConnection( int aSocket );
 
     /// Register a client using the OS socket allocated when we accepted the TCP connection
-    static EncapsulationProtocolErrorCode RegisterSession( int aSocket, CipUdint* aSessionHandleResult );
+    static EncapError RegisterSession( int aSocket, CipUdint* aSessionHandleResult );
+
+    /**
+     * Function UpdateRegisteredTcpConnection
+     * checks if aSocket belongs to a registered TCP connection, and if so
+     * updates its activity timer.
+     *
+     * @param aSocket to check
+     *
+     * @return EncapSession* - non-NULL if aSocket is already registered, else NULL.
+     */
+    static EncapSession* UpdateRegisteredTcpConnection( int aSocket );
+
+    /**
+     * Function CheckRegisteredSession
+     * checks if aSocket belongs to a registered session.
+     *
+     * @param aSessionHandle a client provides session handle to verify
+     * @param aSocket TCP socket that the register session request came in on.
+     *
+     * @return EncapSession* - valid if session is already registered, else NULL if
+     *  the session is not active or does not below to aSocket or is not registered.
+     */
+    static EncapSession* CheckRegisteredSession( CipUdint aSessionHandle, int aSocket );
 
     /**
      * Function UnregisterSession
-     * closes all corresponding TCP connections and deletes session handle.
-     */
-    static EncapsulationProtocolErrorCode UnregisterSession( CipUdint aSessionHandle );
-
-    /** @ingroup CIP_API
-     * Function CloseSession
-     * deletes any session associated with the aSocket and closes the socket connection.
+     * closes the corresponding TCP connection and deletes the session info.
      *
-     * @param aSocket the socket of the session to close.
-     * @return bool - true if aSocket was found in an open session (in which case), else false.
+     * @param aSessionHandle to close
+     * @param aSocket is used to verify that aSessionHandle has matching socket
+     *
+     * @return EcapError - error if the session is not registered.
      */
-    static bool CloseSession( int aSocket );
+    static EncapError UnregisterSession( CipUdint aSessionHandle, int aSocket );
+
+    /**
+     * Function Close
+     * closes the TCP connection [and registered session] associated with @a aSocket
+     *
+     * @param aSocket the socket of the TCP connection to close.
+     * @return bool - true if aSocket was found
+     */
+    static bool Close( int aSocket );
+
+    static void AgeInactivity();
 
 private:
-    static int sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];
+
+    static EncapSession sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];
 };
 
 

@@ -1,7 +1,7 @@
 
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (C) 2016-2018, SoftPLC Corportion.
+ * Copyright (C) 2016-2018, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPSERVICE_H_
@@ -9,6 +9,48 @@
 
 #include <string>
 #include <typedefs.h>
+
+
+/**
+ * Enum CIPServiceCode
+ * is the set of CIP service codes.
+ * Common service codes range from 0x01 to 0x1c.  Beyond that there can
+ * be class or instance specific service codes and some may overlap.
+ */
+enum CIPServiceCode
+{
+    kGetAttributeAll = 0x01,
+    kSetAttributeAll = 0x02,
+    kGetAttributeList = 0x03,
+    kSetAttributeList = 0x04,
+    kReset  = 0x05,
+    kStart  = 0x06,
+    kStop   = 0x07,
+    kCreate = 0x08,
+    kDelete = 0x09,
+    kMultipleServicePacket = 0x0A,
+    kApplyAttributes = 0x0D,
+    kGetAttributeSingle = 0x0E,
+    kSetAttributeSingle = 0x10,
+    kFindNextObjectInstance = 0x11,
+    kRestore = 0x15,
+    kSave = 0x16,
+    kNoOperation    = 0x17,
+    kGetMember  = 0x18,
+    kSetMember  = 0x19,
+    kInsertMember = 0x1A,
+    kRemoveMember = 0x1B,
+    kGroupSync = 0x1C,
+
+    // Start CIP class or instance specific services, probably should go in class specific area
+    kForwardClose = 0x4E,
+    kUnconnectedSend = 0x52,
+    kForwardOpen = 0x54,
+    kLargeForwardOpen = 0x5b,
+    kGetConnectionOwner = 0x5A
+    // End CIP class or instance specific services
+};
+
 
 /**
  * Typedef EipStatus (*CipServiceFunc)( CipInstance *,
@@ -32,13 +74,13 @@ typedef EipStatus (*CipServiceFunction)( CipInstance* aInstance,
 
 /**
  * Class CipService
- * holds info for a CIP service and services may be contained within a CipClass.
+ * holds info for a CIP service to be contained within a CipClass.
  */
 class CipService
 {
 public:
-    CipService( const char* aServiceName = "", int aServiceId = 0,
-            CipServiceFunction aServiceFunction = 0 ) :
+    CipService( const char* aServiceName, int aServiceId,
+            CipServiceFunction aServiceFunction ) :
         service_name( aServiceName ),
         service_id( aServiceId ),
         service_function( aServiceFunction )
@@ -51,11 +93,11 @@ public:
 
     const std::string& ServiceName() const  { return service_name; }
 
-    CipServiceFunction service_function;    ///< pointer to a function call
+    CipServiceFunction  service_function;
 
 protected:
-    std::string service_name;               ///< name of the service
-    int         service_id;                 ///< service number
+    std::string         service_name;
+    int                 service_id;
 };
 
 #endif  // CIPSERVICE_H_

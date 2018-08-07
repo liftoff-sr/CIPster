@@ -1,10 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2011, Rockwell Automation, Inc.
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPIOCONNECTION_H_
 #define CIPIOCONNECTION_H_
+
+#include "../enet_encap/sockaddr.h"
 
 /**
  * @file cipconnection.h
@@ -43,21 +45,32 @@
 #include "cipepath.h"
 #include "cipclass.h"
 
+/// The port to be used per default for I/O messages on UDP, do not change this.
+const int kEIP_IoUdpPort = 0x08AE;      // = 2222
 
-//* @brief States of a connection
-enum ConnectionState
+
+
+/**
+ * Enum ConnState
+ * is the set of CipConn connection states.
+ * @see Vol1 Table 3-4.4.1 CipConn instance attribute_id 1
+ */
+enum ConnState
 {
-    kConnectionStateNonExistent = 0,
-    kConnectionStateConfiguring = 1,
-    kConnectionStateWaitingForConnectionId = 2,    ///< only used in DeviceNet
-    kConnectionStateEstablished = 3,
-    kConnectionStateTimedOut = 4,
-    kConnectionStateDeferredDelete = 5,    ///< only used in DeviceNet
-    kConnectionStateClosing
+    kConnStateNonExistent               = 0,
+    kConnStateConfiguring               = 1,
+    kConnStateWaitingForConnectionId    = 2,    ///< only used in DeviceNet
+    kConnStateEstablished               = 3,
+    kConnStateTimedOut                  = 4,
+    kConnStateDeferredDelete            = 5,    ///< only used in DeviceNet
+    kConnStateClosing                   = 6,
 };
 
 
-//* @brief instance_type attributes
+/**
+ * Enum ConnInstanceType
+ * is the set of CipConn instance types.
+ */
 enum ConnInstanceType
 {
     kConnInstanceTypeExplicit           = 0x00,
@@ -123,24 +136,6 @@ typedef void (* ConnectionCloseFunction)( CipConn* aConn );
  */
 typedef void (* ConnectionTimeoutFunction)( CipConn* aConn );
 
-/** @ingroup CIP_API
- * @brief Function prototype for sending data via a connection
- *
- * @param aConn The connection object which connection timed out
- *
- * @return EIP stack status
- */
-typedef EipStatus (* ConnectionSendDataFunction)( CipConn* aConn );
-
-/** @ingroup CIP_API
- * @brief Function prototype for receiving data via a connection
- *
- * @param aConn the connection object which connection timed out
- * @param aInput the payload of the CIP message with its length
- *
- * @return Stack status
- */
-typedef EipStatus (* ConnectionReceiveDataFunction)( CipConn* aConn, BufReader aInput );
 
 /**
  * Class NetCnParams
@@ -292,20 +287,20 @@ private:
 };
 
 
-enum ConnectionTriggerType
+enum ConnTriggerType
 {
-    kConnectionTriggerTypeCyclic        = 0,
-    kConnectionTriggerTypeChangeOfState = 1,
-    kConnectionTriggerTypeApplication   = 2,
+    kConnTriggerTypeCyclic        = 0,
+    kConnTriggerTypeChangeOfState = 1,
+    kConnTriggerTypeApplication   = 2,
 };
 
 
-enum ConnectionTransportClass
+enum ConnTransportClass
 {
-    kConnectionTransportClass0 = 0,
-    kConnectionTransportClass1 = 1,
-    kConnectionTransportClass2 = 2,
-    kConnectionTransportClass3 = 3,
+    kConnTransportClass0 = 0,
+    kConnTransportClass1 = 1,
+    kConnTransportClass2 = 2,
+    kConnTransportClass3 = 3,
 };
 
 
@@ -319,8 +314,8 @@ public:
 
     TransportTrigger(
             bool isServer,
-            ConnectionTriggerType aTrigger,
-            ConnectionTransportClass aClass
+            ConnTriggerType aTrigger,
+            ConnTransportClass aClass
             )
     {
         bits = (isServer << 7) | (aTrigger << 4) | aClass;
@@ -336,14 +331,21 @@ public:
     /// Return true if server else false for client.
     bool IsServer() const       { return bits & 0x80; }
 
-    ConnectionTriggerType Trigger()  const
+    TransportTrigger& SetServer( bool isServer )
     {
-        return ConnectionTriggerType( (bits >> 4) & 7 );
+        bits = ( bits & ~(1<<7) ) | (isServer << 7);
+        return *this;
     }
 
-    ConnectionTransportClass Class() const
+    ConnTriggerType Trigger()  const
     {
-        return ConnectionTransportClass( bits & 15 );
+        return ConnTriggerType( (bits >> 4) & 7 );
+    }
+
+
+    ConnTransportClass Class() const
+    {
+        return ConnTransportClass( bits & 15 );
     }
 
     void Serialize( BufWriter& aOutput ) const
@@ -372,14 +374,14 @@ enum WatchdogTimeoutAction
 /*
 struct LinkConsumer
 {
-    ConnectionState state;
+    ConnState state;
     EipUint16       connection_id;
 };
 
 
 struct LinkProducer
 {
-    ConnectionState state;
+    ConnState state;
     EipUint16       connection_id;
 };
 
@@ -395,13 +397,14 @@ struct LinkObject
 /**
  * Class ConnectionPath
  * holds data deserialized from the connection_path portion of a
- * forward_open service request.
+ * forward_open service request, or set manually in preparation for sending
+ * a forward_open request.
  * @see Vol1 3-5.4.1.10  Connection Path
  */
 class ConnectionPath : public Serializeable
 {
 public:
-    // They arrive in this order when all are present:
+    // They arrive in this order when all are present in a forward_open request:
 
     CipPortSegmentGroup     port_segs;  // has optional electronic key.
 
@@ -445,6 +448,7 @@ class ConnectionData : public Serializeable
 {
     friend class CipConnectionClass;
     friend class CipConnMgrClass;
+    //friend class CipConn;
 
 public:
     ConnectionData(
@@ -465,18 +469,35 @@ public:
     CipUdint            consuming_connection_id;
     CipUdint            producing_connection_id;
 
+    //-----<ConnectionTriad>----------------------------------------------------
     // The Connection Triad used in the Connection Manager specification includes
     // the combination of Connection Serial Number, Originator Vendor ID and
     // Originator Serial Number parameters.
     CipUint             connection_serial_number;
     CipUint             originator_vendor_id;
+
+    // The Originator Serial Number utilized in conjunction with the Connection
+    // Manager is a reference to the Identity object instance #1, attribute #6
+    // (Serial Number) of the connection originator.
     CipUdint            originator_serial_number;
+    //-----</ConnectionTriad>---------------------------------------------------
+
+    bool TriadEquals( const ConnectionData& aOther ) const
+    {
+        return connection_serial_number == aOther.connection_serial_number
+            && originator_vendor_id     == aOther.originator_vendor_id
+            && originator_serial_number == aOther.originator_serial_number;
+    }
 
     ConnectionData& SetTimeoutMultiplier( ConnTimeoutMultiplier aMultiplier );
 
     ConnTimeoutMultiplier TimeoutMultiplier() const
     {
-        return ConnTimeoutMultiplier( 1 << (2 + connection_timeout_multiplier_value) );
+        ConnTimeoutMultiplier ret =
+            ConnTimeoutMultiplier( 1 << (2 + connection_timeout_multiplier_value) );
+
+        CIPSTER_TRACE_INFO( "%s: %d\n", __func__, ret );
+        return ret;
     }
 
     CipUdint            o_to_t_RPI_usecs;
@@ -505,7 +526,7 @@ public:
      *    - kCipErrorSuccess on success
      *    - On an error the general status code to be put into the response
      */
-    CipError DeserializeConnectionPath( BufReader aInput, ConnectionManagerStatusCode* extended_error );
+    CipError DeserializeConnectionPath( BufReader aInput, ConnMgrStatus* extended_error );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
@@ -545,18 +566,17 @@ private:
     CipByte             connection_timeout_multiplier_value;
 
 protected:
-
-
     // The following variables do not come from the forward open request,
     // but are held here for the benefit of the deriving CipConn class and for
     // validation of forward open request.
     EipUint16           corrected_o_to_t_size;
     EipUint16           corrected_t_to_o_size;
 
-    CipInstance*        consuming_instance;             ///< corresponds to conn_path.consuming_path
-    CipInstance*        producing_instance;             ///< corresponds to conn_path.producing_path
-    CipInstance*        config_instance;                ///< corresponds to conn_path.config_path
+    CipInstance*        consuming_instance; ///< corresponds to conn_path.consuming_path
+    CipInstance*        producing_instance; ///< corresponds to conn_path.producing_path
+    CipInstance*        config_instance;    ///< corresponds to conn_path.config_path
 
+    // class id of the clazz->OpenConnection() virtual to call
     int                 mgmnt_class;
 };
 
@@ -564,7 +584,7 @@ protected:
 /**
  * Class CipConn
  * holds data for a connection. This data is strongly related to
- * the connection instance defined in the CIP-specification.
+ * the connection class instance defined in the CIP-specification.
  */
 class CipConn : public ConnectionData
 {
@@ -579,59 +599,41 @@ public:
     static EipStatus Init( EipUint16 unique_connection_id );
 
     /**
-     * Function OpenCommunicationChannels
-     * takes the data given in this CipConn and opens the necessary
-     * communication channels.
-     *
-     * @param aCpf
-     * @return general status on the open process
-     *    - kEipStatusOk ... on success
-     *    - On an error the general status code to be put into the response
+     * operator =
+     * does assignment from a ConnectionData instance to this CipConnection.
      */
-    CipError OpenCommunicationChannels( Cpf* aCpf );
+    CipConn& operator=( const ConnectionData& aSrc )
+    {
+        * static_cast<ConnectionData*>(this) = aSrc;
+        return *this;
+    }
 
     /**
-     * Function OpenConsumingPointToPointConnection
-     * opens a Point2Point connection dependent on pa_direction.
-     * @param cip_conn Pointer to registered Object in ConnectionManager.
-     * @param cpfd Index of the connection object
-     * @return status
-     *         0 .. success
-     *        -1 .. error
+     * Function Activate
+     * changes state of this CipConn to activated if it can, otherwise returns
+     * an error.
      */
-    EipStatus OpenConsumingPointToPointConnection( Cpf* cpfd );
-
-    CipError OpenProducingPointToPointConnection( Cpf* cpfd );
-
-    /**
-     * Function OpenMulticastConnection
-     * opens a Multicast connection dependent using @a direction.
-     *
-     * @param direction Flag to indicate if consuming or producing.
-     * @param aConn registered CipConn in ConnectionManager.
-     * @param cpfd     received CPF Data Item.
-     * @return status
-     *         0 .. success
-     *         -1 .. error
-     */
-    EipStatus OpenMulticastConnection( UdpCommuncationDirection direction, Cpf* cpfd );
-
-    EipStatus OpenProducingMulticastConnection( Cpf* cpfd );
+    CipError Activate( Cpf* cpfd, ConnMgrStatus* extended_error,
+            EipUint16* aCorrectedOTz , EipUint16* aCorrectedTOz );
 
     void Clear( bool doConnectionDataToo = true );
 
     void GeneralConnectionConfiguration();
 
-    CipConn& SetState( ConnectionState aNewState )
+    CipConn& SetState( ConnState aNewState )
     {
+        CIPSTER_TRACE_INFO( "%s( %s )\n", __func__, ShowState( aNewState ) );
         state = aNewState;
         return *this;
     }
 
-    ConnectionState State() const   { return state; }
+    ConnState State() const   { return state; }
+
+    static const char* ShowState( ConnState aState );
 
     CipConn& SetInstanceType( ConnInstanceType aType )
     {
+        CIPSTER_TRACE_INFO( "%s: %d\n", __func__, aType );
         instance_type = aType;
         return *this;
     }
@@ -668,9 +670,11 @@ public:
         return *this;
     }
 
-    EipUint32   TimeoutUSecs() const
+    CipUdint TimeoutUSecs() const
     {
-        return expected_packet_rate_usecs * TimeoutMultiplier();
+        CipUdint ret = expected_packet_rate_usecs * TimeoutMultiplier();
+        CIPSTER_TRACE_INFO( "%s: %d\n", __func__, ret );
+        return ret;
     }
 
     EipInt32 TransmissionTriggerTimerUSecs() const
@@ -680,7 +684,7 @@ public:
 
     CipConn& SetTransmissionTriggerTimerUSecs( EipInt32 aValue )
     {
-        CIPSTER_TRACE_INFO( "%s( %d )\n", __func__, aValue );
+        //CIPSTER_TRACE_INFO( "%s( %d ) CID:0x%08x PID:0x%08x\n", __func__, aValue, consuming_connection_id, producing_connection_id );
         transmission_trigger_timer_usecs = aValue;
         return *this;
     }
@@ -690,7 +694,6 @@ public:
         return SetTransmissionTriggerTimerUSecs( transmission_trigger_timer_usecs + aUSecs );
     }
 
-
     EipInt32 InactivityWatchDogTimerUSecs() const
     {
         return inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
@@ -698,21 +701,21 @@ public:
 
     CipConn& SetInactivityWatchDogTimerUSecs( EipInt32 aUSecs )
     {
-        CIPSTER_TRACE_INFO( "%s( %d )\n", __func__, aUSecs );
+        //CIPSTER_TRACE_INFO( "%s( %d )\n", __func__, aUSecs );
         inactivity_watchdog_timer_usecs = aUSecs;
         return *this;
     }
 
-    CipConn& AddToInactivityWatchDogTimerUSecs( EipInt32 aUSecs )
+    CipConn& AddToInactivityWatchDogTimerUSecs( int aUSecs )
     {
         return SetInactivityWatchDogTimerUSecs( inactivity_watchdog_timer_usecs + aUSecs );
     }
 
+    /// Some connections never timeout, some do.  Vol1 3-4.5.3
     bool HasInactivityWatchDogTimer() const
     {
-        // Vol 1 3-4.5.3
         return( expected_packet_rate_usecs      // if zero, no inactivity timer
-            &&  (consuming_instance              // a consuming connection in play
+            &&  ( consuming_instance            // a consuming connection in play
                 || trigger.IsServer() ));
     }
 
@@ -730,7 +733,7 @@ public:
      * closes a connection. If it is an exclusive owner or input only
      * connection and in charge of the connection a new owner will be searched
      */
-    virtual void Close();
+    void Close();
 
     int ConsumingSocket() const             { return consuming_socket; }
     void SetConsumingSocket( int aSocket )  { consuming_socket = aSocket; }
@@ -792,21 +795,24 @@ public:
         conn_path.port_segs.SetPIT_USecs( aUSECS );
     }
 
-    /**
-     * Timer for the production inhibition of application triggered or
-     * change-of-state I/O connections.
-     */
+    /// Timer for the production inhibition of application triggered or
+    /// change-of-state I/O connections.
     EipInt32 production_inhibit_timer_usecs;
 
-    sockaddr_in  remote_address;            // socket address for produce
+    /// Destination IP address for the optional producing CIP connection held
+    /// by this CipConnection instance.
+    SockAddr send_address;
 
-    /**
-     * Address of the originator that established the connection, needed
-     * for scanning if the right packet is arriving
-     */
-    sockaddr_in  originator_address;
+    /// Address to use when filtering incoming packets on the optional
+    /// consuming connection.
+    SockAddr recv_address;
 
-    // hooks for special events that a user or debugging task can install.
+    /// Address of the node that did the forward_open and established
+    /// this connection, needed for forward_close.
+    SockAddr openers_address;
+
+    // Hooks for special events that a user or debugging task can install.
+    // Otherwise they are not used.
     ConnectionCloseFunction         hook_close;
     ConnectionTimeoutFunction       hook_timeout;
 
@@ -814,11 +820,50 @@ protected:
 
     void timeOut();
 
-    ConnectionManagerStatusCode handleConfigData();
+    ConnMgrStatus handleConfigData();
+
+    /**
+     * Function openCommunicationChannels
+     * takes the data given in this CipConn and opens the necessary
+     * communication channels.
+     *
+     * @param aCpf
+     * @param aExtError where to put an extended CIP error, if any.
+     * @return CipError - general status on the open process
+     *    - kCipErrorSuccess ... on success
+     *    - On an error the general status code to be put into the response
+     */
+    CipError openCommunicationChannels( Cpf* aCpf, ConnMgrStatus* aExtError );
+
+    CipError openProducingMulticastConnection( Cpf* aCpf, ConnMgrStatus* aExtError );
+
+    /**
+     * Function openMulticastConnection
+     * opens a Multicast connection in a direction dependent on @a aDirection.
+     *
+     * @param aDirection indicates if consuming or producing.
+     * @param aCpfd  the Cpf that the forward open request arrived within.
+     * @param aExtError where to put an extended CIP error, if any.
+     * @return CipError -
+     */
+    CipError openMulticastConnection( UdpDirection aDirection,
+                Cpf* aCpf, ConnMgrStatus* aExtError );
+
+    /**
+     * Function openConsumingPointToPointConnection
+     * opens a Point2Point connection.
+     *
+     * @param aCpfd  the Cpf that the forward open request arrived within.
+     * @param aExtError where to put an extended CIP error, if any.
+     * @return CipError -
+     */
+    CipError openConsumingPointToPointConnection( Cpf* cpfd, ConnMgrStatus* aExtError );
+
+    CipError openProducingPointToPointConnection( Cpf* aCpf, ConnMgrStatus* aExtError );
 
     ConnInstanceType    instance_type;
 
-    ConnectionState     state;
+    ConnState     state;        // CIP Connection Instance attribute id 1
 
     EipUint32   expected_packet_rate_usecs;
 
@@ -828,20 +873,13 @@ protected:
     int consuming_socket;
     int producing_socket;
 
+    CipUdint    encap_session;          // session_handle, 0 is not used.
+
 private:
     // for active connection doubly linked list at g_active_conns
     CipConn*    next;
     CipConn*    prev;
 };
-
-
-/**
- * Copy connection data from aSrc to aDst
- */
-inline void CopyConnectionData( CipConn* aDst, ConnectionData* aSrc )
-{
-    * static_cast<ConnectionData*>(aDst) = *aSrc;
-}
 
 
 /** @brief Generate the ConnectionIDs and set the general configuration
@@ -862,7 +900,7 @@ class CipConnectionClass : public CipClass
 public:
     CipConnectionClass();
 
-    static CipError OpenIO( ConnectionData* aParams, Cpf* cpfd, ConnectionManagerStatusCode* extended_error_code );
+    static CipError OpenIO( ConnectionData* aParams, Cpf* cpfd, ConnMgrStatus* extended_error_code );
 };
 
 

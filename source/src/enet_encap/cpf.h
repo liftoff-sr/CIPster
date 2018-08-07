@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (C) 2016, SoftPLC Corportion.
+ * Copyright (C) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CPF_H_
@@ -19,18 +19,20 @@
 /**
  * Enum CpfId
  * is the set of Item ID numbers used for address and data items in CPF structures
+ * @see #Cpf
  */
 enum CpfId
 {
-    kCpfIdNullAddress                   = 0x0000,   ///< Address: encapsulation routing is not needed.
-    kCpfIdListIdentityResponse          = 0x000C,
-    kCpfIdConnectedAddress              = 0x00A1,   ///< Address: connection-based, used for connected messages, see Vol2 2-6.22
-    kCpfIdConnectedDataItem             = 0x00B1,   ///< Data: connected data item, see Vol.2, p.43
-    kCpfIdUnconnectedDataItem           = 0x00B2,   ///< Data: Unconnected message
-    kCpfIdListServiceResponse           = 0x0100,
-    kCpfIdSockAddrInfo_O_to_T           = 0x8000,   ///< Data: Sockaddr Info Item originator to target
-    kCpfIdSockAddrInfo_T_to_O           = 0x8001,   ///< Data: Sockaddr Info Item target to originator
-    kCpfIdSequencedAddress              = 0x8002    ///< Address: Sequenced Address Item
+    kCpfIdEmpty                 = -1,       ///< invalid but marks item as empty
+    kCpfIdNullAddress           = 0x0000,   ///< Address: encapsulation routing is not needed.
+    kCpfIdListIdentityResponse  = 0x000C,
+    kCpfIdConnectedAddress      = 0x00A1,   ///< Address: connection-based, used for connected messages, see Vol2 2-6.22
+    kCpfIdConnectedDataItem     = 0x00B1,   ///< Data: connected data item, see Vol.2, p.43
+    kCpfIdUnconnectedDataItem   = 0x00B2,   ///< Data: Unconnected message
+    kCpfIdListServiceResponse   = 0x0100,
+    kCpfIdSockAddrInfo_O_T      = 0x8000,   ///< Sockaddr Info Item originator to target
+    kCpfIdSockAddrInfo_T_O      = 0x8001,   ///< Sockaddr Info Item target to originator
+    kCpfIdSequencedAddress      = 0x8002,   ///< Address: Sequenced Address Item
 };
 
 
@@ -87,53 +89,29 @@ struct DataItem
 
 
 /**
- * Struct SockAddrInfoItem
- * is storage for the last part of the Common Packet Format.
+ * Enum SockAddrId
+ * is here to limit what can be passed to the Cpf SockAddr related functions
+ * to two values rather than any of the full CpfId set.
  * @see #Cpf
  */
-struct SockAddrInfoItem
+enum SockAddrId
 {
-    SockAddrInfoItem( CpfId aType, CipUdint aIP, int aPort );
+    kSockAddr_O_T   = kCpfIdSockAddrInfo_O_T,
+    kSockAddr_T_O   = kCpfIdSockAddrInfo_T_O,
+};
 
-    SockAddrInfoItem() :
-        type_id( kCpfIdNullAddress ),
-        length( 16 ),
-        sin_family( AF_INET ),
-        sin_port( 0 ),
-        sin_addr( 0 ),
-        nasin_zero()
-    {
-    }
 
-    CpfId       type_id;
-    CipUint     length;
-    CipInt      sin_family;
-    CipUint     sin_port;
-    CipUdint    sin_addr;
-    CipUsint    nasin_zero[8];
+struct SaiiPair
+{
+    SaiiPair() :
+        has_O_T( false ),
+        has_T_O( false )
+    {}
 
-    /// assign from a sockaddr_in to this
-    SockAddrInfoItem& operator=( sockaddr_in& rhs )
-    {
-        sin_family  = rhs.sin_family;
-        sin_port    = ntohs( rhs.sin_port );
-        sin_addr    = ntohl( rhs.sin_addr.s_addr );
-        return *this;
-    }
-
-    /// convert this to a sockaddr_in
-    operator sockaddr_in ()
-    {
-        sockaddr_in lhs;
-
-        memset( &lhs, 0, sizeof lhs );
-
-        lhs.sin_family      = sin_family;
-        lhs.sin_port        = htons( sin_port );
-        lhs.sin_addr.s_addr = htonl( sin_addr );
-
-        return lhs;
-    }
+    char        has_O_T;
+    char        has_T_O;
+    SockAddr    O_T;
+    SockAddr    T_O;
 };
 
 
@@ -145,42 +123,30 @@ class Cpf : public Serializeable
 {
 public:
 
-    Cpf() :
-        payload( 0 )
-    {
-        Clear();
-    }
+    /**
+     * Constructor
+     * that takes @a aClient IP address and port.  This information is simply
+     * saved in this instance for use by stack functions which need to know
+     * from which TCP peer that this request originated from.
+     */
+    Cpf( const SockAddr* aClient = NULL );
 
-    Cpf( CpfId aAddrType, CpfId aDataType, Serializeable* aPayload = NULL ) :
-        address_item( aAddrType, aDataType ),
-        data_item( aDataType ),
-        payload( aPayload ),
-        rx_aii_count( 0 ),
-        tx_aii_count( 0 ),
-        item_count( 2 )
-    {}
+    Cpf( CpfId aAddrType, CpfId aDataType, Serializeable* aPayload = NULL );
 
-    Cpf( const AddressItem& aAddr, CpfId aDataType = kCpfIdConnectedDataItem ) :
-        address_item( aAddr ),
-        data_item( aDataType ),
-        payload( 0 ),
-        rx_aii_count( 0 ),
-        tx_aii_count( 0 ),
-        item_count( 2 )
-    {}
+    Cpf( const AddressItem& aAddr, CpfId aDataType = kCpfIdConnectedDataItem );
 
     /**
      * Function DeserializeCpf
      * sets fields in this object from the provided serialized data.
      * Create CPF structure out of the received data.
      *
-     *  @param  aSrc serialized bytes which need to be structured.
+     *  @param  aInput the byte sequence to deserialize
       *
      *  @return int -
      *     - >  0 : the number of bytes consumed
      *     - <= 0 : the negative offset of the problem byte
      */
-    int DeserializeCpf( BufReader aSrc );
+    int DeserializeCpf( BufReader aInput );
 
     //-----<Serializeable>------------------------------------------------------
     int SerializedCount( int aCtl = 0 ) const;
@@ -193,10 +159,11 @@ public:
      * the connection status, updates any timers, and hands the data on to
      * the message router
      *
-     * @param  aCommand encapsulation structure with the received message
-     * @param  aReply where to put the reply and what its size limit is.
+     * @param aCommand encapsulation structure with the received message
+     * @param aReply where to put the reply and what its size limit is.
+     *
      * @return int - number of bytes to be sent back. <= 0 if nothing should be sent and is the
-     *  the negative of one of the values in EncapsulationProtocolErrorCode.
+     *  the negative of one of the values in EncapError.
      */
     int NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply );
 
@@ -207,24 +174,26 @@ public:
      * on to the message router.  Upon return, a CPF header is placed into aReply and
      * the payload reply generated by the message router is appended also into aReply.
      *
-     * @param  aCommand encapsulation structure with the received message
-     * @param  aReply where to put the reply and what its size limit is.
+     * @param aCommand encapsulation structure with the received message
+     * @param aReply where to put the reply and what its size limit is.
+     *
      * @return int - number of bytes to be sent back. <= 0 if nothing should be sent and is the
-     *  the negative of one of the values in EncapsulationProtocolErrorCode.
+     *  the negative of one of the values in EncapError.
      */
     int NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply );
 
-    void SetItemCount( int aCount )         {  item_count = aCount; }
-
     void Clear()
     {
-        item_count = 0;
-        rx_aii_count = 0;
-        tx_aii_count = 0;
-    }
+        address_item.type_id = kCpfIdEmpty;
+        data_item.type_id    = kCpfIdEmpty;
 
-    void ClearTx()                          { tx_aii_count = 0; }
-    void ClearRx()                          { rx_aii_count = 0; }
+        ClearRx_T_O().ClearRx_O_T().ClearTx_T_O().ClearTx_O_T();
+
+        /*  no, DeserializeCpf() calls Clear() and at that time client_addr
+            is already set, so we need that info.
+        client_addr = NULL;
+        */
+    }
 
     /**
      * Function AddNullAddressItem
@@ -239,66 +208,73 @@ public:
         address_item.length  = 0;
     }
 
-    bool AppendRx( const SockAddrInfoItem& aSockAddrInfoItem )
+    bool HasAddr() const        { return address_item.type_id != kCpfIdEmpty; }
+    bool HasData() const        { return data_item.type_id != kCpfIdEmpty; }
+    bool HasRx_O_T() const      { return rx.has_O_T; }
+    bool HasRx_T_O() const      { return rx.has_T_O; }
+    bool HasTx_O_T() const      { return tx.has_O_T; }
+    bool HasTx_T_O() const      { return tx.has_T_O; }
+
+    void AddTx( SockAddrId aType, const SockAddr& aSockAddr )
     {
-        if( rx_aii_count < DIM( rx_aii ) )
+        if( aType == kSockAddr_T_O )
         {
-            rx_aii[rx_aii_count++] = aSockAddrInfoItem;
-            return true;
+            tx.has_T_O = true;
+            tx.T_O     = aSockAddr;
         }
-        return false;
+
+        else if( aType == kSockAddr_O_T )
+        {
+            tx.has_O_T = true;
+            tx.O_T     = aSockAddr;
+        }
     }
 
-    bool AppendTx( const SockAddrInfoItem& aSockAddrInfoItem )
+    void AddRx( SockAddrId aType, const SockAddr& aSockAddr )
     {
-        if( tx_aii_count < DIM( tx_aii ) )
+        if( aType == kSockAddr_T_O )
         {
-            tx_aii[tx_aii_count++] = aSockAddrInfoItem;
-            return true;
+            rx.has_T_O = true;
+            rx.T_O     = aSockAddr;
         }
-        return false;
+
+        else if( aType == kSockAddr_O_T )
+        {
+            rx.has_O_T = true;
+            rx.O_T     = aSockAddr;
+        }
     }
 
-    const SockAddrInfoItem* SearchRx( CpfId aType ) const
+    const SockAddr* SaiiRx( SockAddrId aType ) const
     {
-        for( int i=0; i<rx_aii_count;  ++i )
+        if( aType == kSockAddr_O_T && HasRx_O_T() )
         {
-            if( rx_aii[i].type_id == aType )
-                return &rx_aii[i];
+            return  &rx.O_T;
         }
-        return NULL;
-    }
-
-    const SockAddrInfoItem* SearchTx( CpfId aType ) const
-    {
-        for( int i=0; i<tx_aii_count;  ++i )
+        else if( aType == kSockAddr_T_O && HasRx_T_O() )
         {
-            if( tx_aii[i].type_id == aType )
-                return &tx_aii[i];
-        }
-        return NULL;
-    }
-
-    int RxSockAddrInfoItemCount() const    { return rx_aii_count; }
-    int TxSockAddrInfoItemCount() const    { return tx_aii_count; }
-
-    SockAddrInfoItem* RxSockAddrInfoItem( int aIndex )
-    {
-        if( aIndex < rx_aii_count )
-        {
-            return rx_aii + aIndex;
+            return &rx.T_O;
         }
         return NULL;
     }
 
-    SockAddrInfoItem* TxSockAddrInfoItem( int aIndex )
+    const SockAddr* SaiiTx( SockAddrId aType ) const
     {
-        if( aIndex < tx_aii_count )
+        if( aType == kSockAddr_O_T && HasTx_O_T() )
         {
-            return tx_aii + aIndex;
+            return  &tx.O_T;
+        }
+        else if( aType == kSockAddr_T_O && HasTx_T_O() )
+        {
+            return &tx.T_O;
         }
         return NULL;
     }
+
+    Cpf& ClearRx_T_O()      { rx.has_T_O = false; return *this; }
+    Cpf& ClearRx_O_T()      { rx.has_O_T = false; return *this; }
+    Cpf& ClearTx_T_O()      { tx.has_T_O = false; return *this; }
+    Cpf& ClearTx_O_T()      { tx.has_O_T = false; return *this; }
 
     BufReader DataItemPayload() const
     {
@@ -357,24 +333,34 @@ public:
         return *this;
     }
 
+    const SockAddr* ClientAddr() const   { return client_addr; }
+
+    Cpf& SetClientAddr( const SockAddr* aClient )
+    {
+        client_addr = aClient;
+        return *this;
+    }
+
+    /// Has SetClientAddr() been called?
+    bool HasClient() const { return client_addr && client_addr->Family(); }
+
 protected:
 
+    static int serialize_sockaddr( const SockAddr& aSockAddr, BufWriter aOutput );
+    static int deserialize_sockaddr( SockAddr* aSockAddr, BufReader aInput );
 
-    int             item_count;
+    AddressItem         address_item;
+    DataItem            data_item;
 
-    AddressItem     address_item;
-    DataItem        data_item;
+    SaiiPair            rx;
+    SaiiPair            tx;
 
-    Serializeable*  payload;
+    Serializeable*      payload;
 
-    int         rx_aii_count;
-    SockAddrInfoItem rx_aii[2];
-
-    int         tx_aii_count;
-    SockAddrInfoItem tx_aii[2];
+    const SockAddr*     client_addr;
 
 private:
-    Cpf( const Cpf& );  // not implemented
+    //Cpf( const Cpf& );  // not implemented
 };
 
 

@@ -1,9 +1,10 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016-2018, SoftPLC Corportion.
+ * Copyright (c) 2016-2018, SoftPLC Corporation.
  *
  ******************************************************************************/
 
+#include <unordered_map>
 
 #include <cipclass.h>
 #include <cipcommon.h>
@@ -12,6 +13,67 @@
 
 
 static EipUint16 Zero = 0;
+
+
+
+/**
+ * Class CipClassRegistry
+ * is a container for the defined CipClass()es, which in turn hold all
+ * the CipInstance()s.  This container takes ownership of the CipClasses.
+ * (Ownership means having the obligation to delete upon destruction.)
+ */
+class CipClassRegistry
+{
+    // hashtable from C++ std library.
+    typedef std::unordered_map< int, CipClass* >    ClassHash;
+
+public:
+    CipClass*   FindClass( int aClassId )
+    {
+        ClassHash::iterator it = container.find( aClassId );
+
+        if( it != container.end() )
+            return it->second;
+
+        return NULL;
+    }
+
+    /** @brief Register a Class in the CIP class registry for the message router
+     *  @param aClass a class object to be registered, and to take ownership over.
+     *  @return bool - true.. success
+     *                 false.. class with conflicting class_id is already registered
+     */
+    bool RegisterClass( CipClass* aClass )
+    {
+        ClassHash::value_type e( aClass->ClassId(), aClass );
+
+        std::pair< ClassHash::iterator, bool > r = container.insert( e );
+
+        return r.second;
+    }
+
+    void DeleteAll()
+    {
+        while( container.size() )
+        {
+            delete container.begin()->second;       // Delete the first of remaining classes
+            container.erase( container.begin() );   // Erase first class's ClassEntry
+        }
+    }
+
+    ~CipClassRegistry()
+    {
+        DeleteAll();
+    }
+
+private:
+
+    ClassHash   container;
+};
+
+
+static CipClassRegistry registry;
+
 
 
 CipClass::CipClass(
@@ -98,7 +160,8 @@ CipClass::CipClass(
     */
 
     ServiceInsert( kGetAttributeSingle, GetAttributeSingle, "GetAttributeSingle" );
-    ServiceInsert( kGetAttributeAll, GetAttributeAll, "GetAttributeAll" );
+    ServiceInsert( kGetAttributeAll,    GetAttributeAll,    "GetAttributeAll" );
+    ServiceInsert( kReset,              Reset,              "Reset" );
 }
 
 
@@ -142,11 +205,32 @@ CipClass::~CipClass()
 }
 
 
+EipStatus CipClass::Register( CipClass* cip_class )
+{
+    if( registry.RegisterClass( cip_class ) )
+        return kEipStatusOk;
+    else
+        return kEipStatusError;
+}
+
+
+CipClass* CipClass::Get( int aClassId )
+{
+    return registry.FindClass( aClassId );
+}
+
+
+void CipClass::DeleteAll()
+{
+    registry.DeleteAll();
+}
+
+
 CipError CipClass::OpenConnection( ConnectionData* aParams,
-        Cpf* cpfd, ConnectionManagerStatusCode* extended_error )
+        Cpf* cpfd, ConnMgrStatus* extended_error )
 {
     CIPSTER_TRACE_INFO( "%s: NOT implemented for class '%s'\n", __func__, ClassName().c_str() );
-    *extended_error = kConnectionManagerStatusCodeInconsistentApplicationPathCombo;
+    *extended_error = kConnMgrStatusInconsistentApplicationPathCombo;
     return kCipErrorConnectionFailure;
 }
 
@@ -448,7 +532,7 @@ EipStatus CipClass::getLargestClassAttributeId( CipAttribute* attr,
 //----</AttrubuteFuncs>------------------------------------------------------
 
 
-//-----<ServiceFuncs>--------------------------------------------------------
+//-----<CipServiceFunctions>----------------------------------------------------
 
 EipStatus CipClass::GetAttributeSingle( CipInstance* instance,
         CipMessageRouterRequest* request,
@@ -560,4 +644,20 @@ EipStatus CipClass::SetAttributeSingle( CipInstance* instance,
     return attribute->Set( request, response );
 }
 
-//-----</ServiceFuncs>-------------------------------------------------------
+
+EipStatus CipClass::Reset( CipInstance* instance,
+        CipMessageRouterRequest* request,
+        CipMessageRouterResponse* response )
+{
+    // Each class must override this per Vol1 appendix A.
+
+    if( request->Data().size() )
+    {
+        // Conformance tool is complaining about any parameters in default Reset
+        response->SetGenStatus( kCipErrorInvalidParameter );
+    }
+
+    return kEipStatusOkSend;
+}
+
+//-----</CipServiceFuncs>-------------------------------------------------------

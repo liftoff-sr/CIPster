@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016-2018, SoftPLC Corportion.
+ * Copyright (c) 2016-2018, SoftPLC Corporation.
  *
  ******************************************************************************/
 
@@ -21,26 +21,27 @@
 // thus improving speed in the API Functions.
 static CipTCPIPInterfaceClass* s_tcp;
 
-static CipUint s_inactivity_timeout = 120;  // spec default
+CipUint CipTCPIPInterfaceInstance::inactivity_timeout_secs = 120;  // spec default
 
 std::string CipTCPIPInterfaceInstance::hostname;
 
 
 CipTCPIPInterfaceInstance::CipTCPIPInterfaceInstance( int aInstanceId ) :
     CipInstance( aInstanceId ),
-    tcp_status( 2 ),
+    status( 1 ),        // attribute_id 1
 
     configuration_capability(
-            (1<<0)
-        |   (1<<1)
-        |   (1<<2)  // Bit 2  => "DHCP Client"
-        |   (1<<5)  // Bit 5  => "Hardware Configurable"
+        0
+                |   (1<<0)  // BootP client
+                |   (1<<1)  // DNS capable
+                |   (1<<2)  // Bit 2  => "DHCP Client"
+                |   (1<<5)  // Bit 5  => "Hardware Configurable"
         ),
 
     configuration_control( 0 ),
     time_to_live( 1 )
 {
-    AttributeInsert( 1, kCipDword, &tcp_status );
+    AttributeInsert( 1, kCipDword, &status );
     AttributeInsert( 2, kCipDword, &configuration_capability );
     AttributeInsert( 3, kCipDword, &configuration_control );
     AttributeInsert( 4, get_attr_4 );
@@ -56,7 +57,7 @@ CipTCPIPInterfaceInstance::CipTCPIPInterfaceInstance( int aInstanceId ) :
 
     // Use a standard method to Get the attribute, but a custom one to Set it.
     // This would also be a good place to read it from disk or non volatile storage.
-    AttributeInsert( 13, CipAttribute::GetAttrData, true, set_attr_13, &s_inactivity_timeout, kCipUint );
+    AttributeInsert( 13, CipAttribute::GetAttrData, true, set_attr_13, &inactivity_timeout_secs, kCipUint );
 }
 
 
@@ -102,7 +103,7 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_5( CipAttribute* attribute,
     out.put32( ntohl( c.gateway ) );
     out.put32( ntohl( c.name_server ) );
     out.put32( ntohl( c.name_server_2 ) );
-    out.put_STRING( c.domain_name );
+    out.put_STRING( c.domain_name, true /* yes pad to even */ );
 
     aResponse->SetWrittenSize( out.data() - aResponse->Writer().data() );
 
@@ -110,8 +111,7 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_5( CipAttribute* attribute,
 }
 
 
-// Attribute 9 can not be easily handled with the default mechanism
-// therefore we will do here.
+// Attribute 9
 EipStatus CipTCPIPInterfaceInstance::get_multicast_config( CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
@@ -171,7 +171,7 @@ EipStatus CipTCPIPInterfaceInstance::set_attr_13( CipAttribute* attribute,
         CipMessageRouterResponse* aResponse )
 {
     // all instances are sharing a common value for this attribute so ignore instance
-    s_inactivity_timeout = BufReader( aRequest->Data() ).get16();
+    inactivity_timeout_secs = BufReader( aRequest->Data() ).get16();
 
     // [write it to disk here?]
 
@@ -202,9 +202,11 @@ EipStatus CipTCPIPInterfaceInstance::configureNetworkInterface(
         const char* subnet_mask,
         const char* gateway )
 {
-    interface_configuration.ip_address = inet_addr( ip_address );
+    // Save all these values in network byte order
+
+    interface_configuration.ip_address   = inet_addr( ip_address );
     interface_configuration.network_mask = inet_addr( subnet_mask );
-    interface_configuration.gateway = inet_addr( gateway );
+    interface_configuration.gateway      = inet_addr( gateway );
 
     // Calculate the CIP multicast address. The multicast address is calculated, not input.
     // See CIP spec Vol2 3-5.3 for multicast address algorithm.
@@ -229,11 +231,11 @@ EipStatus CipTCPIPInterfaceInstance::configureNetworkInterface(
 CipTCPIPInterfaceClass::CipTCPIPInterfaceClass() :
     CipClass( kCipTcpIpInterfaceClass,
         "TCP/IP Interface",
-        // The Vol2 spec for this class says 4-7 are optional,
-        // but conformance test software whines about 4 & 5 so omit them.
 #if 0
         MASK7(1,2,3,4,5,6,7),   // common class attributes mask
 #else
+        // The Vol2 spec for this class says 4-7 are optional,
+        // but conformance test software may whine about 4 & 5 so omit them.
         MASK5(1,2,3,6,7),       // common class attributes mask
 #endif
         4                         // version
@@ -260,7 +262,7 @@ CipTCPIPInterfaceInstance* CipTCPIPInterfaceClass::Instance( int aInstanceId )
 }
 
 
-//-----<ServiceFuncs>-----------------------------------------------------------
+//-----<CipServiceFunctions>-----------------------------------------------------------
 
 // This is supplied because the TCIP/IP class spec wants ALL attributes to
 // be returned up to and including the last implemented one, WITH NO GAPS.
@@ -274,7 +276,7 @@ EipStatus CipTCPIPInterfaceClass::get_all( CipInstance* aInstance,
     BufWriter out = aResponse->Writer();
 
     // output attributes 1, 2, & 3
-    out.put32( i->tcp_status )
+    out.put32( i->status )
     .put32( i->configuration_capability )
     .put32( i->configuration_control );
 
@@ -288,15 +290,16 @@ EipStatus CipTCPIPInterfaceClass::get_all( CipInstance* aInstance,
 
     // attribute 5
     const CipTcpIpInterfaceConfiguration& c = i->interface_configuration;
+
     out.put32( ntohl( c.ip_address ) )
     .put32( ntohl( c.network_mask ) )
     .put32( ntohl( c.gateway ) )
     .put32( ntohl( c.name_server ) )
     .put32( ntohl( c.name_server_2 ) )
-    .put_STRING( c.domain_name );
+    .put_STRING( c.domain_name, true );
 
     // attribute 6
-    out.put_STRING( i->hostname );
+    out.put_STRING( i->hostname, true );
 
     // attribute 7, 6 zeros
     out.fill( 6 );
@@ -321,14 +324,14 @@ EipStatus CipTCPIPInterfaceClass::get_all( CipInstance* aInstance,
     out.put8( 0 );
 
     // attribute 13
-    out.put16( s_inactivity_timeout );
+    out.put16( i->inactivity_timeout_secs );
 
     aResponse->SetWrittenSize( out.data() - aResponse->Writer().data() );
 
     return kEipStatusOk;
 }
 
-//-----</ServiceFuncs>----------------------------------------------------------
+//-----</CipServiceFunctions>---------------------------------------------------
 
 
 //----<API Funcs>---------------------------------------------------------------
@@ -383,15 +386,11 @@ void CipTCPIPInterfaceClass::ConfigureDomainName( int aInstanceId, const char* a
 
 void CipTCPIPInterfaceClass::ConfigureHostName( int aInstanceId, const char* aHostName )
 {
-#if 0
-    CipTCPIPInterfaceInstance::hostname = aHostName;
-#else
-
-    // should be equivalent to above
+    // hostname is actually static here, but code it as an instance variable.
+    // Compiler figures it out either way.
     CipTCPIPInterfaceInstance* inst = s_tcp->Instance( aInstanceId );
 
     inst->hostname = aHostName;
-#endif
 }
 
 

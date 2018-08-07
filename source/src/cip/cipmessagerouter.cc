@@ -1,12 +1,10 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
- * Copyright (c) 2016, SoftPLC Corportion.
+ * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
 
-#include <unordered_map>
 #include <string.h>
-
 
 #include "cipster_api.h"
 #include "cipcommon.h"
@@ -20,86 +18,6 @@
 
 /// @brief Array of the available explicit connections
 static CipConn g_explicit_connections[CIPSTER_CIP_NUM_EXPLICIT_CONNS];
-
-/**
- * Class CipClassRegistry
- * is a container for the defined CipClass()es, which in turn hold all
- * the CipInstance()s.  This container takes ownership of the CipClasses.
- * (Ownership means having the obligation to delete upon destruction.)
- */
-class CipClassRegistry
-{
-    // hashtable from C++ std library.
-    typedef std::unordered_map< int, CipClass* >    ClassHash;
-
-public:
-    CipClass*   FindClass( int aClassId )
-    {
-        ClassHash::iterator it = container.find( aClassId );
-
-        if( it != container.end() )
-            return it->second;
-
-        return NULL;
-    }
-
-    /** @brief Register a Class in the CIP class registry for the message router
-     *  @param aClass a class object to be registered, and to take ownership over.
-     *  @return bool - true.. success
-     *                 false.. class with conflicting class_id is already registered
-     */
-    bool RegisterClass( CipClass* aClass )
-    {
-        ClassHash::value_type e( aClass->ClassId(), aClass );
-
-        std::pair< ClassHash::iterator, bool > r = container.insert( e );
-
-        return r.second;
-    }
-
-    void DeleteAll()
-    {
-        while( container.size() )
-        {
-            delete container.begin()->second;       // Delete the first of remaining classes
-            container.erase( container.begin() );   // Erase first class's ClassEntry
-        }
-    }
-
-    ~CipClassRegistry()
-    {
-        DeleteAll();
-    }
-
-private:
-
-    ClassHash   container;
-};
-
-
-static CipClassRegistry    g_class_registry;
-
-
-void DeleteAllClasses()
-{
-    g_class_registry.DeleteAll();
-}
-
-
-EipStatus RegisterCipClass( CipClass* cip_class )
-{
-    if( g_class_registry.RegisterClass( cip_class ) )
-        return kEipStatusOk;
-    else
-        return kEipStatusError;
-}
-
-
-CipClass* GetCipClass( int class_id )
-{
-    return g_class_registry.FindClass( class_id );
-}
-
 
 
 //-----<CipMessageRounterRequest>-----------------------------------------------
@@ -268,7 +186,7 @@ static CipConn* getFreeExplicitConnection()
 {
     for( int i = 0; i < DIM( g_explicit_connections );  ++i )
     {
-        if( g_explicit_connections[i].State() == kConnectionStateNonExistent )
+        if( g_explicit_connections[i].State() == kConnStateNonExistent )
             return &g_explicit_connections[i];
     }
 
@@ -277,7 +195,7 @@ static CipConn* getFreeExplicitConnection()
 
 
 CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConn,
-            Cpf* cpfd, ConnectionManagerStatusCode* extended_error )
+            Cpf* aCpf, ConnMgrStatus* extended_error )
 {
     CipError ret = kCipErrorSuccess;
 
@@ -290,12 +208,13 @@ CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConn,
     {
         ret = kCipErrorConnectionFailure;
 
-        *extended_error = kConnectionManagerStatusCodeErrorNoMoreConnectionsAvailable;
+        *extended_error = kConnMgrStatusErrorNoMoreConnectionsAvailable;
     }
 
     else
     {
-        CopyConnectionData( ex_conn, aConn );
+        // was CopyConnectionData( ex_conn, aConn );
+        *ex_conn = *aConn;
 
         EipUint32 saved = ex_conn->producing_connection_id;
 
@@ -320,13 +239,15 @@ CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConn,
 }
 
 
-static CipInstance* createCipMessageRouterInstance()
+CipInstance* CipMessageRouterClass::CreateInstance( int aInstanceId )
 {
-    CipClass* clazz = GetCipClass( kCipMessageRouterClass );
+    CipInstance* i = new CipInstance( aInstanceId );
 
-    CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
-
-    clazz->InstanceInsert( i );
+    if( !InstanceInsert( i ) )
+    {
+        delete i;
+        i = NULL;
+    }
 
     return i;
 }
@@ -337,39 +258,29 @@ EipStatus CipMessageRouterClass::Init()
     // may not already be registered.
     if( !GetCipClass( kCipMessageRouterClass ) )
     {
-        CipClass* clazz = new CipMessageRouterClass();
+        CipMessageRouterClass* clazz = new CipMessageRouterClass();
 
         RegisterCipClass( clazz );
 
-        createCipMessageRouterInstance();
+        clazz->CreateInstance( clazz->Instances().size() + 1 );
     }
 
     return kEipStatusOk;
 }
 
 
-EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterResponse* aResponse )
+EipStatus CipMessageRouterClass::NotifyMR(
+        CipMessageRouterRequest* aRequest, CipMessageRouterResponse* aResponse )
 {
     CIPSTER_TRACE_INFO( "%s: routing unconnected message\n", __func__ );
 
-    CipMessageRouterRequest request;
-
-    int result = request.DeserializeMRReq( aCommand );
-
-    aResponse->SetService( request.Service() );
-
-    if( result <= 0 )
-    {
-        CIPSTER_TRACE_ERR( "notifyMR: error from createMRRequeststructure\n" );
-        aResponse->SetGenStatus( kCipErrorPathSegmentError );
-        return kEipStatusOkSend;
-    }
+    aResponse->SetService( aRequest->Service() );
 
     CipClass* clazz = NULL;
 
     int instance_id;
 
-    if( request.Path().HasSymbol() )
+    if( aRequest->Path().HasSymbol() )
     {
         instance_id = 0;   // talk to class 06b instance 0
 
@@ -391,10 +302,10 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
 #endif
 
     }
-    else if( request.Path().HasInstance() )
+    else if( aRequest->Path().HasInstance() )
     {
-        instance_id = request.Path().GetInstance();
-        clazz = GetCipClass( request.Path().GetClass() );
+        instance_id = aRequest->Path().GetInstance();
+        clazz = GetCipClass( aRequest->Path().GetClass() );
     }
     else
     {
@@ -410,7 +321,7 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
         CIPSTER_TRACE_ERR(
             "%s: un-registered class in request path:'%s'\n",
             __func__,
-            request.Path().Format().c_str()
+            aRequest->Path().Format().c_str()
             );
 
         aResponse->SetGenStatus( kCipErrorPathDestinationUnknown );
@@ -422,21 +333,24 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
     // the order of these next two if() tests is very important.
 
     CipService* service = instance_id == 0 ?
-            clazz->Class()->Service( request.Service() ) :  // meta-class
-            clazz->Service( request.Service() );
+            clazz->Class()->Service( aRequest->Service() ) :  // meta-class
+            clazz->Service( aRequest->Service() );
 
     if( !service )
     {
-#if 0
-        if( request.Service() == kGetAttributeSingle && instance_id == 1 && clazz->ClassId() == 1 )
+#if 1
+        if( aRequest->Service() == kGetAttributeSingle &&
+            instance_id     > 7 &&
+            clazz->ClassId() == kCipTcpIpInterfaceClass )
         {
             int break_here = 1;
+            (void) break_here;
         }
 #endif
 
         CIPSTER_TRACE_WARN( "%s: service 0x%02x not found\n",
                 __func__,
-                request.Service() );
+                aRequest->Service() );
 
         aResponse->SetGenStatus( kCipErrorServiceNotSupported );
         return kEipStatusOkSend;
@@ -452,16 +366,16 @@ EipStatus CipMessageRouterClass::NotifyMR( BufReader aCommand, CipMessageRouterR
     }
 
     CIPSTER_TRACE_INFO(
-        "%s: targeting instance %d of class %s with service %s\n",
+        "%s: targeting '%s' instance %d with service %s\n",
         __func__,
-        instance_id,
         clazz->ClassName().c_str(),
+        instance_id,
         service->ServiceName().c_str()
         );
 
     CIPSTER_ASSERT( service->service_function );
 
-    EipStatus status = service->service_function( instance, &request, aResponse );
+    EipStatus status = service->service_function( instance, aRequest, aResponse );
 
     CIPSTER_TRACE_ERR(
             "%s: service %s of class '%s' returned %d\n",

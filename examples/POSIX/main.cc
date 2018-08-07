@@ -11,8 +11,6 @@
 
 EipStatus ApplicationInitialization();  // my business.
 
-extern int newfd;
-
 // ****************************************************************************
 /** @brief Signal handler function for ending stack execution
  *
@@ -74,7 +72,7 @@ int main( int argc, char* argv[] )
         goto shutdown;
     }
 
-    // Setup Network Handles
+    // Setup Network only after Configure*() calls above
     if( NetworkHandlerInitialize() != kEipStatusOk )
     {
         fprintf( stderr, "Unable to initialize NetworkHandlers\n" );
