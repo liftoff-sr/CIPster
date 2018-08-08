@@ -34,9 +34,7 @@ CipConn* CipConnMgrClass::FindExistingMatchingConnection( const ConnectionData& 
     {
         if( active->State() == kConnStateEstablished )
         {
-            if( params.connection_serial_number == active->connection_serial_number
-             && params.originator_vendor_id     == active->originator_vendor_id
-             && params.originator_serial_number == active->originator_serial_number )
+            if( params.TriadEquals( *active ) )
             {
                 return active;
             }

@@ -357,7 +357,7 @@ struct EncapSession
     void Clear()
     {
         m_socket   = kEipInvalidSocket;
-        m_peeraddr = SockAddr();
+        m_peeraddr.SetFamily( 0 );
         m_last_activity_usecs = 0;
         m_is_registered = false;
     }
@@ -365,7 +365,9 @@ struct EncapSession
     int         m_socket;
     SockAddr    m_peeraddr;             // peer's IP address, port, etc.
     USECS_T     m_last_activity_usecs;
-    bool        m_is_registered;
+
+    bool        m_is_registered;        // false => TCP connection only
+                                        // true  => Registered ENIP Session
 };
 
 
@@ -399,7 +401,7 @@ public:
 
     /**
      * Function UpdateRegisteredTcpConnection
-     * checks if aSocket belongs to a registered TCP connection, and if so
+     * checks if @a aSocket belongs to a registered TCP connection, and if so
      * updates its activity timer.
      *
      * @param aSocket to check
@@ -410,13 +412,13 @@ public:
 
     /**
      * Function CheckRegisteredSession
-     * checks if aSocket belongs to a registered session.
+     * checks if @a aSocket belongs to a registered session.
      *
      * @param aSessionHandle a client provides session handle to verify
-     * @param aSocket TCP socket that the register session request came in on.
+     * @param aSocket TCP socket that the registered session request came in on.
      *
      * @return EncapSession* - valid if session is already registered, else NULL if
-     *  the session is not active or does not below to aSocket or is not registered.
+     *  the session is not active or does not belong to aSocket or is not registered.
      */
     static EncapSession* CheckRegisteredSession( CipUdint aSessionHandle, int aSocket );
 

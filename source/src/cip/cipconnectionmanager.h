@@ -211,8 +211,8 @@ public:
         }
 
         CipConn* operator->() const     { return p; }
-        CipConn* operator*() const      { return p; }
-        operator CipConn* () const      { return p; }
+        CipConn& operator*()  const     { return *p; }
+        operator CipConn* ()  const     { return p; }
 
     private:
         CipConn*    p;
