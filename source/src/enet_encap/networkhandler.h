@@ -12,7 +12,7 @@
 #include "sockaddr.h"
 #include "../cip/ciptypes.h"
 
-extern USECS_T  g_current_usecs;
+extern uint64_t g_current_usecs;
 
 
 /**
@@ -45,5 +45,24 @@ inline const char* ShowUdpDirection( UdpDirection aDirection )
     else
         return "producing";
 }
+
+/**
+ * Function SendUdpData
+ * sends the bytes provided in @a aOutput to the UDP node given by @a aSockAddr
+ * using @a aSocket.
+ *
+ * @param aSockAddr is the "send to" address
+ * @param aSocket is the socket descriptor to send on
+ * @param aOutput is the data to send and its length
+ * @return  EipStatus - EipStatusSuccess on success
+ */
+EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput );
+
+/**
+ * Function CloseSocket
+ * closes @a aSocket
+ */
+void CloseSocket( int aSocket );
+
 
 #endif  // NETWORKHANDLER_H_

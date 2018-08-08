@@ -736,8 +736,8 @@ void CipConn::Clear( bool doConnectionDataToo )
     hook_close = NULL;
     hook_timeout = NULL;
 
-    SetConsumingSocket( kEipInvalidSocket );
-    SetProducingSocket( kEipInvalidSocket );
+    SetConsumingSocket( kSocketInvalid );
+    SetProducingSocket( kSocketInvalid );
 
     encap_session = 0;
 
@@ -898,7 +898,7 @@ void CipConn::Close()
          || InstanceType() == kConnInstanceTypeIoInputOnly )
         {
             if( t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
-             && ProducingSocket() != kEipInvalidSocket )
+             && ProducingSocket() != kSocketInvalid )
             {
                 CipConn* next_non_control_master =
                     GetNextNonControlMasterConnection( conn_path.producing_path.GetInstanceOrConnPt() );
@@ -914,7 +914,7 @@ void CipConn::Close()
 
                     next_non_control_master->sequence_count_producing = sequence_count_producing;
 
-                    SetProducingSocket( kEipInvalidSocket );
+                    SetProducingSocket( kSocketInvalid );
 
                     next_non_control_master->SetTransmissionTriggerTimerUSecs(
                         TransmissionTriggerTimerUSecs() );
@@ -933,10 +933,10 @@ void CipConn::Close()
     }
 
     CloseSocket( consuming_socket );
-    SetConsumingSocket( kEipInvalidSocket );
+    SetConsumingSocket( kSocketInvalid );
 
     CloseSocket( producing_socket );
-    SetProducingSocket( kEipInvalidSocket );
+    SetProducingSocket( kSocketInvalid );
 
     encap_session = 0;
 
@@ -1119,7 +1119,7 @@ void CipConn::timeOut()
                 break;
 
             case kConnInstanceTypeIoInputOnly:
-                if( kEipInvalidSocket != ProducingSocket() )
+                if( kSocketInvalid != ProducingSocket() )
                 {
                     // we are the controlling input only connection find a new controller
 
@@ -1129,7 +1129,7 @@ void CipConn::timeOut()
                     if( next_non_control_master )
                     {
                         next_non_control_master->SetProducingSocket( ProducingSocket() );
-                        SetProducingSocket( kEipInvalidSocket );
+                        SetProducingSocket( kSocketInvalid );
 
                         next_non_control_master->SetTransmissionTriggerTimerUSecs(
                             TransmissionTriggerTimerUSecs() );
@@ -1153,6 +1153,8 @@ void CipConn::timeOut()
         }
     }
 
+    CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( this );
+
     Close();
 }
 
@@ -1171,7 +1173,7 @@ CipError CipConn::openConsumingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
 
     int socket = CreateUdpSocket( kUdpConsuming, peers_destination );
 
-    if( socket == kEipInvalidSocket )
+    if( socket == kSocketInvalid )
     {
         CIPSTER_TRACE_ERR( "%s: cannot create UDP socket on port:%d\n",
             __func__, g_my_io_udp_port );
@@ -1235,7 +1237,7 @@ CipError CipConn::openProducingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
 
     int socket = CreateUdpSocket( kUdpProducing, source );
 
-    if( socket == kEipInvalidSocket )
+    if( socket == kSocketInvalid )
     {
         CIPSTER_TRACE_ERR( "%s: cannot create UDP socket on port:%d\n",
                 __func__, source.Port() );
@@ -1279,11 +1281,11 @@ CipError CipConn::openProducingMulticastConnection( Cpf* aCpf, ConnMgrStatus* aE
          */
         SetProducingSocket( existing->ProducingSocket() );
 
-        existing->SetProducingSocket( kEipInvalidSocket );
+        existing->SetProducingSocket( kSocketInvalid );
     }
     else    // this connection will not produce the data
     {
-        SetProducingSocket( kEipInvalidSocket );
+        SetProducingSocket( kSocketInvalid );
     }
 
     SockAddr destination(
@@ -1339,7 +1341,7 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
 
         int socket = CreateUdpSocket( aDirection, remotes_destination );
 
-        if( socket == kEipInvalidSocket )
+        if( socket == kSocketInvalid )
         {
             CIPSTER_TRACE_ERR( "%s: cannot create consuming UDP socket\n", __func__ );
             *aExtError = kConnMgrStatusTargetObjectOutOfConnections;
@@ -1364,7 +1366,7 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
 
         int socket = CreateUdpSocket( aDirection, source );
 
-        if( socket == kEipInvalidSocket )
+        if( socket == kSocketInvalid )
         {
             CIPSTER_TRACE_ERR( "%s: cannot create producing UDP socket\n",
                 __func__ );

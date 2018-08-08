@@ -489,6 +489,12 @@ public:
             && originator_serial_number == aOther.originator_serial_number;
     }
 
+    bool OriginatorEquals( const ConnectionData& aOther ) const
+    {
+        return originator_vendor_id     == aOther.originator_vendor_id
+            && originator_serial_number == aOther.originator_serial_number;
+    }
+
     ConnectionData& SetTimeoutMultiplier( ConnTimeoutMultiplier aMultiplier );
 
     ConnTimeoutMultiplier TimeoutMultiplier() const

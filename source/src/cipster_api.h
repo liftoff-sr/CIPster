@@ -364,23 +364,6 @@ EipStatus ResetDeviceToInitialConfiguration( bool also_reset_comm_parameters );
 void RunIdleChanged( EipUint32 run_idle_value );
 
 
-/** @ingroup CIP_CALLBACK_API
- * @brief create a producing or consuming UDP socket
- *
- * @param aSockAddr the "send to" address
- * @param aSocket socket descriptor to send on
- * @param aOutput the data to send and its length
- * @return  EIP_SUCCESS on success
- */
-EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput );
-
-/** @ingroup CIP_CALLBACK_API
- * @brief Close the given socket
- *
- * @param aSocket the socket to close
- */
-void CloseSocket( int aSocket );
-
 /** @ingroup CIP_API
  * Function CloseSession
  * deletes any session associated with the aSocket and closes the socket connection.
@@ -390,7 +373,7 @@ void CloseSocket( int aSocket );
  */
 inline bool CloseSession( int aSocket )
 {
-    return ServerSessionMgr::Close( aSocket );
+    return ServerSessionMgr::CloseBySocket( aSocket );
 }
 
 /** @mainpage CIPster - Open Source EtherNet/IP(TM) Communication Stack

@@ -389,7 +389,7 @@ CipConn* GetExistingProducerMulticastConnection( int input_point )
         {
             if( input_point == producer_multicast_connection->conn_path.producing_path.GetInstanceOrConnPt()
                 && producer_multicast_connection->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
-                && kEipInvalidSocket != producer_multicast_connection->ProducingSocket() )
+                && kSocketInvalid != producer_multicast_connection->ProducingSocket() )
             {
                 // we have a connection that produces the same input assembly,
                 // is a multicast producer and manages the connection.
@@ -415,7 +415,7 @@ CipConn* GetNextNonControlMasterConnection( int input_point )
         {
             if( input_point == c->conn_path.producing_path.GetInstanceOrConnPt()
              && c->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
-             && c->ProducingSocket() == kEipInvalidSocket )
+             && c->ProducingSocket() == kSocketInvalid )
             {
                 // we have a connection that produces the same input assembly,
                 // is a multicast producer and does not manages the connection.

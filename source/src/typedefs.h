@@ -57,12 +57,9 @@ typedef uint64_t    CipUlint;   ///< 64-bit unsignedeger
 typedef uint64_t    CipLword;   ///< 64-bit bit string
 
 
-typedef uint32_t    USECS_T;
-
-
 
 /// Constant identifying an invalid socket
-const int kEipInvalidSocket = -1;
+const int kSocketInvalid = -1;
 
 /**
  *

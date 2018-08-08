@@ -18,6 +18,8 @@
 #endif
 
 
+const int SADDRZ = sizeof(sockaddr);
+
 std::string IpAddrStr( in_addr aIP );
 
 

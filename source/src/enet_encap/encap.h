@@ -7,7 +7,7 @@
 #define CIPSTER_ENCAP_H_
 
 //#include <string>
-#include "sockaddr.h"
+#include "networkhandler.h"
 #include "typedefs.h"
 #include "../cip/cipcommon.h"
 
@@ -138,7 +138,7 @@ public:
      * @param isUnicast true if unicast, else false.
      * @return int - byte count of reply that need to be sent back
      */
-    static int HandleReceivedExplicitUdpData( int aSocket, const SockAddr* aSockAddr,
+    static int HandleReceivedExplicitUdpData( int aSocket, const SockAddr& aSockAddr,
         BufReader aCommand,  BufWriter aReply, bool isUnicast );
 
     /**
@@ -149,7 +149,7 @@ public:
      * @param aSocket the BSD socket from which data is received.
      * @param aCommand is the buffer that contains the received data.
      * @param aReply is the buffer that should be used for the reply.
-     * @return int - byte count of reply that needs to be sent back
+     * @return int - byte count of reply that needs to be sent back, or -1 if error
      */
     static int HandleReceivedExplicitTcpData( int aSocket,
                     BufReader aCommand, BufWriter aReply );
@@ -223,7 +223,8 @@ protected:
 
     static int serializeListIdentityResponse( BufWriter aReply );
 
-    static int handleReceivedListIdentityCommandDelayed( int socket, const SockAddr* from_address,
+    static int handleReceivedListIdentityCommandDelayed(
+            int socket, const SockAddr& aFromAddress,
             unsigned aMSecDelay, BufReader aCommand );
 
     /**
@@ -356,15 +357,21 @@ struct EncapSession
 
     void Clear()
     {
-        m_socket   = kEipInvalidSocket;
+        m_socket   = kSocketInvalid;
         m_peeraddr.SetFamily( 0 );
         m_last_activity_usecs = 0;
         m_is_registered = false;
     }
 
+    void Close()
+    {
+        CloseSocket( m_socket );
+        Clear();
+    }
+
     int         m_socket;
     SockAddr    m_peeraddr;             // peer's IP address, port, etc.
-    USECS_T     m_last_activity_usecs;
+    uint64_t    m_last_activity_usecs;
 
     bool        m_is_registered;        // false => TCP connection only
                                         // true  => Registered ENIP Session
@@ -434,14 +441,32 @@ public:
     static EncapError UnregisterSession( CipUdint aSessionHandle, int aSocket );
 
     /**
-     * Function Close
-     * closes the TCP connection [and registered session] associated with @a aSocket
+     * Function CloseBySocket
+     * closes the TCP connection (which may also be a registered session)
+     * associated with @a aSocket
      *
      * @param aSocket the socket of the TCP connection to close.
      * @return bool - true if aSocket was found
      */
-    static bool Close( int aSocket );
+    static bool CloseBySocket( int aSocket );
 
+    /**
+     * Function CloseBySessionHandle
+     * closes the TCP connection (which may also be a registered session)
+     * given by @a aSessionHandle
+     *
+     * @param aSessionHandle the session of the TCP connection to close.
+     * @return bool - true on success, else false
+     */
+    static bool CloseBySessionHandle( CipUdint aSessionHandle );
+
+    /**
+     * Function AgeInactivity
+     * scans all open TCP connections, some of which are also registered sessions,
+     * and closes those which have been inactive for greater than the
+     * CipTCPIPInterfaceInstance::inactivity_timeout_secs setting.
+     * @see Vol2 2-5.5.2
+     */
     static void AgeInactivity();
 
 private:

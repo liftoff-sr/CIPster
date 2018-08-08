@@ -43,17 +43,18 @@ static fd_set read_set;
 // temporary file descriptor for select()
 static int highest_socket_handle;
 
-USECS_T     g_current_usecs;
+uint64_t    g_current_usecs;
+unsigned    s_last_usecs;       // only 32 needed bits here.
 
 
 struct NetworkStatus
 {
-    int     tcp_listener;
-    int     udp_unicast_listener;
-    int     udp_local_broadcast_listener;
-    int     udp_global_broadcast_listener;
-    USECS_T elapsed_time_usecs;
-    USECS_T tcp_inactivity_usecs;
+    int         tcp_listener;
+    int         udp_unicast_listener;
+    int         udp_local_broadcast_listener;
+    int         udp_global_broadcast_listener;
+    unsigned    elapsed_time_usecs;
+    unsigned    tcp_inactivity_usecs;
 };
 
 
@@ -74,15 +75,18 @@ std::string strerrno()
 }
 
 
-/// Return a monotonically increasing usecs time that wraps around after overflow.
-static USECS_T usecs_now()
+/// Return a monotonically increasing usecs time that wraps around
+/// after overflow.  Just use 32 bits here, 64 bits are kept in
+/// g_current_usecs which is global.  This a cross platform concern which
+/// will make implementing this function easier under other OS's.
+static unsigned usecs_now()
 {
 #if defined(__linux__)
     struct timespec	now;
 
     clock_gettime( CLOCK_MONOTONIC, &now );
 
-    USECS_T usecs = USECS_T( (unsigned long) now.tv_nsec/1000u + now.tv_sec * 1000000 );
+    unsigned usecs = unsigned( (unsigned long) now.tv_nsec/1000u + now.tv_sec * 1000000 );
 
 #elif defined(_WIN32)
 
@@ -107,7 +111,7 @@ static USECS_T usecs_now()
 
     QueryPerformanceCounter( &performance_counter );
 
-    USECS_T usecs = USECS_T( performance_counter.QuadPart * 1000000 / clock.frequency );
+    unsigned usecs = unsigned( performance_counter.QuadPart * 1000000 / clock.frequency );
 #endif
 
     return usecs;
@@ -198,28 +202,27 @@ void CheckAndHandleUdpUnicastSocket()
         from_address_length = sizeof(from_address);
 
         CIPSTER_TRACE_STATE(
-                "%s: unsolicited UDP message on EIP unicast socket\n", __func__ );
+                "%s[%d]: unsolicited UDP message on EIP unicast socket\n",
+                __func__, s_sockets.udp_unicast_listener );
 
         // Handle UDP broadcast messages
         int received_size = recvfrom( s_sockets.udp_unicast_listener,
                 (char*) s_packet,
                 sizeof(s_packet),
-                0, (struct sockaddr*) &from_address,
-                &from_address_length );
+                0, from_address,  &from_address_length );
 
         if( received_size <= 0 ) // got error
         {
             CIPSTER_TRACE_ERR(
-                    "%s: error on recvfrom UDP unicast port: '%s'\n",
+                    "%s[%d]: error on recvfrom UDP unicast socket: '%s'\n",
                     __func__,
+                    s_sockets.udp_unicast_listener,
                     strerrno().c_str() );
             return;
         }
 
-        CIPSTER_TRACE_INFO( "%s: data received on UDP unicast:\n", __func__ );
-
         int reply_length = Encapsulation::HandleReceivedExplicitUdpData(
-                s_sockets.udp_unicast_listener, &from_address,
+                s_sockets.udp_unicast_listener, from_address,
                 BufReader( s_packet, received_size ),
                 BufWriter( s_packet, sizeof s_packet ), true );
 
@@ -230,13 +233,14 @@ void CheckAndHandleUdpUnicastSocket()
                         (char*) s_packet, reply_length, 0,
                         from_address, sizeof(from_address) );
 
-            CIPSTER_TRACE_INFO( "%s: sent %d reply bytes.  line:%d\n",
-                __func__, sent_count, __LINE__ );
+            CIPSTER_TRACE_INFO( "%s[%d]: sent %d reply bytes\n",
+                __func__, s_sockets.udp_unicast_listener,  sent_count );
 
             if( sent_count != reply_length )
             {
                 CIPSTER_TRACE_INFO(
-                        "%s: UDP unicast response was not fully sent\n", __func__ );
+                        "%s[%d]: UDP unicast response was not fully sent\n",
+                        __func__, s_sockets.udp_unicast_listener );
             }
         }
     }
@@ -258,7 +262,7 @@ void CheckAndHandleTcpListenerSocket()
 
         CIPSTER_TRACE_INFO( "%s[%d]: new TCP connection\n", __func__, new_socket );
 
-        if( new_socket == kEipInvalidSocket )
+        if( new_socket == kSocketInvalid )
         {
             CIPSTER_TRACE_ERR( "%s: error on accept: %s\n",
                     __func__, strerrno().c_str() );
@@ -310,8 +314,10 @@ void CheckAndHandleUdpLocalBroadcastSocket()
         from_address_length = sizeof(from_address);
 
         CIPSTER_TRACE_STATE(
-                "%s: unsolicited UDP message on EIP local broadcast socket\n",
-                __func__ );
+            "%s[%d]: unsolicited UDP on local broadcast socket\n",
+            __func__,
+            s_sockets.udp_local_broadcast_listener
+            );
 
         // Handle UDP broadcast messages
         int received_size = recvfrom( s_sockets.udp_local_broadcast_listener,
@@ -323,15 +329,15 @@ void CheckAndHandleUdpLocalBroadcastSocket()
         if( received_size <= 0 ) // got error
         {
             CIPSTER_TRACE_ERR(
-                    "%s: error on recvfrom UDP local broadcast port: '%s'\n",
-                    __func__, strerrno().c_str() );
+                    "%s[%d]: error on recvfrom UDP local broadcast socket: '%s'\n",
+                    __func__,
+                    s_sockets.udp_local_broadcast_listener,
+                    strerrno().c_str() );
             return;
         }
 
-        CIPSTER_TRACE_INFO( "Data received on UDP:\n" );
-
         int reply_length = Encapsulation::HandleReceivedExplicitUdpData(
-                s_sockets.udp_local_broadcast_listener, &from_address,
+                s_sockets.udp_local_broadcast_listener, from_address,
                 BufReader( s_packet, received_size ),
                 BufWriter( s_packet, sizeof s_packet ), false );
 
@@ -342,13 +348,14 @@ void CheckAndHandleUdpLocalBroadcastSocket()
                         (char*) s_packet, reply_length, 0,
                         from_address, sizeof(from_address) );
 
-            CIPSTER_TRACE_INFO( "%s: sent %d reply bytes. line %d\n",
-                __func__, sent_count, __LINE__ );
+            CIPSTER_TRACE_INFO( "%s[%d]: sent %d reply bytes\n",
+                __func__, s_sockets.udp_local_broadcast_listener, sent_count );
 
             if( sent_count != reply_length )
             {
                 CIPSTER_TRACE_INFO(
-                        "%s: UDP response was not fully sent\n", __func__ );
+                    "%s[%d]: UDP response was not fully sent\n",
+                    __func__, s_sockets.udp_local_broadcast_listener );
             }
         }
     }
@@ -366,8 +373,8 @@ void CheckAndHandleUdpGlobalBroadcastSocket()
         from_address_length = sizeof(from_address);
 
         CIPSTER_TRACE_STATE(
-                "%s: unsolicited UDP message on EIP global broadcast socket\n",
-                __func__ );
+            "%s[%d]: unsolicited UDP on global broadcast socket\n",
+            __func__, s_sockets.udp_global_broadcast_listener );
 
         // Handle UDP broadcast messages
         int received_size = recvfrom( s_sockets.udp_global_broadcast_listener,
@@ -379,15 +386,19 @@ void CheckAndHandleUdpGlobalBroadcastSocket()
         if( received_size <= 0 ) // got error
         {
             CIPSTER_TRACE_ERR(
-                    "%s: error on recvfrom UDP global broadcast port: '%s'\n",
-                    __func__, strerrno().c_str() );
+                "%s[%d]: error on recvfrom UDP global broadcast socket: '%s'\n",
+                __func__,
+                s_sockets.udp_global_broadcast_listener,
+                strerrno().c_str() );
+
             return;
         }
 
-        CIPSTER_TRACE_INFO( "%s: data received on global broadcast UDP:\n", __func__ );
+        CIPSTER_TRACE_INFO( "%s[%d]: %d bytes received on global broadcast UDP\n",
+            __func__, s_sockets.udp_global_broadcast_listener, received_size );
 
         int reply_length = Encapsulation::HandleReceivedExplicitUdpData(
-                s_sockets.udp_global_broadcast_listener, &from_address,
+                s_sockets.udp_global_broadcast_listener, from_address,
                 BufReader( s_packet, received_size ),
                 BufWriter( s_packet, sizeof s_packet ), false );
 
@@ -396,16 +407,16 @@ void CheckAndHandleUdpGlobalBroadcastSocket()
             // if the active socket matches a registered UDP callback, handle a UDP packet
             int sent_count = sendto( s_sockets.udp_global_broadcast_listener,
                         (char*) s_packet, reply_length, 0,
-                        from_address, sizeof(sockaddr) );
+                        from_address, SADDRZ );
 
-            CIPSTER_TRACE_INFO( "%s: sent %d reply bytes. line %d:\n",
-                __func__, sent_count, __LINE__ );
+            CIPSTER_TRACE_INFO( "%s[%d]: sent %d reply bytes\n",
+                __func__, s_sockets.udp_global_broadcast_listener, sent_count );
 
             if( sent_count != reply_length )
             {
                 CIPSTER_TRACE_INFO(
-                        "%s: UDP response was not fully sent\n",
-                        __func__ );
+                        "%s[%d]: UDP response was not fully sent\n",
+                        __func__, s_sockets.udp_global_broadcast_listener );
             }
         }
     }
@@ -485,6 +496,8 @@ EipStatus HandleDataOnTcpSocket( int aSocket )
     int num_read = Encapsulation::ReceiveTcpMsg( aSocket,
                         BufWriter( s_packet, sizeof s_packet ) );
 
+    //CIPSTER_TRACE_INFO( "%s[%d]: num_read:%d\n", __func__, aSocket, num_read );
+
     if( num_read < ENCAPSULATION_HEADER_LENGTH )
     {
         return kEipStatusError;
@@ -509,9 +522,27 @@ EipStatus HandleDataOnTcpSocket( int aSocket )
             CIPSTER_TRACE_WARN( "%s[%d]: TCP response was not fully sent\n",
                     __func__, aSocket );
         }
+
+        return kEipStatusOk;
     }
 
-    return kEipStatusOk;
+    else if( replyz == 0 )
+    {
+        CIPSTER_TRACE_INFO(
+            "%s[%d]: 0 length reply from HandleReceivedExplicitTcpData()\n",
+            __func__, aSocket );
+
+        return kEipStatusOk;
+    }
+
+    else
+    {
+        CIPSTER_TRACE_INFO(
+            "%s[%d]: < 0 length reply from HandleReceivedExplicitTcpData()\n",
+            __func__, aSocket );
+
+        return kEipStatusError;
+    }
 }
 
 
@@ -565,7 +596,7 @@ EipStatus NetworkHandlerInitialize()
         SockAddr address( kEIP_Reserved_Port, ntohl( c.ip_address ) );
 
         // bind the new socket to port 0xAF12 (CIP)
-        if( bind( s_sockets.tcp_listener, address, sizeof(sockaddr) ) == -1 )
+        if( bind( s_sockets.tcp_listener, address, SADDRZ ) == -1 )
         {
             CIPSTER_TRACE_ERR( "%s: bind(%s) error for tcp_listener: %s\n",
                 __func__, address.AddrStr().c_str(), strerrno().c_str() );
@@ -606,7 +637,7 @@ EipStatus NetworkHandlerInitialize()
         SockAddr address( kEIP_Reserved_Port, INADDR_BROADCAST );
 
         if( ( bind( s_sockets.udp_global_broadcast_listener,
-                      address, sizeof(sockaddr) ) ) == -1 )
+                      address, SADDRZ ) ) == -1 )
         {
             CIPSTER_TRACE_ERR(
                     "error with global broadcast UDP bind: %s\n",
@@ -640,7 +671,7 @@ EipStatus NetworkHandlerInitialize()
                             ntohl( c.ip_address | ~c.network_mask ) );
 
         if( bind( s_sockets.udp_local_broadcast_listener,
-                      address, sizeof(sockaddr) ) == -1 )
+                      address, SADDRZ ) == -1 )
         {
             CIPSTER_TRACE_ERR(
                     "error with udp_local_broadcast_listener bind: %s\n",
@@ -672,7 +703,7 @@ EipStatus NetworkHandlerInitialize()
         SockAddr address( kEIP_Reserved_Port, ntohl( c.ip_address ) );
 
         if( bind( s_sockets.udp_unicast_listener,
-                      address, sizeof(sockaddr) ) == -1 )
+                      address, SADDRZ ) == -1 )
         {
             CIPSTER_TRACE_ERR(
                 "error with udp_unicast_listener bind: %s\n",
@@ -710,7 +741,7 @@ EipStatus NetworkHandlerInitialize()
         s_sockets.udp_global_broadcast_listener
         );
 
-    g_current_usecs = usecs_now();      // initialize time keeping
+    s_last_usecs = usecs_now();         // initialize time keeping
     s_sockets.elapsed_time_usecs = 0;
     s_sockets.tcp_inactivity_usecs = 0;
 
@@ -762,28 +793,31 @@ EipStatus NetworkHandlerProcessOnce()
                 // if it is still checked it is a TCP receive
                 if( kEipStatusError == HandleDataOnTcpSocket( socket ) )
                 {
-                    if( !CloseSession( socket ) )
-                    {
-                        // CloseSession could not find the socket.
-                        CloseSocket( socket );
-                    }
+                    CIPSTER_TRACE_INFO( "%s[%d]: calling CloseBySocket()\n",
+                        __func__, socket );
+                    ServerSessionMgr::CloseBySocket( socket );
                 }
             }
         }
     }
 
-    USECS_T now = usecs_now();  // newer than g_current_usecs
+    unsigned now = usecs_now();
+    unsigned elapsed_usecs = now - s_last_usecs;
 
-    USECS_T elapsed_usecs = now - g_current_usecs;
+    s_last_usecs = now;
 
     s_sockets.elapsed_time_usecs    += elapsed_usecs;
     s_sockets.tcp_inactivity_usecs  += elapsed_usecs;
 
-    g_current_usecs = now;
+    g_current_usecs += elapsed_usecs;   // accumulate into 64 bits.
 
-    /*  check if we had been not able to update the connection manager for
-        several CIPSTER_TIMER_TICK.
-        This should compensate the jitter of the windows timer
+    /*  Call ManageConnections() if the elapsed_time_usecs is greater than
+        kOpenerTimerTickInMicroSeconds.  If more than once cycle
+        was missed, call it more than once so internal time management
+        functions can expect each call to represent kOpenerTimerTickInMicroSeconds.
+        This will compensate for jitter in how frequently NetworkHandlerProcessOnce()
+        is called.  But please try and call it at least slightly more frequently
+        than every kOpenerTimerTickInMicroSeconds.
     */
     while( s_sockets.elapsed_time_usecs >= kOpenerTimerTickInMicroSeconds )
     {
@@ -794,11 +828,14 @@ EipStatus NetworkHandlerProcessOnce()
         s_sockets.elapsed_time_usecs -= kOpenerTimerTickInMicroSeconds;
     }
 
-    // process AgeInactivity every 1/2 second.
-    if( CipTCPIPInterfaceInstance::inactivity_timeout_secs &&
-        s_sockets.tcp_inactivity_usecs >= 500000 )
+    // process AgeInactivity every 1/2 second.  This is fine because
+    // CipTCPIPInterfaceInstance::inactivity_timeout_secs is in seconds so
+    // respecting the timeout within 1/2 is sufficient.
+    const unsigned INACTIVITY_CHECK_PERIOD_USECS = 500000;
+
+    if( s_sockets.tcp_inactivity_usecs >= INACTIVITY_CHECK_PERIOD_USECS )
     {
-        s_sockets.tcp_inactivity_usecs -= 500000;
+        s_sockets.tcp_inactivity_usecs -= INACTIVITY_CHECK_PERIOD_USECS;
 
         ServerSessionMgr::AgeInactivity();
     }
@@ -821,7 +858,7 @@ EipStatus NetworkHandlerFinish()
 EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput )
 {
     int sent_count = sendto( aSocket, (char*) aOutput.data(), aOutput.size(), 0,
-                        aSockAddr, sizeof(sockaddr) );
+                        aSockAddr, SADDRZ );
 
     CIPSTER_TRACE_INFO( "%s[%d]: %d bytes to:%s:%d\n",
         __func__,
@@ -876,7 +913,7 @@ int CreateUdpSocket( UdpDirection aDirection, const SockAddr& aSockAddr )
 
    int udp_sock = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
 
-   if( udp_sock == kEipInvalidSocket )
+   if( udp_sock == kSocketInvalid )
    {
         CIPSTER_TRACE_ERR( "%s: cannot create %s UDP socket: '%s'\n",
                 __func__,
@@ -901,7 +938,7 @@ int CreateUdpSocket( UdpDirection aDirection, const SockAddr& aSockAddr )
             goto close_and_exit;
         }
 
-        if( bind( udp_sock, aSockAddr, sizeof(sockaddr) ) == -1 )
+        if( bind( udp_sock, aSockAddr, SADDRZ ) == -1 )
         {
             CIPSTER_TRACE_ERR( "%s[%d]: bind(ip=%s, port=0x%x) error on consuming udp: '%s'\n",
                     __func__,
@@ -911,7 +948,7 @@ int CreateUdpSocket( UdpDirection aDirection, const SockAddr& aSockAddr )
                     strerrno().c_str()
                     );
             goto close_and_exit;
-            return kEipInvalidSocket;
+            return kSocketInvalid;
         }
 
         CIPSTER_TRACE_INFO( "%s[%d]: consuming on %s:%d\n",
@@ -940,7 +977,7 @@ int CreateUdpSocket( UdpDirection aDirection, const SockAddr& aSockAddr )
             goto close_and_exit;
         }
 
-        if( bind( udp_sock, (sockaddr*) &aSockAddr, sizeof(sockaddr) ) == -1 )
+        if( bind( udp_sock, (sockaddr*) &aSockAddr, SADDRZ ) == -1 )
         {
             CIPSTER_TRACE_ERR( "%s[%d]: bind(ip:%s, port:%d) error on producing udp: '%s'\n",
                     __func__,
@@ -999,5 +1036,5 @@ exit:
 close_and_exit:
 
     CloseSocket( udp_sock );
-    return kEipInvalidSocket;
+    return kSocketInvalid;
 }

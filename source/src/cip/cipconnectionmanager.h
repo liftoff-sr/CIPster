@@ -28,9 +28,11 @@ public:
      * Since multiple CIP Class 3 connections can be instantiated all on the
      * same TCP connection, we could be deleting more than one here.
      *
-     * @param aSessionId which session id to match against.
+     * @param aSessionId is a session id to match against.
      */
     static void CloseClass3Connections( CipUdint aSessionId );
+
+    static void CheckForTimedOutConnectionsAndCloseTCPConnections( CipConn *aConn );
 
     /**
      * Function FindExsitingMatchingConnection
@@ -220,7 +222,7 @@ public:
 
     /**
      * Function Insert
-     * inserts the given connection object to this list.
+     * inserts the given connection object into this container.
      *
      * By adding a connection to the active connection list the connection manager
      * will perform the supervision and handle the timing (e.g., timeout,

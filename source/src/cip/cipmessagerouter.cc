@@ -225,11 +225,11 @@ CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConn,
         ex_conn->SetInstanceType( kConnInstanceTypeExplicit );
 
 #if 1
-        CIPSTER_ASSERT( ex_conn->ConsumingSocket() == kEipInvalidSocket );
-        CIPSTER_ASSERT( ex_conn->ProducingSocket() == kEipInvalidSocket );
+        CIPSTER_ASSERT( ex_conn->ConsumingSocket() == kSocketInvalid );
+        CIPSTER_ASSERT( ex_conn->ProducingSocket() == kSocketInvalid );
 #else
-        ex_conn->SetConsumingSocket( kEipInvalidSocket );
-        ex_conn->SetProducingSocket( kEipInvalidSocket );
+        ex_conn->SetConsumingSocket( kSocketInvalid );
+        ex_conn->SetProducingSocket( kSocketInvalid );
 #endif
 
         g_active_conns.Insert( ex_conn );

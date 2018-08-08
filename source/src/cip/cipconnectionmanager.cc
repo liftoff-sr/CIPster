@@ -46,7 +46,7 @@ CipConn* CipConnMgrClass::FindExistingMatchingConnection( const ConnectionData& 
 
 
 EipStatus CipConnMgrClass::HandleReceivedConnectedData(
-        const SockAddr& from_address, BufReader aCommand )
+        const SockAddr& aFromAddress, BufReader aCommand )
 {
     CIPSTER_TRACE_INFO( "%s: %zd bytes\n", __func__, aCommand.size() );
 
@@ -71,7 +71,7 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
 
             if( !conn )
             {
-                CIPSTER_TRACE_INFO( "%s: no consuming connection for conn_id 0x%x\n",
+                CIPSTER_TRACE_INFO( "%s: no existing connection for CID:0x%x\n",
                     __func__, cpfd.AddrConnId()
                     );
                 return kEipStatusError;
@@ -82,17 +82,17 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
                 __func__, cpfd.AddrConnId()
                 );
 
-            CIPSTER_TRACE_INFO( "%s: recv_address:%s:%d  from_address:%s:%d\n",
+            CIPSTER_TRACE_INFO( "%s: recv_address:%s:%d  aFromAddress:%s:%d\n",
                 __func__,
                 IpAddrStr( conn->recv_address.sin_addr ).c_str(),
                 ntohs( conn->recv_address.sin_port ),
-                IpAddrStr( from_address->sin_addr ).c_str(),
-                ntohs( from_address->sin_port )
+                IpAddrStr( aFromAddress->sin_addr ).c_str(),
+                ntohs( aFromAddress->sin_port )
                 );
             */
 
             // only handle the data if it is coming from the originator
-            if( conn->recv_address.Addr() == from_address.Addr() )
+            if( conn->recv_address.Addr() == aFromAddress.Addr() )
             {
                 CIPSTER_TRACE_INFO( "%s: CID:0x%08x  cpf.seq=0x%08x  encap.seq=0x%08x\n",
                     __func__,
@@ -123,7 +123,8 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
                 }
                 else
                 {
-                    CIPSTER_TRACE_INFO( "%s: received sequence number was not greater, no watchdog reset\n"
+                    CIPSTER_TRACE_INFO(
+                        "%s: received sequence number was not greater, no watchdog reset\n"
                         " received:%08x   connection seqn:%08x\n",
                         __func__,
                         cpfd.AddrEncapSeqNum(),
@@ -135,11 +136,13 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
             {
                 CIPSTER_TRACE_WARN(
                         "%s: I/O data received with wrong originator address.\n"
-                        " from:%s   connection originator:%s\n",
+                        " from:%s   originator for provided CID:%s\n",
                         __func__,
-                        from_address.AddrStr().c_str(),
+                        aFromAddress.AddrStr().c_str(),
                         conn->recv_address.AddrStr().c_str()
                         );
+
+                return kEipStatusError;
             }
         }
     }
@@ -206,7 +209,7 @@ EipStatus CipConnMgrClass::ManageConnections()
                     && active->ExpectedPacketRateUSecs() != 0
 
                     // only produce for the master connection
-                    && active->ProducingSocket() != kEipInvalidSocket )
+                    && active->ProducingSocket() != kSocketInvalid )
                 {
                     if( active->trigger.Trigger() != kConnTriggerTypeCyclic )
                     {
@@ -225,7 +228,9 @@ EipStatus CipConnMgrClass::ManageConnections()
 
                         if( eip_status == kEipStatusError )
                         {
-                            CIPSTER_TRACE_ERR( "sending of UDP data in manage Connection failed\n" );
+                            CIPSTER_TRACE_ERR(
+                                "%s: sending of UDP data in manage Connection failed\n",
+                                __func__ );
                         }
 
                         active->SetTransmissionTriggerTimerUSecs( active->ExpectedPacketRateUSecs() );
@@ -242,6 +247,31 @@ EipStatus CipConnMgrClass::ManageConnections()
     }
 
     return kEipStatusOk;
+}
+
+
+void CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( CipConn *aConn )
+{
+    bool another_active_with_same_session_found = false;
+
+    CipUdint session_handle = aConn->encap_session;
+
+    for( CipConnBox::iterator it = g_active_conns.begin();
+            it != g_active_conns.end();  ++it )
+    {
+        if( (CipConn*) it != aConn
+         && it->State() == kConnStateEstablished
+         && aConn->encap_session == session_handle )
+        {
+            another_active_with_same_session_found = true;
+            break;
+        }
+    }
+
+    if( !another_active_with_same_session_found )
+    {
+        ServerSessionMgr::CloseBySessionHandle( session_handle );
+    }
 }
 
 

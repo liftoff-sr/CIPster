@@ -75,7 +75,7 @@ void ServerSessionMgr::Init()
     initialize Sessions to invalid == free session
     for( int i = 0; i < DIM(sessions); ++i )
     {
-        sessions[i].m_socket = kEipInvalidSocket;
+        sessions[i].m_socket = kSocketInvalid;
     }
     */
 }
@@ -87,7 +87,7 @@ EncapError ServerSessionMgr::RegisterTcpConnection( int aSocket )
 
     for( index = 0; index < DIM(sessions); ++index )
     {
-        if( sessions[index].m_socket == kEipInvalidSocket )
+        if( sessions[index].m_socket == kSocketInvalid )
             break;
     }
 
@@ -103,7 +103,7 @@ EncapError ServerSessionMgr::RegisterTcpConnection( int aSocket )
     // Fetch IP address of other end of this TCP connection and save
     // in Session::sockaddr.
 
-    socklen_t   addrz = sizeof( sockaddr );
+    socklen_t   addrz = SADDRZ;
 
     // we have a peer to peer producer or a consuming connection
     int rc = getpeername( aSocket, ses.m_peeraddr, &addrz );
@@ -154,7 +154,7 @@ EncapError ServerSessionMgr::RegisterSession(
         // Return the already assigned session back, the cip spec is
         // not clear about this.
         *aSessionHandleResult = index + 1;
-        return  kEncapErrorIncorrectData;
+        return kEncapErrorInvalidOrUnsupportedCommand;
     }
 
     ses.m_is_registered = true;
@@ -208,15 +208,39 @@ EncapSession* ServerSessionMgr::CheckRegisteredSession(
 }
 
 
-bool ServerSessionMgr::Close( int aSocket )
+bool ServerSessionMgr::CloseBySessionHandle( CipUdint aSessionHandle )
+{
+    CIPSTER_ASSERT( aSessionHandle && aSessionHandle <= DIM(sessions) );
+
+    unsigned index = aSessionHandle - 1;
+
+    if( index < (unsigned) DIM(sessions) && sessions[index].m_socket != kSocketInvalid )
+    {
+        CIPSTER_TRACE_INFO( "%s[%d]: aSessionHandle:%d\n",
+            __func__, sessions[index].m_socket, aSessionHandle );
+
+        sessions[index].Close();
+        return true;
+    }
+    else
+    {
+        CIPSTER_TRACE_INFO( "%s: BAD or inactive aSessionHandle:%d\n",
+            __func__, aSessionHandle );
+
+        return false;
+    }
+}
+
+
+bool ServerSessionMgr::CloseBySocket( int aSocket )
 {
     CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, aSocket );
+
     for( int i = 0; i < DIM(sessions); ++i )
     {
         if( sessions[i].m_socket == aSocket )
         {
-            CloseSocket( aSocket );
-            sessions[i].Clear();
+            sessions[i].Close();
             return true;
         }
     }
@@ -236,8 +260,7 @@ EncapError ServerSessionMgr::UnregisterSession( CipUdint aSessionHandle, int aSo
     {
         if( sessions[index].m_socket == aSocket  )
         {
-            CloseSocket( sessions[index].m_socket );
-            sessions[index].Clear();
+            sessions[index].Close();
             return kEncapErrorSuccess;
         }
     }
@@ -251,30 +274,34 @@ void ServerSessionMgr::AgeInactivity()
 {
     //CIPSTER_TRACE_INFO( "%s: \n", __func__ );
 
+    // User can effectively defeat the inactivity timer by setting the attribute
+    // to a large number of seconds.
+    uint64_t timeout_usecs = CipTCPIPInterfaceInstance::inactivity_timeout_secs * 1000000;
+
     EncapSession* it  = sessions;
     EncapSession* end = it + DIM(sessions);
 
     for( ; it != end; ++it )
     {
-        if( it->m_socket != kEipInvalidSocket )
+        if( it->m_socket != kSocketInvalid )
         {
-            USECS_T delta = g_current_usecs - it->m_last_activity_usecs;
+            // This is positive and valid for all values of g_current_usecs, even
+            // if it has wrapped since setting it->m_last_activity_usecs.
+            uint64_t age_usecs = g_current_usecs - it->m_last_activity_usecs;
 
-            if( delta >= CipTCPIPInterfaceInstance::inactivity_timeout_secs * 1000000 )
+            if( age_usecs >= timeout_usecs )
             {
                 // Only a registered session can have Class3 or 4 connections.
                 if( it->m_is_registered )
                 {
-                    // close any class3 connection associated with this socket.
+                    // close any class3 connections associated with this socket.
                     CipUdint session_handle = (it - sessions) + 1;
 
                     CipConnMgrClass::CloseClass3Connections( session_handle );
                 }
 
-                CIPSTER_TRACE_INFO( "%s[%d]: >>>> TIMEOUT\n", __func__, it->m_socket );
-
-                CloseSocket( it->m_socket );
-                it->Clear();
+                CIPSTER_TRACE_INFO( "%s[%d]: >>>> TCP TIMEOUT\n", __func__, it->m_socket );
+                it->Close();
             }
         }
     }
@@ -288,10 +315,9 @@ void ServerSessionMgr::Shutdown()
 
     for( ; it != end; ++it )
     {
-        if( it->m_socket != kEipInvalidSocket )
+        if( it->m_socket != kSocketInvalid )
         {
-            CloseSocket( it->m_socket );
-            it->Clear();
+            it->Close();
         }
     }
 }
@@ -359,32 +385,42 @@ int Encapsulation::EnsuredTcpRecv( int aSocket, EipByte* aDest, int aByteCount )
 }
 
 
-static int disposeOfLargePacket( int aSocket, size_t aByteCount )
+/**
+ * Function disposeOfLargePacket
+ *
+ * @return int - >  0 : number of bytes read.
+ *             - == 0 : socket close on other end.
+ *             - <  0 : error of some kind.
+ */
+static int disposeOfLargePacket( int aSocket, unsigned aCount )
 {
-    EipByte junk_buf[256];
+    EipByte chunk[256];
+    int     total = 0;
 
-    CIPSTER_TRACE_INFO( "%s[%d]: count:%zd\n", __func__, aSocket, aByteCount );
-    // toss in chunks.
+    CIPSTER_TRACE_INFO( "%s[%d]: count:%zd\n", __func__, aSocket, aCount );
 
-    while( aByteCount )
+    while( aCount )
     {
-        int readz = std::min( aByteCount, sizeof junk_buf );
+        // toss in chunks.
+        int readz = std::min( aCount, unsigned( sizeof chunk ) );
 
-        int num_read = Encapsulation::EnsuredTcpRecv( aSocket, junk_buf, readz );
+        int num_read = Encapsulation::EnsuredTcpRecv( aSocket, chunk, readz );
 
         if( num_read != readz )
-            return -1;
+        {
+            return num_read;
+        }
 
-#if defined(DEBUG)
-        byte_dump( "bigTCP", junk_buf, num_read );
+#if defined(DEBUG) && 0
+        byte_dump( "bigTCP", chunk, num_read );
 #endif
-
-        aByteCount -= num_read;
+        total  += num_read;
+        aCount -= num_read;
     }
 
-    CIPSTER_TRACE_INFO( "~%s\n", __func__ );
+    //CIPSTER_TRACE_INFO( "~%s\n", __func__ );
 
-    return 0;
+    return total;
 }
 
 
@@ -423,18 +459,30 @@ int Encapsulation::ReceiveTcpMsg( int aSocket, BufWriter aMsg )
 
     if( remaining > aMsg.capacity() )
     {
+        if( remaining > 65511 )
+        {
+            CIPSTER_TRACE_ERR(
+                "%s[%d]: illegal encapsulation data size:%d\n"
+                " possibly out of sync, closing TCP connection\n",
+                __func__, aSocket, remaining );
+            return kEipStatusError;
+        }
+
 #if defined(DEBUG)
-        byte_dump( "rBAD", start, ENCAPSULATION_HEADER_LENGTH );
+        byte_dump( "rHDR", start, ENCAPSULATION_HEADER_LENGTH );
 #endif
 
         CIPSTER_TRACE_ERR(
-                "%s[%d]: packet len=%u is too big for #defined CIPSTER_ETHERNET_BUFFER_SIZE,\n"
-                "ignoring entire packet with Encap.command=0x%x\n",
-                __func__, aSocket, remaining + CIPSTER_ETHERNET_BUFFER_SIZE,
-                start[0] | (start[1] << 8)
-                );
+            "%s[%d]: packet len=%u is too big for #defined CIPSTER_ETHERNET_BUFFER_SIZE,\n"
+            "ignoring entire packet with Encap.command='%s'\n",
+            __func__, aSocket, remaining + ENCAPSULATION_HEADER_LENGTH,
+            ShowEncapCmd( start[0] | (start[1] << 8) )
+            );
 
-        return disposeOfLargePacket( aSocket, remaining );
+        if( disposeOfLargePacket( aSocket, remaining ) != remaining )
+            return kEipStatusError;
+        else
+            return remaining + ENCAPSULATION_HEADER_LENGTH;
     }
 
     num_read = EnsuredTcpRecv( aSocket, aMsg.data(), remaining );
@@ -516,7 +564,7 @@ int Encapsulation::registerSession( int socket, BufReader aCommand, BufWriter aR
     int options = aCommand.get16();
 
     // Check if requested protocol version is supported and the
-    // register session option flag is zero.
+    // register session option parameter is zero.
     if( version && version <= kSupportedProtocolVersion && !options )
     {
         *aEncapError = ServerSessionMgr::RegisterSession( socket, aSessionHandleResult );
@@ -581,14 +629,14 @@ int Encapsulation::handleReceivedListIdentityCommandImmediate( BufWriter aReply 
 
 
 int Encapsulation::handleReceivedListIdentityCommandDelayed(
-        int aSocket, const SockAddr* from_address,
+        int aSocket, const SockAddr& aFromAddress,
         unsigned aMSecDelay, BufReader aCommand )
 {
     DelayedMsg* delayed = NULL;
 
     for( unsigned i = 0; i < DIM( DelayedMsg::messages );  ++i )
     {
-        if( kEipInvalidSocket == DelayedMsg::messages[i].socket )
+        if( kSocketInvalid == DelayedMsg::messages[i].socket )
         {
             delayed = &DelayedMsg::messages[i];
             break;
@@ -598,7 +646,7 @@ int Encapsulation::handleReceivedListIdentityCommandDelayed(
     if( delayed )
     {
         delayed->socket   = aSocket;
-        delayed->receiver = *from_address;
+        delayed->receiver = aFromAddress;
 
         delayed->time_out_usecs = aMSecDelay * 1000;
 
@@ -695,14 +743,21 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
             require that a session be established.
         */
 
-        CIPSTER_TRACE_INFO( "%s[%d]:'NOP'\n", __func__, aSocket );
-        return -1;
+        CIPSTER_TRACE_INFO( "%s[%d]:'NOP' not gonna reply\n", __func__, aSocket );
+
+        return 0;       // This is not an error, but we should not reply.
     }
 
-    if( encap.Status() )  // all commands have 0 in status, else ignore
+    if( encap.Status() )  // all commands have 0 in status, else ignore with no reply
     {
         CIPSTER_TRACE_INFO( "%s[%d]: header status != 0\n", __func__, aSocket );
-        return -1;
+        return 0;       // Zero keeps the TCP connection open, but omits a reply.
+    }
+
+    if( encap.Options() )  // all commands have 0 in options, else ignore with no reply
+    {
+        CIPSTER_TRACE_INFO( "%s[%d]: header status != 0\n", __func__, aSocket );
+        return 0;       // Zero keeps the TCP connection open, but omits a reply.
     }
 
     // Establish default Encapsulation length field, maybe adjusted at bottom here.
@@ -753,7 +808,9 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
             "%s[%d]: no reply required for encap UnregisterSession\n",
             __func__, aSocket );
 
-        // result = -1;    // no reply
+        // no reply, but since ServerSessionMgr::UnregisterSession() has already
+        // closed the socket, return 0 so caller does not also.
+        result = 0;
         break;
 
     case kEncapCmdSendRRData:
@@ -837,7 +894,7 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
 
 
 int Encapsulation::HandleReceivedExplicitUdpData( int aSocket,
-        const SockAddr* from_address,
+        const SockAddr& aFromAddress,
         BufReader aCommand, BufWriter aReply, bool isUnicast )
 {
     CIPSTER_ASSERT( aReply.capacity() >= ENCAPSULATION_HEADER_LENGTH ); // caller bug
@@ -865,8 +922,12 @@ int Encapsulation::HandleReceivedExplicitUdpData( int aSocket,
         return -1;
     }
 
-    CIPSTER_TRACE_INFO( "%s[%d]: encap.Command():%d payload_size:%d  aReply.capacity:%d\n",
-        __func__, aSocket, encap.Command(), (int) aCommand.size(), (int) aReply.capacity() );
+    CIPSTER_TRACE_INFO( "%s[%d]: encap.Command():'%s' payload_size:%d\n",
+        __func__,
+        aSocket,
+        ShowEncapCmd( encap.Command() ),
+        (int) aCommand.size()
+        );
 
     if( encap.Status() )  // all commands have 0 in status, else ignore
     {
@@ -898,7 +959,7 @@ int Encapsulation::HandleReceivedExplicitUdpData( int aSocket,
             unsigned maxMSecs = encap.TimeoutMS();
             unsigned timeoutMSecs = determineDelayTimeMSecs( maxMSecs );
 
-            result = handleReceivedListIdentityCommandDelayed( aSocket, from_address,
+            result = handleReceivedListIdentityCommandDelayed( aSocket, aFromAddress,
                         timeoutMSecs, aCommand );
         }
         break;
@@ -1014,7 +1075,7 @@ void ManageEncapsulationMessages()
 {
     for( int i = 0; i < DIM( DelayedMsg::messages );  ++i )
     {
-        if( kEipInvalidSocket != DelayedMsg::messages[i].socket )
+        if( kSocketInvalid != DelayedMsg::messages[i].socket )
         {
             DelayedMsg::messages[i].time_out_usecs -= kOpenerTimerTickInMicroSeconds;
 
