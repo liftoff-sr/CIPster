@@ -9,8 +9,11 @@
 #ifdef HAVE_ICONV
 #include <iconv.h>
 
-#define UNICODE     "UTF16LE"
-#define UTF8        "UTF8"
+#define UNICODE     "UTF16LE"   // UTF16LE is UNICODE with fixes to shortsighted-ness.
+
+#define UTF8        "UTF8"      // The best way go deal with all unicode chars in a
+                                // platform independent way using 8 bit multibyte
+                                // characters.
 
 /**
  * Class IConv
@@ -214,32 +217,33 @@ std::string BufReader::get_STRING2()
 
 #ifdef HAVE_ICONV
 
-    if( len * 2 > size() )
-        overrun();
-
     char    buf[WORKZ];
     char*   src_ptr  = (char*) data();
     size_t  src_size = len * 2;
+
+    // Advance this BufReader by full "len*2" now using a function which
+    // also does overrun protection.  Prior to this, we snapshotted the
+    // src_ptr to just past the len field.
+    operator+=( src_size );
 
     while( src_size )
     {
         char*   dst_ptr  = buf;
         size_t  dst_size = sizeof(buf);
-        int     r;
 
         try
         {
-            r = convert.ToUTF8(  &src_ptr, &src_size, &dst_ptr, &dst_size );
+            convert.ToUTF8(  &src_ptr, &src_size, &dst_ptr, &dst_size );
         }
         catch( const std::runtime_error& ex )
         {
             CIPSTER_TRACE_ERR( "%s: ERROR '%s'\n", __func__, ex.what() );
+
+            // std::string ret will be abbreviated, but we consumed full STRING2.
             break;
         }
 
         ret.append( buf, sizeof(buf) - dst_size );
-
-        start += r;
     }
 
 #else
@@ -276,7 +280,7 @@ int ByteSerializer::SerializedCount( int aCtl ) const
 
 // The CMake build target for this is "test_byte_bufs"
 // Do "make help" in the _library's_ build directory to see that.
-// compile only with C++11 or greater:
+// compile only with C++11 or greater?
 // https://en.cppreference.com/w/cpp/language/string_literal
 
 EipByte buf[400];
@@ -285,7 +289,7 @@ EipByte buf[400];
 int main( int argc, char** argv )
 {
     const char16_t  unicode[] = u"This is some sample boring UNICODE text for input.";
-    const char      utf8[]    = u8"ASCII is also UTF8, but reverse is not true";
+    const char      utf8[]    = u8"ASCII is also UTF8, but reverse is not true, some trivia there.";
 
     BufWriter   w( buf, sizeof(buf) );
 
@@ -310,6 +314,6 @@ int main( int argc, char** argv )
 
     s = r2.get_STRING2();
 
-    printf( "round trip utf8[]:'%s'\n", s.c_str() );
+    printf( "round trip UTF8->UNICODE->UTF8:'%s'\n", s.c_str() );
 }
 #endif
