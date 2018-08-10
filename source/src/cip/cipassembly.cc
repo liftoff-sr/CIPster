@@ -131,19 +131,20 @@ public:
         CipClass( kCipAssemblyClass,
             "Assembly",
             MASK7( 1,2,3,4,5,6,7 ), // common class attributes mask
-            2                       // aRevision, according to the CIP spec currently this has to be 2
+            2                       // class revision
             )
     {
     }
 
-    CipError OpenConnection( ConnectionData* aConn, Cpf* cpfd, ConnMgrStatus* extended_error ); // override
+    CipError OpenConnection( ConnectionData* aConnData,
+                Cpf* aCpf, ConnMgrStatus* aExtError ); // override
 };
 
 
-CipError CipAssemblyClass::OpenConnection( ConnectionData* aParams,
-    Cpf* aCpf, ConnMgrStatus* extended_error )
+CipError CipAssemblyClass::OpenConnection( ConnectionData* aConnData,
+    Cpf* aCpf, ConnMgrStatus* aExtError )
 {
-    return CipConnectionClass::OpenIO( aParams, aCpf, extended_error );
+    return CipConnectionClass::OpenIO( aConnData, aCpf, aExtError );
 }
 
 

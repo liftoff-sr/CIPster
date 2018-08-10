@@ -4,6 +4,90 @@
  ******************************************************************************/
 
 #include <byte_bufs.h>
+#include <trace.h>
+
+#ifdef HAVE_ICONV
+#include <iconv.h>
+
+#define UNICODE     "UTF16LE"
+#define UTF8        "UTF8"
+
+/**
+ * Class IConv
+ * is a wrapper to customize the general iconv library to convert to and
+ * from UTF8 to and from little endian UNICODE.
+ *
+ * @author Dick Hollenbeck, SoftPLC Corporation
+ */
+class IConv
+{
+public:
+    IConv()
+    {
+        to_unicode = iconv_open( UNICODE, UTF8 );
+
+        if( to_unicode == iconv_t(-1) )
+            throw std::runtime_error( "error from iconv_open(\"" UNICODE "\", \"" UTF8 "\")" );
+
+        to_utf8 = iconv_open( UTF8, UNICODE );
+
+        if( to_utf8 == iconv_t(-1) )
+            throw std::runtime_error( "error from iconv_open(\"" UTF8 "\", \"" UNICODE "\" )" );
+    }
+
+    ~IConv()
+    {
+        iconv_close( to_unicode );
+        iconv_close( to_utf8 );
+    }
+
+    // return the number of bytes
+    int ToUTF8( char** src_ptr, size_t* src_size, char** dst_ptr, size_t* dst_size )
+    {
+        size_t  dst_startz = *dst_size;
+        size_t  r = ::iconv( to_utf8, src_ptr, src_size, dst_ptr, dst_size );
+
+        if( r == size_t(-1) )
+        {
+            if( errno == E2BIG )
+                r = dst_startz;
+            else
+                throw std::runtime_error( "invalid UNICODE" );
+        }
+
+        return r;
+    }
+
+    int ToUNICODE( char** src_ptr, size_t* src_size, char** dst_ptr, size_t* dst_size )
+    {
+        size_t  dst_startz = *dst_size;
+        size_t  r = ::iconv( to_unicode, src_ptr, src_size, dst_ptr, dst_size );
+
+        if( r == size_t(-1) )
+        {
+            if( errno == E2BIG )
+                r = dst_startz;
+            else
+                throw std::runtime_error( "invalid UTF8" );
+        }
+
+        return r;
+    }
+
+private:
+    iconv_t to_unicode;
+    iconv_t to_utf8;
+};
+
+static IConv convert;
+
+#if defined(TEST_BYTE_BUFS)
+const int WORKZ = 32;           // force multiple iconv() loops when testing.
+#else
+const int WORKZ = 256;
+#endif
+
+#endif
 
 
 void BufWriter::overrun() const
@@ -41,9 +125,37 @@ BufWriter& BufWriter::put_STRING2( const std::string& aString )
 {
     put16( aString.size() );
 
-    // TODO: decode from UTF8 here:
+#if HAVE_ICONV
+
+    char    buf[WORKZ];
+    char*   src_ptr  = (char*) aString.c_str();
+    size_t  src_size = aString.size();
+
+    while( src_size )
+    {
+        char*   dst_ptr  = buf;
+        size_t  dst_size = sizeof(buf);
+
+        try
+        {
+            convert.ToUNICODE(  &src_ptr, &src_size, &dst_ptr, &dst_size );
+        }
+        catch( const std::runtime_error& ex )
+        {
+            CIPSTER_TRACE_ERR( "%s: ERROR '%s'\n", __func__, ex.what() );
+            break;
+        }
+
+        append( (EipByte*) buf, sizeof(buf) - dst_size );
+    }
+
+#else
+
     for( unsigned i = 0; i < aString.size(); ++i )
         put16( (unsigned char) aString[i] );
+
+#endif
+
     return *this;
 }
 
@@ -100,14 +212,41 @@ std::string BufReader::get_STRING2()
     std::string ret;
     unsigned    len = get16();
 
-    /* get16() below will protect instead of this
+#ifdef HAVE_ICONV
+
     if( len * 2 > size() )
         overrun();
-    */
 
-    // todo, this needs to be encoded into UTF8 instead of this MSbyte truncation.
+    char    buf[WORKZ];
+    char*   src_ptr  = (char*) data();
+    size_t  src_size = len * 2;
+
+    while( src_size )
+    {
+        char*   dst_ptr  = buf;
+        size_t  dst_size = sizeof(buf);
+        int     r;
+
+        try
+        {
+            r = convert.ToUTF8(  &src_ptr, &src_size, &dst_ptr, &dst_size );
+        }
+        catch( const std::runtime_error& ex )
+        {
+            CIPSTER_TRACE_ERR( "%s: ERROR '%s'\n", __func__, ex.what() );
+            break;
+        }
+
+        ret.append( buf, sizeof(buf) - dst_size );
+
+        start += r;
+    }
+
+#else
+
     for( unsigned i = 0; i < len; ++i )
         ret += (char) get16();
+#endif
 
     return ret;
 }
@@ -130,4 +269,47 @@ int ByteSerializer::SerializedCount( int aCtl ) const
 
 #if !BYTEBUFS_INLINE
  #include <byte_bufs.impl>
+#endif
+
+
+#if defined(TEST_BYTE_BUFS)
+
+// The CMake build target for this is "test_byte_bufs"
+// Do "make help" in the _library's_ build directory to see that.
+// compile only with C++11 or greater:
+// https://en.cppreference.com/w/cpp/language/string_literal
+
+EipByte buf[400];
+
+
+int main( int argc, char** argv )
+{
+    const char16_t  unicode[] = u"This is some sample boring UNICODE text for input.";
+    const char      utf8[]    = u8"ASCII is also UTF8, but reverse is not true";
+
+    BufWriter   w( buf, sizeof(buf) );
+
+    // make a STRING2 in buf[].  The -2 removes trailing null char16_t.
+    w.put16( (sizeof(unicode)-2)/2 );
+    for( unsigned i=0; i<(sizeof(unicode)-2)/2; ++i )
+        w.put16( unicode[i] );
+
+    // Read back the STRING2 using this BufReader 'r'.
+    BufReader r( buf, w.data() - buf );
+    std::string s = r.get_STRING2();
+    printf( "from UNICODE:'%s'\n", s.c_str() );
+
+    // Save utf8 as UNICODE and read it back:
+    s = utf8;
+
+    BufWriter w2( buf, sizeof buf );
+
+    w2.put_STRING2( s );
+
+    BufReader r2( buf, w2.data() - buf );
+
+    s = r2.get_STRING2();
+
+    printf( "round trip utf8[]:'%s'\n", s.c_str() );
+}
 #endif

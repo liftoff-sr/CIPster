@@ -36,7 +36,7 @@ public:
      * AddExpection() registered expectations.  If a match is found, then
      * this expectation matching connnection is returned.
      */
-    static CipConn* GetConnection( ConnectionData* aConn, ConnMgrStatus* extended_error );
+    static CipConn* GetConnection( ConnectionData* aConnData, ConnMgrStatus* aExtError );
 
     /**
      * Function AddExpectation
@@ -107,7 +107,7 @@ public:
         return false;
     }
 
-    static CipConn* GetConnection( ConnectionData* aConn, ConnMgrStatus* extended_error );
+    static CipConn* GetConnection( ConnectionData* aConnData, ConnMgrStatus* aExtError );
 
     static void Clear()     { s_input_only.clear(); }
 
@@ -166,7 +166,7 @@ public:
 
     static void Clear()     { s_listen_only.clear(); }
 
-    static CipConn* GetConnection( ConnectionData* aConn, ConnMgrStatus* extended_error );
+    static CipConn* GetConnection( ConnectionData* aConnData, ConnMgrStatus* aExtError );
 
     typedef std::vector<ListenOnlyConnSet>::iterator  iterator;
 
@@ -186,20 +186,23 @@ std::vector<InputOnlyConnSet>       InputOnlyConnSet::s_input_only;
 std::vector<ListenOnlyConnSet>      ListenOnlyConnSet::s_listen_only;
 
 
-CipConn* ExclusiveOwner::GetConnection( ConnectionData* aConn, ConnMgrStatus* extended_error )
+CipConn* ExclusiveOwner::GetConnection( ConnectionData* aConnData, ConnMgrStatus* aExtError )
 {
     for( ExclusiveOwner::iterator it = s_exclusive_owner.begin();  it != s_exclusive_owner.end();  ++it )
     {
-        if( it->output_assembly == aConn->conn_path.consuming_path.GetInstanceOrConnPt()
-         && it->input_assembly  == aConn->conn_path.producing_path.GetInstanceOrConnPt()
-         && ( it->config_assembly == aConn->conn_path.config_path.GetInstanceOrConnPt() ||
-            ( it->config_assembly == -1 && !aConn->conn_path.config_path.HasAny() ) )
+        if( it->output_assembly == aConnData->conn_path.consuming_path.GetInstanceOrConnPt()
+         && it->input_assembly  == aConnData->conn_path.producing_path.GetInstanceOrConnPt()
+         && ( it->config_assembly == aConnData->conn_path.config_path.GetInstanceOrConnPt() ||
+            ( it->config_assembly == -1 && !aConnData->conn_path.config_path.HasAny() ) )
           )
         {
             // check if another connection point with the same output assembly is currently connected
-            if( GetConnectedOutputAssembly( aConn->conn_path.consuming_path.GetInstanceOrConnPt() ) )
+            if( GetConnectedOutputAssembly( aConnData->conn_path.consuming_path.GetInstanceOrConnPt() ) )
             {
-                *extended_error = kConnMgrStatusErrorOwnershipConflict;
+                CIPSTER_TRACE_INFO( "%s:ERROR. Matching consuming assembly id:%d\n",
+                    __func__, aConnData->conn_path.consuming_path.GetInstanceOrConnPt() );
+
+                *aExtError = kConnMgrStatusErrorOwnershipConflict;
                 break;
             }
 
@@ -211,22 +214,22 @@ CipConn* ExclusiveOwner::GetConnection( ConnectionData* aConn, ConnMgrStatus* ex
 }
 
 
-CipConn* InputOnlyConnSet::GetConnection( ConnectionData* aConn, ConnMgrStatus* extended_error )
+CipConn* InputOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrStatus* aExtError )
 {
     for( InputOnlyConnSet::iterator it = s_input_only.begin();  it != s_input_only.end();  ++it )
     {
         // we have the same output assembly?
-        if( it->output_assembly == aConn->conn_path.consuming_path.GetInstanceOrConnPt() )
+        if( it->output_assembly == aConnData->conn_path.consuming_path.GetInstanceOrConnPt() )
         {
-            if( it->input_assembly != aConn->conn_path.producing_path.GetInstanceOrConnPt() )
+            if( it->input_assembly != aConnData->conn_path.producing_path.GetInstanceOrConnPt() )
             {
-                *extended_error = kConnMgrStatusInvalidProducingApplicationPath;
+                *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
                 break;
             }
 
-            if( it->config_assembly != aConn->conn_path.config_path.GetInstanceOrConnPt() )
+            if( it->config_assembly != aConnData->conn_path.config_path.GetInstanceOrConnPt() )
             {
-                *extended_error = kConnMgrStatusInconsistentApplicationPathCombo;
+                *aExtError = kConnMgrStatusInconsistentApplicationPathCombo;
                 break;
             }
 
@@ -235,7 +238,7 @@ CipConn* InputOnlyConnSet::GetConnection( ConnectionData* aConn, ConnMgrStatus* 
             if( in )
                 return in;
 
-            *extended_error = kConnMgrStatusTargetObjectOutOfConnections;
+            *aExtError = kConnMgrStatusTargetObjectOutOfConnections;
             break;
         }
     }
@@ -244,12 +247,12 @@ CipConn* InputOnlyConnSet::GetConnection( ConnectionData* aConn, ConnMgrStatus* 
 }
 
 
-CipConn* ListenOnlyConnSet::GetConnection( ConnectionData* aConn, ConnMgrStatus* extended_error )
+CipConn* ListenOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrStatus* aExtError )
 {
-    if( aConn->t_to_o_ncp.ConnectionType() != kIOConnTypeMulticast )
+    if( aConnData->t_to_o_ncp.ConnectionType() != kIOConnTypeMulticast )
     {
         // a listen only connection has to be a multicast connection.
-        *extended_error = kConnMgrStatusNonListenOnlyConnectionNotOpened;
+        *aExtError = kConnMgrStatusNonListenOnlyConnectionNotOpened;
 
         return NULL;
     }
@@ -257,23 +260,23 @@ CipConn* ListenOnlyConnSet::GetConnection( ConnectionData* aConn, ConnMgrStatus*
     for( ListenOnlyConnSet::iterator it = s_listen_only.begin();  it != s_listen_only.end(); ++it )
     {
                 // we have the same output assembly?
-        if( it->output_assembly == aConn->conn_path.consuming_path.GetInstanceOrConnPt() )
+        if( it->output_assembly == aConnData->conn_path.consuming_path.GetInstanceOrConnPt() )
         {
-            if( it->input_assembly != aConn->conn_path.producing_path.GetInstanceOrConnPt() )
+            if( it->input_assembly != aConnData->conn_path.producing_path.GetInstanceOrConnPt() )
             {
-                *extended_error = kConnMgrStatusInvalidProducingApplicationPath;
+                *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
                 break;
             }
 
-            if( it->config_assembly != aConn->conn_path.config_path.GetInstanceOrConnPt() )
+            if( it->config_assembly != aConnData->conn_path.config_path.GetInstanceOrConnPt() )
             {
-                *extended_error = kConnMgrStatusInconsistentApplicationPathCombo;
+                *aExtError = kConnMgrStatusInconsistentApplicationPathCombo;
                 break;
             }
 
-            if( NULL == GetExistingProducerMulticastConnection( aConn->conn_path.producing_path.GetInstanceOrConnPt() ) )
+            if( NULL == GetExistingProducerMulticastConnection( aConnData->conn_path.producing_path.GetInstanceOrConnPt() ) )
             {
-                *extended_error = kConnMgrStatusNonListenOnlyConnectionNotOpened;
+                *aExtError = kConnMgrStatusNonListenOnlyConnectionNotOpened;
                 break;
             }
 
@@ -282,7 +285,7 @@ CipConn* ListenOnlyConnSet::GetConnection( ConnectionData* aConn, ConnMgrStatus*
             if( listener )
                 return listener;
 
-            *extended_error = kConnMgrStatusTargetObjectOutOfConnections;
+            *aExtError = kConnMgrStatusTargetObjectOutOfConnections;
             break;
         }
     }
@@ -318,35 +321,34 @@ bool ConfigureListenOnlyConnectionPoint(
 }
 
 
-CipConn* GetIoConnectionForConnectionData( ConnectionData* aConn,  ConnMgrStatus* extended_error )
+CipConn* GetIoConnectionForConnectionData( ConnectionData* aConnData, ConnMgrStatus* aExtError )
 {
     ConnInstanceType    conn_type;
 
-    *extended_error = kConnMgrStatusSuccess;
+    *aExtError = kConnMgrStatusSuccess;
 
-    CipConn* io_connection = ExclusiveOwner::GetConnection( aConn, extended_error );
+    CipConn* io_connection = ExclusiveOwner::GetConnection( aConnData, aExtError );
 
     if( !io_connection )
     {
-        if( kConnMgrStatusSuccess == *extended_error )
+        if( kConnMgrStatusSuccess == *aExtError )
         {
             // we found no connection and don't have an error so try input only next
-            io_connection = InputOnlyConnSet::GetConnection( aConn, extended_error );
+            io_connection = InputOnlyConnSet::GetConnection( aConnData, aExtError );
 
             if( !io_connection )
             {
-                if( kConnMgrStatusSuccess == *extended_error )
+                if( kConnMgrStatusSuccess == *aExtError )
                 {
                     // we found no connection and don't have an error so try listen only next
-                    io_connection = ListenOnlyConnSet::GetConnection( aConn, extended_error );
+                    io_connection = ListenOnlyConnSet::GetConnection( aConnData, aExtError );
 
                     if( !io_connection )
                     {
-                        if( kConnMgrStatusSuccess == *extended_error )
+                        if( kConnMgrStatusSuccess == *aExtError )
                         {
                             // no application connection type was found that suits the given data
-                            // TODO check error code VS
-                            *extended_error = kConnMgrStatusInconsistentApplicationPathCombo;
+                            *aExtError = kConnMgrStatusInconsistentApplicationPathCombo;
                         }
                     }
                     else
@@ -368,9 +370,6 @@ CipConn* GetIoConnectionForConnectionData( ConnectionData* aConn,  ConnMgrStatus
 
     if( io_connection )
     {
-        // was CopyConnectionData( io_connection, aConn );
-        *io_connection = *aConn;
-
         io_connection->SetInstanceType( conn_type );
     }
 

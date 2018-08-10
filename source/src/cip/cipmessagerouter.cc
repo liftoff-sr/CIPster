@@ -194,45 +194,30 @@ static CipConn* getFreeExplicitConnection()
 }
 
 
-CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConn,
-            Cpf* aCpf, ConnMgrStatus* extended_error )
+CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConnData,
+            Cpf* aCpf, ConnMgrStatus* aExtError )
 {
     CipError ret = kCipErrorSuccess;
+    CipConn* new_explicit = getFreeExplicitConnection();
 
-    // TODO add check for transport type trigger
-    // if (0x03 == (g_stDummyCipConn.TransportTypeClassTrigger & 0x03))
-
-    CipConn* ex_conn = getFreeExplicitConnection();
-
-    if( !ex_conn )
+    if( !new_explicit )
     {
         ret = kCipErrorConnectionFailure;
-
-        *extended_error = kConnMgrStatusErrorNoMoreConnectionsAvailable;
+        *aExtError = kConnMgrStatusErrorNoMoreConnectionsAvailable;
     }
 
     else
     {
-        // was CopyConnectionData( ex_conn, aConn );
-        *ex_conn = *aConn;
+        new_explicit->GeneralConnectionConfiguration( aConnData, kConnInstanceTypeExplicit );
 
-        EipUint32 saved = ex_conn->producing_connection_id;
+        // Save TCP client's IP address in order to qualify a future forward_close.
+        CIPSTER_ASSERT( aCpf->ClientAddr() );
+        new_explicit->openers_address = *aCpf->ClientAddr();
 
-        ex_conn->GeneralConnectionConfiguration();
+        // Save TCP connection session_handle for TCP inactivity timeouts.
+        new_explicit->SetSessionHandle( aCpf->SessionHandle() );
 
-        ex_conn->producing_connection_id = saved;
-
-        ex_conn->SetInstanceType( kConnInstanceTypeExplicit );
-
-#if 1
-        CIPSTER_ASSERT( ex_conn->ConsumingSocket() == kSocketInvalid );
-        CIPSTER_ASSERT( ex_conn->ProducingSocket() == kSocketInvalid );
-#else
-        ex_conn->SetConsumingSocket( kSocketInvalid );
-        ex_conn->SetProducingSocket( kSocketInvalid );
-#endif
-
-        g_active_conns.Insert( ex_conn );
+        g_active_conns.Insert( new_explicit );
     }
 
     return ret;

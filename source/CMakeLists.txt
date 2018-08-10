@@ -12,6 +12,7 @@ cmake_minimum_required( VERSION 2.8.3 )
 
 project( CIPster )
 
+cmake_policy(SET CMP0056 OLD)
 
 set( CIPster_VERSION_MAJOR 1 )
 set( CIPster_VERSION_MINOR 0 )
@@ -27,16 +28,14 @@ endif()
 
 include_directories( ${USER_INCLUDE_DIR} )
 
-set( CIPster_BUILDSUPPORT_DIR ${PROJECT_SOURCE_DIR}/buildsupport )
+set( CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/buildsupport )
 
-include( ${CIPster_BUILDSUPPORT_DIR}/CIPster.cmake )
+include( ${CMAKE_MODULE_PATH}/CIPster.cmake )
+
+include( ${CMAKE_MODULE_PATH}/CIPster_function_checks.cmake )
 
 
-include( ${CIPster_BUILDSUPPORT_DIR}/CIPster_function_checks.cmake )
-
-#================================================
-# Doxygen Output
-#================================================
+# Doxygen Output #=====================================
 
 find_package( Doxygen )
 if( DOXYGEN_FOUND )
@@ -48,9 +47,20 @@ if( DOXYGEN_FOUND )
         COMMENT "building doxygen docs into directory doc/doxygen/html"
         )
 else()
-    message( STATUS "WARNING: Doxygen not found - doxygen-docs (Source Docs) target not created" )
+    message( STATUS "WARNING - Doxygen not found - doxygen-docs (Source Docs) target not created" )
 endif()
 
+find_package( Iconv )
+if( Iconv_FOUND )
+    if( NOT Iconv_IS_BUILT_IN )
+        include_directories( ${Iconv_INCLUDE_DIR} )
+    endif()
+    # TODO put into a config.h generator
+    add_definitions( -DHAVE_ICONV=1 )
+else()
+    message( STATUS "WARNING - libiconv not found.  BufReader::get_STRING2()
+        and BufWriter::put_STRING2() will not be full featured" )
+endif()
 
 set( CIPster_TRACES OFF CACHE BOOL "Activate CIPster traces" )
 if(CIPster_TRACES)
@@ -63,7 +73,7 @@ if( CIPster_TESTS )
     enable_testing()
     enable_language( CXX )
     set( CPPUTEST_HOME "" CACHE PATH "Path to CppUTest directory" )
-    include( ${CIPster_BUILDSUPPORT_DIR}/CIPster_Tests.cmake )
+    include( ${CMAKE_MODULE_PATH}/CIPster_Tests.cmake )
     add_subdirectory( tests )
 endif()
 
@@ -86,15 +96,13 @@ if( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
 endif()
 
 
-####################################################
-# Internal cache holding the available CIP objects #
-####################################################
+# Internal cache holding the available CIP objects ##############
 set( CIPster_ADD_CIP_OBJECTS "" CACHE INTERNAL STRING )
 
-#######################################
-# Add custom CIP objects              #
-#######################################
+
+# Add custom CIP objects  #######################################
 set( CIPster_CIP_OBJECTS_DIR ${PROJECT_SOURCE_DIR}/src/cip_objects )
-include( ${CIPster_BUILDSUPPORT_DIR}/CIPster_CIP_Object_generator.cmake )
+include( ${CMAKE_MODULE_PATH}/CIPster_CIP_Object_generator.cmake )
+
 
 add_subdirectory( src )

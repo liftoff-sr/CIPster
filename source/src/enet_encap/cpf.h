@@ -125,11 +125,11 @@ public:
 
     /**
      * Constructor
-     * that takes @a aClient IP address and port.  This information is simply
+     * that takes @a aSessionHandle.  This information is simply
      * saved in this instance for use by stack functions which need to know
      * from which TCP peer that this request originated from.
      */
-    Cpf( const SockAddr* aClient = NULL );
+    Cpf( CipUdint aSessionHandle = 0 );
 
     Cpf( CpfId aAddrType, CpfId aDataType, Serializeable* aPayload = NULL );
 
@@ -333,16 +333,10 @@ public:
         return *this;
     }
 
-    const SockAddr* ClientAddr() const   { return client_addr; }
+    const SockAddr* ClientAddr() const;
 
-    Cpf& SetClientAddr( const SockAddr* aClient )
-    {
-        client_addr = aClient;
-        return *this;
-    }
+    CipUdint  SessionHandle() const     { return session_handle; }
 
-    /// Has SetClientAddr() been called?
-    bool HasClient() const { return client_addr && client_addr->Family(); }
 
 protected:
 
@@ -357,7 +351,7 @@ protected:
 
     Serializeable*      payload;
 
-    const SockAddr*     client_addr;
+    CipUdint            session_handle;
 
 private:
     //Cpf( const Cpf& );  // not implemented

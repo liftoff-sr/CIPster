@@ -16,9 +16,9 @@
 #include "trace.h"
 
 
-Cpf::Cpf( const SockAddr* aClient ) :
+Cpf::Cpf( CipUdint aSessionHandle ) :
     payload( 0 ),
-    client_addr( aClient )
+    session_handle( aSessionHandle )
 {
     Clear();
 }
@@ -28,7 +28,7 @@ Cpf::Cpf( CpfId aAddrType, CpfId aDataType, Serializeable* aPayload ) :
     address_item( aAddrType, aDataType ),
     data_item( aDataType ),
     payload( aPayload ),
-    client_addr( 0 )
+    session_handle( 0 )
 {
     ClearRx_O_T();
     ClearRx_T_O();
@@ -41,12 +41,22 @@ Cpf::Cpf( const AddressItem& aAddr, CpfId aDataType ) :
     address_item( aAddr ),
     data_item( aDataType ),
     payload( 0 ),
-    client_addr( 0 )
+    session_handle( 0 )
 {
     ClearRx_O_T();
     ClearRx_T_O();
     ClearTx_O_T();
     ClearTx_T_O();
+}
+
+
+const SockAddr* Cpf::ClientAddr() const
+{
+    if( const EncapSession* s = ServerSessionMgr::GetSession( session_handle ) )
+    {
+        return &s->m_peeraddr;
+    }
+    return NULL;
 }
 
 
@@ -157,7 +167,7 @@ int Cpf::NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply
                 if( s == kEipStatusError )
                     return -kEncapErrorIncorrectData;
 
-                address_item.connection_identifier = conn->producing_connection_id;
+                address_item.connection_identifier = conn->ProducingConnectionId();
             }
 
             SetPayload( &response );

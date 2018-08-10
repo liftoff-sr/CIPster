@@ -96,7 +96,7 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
             {
                 CIPSTER_TRACE_INFO( "%s: CID:0x%08x  cpf.seq=0x%08x  encap.seq=0x%08x\n",
                     __func__,
-                    conn->consuming_connection_id,
+                    conn->ConsumingConnectionId(),
                     cpfd.AddrEncapSeqNum(),
                     conn->eip_level_sequence_count_consuming
                     );
@@ -168,7 +168,7 @@ EipStatus CipConnMgrClass::ManageConnections()
             // maybe check inactivity watchdog timer.
             if( active->HasInactivityWatchDogTimer() )
             {
-                active->AddToInactivityWatchDogTimerUSecs( -kOpenerTimerTickInMicroSeconds );
+                active->AddToInactivityWatchDogTimerUSecs( -kCIPsterTimerTickInMicroSeconds );
 
                 if( active->InactivityWatchDogTimerUSecs() <= 0 )
                 {
@@ -180,7 +180,7 @@ EipStatus CipConnMgrClass::ManageConnections()
                             "%s: >>> Connection class:%d timeOut on session with handle:%d\n",
                             __func__,
                             active->trigger.Class(),
-                            active->encap_session
+                            active->SessionHandle()
                             );
                     }
                     else
@@ -216,11 +216,11 @@ EipStatus CipConnMgrClass::ManageConnections()
                         // non cyclic connections have to decrement production inhibit timer
                         if( active->production_inhibit_timer_usecs >= 0 )
                         {
-                            active->production_inhibit_timer_usecs -= kOpenerTimerTickInMicroSeconds;
+                            active->production_inhibit_timer_usecs -= kCIPsterTimerTickInMicroSeconds;
                         }
                     }
 
-                    active->AddToTransmissionTriggerTimerUSecs( -kOpenerTimerTickInMicroSeconds );
+                    active->AddToTransmissionTriggerTimerUSecs( -kCIPsterTimerTickInMicroSeconds );
 
                     if( active->TransmissionTriggerTimerUSecs() <= 0 ) // need to send package
                     {
@@ -252,16 +252,16 @@ EipStatus CipConnMgrClass::ManageConnections()
 
 void CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( CipConn *aConn )
 {
-    bool another_active_with_same_session_found = false;
+    CipUdint session_handle = aConn->SessionHandle();
 
-    CipUdint session_handle = aConn->encap_session;
+    bool another_active_with_same_session_found = false;
 
     for( CipConnBox::iterator it = g_active_conns.begin();
             it != g_active_conns.end();  ++it )
     {
         if( (CipConn*) it != aConn
          && it->State() == kConnStateEstablished
-         && aConn->encap_session == session_handle )
+         && aConn->SessionHandle() == session_handle )
         {
             another_active_with_same_session_found = true;
             break;
@@ -282,7 +282,7 @@ void CipConnMgrClass::CloseClass3Connections( CipUdint aSessionId )
     while( it != g_active_conns.end() )
     {
         if( it->trigger.Class() == kConnTransportClass3 &&
-            it->encap_session   == aSessionId )
+            it->SessionHandle() == aSessionId )
         {
             CIPSTER_TRACE_INFO( "%s: closing class 3 on session:%d\n",
                 __func__, aSessionId );
@@ -300,96 +300,6 @@ void CipConnMgrClass::CloseClass3Connections( CipUdint aSessionId )
 }
 
 
-void CipConnMgrClass::assembleForwardOpenResponse( ConnectionData* aParams,
-        CipMessageRouterResponse* response, CipError general_status,
-        ConnMgrStatus extended_status )
-{
-    //Cpf cpfd( kCpfIdNullAddress, kCpfIdUnconnectedDataItem );
-
-    BufWriter out = response->Writer();
-
-    response->SetGenStatus( general_status );
-
-    CIPSTER_ASSERT( response->AdditionalStsCount() == 0 );
-
-    if( general_status == kCipErrorSuccess )
-    {
-        CIPSTER_TRACE_INFO( "%s: sending success response\n", __func__ );
-
-        out.put32( aParams->consuming_connection_id );
-        out.put32( aParams->producing_connection_id );
-    }
-    else
-    {
-        CIPSTER_TRACE_INFO(
-            "%s: sending error response, general_status:0x%x extended_status:0x%x\n",
-            __func__,
-            general_status,
-            extended_status
-            );
-
-        switch( general_status )
-        {
-        case kCipErrorNotEnoughData:
-        case kCipErrorTooMuchData:
-            break;
-
-        default:
-            switch( extended_status )
-            {
-            case kConnMgrStatusErrorInvalidOToTConnectionSize:
-                response->AddAdditionalSts( extended_status );
-                response->AddAdditionalSts( aParams->corrected_o_to_t_size );
-                break;
-
-            case kConnMgrStatusErrorInvalidTToOConnectionSize:
-                response->AddAdditionalSts( extended_status );
-                response->AddAdditionalSts( aParams->corrected_t_to_o_size );
-                break;
-
-            default:
-                response->AddAdditionalSts( extended_status );
-                break;
-            }
-            break;
-        }
-    }
-
-    out.put16( aParams->connection_serial_number );
-    out.put16( aParams->originator_vendor_id );
-    out.put32( aParams->originator_serial_number );
-
-    if( general_status == kCipErrorSuccess )
-    {
-        // Set the APIs (actual packet intervals) to caller's unadjusted rates.
-        // Vol1 3-5.4.1.2 & Vol1 3-5.4.3 are not clear enough here.
-        out.put32( aParams->o_to_t_RPI_usecs );
-        out.put32( aParams->t_to_o_RPI_usecs );
-
-        out.put8( 0 );   // Application Reply Size
-    }
-    else
-    {
-        // Vol1 Table 3-5.20 Unsuccessful Forward_Open Response
-
-        // Remaining Path Size: "The number of words in the
-        // Connection_Path parameter of the request as received
-        // by the router that detects the error."
-
-        // In the failure response, the remaining remaining_path_size shall be
-        // the “pre-stripped” size. This shall be the size of the path when the
-        // node first receives the request and has not yet started processing
-        // it. A target node may return either the “pre-stripped” size or 0 for
-        // the remaining remaining_path_size.
-
-        out.put8( 0 );
-    }
-
-    out.put8( 0 );   // reserved
-    response->SetWrittenSize( out.data() - response->Writer().data() );
-}
-
-
 CipConn* GetConnectionByConsumingId( int aConnectionId )
 {
     CipConnBox::iterator c = g_active_conns.begin();
@@ -398,7 +308,7 @@ CipConn* GetConnectionByConsumingId( int aConnectionId )
     {
         if( c->State() == kConnStateEstablished )
         {
-            if( c->consuming_connection_id == aConnectionId )
+            if( c->ConsumingConnectionId() == aConnectionId )
             {
                 return c;
             }
@@ -432,7 +342,7 @@ void CipConnBox::Insert( CipConn* aConn )
 {
     if( aConn->trigger.Class() == kConnTransportClass1 )
     {
-        //CIPSTER_TRACE_INFO( "%s: conn->consuming_connection_id:%d\n", __func__, aConn->consuming_connection_id );
+        //CIPSTER_TRACE_INFO( "%s: consuming_connection_id:%d\n", __func__, aConn->ConsumingConnectionId() );
     }
 
     aConn->prev = NULL;
@@ -453,7 +363,7 @@ void CipConnBox::Remove( CipConn* aConn )
 {
     if( aConn->trigger.Class() == kConnTransportClass1 )
     {
-        //CIPSTER_TRACE_INFO( "%s: consuming_connection_id:%d\n", __func__, consuming_connection_id );
+        //CIPSTER_TRACE_INFO( "%s: consuming_connection_id:%d\n", __func__, aConn->ConsumingConnectionId() );
     }
 
     if( aConn->prev )
@@ -534,17 +444,21 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response, bool isLarge )
 {
-    ConnMgrStatus connection_status = kConnMgrStatusSuccess;
-
-    BufReader in = request->Data();
-
     (void) instance;        // suppress compiler warning
 
-    ConnectionData    params;
+    // general and extended status.
+    CipError        gen_status  = kCipErrorConnectionFailure;
+    ConnMgrStatus   ext_status  = kConnMgrStatusSuccess;
+
+    unsigned        conn_path_byte_count;
+    ConnectionData  params;
+
+    BufReader  in = request->Data();
 
     try
     {
-        in += params.DeserializeConnectionData( in, isLarge );
+        in += params.DeserializeForwardOpen( in, isLarge );
+        conn_path_byte_count = in.get8() * 2;
     }
     catch( const std::range_error& e )
     {
@@ -560,38 +474,18 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     // first check if we have already a connection with the given params
     if( FindExistingMatchingConnection( params ) )
     {
-        // TODO this test is incorrect, see CIP spec 3-5.5.2 re: duplicate forward open
-        // it should probably be testing the connection type fields
-        // TODO think on how a reconfiguration request could be handled correctly.
-        if( !params.consuming_connection_id && !params.producing_connection_id )
-        {
-            // TODO implement reconfiguration of connection
-
-            CIPSTER_TRACE_ERR(
-                    "this looks like a duplicate forward open -- I can't handle this yet,\n"
-                    "sending a CIP_CON_MGR_ERROR_CONNECTION_IN_USE response\n" );
-        }
-
-        assembleForwardOpenResponse(
-                &params, response,
-                kCipErrorConnectionFailure,
-                kConnMgrStatusErrorConnectionInUse );
-
-        return kEipStatusOkSend;
+        ext_status = kConnMgrStatusErrorConnectionInUse;
+        goto forward_open_response;
     }
 
     if( params.connection_timeout_multiplier_value > 7 )
     {
-        // 3-5.4.1.4
+        // Vol1 3-5.4.1.4
        CIPSTER_TRACE_INFO( "%s: invalid connection timeout multiplier: %u\n",
            __func__, params.connection_timeout_multiplier_value );
 
-        assembleForwardOpenResponse(
-                &params, response,
-                kCipErrorConnectionFailure,
-                kConnMgrStatusErrorInvalidOToTConnectionType );
-
-        return kEipStatusOkSend;
+       ext_status = kConnMgrStatusErrorInvalidOToTConnectionType;
+       goto forward_open_response;
     }
 
     CIPSTER_TRACE_INFO(
@@ -599,32 +493,24 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         params.connection_serial_number,
         params.originator_vendor_id,
         params.originator_serial_number,
-        params.consuming_connection_id,
-        params.producing_connection_id
+        params.ConsumingConnectionId(),
+        params.ProducingConnectionId()
         );
 
     if( params.o_to_t_ncp.ConnectionType() == kIOConnTypeInvalid )
     {
         CIPSTER_TRACE_INFO( "%s: invalid O to T connection type\n", __func__ );
 
-        assembleForwardOpenResponse(
-                &params, response,
-                kCipErrorConnectionFailure,
-                kConnMgrStatusErrorInvalidOToTConnectionType );
-
-        return kEipStatusOkSend;
+        ext_status = kConnMgrStatusErrorInvalidOToTConnectionType;
+        goto forward_open_response;
     }
 
     if( params.t_to_o_ncp.ConnectionType() == kIOConnTypeInvalid )
     {
         CIPSTER_TRACE_INFO( "%s: invalid T to O connection type\n", __func__ );
 
-        assembleForwardOpenResponse(
-                &params, response,
-                kCipErrorConnectionFailure,
-                kConnMgrStatusErrorInvalidTToOConnectionType );
-
-        return kEipStatusOkSend;
+        ext_status = kConnMgrStatusErrorInvalidTToOConnectionType;
+        goto forward_open_response;
     }
 
     // check for undocumented trigger bits
@@ -633,38 +519,31 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         CIPSTER_TRACE_INFO( "%s: trigger 0x%02x not supported\n",
             __func__, params.trigger.Bits() );
 
-        assembleForwardOpenResponse(
-                &params, response,
-                kCipErrorConnectionFailure,
-                kConnMgrStatusErrorTransportTriggerNotSupported );
-
-        return kEipStatusOkSend;
+        ext_status = kConnMgrStatusErrorTransportTriggerNotSupported;
+        goto forward_open_response;
     }
-
-    unsigned conn_path_byte_count = in.get8() * 2;
 
     if( conn_path_byte_count < in.size() )
     {
-        assembleForwardOpenResponse( &params, response, kCipErrorTooMuchData, connection_status );
-        return kEipStatusOkSend;
+        gen_status = kCipErrorTooMuchData;
+        goto forward_open_response;
     }
 
     if( conn_path_byte_count > in.size() )
     {
-        assembleForwardOpenResponse( &params, response, kCipErrorNotEnoughData, connection_status );
-        return kEipStatusOkSend;
+        gen_status = kCipErrorNotEnoughData;
+        goto forward_open_response;
     }
 
     // At this point "in" has the exact correct size() for the connection path in bytes.
 
-    CipError result = params.DeserializeConnectionPath( in, &connection_status );
-
-    if( result != kCipErrorSuccess )
+    gen_status = params.DeserializeConnectionPath( in, &ext_status );
+    if( gen_status != kCipErrorSuccess )
     {
+
         CIPSTER_TRACE_INFO( "%s: unable to parse connection path\n", __func__ );
 
-        assembleForwardOpenResponse( &params, response, result, connection_status );
-        return kEipStatusOkSend;
+        goto forward_open_response;
     }
 
     CIPSTER_TRACE_INFO( "%s: trigger_class:%d\n", __func__, params.trigger.Class() );
@@ -679,27 +558,103 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     CIPSTER_TRACE_INFO( "%s: t_to_o priority:%d\n", __func__, params.t_to_o_ncp.Priority() );
     CIPSTER_TRACE_INFO( "%s: t_to_o type:%s\n", __func__, params.t_to_o_ncp.ShowConnectionType() );
 
-    CipClass* clazz = GetCipClass( params.mgmnt_class );
+    CipClass* clazz;
+    clazz = GetCipClass( params.mgmnt_class );
 
-    result = clazz->OpenConnection( &params, response->CPF(), &connection_status );
+    gen_status = clazz->OpenConnection( &params, response->CPF(), &ext_status );
 
-    if( result != kCipErrorSuccess )
+    if( gen_status != kCipErrorSuccess )
     {
-        CIPSTER_TRACE_INFO( "%s: OpenConnection() failed. status:0x%x\n", __func__, connection_status );
+        CIPSTER_TRACE_INFO( "%s: OpenConnection() failed. ext_status:0x%x\n",
+            __func__, ext_status );
 
-        // in case of error the dummy contains all necessary information
-        assembleForwardOpenResponse( &params, response, result, connection_status );
-        return kEipStatusOkSend;
+        goto forward_open_response;
+    }
+
+    CIPSTER_TRACE_INFO( "%s: OpenConnection() succeeded\n", __func__ );
+
+forward_open_response:
+
+    BufWriter out = response->Writer();
+
+    if( gen_status == kCipErrorSuccess )
+    {
+        CIPSTER_TRACE_INFO( "%s: sending success response\n", __func__ );
+
+        out.put32( params.ConsumingConnectionId() );
+        out.put32( params.ProducingConnectionId() );
     }
     else
     {
-        CIPSTER_TRACE_INFO( "%s: OpenConnection() succeeded\n", __func__ );
+        CIPSTER_TRACE_INFO(
+            "%s: sending error response, gen_status:0x%x ext_status:0x%x\n",
+            __func__,
+            gen_status,
+            ext_status
+            );
 
-        // in case of success, g_active_conns holds to the new connection at begin()
-        assembleForwardOpenResponse( g_active_conns.begin(),
-                response, kCipErrorSuccess, kConnMgrStatusSuccess );
-        return kEipStatusOkSend;
+        response->SetGenStatus( gen_status );
+
+        switch( gen_status )
+        {
+        case kCipErrorNotEnoughData:
+        case kCipErrorTooMuchData:
+            break;
+
+        default:
+            switch( ext_status )
+            {
+            case kConnMgrStatusErrorInvalidOToTConnectionSize:
+                response->AddAdditionalSts( ext_status );
+                response->AddAdditionalSts( params.corrected_o_to_t_size );
+                break;
+
+            case kConnMgrStatusErrorInvalidTToOConnectionSize:
+                response->AddAdditionalSts( ext_status );
+                response->AddAdditionalSts( params.corrected_t_to_o_size );
+                break;
+
+            default:
+                response->AddAdditionalSts( ext_status );
+                break;
+            }
+            break;
+        }
     }
+
+    out.put16( params.connection_serial_number );
+    out.put16( params.originator_vendor_id );
+    out.put32( params.originator_serial_number );
+
+    if( gen_status == kCipErrorSuccess )
+    {
+        // Set the APIs (actual packet intervals) to caller's unadjusted rates.
+        // Vol1 3-5.4.1.2 & Vol1 3-5.4.3 are not clear enough here.
+        out.put32( params.o_to_t_RPI_usecs );
+        out.put32( params.t_to_o_RPI_usecs );
+
+        out.put8( 0 );   // Application Reply Size
+    }
+    else
+    {
+        // Vol1 Table 3-5.20 Unsuccessful Forward_Open Response
+
+        // Remaining Path Size: "The number of words in the
+        // Connection_Path parameter of the request as received
+        // by the router that detects the error."
+
+        // In the failure response, the remaining remaining_path_size shall be
+        // the “pre-stripped” size. This shall be the size of the path when the
+        // node first receives the request and has not yet started processing
+        // it. A target node may return either the “pre-stripped” size or 0 for
+        // the remaining remaining_path_size.
+
+        out.put8( 0 );
+    }
+
+    out.put8( 0 );   // reserved
+    response->SetWrittenSize( out.data() - response->Writer().data() );
+    return kEipStatusOkSend;
 }
 
 
@@ -724,58 +679,99 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
     // Suppress compiler warning
     (void) instance;
 
-    // check connection_serial_number && originator_vendor_id && originator_serial_number if connection is established
-    ConnMgrStatus connection_status =
-        kConnMgrStatusErrorConnectionNotFoundAtTargetApplication;
+    // general and extended status.
+    CipError        gen_status  = kCipErrorConnectionFailure;
+    ConnMgrStatus   ext_status  = kConnMgrStatusSuccess;
 
-    BufReader in = request->Data();
+    unsigned        conn_path_byte_count;
+    ConnectionData  params;
 
-    in += 2;        // ignore Priority/Time_tick and Time-out_ticks
+    BufReader  in = request->Data();
 
-    //-----<ConnectionTriad>----------------------------------------------------
-    CipUint     connection_serial_number = in.get16();
-    CipUint     originator_vendor_id     = in.get16();
-    CipUdint    originator_serial_number = in.get32();
-    //-----</ConnectionTriad>---------------------------------------------------
+    try
+    {
+        in += params.DeserializeForwardClose( in );
+        conn_path_byte_count = in.get8() * 2;
 
-    CipByte     connection_path_size     = in.get8();
+        ++in;       // skip "reserved" byte.  Note: forward_open does not have this.
+    }
+    catch( const std::range_error& e )
+    {
+        // do not even send a reply, the params where not all supplied in the request.
+        return kEipStatusError;
+    }
+    catch( const std::exception& e )
+    {
+        // currently cannot happen except under Murphy's law.
+        return kEipStatusError;
+    }
+
+    if( conn_path_byte_count < in.size() )
+    {
+        gen_status = kCipErrorTooMuchData;
+        goto forward_close_response;
+    }
+
+    if( conn_path_byte_count > in.size() )
+    {
+        gen_status = kCipErrorNotEnoughData;
+        goto forward_close_response;
+    }
+
+#if 0   // spec says this is optional
+    gen_status = params.DeserializeConnectionPath( in, &ext_status );
+
+    if( gen_status != kCipErrorSuccess )
+    {
+        CIPSTER_TRACE_INFO( "%s: unable to parse connection path\n", __func__ );
+        goto forward_close_reponse;
+    }
+
+    gen_status = kCipErrorConnectionFailure;
+#endif
 
     CIPSTER_TRACE_INFO(
         "ForwardClose: ConnSerNo:%x VendorId:%x OriginatorSerNum:%x\n",
-        connection_serial_number,
-        originator_vendor_id,
-        originator_serial_number
+        params.connection_serial_number,
+        params.originator_vendor_id,
+        params.originator_serial_number
         );
 
-    CipConnBox::iterator active = g_active_conns.begin();
+    CipConn* match;
+    match = FindExistingMatchingConnection( params );
 
-    for( ; active != g_active_conns.end();  ++active )
+    if( !match )
     {
-        // This check should not be necessary as only established connections
-        // should be in the active connection list
-        if( active->State() == kConnStateEstablished ||
-            active->State() == kConnStateTimedOut )
-        {
-            if( active->connection_serial_number == connection_serial_number
-             && active->originator_vendor_id     == originator_vendor_id
-             && active->originator_serial_number == originator_serial_number )
-            {
-                // found the corresponding connection -> close it
-                active->Close();
-                connection_status = kConnMgrStatusSuccess;
-                break;
-            }
-        }
+        ext_status =  kConnMgrStatusErrorConnectionNotFoundAtTargetApplication;
+        // goto forward_close_response;
     }
+    else
+    {
+        CIPSTER_ASSERT( response->CPF()->ClientAddr() );
+
+        if( response->CPF()->ClientAddr()->Addr() != match->openers_address.Addr() )
+        {
+            // Vol2 3-3.10 Forward_Close
+            gen_status = kCipErrorPrivilegeViolation;
+            goto forward_close_response;
+        }
+
+        match->Close();
+        gen_status = kCipErrorSuccess;
+    }
+
+forward_close_response:
 
     BufWriter out = response->Writer();
 
-    out.put16( connection_serial_number );
-    out.put16( originator_vendor_id );
-    out.put32( originator_serial_number );
+    out.put16( params.connection_serial_number );
+    out.put16( params.originator_vendor_id );
+    out.put32( params.originator_serial_number );
 
-    if( connection_status == kConnMgrStatusSuccess )
+    if( gen_status == kCipErrorSuccess )
     {
+        // response has general and extended status already set to no errors.
+
         // Vol1 Table 3-5.22
         out.put8( 0 );      // application data word count
         out.put8( 0 );      // reserved
@@ -783,14 +779,16 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
     else
     {
         // Vol1 Table 3-5.23
-        response->SetGenStatus( kCipErrorConnectionFailure );
-        response->AddAdditionalSts( connection_status );
+        response->SetGenStatus( gen_status );
+
+        if( ext_status != kConnMgrStatusSuccess )
+            response->AddAdditionalSts( ext_status );
 
         out.put8( 0 );      // out.put8( connection_path_size );
         out.put8( 0 );      // reserved
     }
 
-    (void) connection_path_size;
+    (void) conn_path_byte_count;
 
     response->SetWrittenSize( out.data() - response->Writer().data() );
 

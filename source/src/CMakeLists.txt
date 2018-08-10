@@ -23,15 +23,14 @@ set( ENCAP_SRCS
     enet_encap/encap.cc
     enet_encap/networkhandler.cc
     enet_encap/sockaddr.cc
+    enet_encap/byte_bufs.cc
     )
 
 if( BYTEBUFS_INLINE )
     add_definitions( -DBYTEBUFS_INLINE=1 )
-    message( "Using inline byte_bufs" )
+    message( STATUS "Using inline byte_bufs" )
 else()
     add_definitions( -DBYTEBUFS_INLINE=0 )
-    message( "Not using inline byte_bufs" )
-    list( APPEND ENCAP_SRCS enet_encap/byte_bufs.cc )
 endif()
 
 set( UTILS_SRCS
@@ -41,7 +40,8 @@ set( UTILS_SRCS
     )
 
 
-set( OBJECTS_SRCS )
+set( OBJECTS_SRCS
+    )
 
 add_subdirectory( cip_objects )
 
@@ -49,11 +49,22 @@ add_subdirectory( cip_objects )
 #message( "OBJECTS_SRC:${OBJECTS_SRC}" )
 
 add_library( eip STATIC
+    g_data.cc
     ${CIPster_ADD_CIP_OBJECTS}
     ${CIP_SRCS}
     ${ENCAP_SRCS}
     ${UTILS_SRCS}
     ${OBJECTS_SRCS}
+    )
+
+add_executable( test_byte_bufs EXCLUDE_FROM_ALL
+    enet_encap/byte_bufs.cc
+    )
+set_target_properties( test_byte_bufs PROPERTIES
+    COMPILE_FLAGS -DTEST_BYTE_BUFS
+    )
+target_link_libraries( test_byte_bufs
+    eip
     )
 
 message( "CMAKE_INSTALL_PREFIX:${CMAKE_INSTALL_PREFIX}" )

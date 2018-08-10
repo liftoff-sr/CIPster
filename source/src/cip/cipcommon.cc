@@ -23,12 +23,6 @@
 #include "appcontype.h"
 
 
-int g_CIPSTER_TRACE_LEVEL = CIPSTER_TRACE_LEVEL;
-
-//int g_my_io_udp_port = kEIP_IoUdpPort;
-int g_my_io_udp_port = 2200;
-
-
 // global public variables
 EipByte g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
 

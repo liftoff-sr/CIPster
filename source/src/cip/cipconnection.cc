@@ -91,7 +91,8 @@ ConnectionData::ConnectionData(
     corrected_t_to_o_size( 0 ),
     consuming_instance( 0 ),
     producing_instance( 0 ),
-    config_instance( 0 )
+    config_instance( 0 ),
+    mgmnt_class( 0 )
 {
     SetTimeoutMultiplier( aConnectionTimeoutMultiplier );
 }
@@ -168,20 +169,21 @@ static CipInstance* check_path( const CipAppPath& aPath,
 }
 
 
-int ConnectionData::DeserializeConnectionData( BufReader aInput, bool isLarge )
+int ConnectionData::DeserializeForwardOpen( BufReader aInput, bool isLarge )
 {
     BufReader in = aInput;
 
     priority_timetick = in.get8();
     timeout_ticks     = in.get8();
 
-    consuming_connection_id = in.get32();     // O_to_T
-    producing_connection_id = in.get32();     // T_to_O
+    SetConsumingConnectionId( in.get32() );     // O->T
+    SetProducingConnectionId( in.get32() );     // T->O
 
-    // The Connection Triad
+    //-----<ConnectionTriad>----------------------------------------------------
     connection_serial_number = in.get16();
     originator_vendor_id     = in.get16();
     originator_serial_number = in.get32();
+    //-----</ConnectionTriad>---------------------------------------------------
 
     connection_timeout_multiplier_value = in.get8();
 
@@ -205,6 +207,23 @@ int ConnectionData::DeserializeConnectionData( BufReader aInput, bool isLarge )
     */
 
     trigger.Set( in.get8() );
+
+    return in.data() - aInput.data();
+}
+
+
+int ConnectionData::DeserializeForwardClose( BufReader aInput )
+{
+    BufReader in = aInput;
+
+    priority_timetick = in.get8();
+    timeout_ticks     = in.get8();
+
+    //-----<ConnectionTriad>----------------------------------------------------
+    connection_serial_number = in.get16();
+    originator_vendor_id     = in.get16();
+    originator_serial_number = in.get32();
+    //-----</ConnectionTriad>---------------------------------------------------
 
     return in.data() - aInput.data();
 }
@@ -786,6 +805,7 @@ ConnMgrStatus CipConn::handleConfigData()
         if( p->size() != words.size() * 2  ||
             memcmp( p->data(), words.data(), p->size() ) != 0 )
         {
+            CIPSTER_TRACE_INFO( "%s: config data mismatch\n", __func__ );
             result = kConnMgrStatusErrorOwnershipConflict;
         }
     }
@@ -802,39 +822,48 @@ ConnMgrStatus CipConn::handleConfigData()
 }
 
 
-/// @brief Holds the connection ID's "incarnation ID" in the upper 16 bits
-static EipUint32 g_incarnation_id;
-
+// Holds the connection ID's "incarnation ID" in upper 16 bits
+static CipUdint s_incarnation_id;
 
 EipUint32 CipConn::NewConnectionId()
 {
-    static EipUint32 connection_id = 18;
+    static CipUint connection_id = 18;
 
-    connection_id++;
-    return g_incarnation_id | (connection_id & 0x0000FFFF);
+    ++connection_id;
+
+    return s_incarnation_id | connection_id;
 }
 
 
-void CipConn::GeneralConnectionConfiguration()
+void CipConn::GeneralConnectionConfiguration(
+            ConnectionData* aConnData, ConnInstanceType aType )
 {
+    *this = *aConnData;     // copy all the ConnectionData stuff to start with.
+
     if( o_to_t_ncp.ConnectionType() == kIOConnTypePointToPoint )
     {
-        // if we have a point to point connection for the O to T direction
+        // if we have a point to point connection for O->T
         // the target shall choose the connection Id.
-        consuming_connection_id = CipConn::NewConnectionId();
+        SetConsumingConnectionId( CipConn::NewConnectionId() );
 
         CIPSTER_TRACE_INFO( "%s: new PointToPoint CID:0x%x\n",
-            __func__, consuming_connection_id );
+            __func__, ConsumingConnectionId() );
+
+        // Report assigned connection Id for possible forward_open response
+        aConnData->SetConsumingConnectionId( ConsumingConnectionId() );
     }
 
     if( t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast )
     {
-        // if we have a multi-cast connection for the T to O direction the
+        // if we have a multi-cast connection for T->O the
         // target shall choose the connection Id.
-        producing_connection_id = CipConn::NewConnectionId();
+        SetProducingConnectionId( CipConn::NewConnectionId() );
 
         CIPSTER_TRACE_INFO( "%s: new Multicast PID:0x%x\n",
-            __func__, producing_connection_id );
+            __func__, ProducingConnectionId() );
+
+        // Report assigned connection Id for possible forward_open response
+        aConnData->SetProducingConnectionId( ProducingConnectionId() );
     }
 
     eip_level_sequence_count_producing = 0;
@@ -878,6 +907,8 @@ void CipConn::GeneralConnectionConfiguration()
             "%s: no inactivity/Watchdog activated; epected_packet_rate is zero\n",
             __func__ );
     }
+
+    SetInstanceType( aType );
 }
 
 
@@ -1011,7 +1042,7 @@ EipStatus CipConn::SendConnectedData()
 
     int data_len = attr3_byte_array->size();
 
-    if( kOpenerProducedDataHasRunIdleHeader )
+    if( kCIPsterProducedDataHasRunIdleHeader )
     {
         data_len += 4;
     }
@@ -1028,7 +1059,7 @@ EipStatus CipConn::SendConnectedData()
         out.put16( data_len );
     }
 
-    if( kOpenerProducedDataHasRunIdleHeader )
+    if( kCIPsterProducedDataHasRunIdleHeader )
     {
         out.put32( g_run_idle_state );
     }
@@ -1070,7 +1101,7 @@ EipStatus CipConn::HandleReceivedIoConnectionData( BufReader aInput )
     {
         // We have no heartbeat connection, because a heartbeat payload
         // may not contain a run_idle header.
-        if( kOpenerConsumedDataHasRunIdleHeader )
+        if( kCIPsterConsumedDataHasRunIdleHeader )
         {
             EipUint32 new_run_idle = aInput.get32();
 
@@ -1204,7 +1235,7 @@ CipError CipConn::openConsumingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
 
 CipError CipConn::openProducingPointToPointConnection( Cpf* aCpf, ConnMgrStatus* aExtError )
 {
-    CIPSTER_ASSERT( aCpf->HasClient() );
+    CIPSTER_ASSERT( aCpf->ClientAddr() );
 
     int destination_port;
 
@@ -1442,12 +1473,17 @@ CipError CipConn::openCommunicationChannels( Cpf* aCpf, ConnMgrStatus* aExtError
         }
     }
 
-    // Save TCP client's IP address in order to qualify a future forward_close.
+/*
     if( t_to_o != kIOConnTypeNull || o_to_t != kIOConnTypeNull )
     {
-        CIPSTER_ASSERT( aCpf->HasClient() );
+        // Save TCP client's IP address in order to qualify a future forward_close.
+        CIPSTER_ASSERT( aCpf->ClientAddr() );
         openers_address = *aCpf->ClientAddr();
+
+        // Save TCP connection session_handle for TCP inactivity timeouts.
+        encap_session   = aCpf->SessionHandle();
     }
+*/
 
     return kCipErrorSuccess;
 }
@@ -1467,12 +1503,12 @@ CipConnectionClass::CipConnectionClass() :
 }
 
 
-CipError CipConnectionClass::OpenIO( ConnectionData* aParams,
+CipError CipConnectionClass::OpenIO( ConnectionData* aConnData,
         Cpf* aCpf, ConnMgrStatus* aExtError )
 {
     // currently we allow I/O connections only to assembly objects
 
-    CipConn* c = GetIoConnectionForConnectionData( aParams, aExtError );
+    CipConn* c = GetIoConnectionForConnectionData( aConnData, aExtError );
 
     if( !c )
     {
@@ -1481,32 +1517,44 @@ CipError CipConnectionClass::OpenIO( ConnectionData* aParams,
             " %s.\n"
             " All anticipated IO connections must be reserved with Configure<*>ConnectionPoint()\n",
             __func__,
-            c->conn_path.Format().c_str()
+            aConnData->conn_path.Format().c_str()
             );
 
         return kCipErrorConnectionFailure;
     }
 
-    return c->Activate( aCpf, aExtError,
-                &c->corrected_o_to_t_size,
-                &c->corrected_t_to_o_size
+    c->GeneralConnectionConfiguration( aConnData, c->InstanceType() );
+
+    CipError cip_error = c->Activate( aCpf, aExtError,
+                &aConnData->corrected_o_to_t_size,
+                &aConnData->corrected_t_to_o_size
                 );
+
+    if( cip_error == kCipErrorSuccess )
+    {
+        // Save TCP client's IP address in order to qualify a future forward_close.
+        CIPSTER_ASSERT( aCpf->ClientAddr() );
+        c->openers_address = *aCpf->ClientAddr();
+
+        // Save TCP connection session_handle for TCP inactivity timeouts.
+        c->SetSessionHandle( aCpf->SessionHandle() );
+    }
+
+    return cip_error;
 }
 
 
 CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError,
         EipUint16* aCorrectedOTz , EipUint16* aCorrectedTOz )
 {
-    IOConnType o_to_t;
-    IOConnType t_to_o;
+    IOConnType o_to_t = o_to_t_ncp.ConnectionType();
+    IOConnType t_to_o = t_to_o_ncp.ConnectionType();
 
-    // Both Change of State and Cyclic triggers use the Transmission Trigger Timer
-    // according to Vol1_3.19_3-4.4.3.7.
-
+    // The Production Inhibit Time Network Segments only apply to Change of
+    // State or Application triggered connections, i.e. all but Cyclic.
+    // Vol1 3-4.4.17
     if( trigger.Trigger() != kConnTriggerTypeCyclic )
     {
-        // trigger is not cyclic, it is Change of State here.
-
         if( !conn_path.port_segs.HasPIT() )
         {
             // saw no PIT segment in the connection path, set PIT to one fourth of RPI
@@ -1521,11 +1569,6 @@ CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError,
             return kCipErrorConnectionFailure;
         }
     }
-
-    GeneralConnectionConfiguration();
-
-    o_to_t = o_to_t_ncp.ConnectionType();
-    t_to_o = t_to_o_ncp.ConnectionType();
 
     int     data_size;
     int     diff_size;
@@ -1554,7 +1597,7 @@ CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError,
             diff_size += 2;
         }
 
-        if( kOpenerConsumedDataHasRunIdleHeader && data_size >= 4
+        if( kCIPsterConsumedDataHasRunIdleHeader && data_size >= 4
             // only expect a run idle header if it is not a heartbeat connection
             && !is_heartbeat )
         {
@@ -1616,7 +1659,7 @@ CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError,
             diff_size += 2;
         }
 
-        if( kOpenerProducedDataHasRunIdleHeader && data_size >= 4
+        if( kCIPsterProducedDataHasRunIdleHeader && data_size >= 4
             // only have a run idle header if it is not a heartbeat connection
             && !is_heartbeat )
         {
@@ -1692,7 +1735,10 @@ EipStatus CipConn::Init( EipUint16 unique_connection_id )
 
         RegisterCipClass( clazz );
 
-        g_incarnation_id = ( (EipUint32) unique_connection_id ) << 16;
+        if( !unique_connection_id )
+            unique_connection_id = 0xc0de;
+
+        s_incarnation_id = unique_connection_id << 16;
     }
 
     return kEipStatusOk;

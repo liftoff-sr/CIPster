@@ -197,7 +197,7 @@ EncapSession* ServerSessionMgr::CheckRegisteredSession(
 
     unsigned index = aSessionHandle - 1;    // goes very large posive at 0
 
-    if( index < DIM( sessions )
+    if( index < UDIM( sessions )
      && sessions[index].m_socket == aSocket
      && sessions[index].m_is_registered )
     {
@@ -210,11 +210,11 @@ EncapSession* ServerSessionMgr::CheckRegisteredSession(
 
 bool ServerSessionMgr::CloseBySessionHandle( CipUdint aSessionHandle )
 {
-    CIPSTER_ASSERT( aSessionHandle && aSessionHandle <= DIM(sessions) );
+    CIPSTER_ASSERT( aSessionHandle && aSessionHandle <= UDIM(sessions) );
 
     unsigned index = aSessionHandle - 1;
 
-    if( index < (unsigned) DIM(sessions) && sessions[index].m_socket != kSocketInvalid )
+    if( index < UDIM(sessions) && sessions[index].m_socket != kSocketInvalid )
     {
         CIPSTER_TRACE_INFO( "%s[%d]: aSessionHandle:%d\n",
             __func__, sessions[index].m_socket, aSessionHandle );
@@ -256,7 +256,7 @@ EncapError ServerSessionMgr::UnregisterSession( CipUdint aSessionHandle, int aSo
 
     unsigned index = aSessionHandle - 1;
 
-    if( index < DIM(sessions) )
+    if( index < UDIM(sessions) )
     {
         if( sessions[index].m_socket == aSocket  )
         {
@@ -325,7 +325,7 @@ void ServerSessionMgr::Shutdown()
 //-----<Encapsulation>----------------------------------------------------------
 
 
-
+#ifdef CIPSTER_WITH_TRACES
 static const char* ShowEncapCmd( int aCmd )
 {
     static char unknown[16];
@@ -345,7 +345,7 @@ static const char* ShowEncapCmd( int aCmd )
             return unknown;
     }
 }
-
+#endif
 
 void Encapsulation::Init()
 {
@@ -397,7 +397,7 @@ static int disposeOfLargePacket( int aSocket, unsigned aCount )
     EipByte chunk[256];
     int     total = 0;
 
-    CIPSTER_TRACE_INFO( "%s[%d]: count:%zd\n", __func__, aSocket, aCount );
+    CIPSTER_TRACE_INFO( "%s[%d]: count:%d\n", __func__, aSocket, aCount );
 
     while( aCount )
     {
@@ -634,7 +634,7 @@ int Encapsulation::handleReceivedListIdentityCommandDelayed(
 {
     DelayedMsg* delayed = NULL;
 
-    for( unsigned i = 0; i < DIM( DelayedMsg::messages );  ++i )
+    for( unsigned i = 0; i < UDIM( DelayedMsg::messages );  ++i )
     {
         if( kSocketInvalid == DelayedMsg::messages[i].socket )
         {
@@ -775,22 +775,18 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
     switch( encap.Command() )
     {
     case kEncapCmdListServices:
-        if( !encap.Options() )
-            result = handleReceivedListServicesCommand( reply );
+        result = handleReceivedListServicesCommand( reply );
         break;
 
     case kEncapCmdListIdentity:
-        if( !encap.Options() )
-            result = handleReceivedListIdentityCommandImmediate( reply );
+        result = handleReceivedListIdentityCommandImmediate( reply );
         break;
 
     case kEncapCmdListInterfaces:
-        if( !encap.Options() )
-            result = handleReceivedListInterfacesCommand( reply );
+        result = handleReceivedListInterfacesCommand( reply );
         break;
 
     case kEncapCmdRegisterSession:
-        if( !encap.Options() )
         {
             EncapError status;
             CipUdint   sh = 0;
@@ -814,14 +810,14 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
         break;
 
     case kEncapCmdSendRRData:
-        if( !encap.Options() && command.size() )
+        if( command.size() )
         {
             EncapSession* ses = ServerSessionMgr::CheckRegisteredSession(
                                     encap.SessionHandle(), aSocket );
 
             if( ses )
             {
-                Cpf cpf( &ses->m_peeraddr ) ;
+                Cpf cpf( encap.SessionHandle() ) ;
 
                 result = cpf.NotifyCommonPacketFormat(
                             command,    // past encap header (headerz)
@@ -848,14 +844,14 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
         break;
 
     case kEncapCmdSendUnitData:
-        if( !encap.Options() && command.size() )
+        if( command.size() )
         {
             EncapSession* ses = ServerSessionMgr::CheckRegisteredSession(
                                     encap.SessionHandle(), aSocket );
 
             if( ses )
             {
-                Cpf cpf( &ses->m_peeraddr ) ;
+                Cpf cpf( encap.SessionHandle() ) ;
 
                 result = cpf.NotifyConnectedCommonPacketFormat(
                             command,    // past encap header
@@ -1077,7 +1073,7 @@ void ManageEncapsulationMessages()
     {
         if( kSocketInvalid != DelayedMsg::messages[i].socket )
         {
-            DelayedMsg::messages[i].time_out_usecs -= kOpenerTimerTickInMicroSeconds;
+            DelayedMsg::messages[i].time_out_usecs -= kCIPsterTimerTickInMicroSeconds;
 
             if( DelayedMsg::messages[i].time_out_usecs < 0 )
             {
@@ -1086,7 +1082,7 @@ void ManageEncapsulationMessages()
                         DelayedMsg::messages[i].socket,
                         DelayedMsg::messages[i].Payload() );
 
-                DelayedMsg::messages[i].socket = -1;
+                DelayedMsg::messages[i].socket = kSocketInvalid;
             }
         }
     }

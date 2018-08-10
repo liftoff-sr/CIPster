@@ -12,7 +12,6 @@
  #define MAYBE_INLINE       /* nothing, so therefore not inline */
 #endif
 
-
 MAYBE_INLINE BufWriter& BufWriter::operator+=( size_t advance )
 {
     if( start + advance > limit )

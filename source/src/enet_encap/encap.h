@@ -469,6 +469,17 @@ public:
      */
     static void AgeInactivity();
 
+    /// inline for speed, translate aSessionHandle into an EncapSession pointer.
+    static const EncapSession* GetSession( CipUdint aSessionHandle )
+    {
+        unsigned ndx = aSessionHandle - 1;
+
+        if( ndx < UDIM(sessions) && sessions[ndx].m_socket != kSocketInvalid )
+            return &sessions[ndx];
+
+        return NULL;
+    }
+
 private:
 
     static EncapSession sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];

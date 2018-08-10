@@ -17,7 +17,9 @@ cmake_minimum_required( VERSION 2.8.3 )
 
 set( CIPSTER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../ )
 
-set( USER_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/sample_application )
+set( USER_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/sample_application
+    CACHE PATH "Location of user specific include file (cipster_user_conf.h)"
+    )
 
 if( CMAKE_BUILD_TYPE STREQUAL Debug )
     add_definitions( -DCIPSTER_WITH_TRACES -DCIPSTER_TRACE_LEVEL=15 )

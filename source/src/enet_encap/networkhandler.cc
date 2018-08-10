@@ -476,7 +476,7 @@ void CheckAndHandleConsumingUdpSockets()
                     __func__,
                     conn->ConsumingSocket(),
                     received_size,
-                    conn->consuming_connection_id,
+                    conn->ConsumingConnectionId(),
                     from_address.AddrStr().c_str(),
                     from_address.Port()
                     );
@@ -636,8 +636,7 @@ EipStatus NetworkHandlerInitialize()
     {
         SockAddr address( kEIP_Reserved_Port, INADDR_BROADCAST );
 
-        if( ( bind( s_sockets.udp_global_broadcast_listener,
-                      address, SADDRZ ) ) == -1 )
+        if( ( bind( s_sockets.udp_global_broadcast_listener, address, SADDRZ ) ) == -1 )
         {
             CIPSTER_TRACE_ERR(
                     "error with global broadcast UDP bind: %s\n",
@@ -670,8 +669,7 @@ EipStatus NetworkHandlerInitialize()
         SockAddr address(   kEIP_Reserved_Port,
                             ntohl( c.ip_address | ~c.network_mask ) );
 
-        if( bind( s_sockets.udp_local_broadcast_listener,
-                      address, SADDRZ ) == -1 )
+        if( bind( s_sockets.udp_local_broadcast_listener, address, SADDRZ ) == -1 )
         {
             CIPSTER_TRACE_ERR(
                     "error with udp_local_broadcast_listener bind: %s\n",
@@ -702,8 +700,7 @@ EipStatus NetworkHandlerInitialize()
     {
         SockAddr address( kEIP_Reserved_Port, ntohl( c.ip_address ) );
 
-        if( bind( s_sockets.udp_unicast_listener,
-                      address, SADDRZ ) == -1 )
+        if( bind( s_sockets.udp_unicast_listener, address, SADDRZ ) == -1 )
         {
             CIPSTER_TRACE_ERR(
                 "error with udp_unicast_listener bind: %s\n",
@@ -812,20 +809,20 @@ EipStatus NetworkHandlerProcessOnce()
     g_current_usecs += elapsed_usecs;   // accumulate into 64 bits.
 
     /*  Call ManageConnections() if the elapsed_time_usecs is greater than
-        kOpenerTimerTickInMicroSeconds.  If more than once cycle
+        kCIPsterTimerTickInMicroSeconds.  If more than once cycle
         was missed, call it more than once so internal time management
-        functions can expect each call to represent kOpenerTimerTickInMicroSeconds.
+        functions can expect each call to represent kCIPsterTimerTickInMicroSeconds.
         This will compensate for jitter in how frequently NetworkHandlerProcessOnce()
         is called.  But please try and call it at least slightly more frequently
-        than every kOpenerTimerTickInMicroSeconds.
+        than every kCIPsterTimerTickInMicroSeconds.
     */
-    while( s_sockets.elapsed_time_usecs >= kOpenerTimerTickInMicroSeconds )
+    while( s_sockets.elapsed_time_usecs >= kCIPsterTimerTickInMicroSeconds )
     {
         ManageConnections();
 
         // Since we qualified this in the while() test, this will never go
         // below zero.
-        s_sockets.elapsed_time_usecs -= kOpenerTimerTickInMicroSeconds;
+        s_sockets.elapsed_time_usecs -= kCIPsterTimerTickInMicroSeconds;
     }
 
     // process AgeInactivity every 1/2 second.  This is fine because
@@ -977,7 +974,7 @@ int CreateUdpSocket( UdpDirection aDirection, const SockAddr& aSockAddr )
             goto close_and_exit;
         }
 
-        if( bind( udp_sock, (sockaddr*) &aSockAddr, SADDRZ ) == -1 )
+        if( bind( udp_sock, aSockAddr, SADDRZ ) == -1 )
         {
             CIPSTER_TRACE_ERR( "%s[%d]: bind(ip:%s, port:%d) error on producing udp: '%s'\n",
                     __func__,

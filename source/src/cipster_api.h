@@ -441,6 +441,13 @@ inline bool CloseSession( int aSocket )
  * @section startup_sec Startup Sequence
  * During startup of your EtherNet/IP(TM) device the following steps have to be
  * performed:
+     -# Initialize CIPster: \n
+        With the function CipStackInit(CipUint unique_connection_id) the
+        internal data structures are correctly setup. After this
+        step own CIP objects and Assembly objects instances may be created. For
+        your convenience we provide the call-back function
+        ApplicationInitialization. This call back function is called when the
+        stack is ready to receive application specific CIP objects.
  *   -# Configure the network properties:\n
  *       With the following functions the network interface of CIPster is
  *       configured:
@@ -458,14 +465,7 @@ inline bool CloseSession( int aSocket )
  *      According to the CIP specification a device vendor has to ensure that
  *      each of its devices has a unique 32Bit device id. You can set it with
  *      the function:
- *       - void setDeviceSerialNumber(EIP_UINT32 serial_number)
- *   -# Initialize CIPster: \n
- *      With the function CipStackInit(EIP_UINT16 unique_connection_id) the
- *      internal data structures of opener are correctly setup. After this
- *      step own CIP objects and Assembly objects instances may be created. For
- *      your convenience we provide the call-back function
- *      ApplicationInitialization. This call back function is called when the
- * stack is ready to receive application specific CIP objects.
+ *       - void setDeviceSerialNumber(CipUdint serial_number)
  *   -# Create Application Specific CIP Objects:\n
  *      Within the call-back function ApplicationInitialization(void) or
  *      after CipStackInit(void) has finished you may create and configure any
@@ -475,10 +475,10 @@ inline bool CloseSession( int aSocket )
  *      for future versions.
  *   -# Setup the listening TCP and UDP port:\n
  *      THE ETHERNET/IP SPECIFICATION demands from devices to listen to TCP
- *      connections and UDP datagrams on the port AF12hex for explicit messages.
+ *      connections and UDP datagrams on the port 0xAF12 for explicit messages.
  *      Therefore before going into normal operation you need to configure your
  *      network library so that TCP and UDP messages on this port will be
- *      received and can be hand over to the Ethernet encapsulation layer.
+ *      received and can be handed over to the Ethernet encapsulation layer.
  *
  * @section normal_op_sec Normal Operation
  * During normal operation the following tasks have to be done by the platform
@@ -530,16 +530,16 @@ inline bool CloseSession( int aSocket )
  * specific services and attributes. Therefore CIPster can be easily adapted to
  * support different device profiles and specific CIP objects needed for your
  * device. The functions to be used are:
- *   - S_CIP_Class *CreateCIPClass(EIP_UINT32 class_id, int
- * number_of_class_attributes, EIP_UINT32 class_get_attribute_all_mask, int
- * number_of_class_services, int number_of_instance_attributes, EIP_UINT32
+ *   - S_CIP_Class *CreateCIPClass(CipUdint class_id, int
+ * number_of_class_attributes, CipUdint class_get_attribute_all_mask, int
+ * number_of_class_services, int number_of_instance_attributes, CipUdint
  * instance_get_attribute_all_mask, int number_of_instance_services, int
- * number_of_instances, char *class_name, EIP_UINT16 revision);
+ * number_of_instances, char *class_name, CipUint revision);
  *   - S_CIP_Instance *AddCIPInstances(S_CIP_Class *cip_object, int
  * number_of_instances);
- *   - S_CIP_Instance *AddCIPInstance(S_CIP_Class * cip_class, EIP_UINT32
+ *   - S_CIP_Instance *AddCIPInstance(S_CIP_Class * cip_class, CipUdint
  * instance_id);
- *   - void InsertAttribute(S_CIP_Instance *instance, EIP_UINT16
+ *   - void InsertAttribute(S_CIP_Instance *instance, CipUint
  * attribute_number, EIP_UINT8 cip_type, void* data);
  *   - void InsertService(S_CIP_Class *class, EIP_UINT8 service_number,
  * CipServiceFunction service_function, char *service_name);

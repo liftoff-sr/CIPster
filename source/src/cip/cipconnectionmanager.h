@@ -28,7 +28,7 @@ public:
      * Since multiple CIP Class 3 connections can be instantiated all on the
      * same TCP connection, we could be deleting more than one here.
      *
-     * @param aSessionId is a session id to match against.
+     * @param aSessionId is a session handle to match against.
      */
     static void CloseClass3Connections( CipUdint aSessionId );
 
@@ -103,10 +103,10 @@ protected:
     /**
      * Function assembleForwardOpenResponse
      * serializes a response to a forward_open
-     */
     static void assembleForwardOpenResponse( ConnectionData* aParams,
             CipMessageRouterResponse* response, CipError general_status,
             ConnMgrStatus extended_status );
+     */
 };
 
 

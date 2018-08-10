@@ -440,9 +440,11 @@ public:
  * Class ConnectionData
  * contains parameters identified in Vol1 3-5.4.1 as well as a ConnectionPath.
  * The members correspond to the fields in the forward open request.  For
- * deserialization, there are two needed functions: DeserializeConnectionData()
- * and DeserializeConnectionPath().  For serialization there is only
- * Serialize().
+ * deserialization, there are these functions:
+ * DeserializeForwardOpen()
+ * DeserializeConnectionPath().
+ * For serialization there is a need for only:
+ * Serialize( BufWriter aOutput, int aCtl ) since the control bits can be embellished.
  */
 class ConnectionData : public Serializeable
 {
@@ -466,9 +468,22 @@ public:
 
     CipByte             priority_timetick;
     CipByte             timeout_ticks;
+
+    CipUdint    ConsumingConnectionId() const               { return consuming_connection_id; }
+    void        SetConsumingConnectionId( CipUdint aCid )   { consuming_connection_id = aCid; }
+
+    CipUdint    ProducingConnectionId() const               { return producing_connection_id; }
+    void        SetProducingConnectionId( CipUdint aCid )   { producing_connection_id = aCid; }
+
+protected:
+    // In general, the consuming device selects the Network Connection ID for a
+    // point-to-point connection, and the producing device selects the Network
+    // Connection ID for a multicast connection.
+    // See Vol2 Table 3-3.2 Network Connection ID Selection
     CipUdint            consuming_connection_id;
     CipUdint            producing_connection_id;
 
+public:
     //-----<ConnectionTriad>----------------------------------------------------
     // The Connection Triad used in the Connection Manager specification includes
     // the combination of Connection Serial Number, Originator Vendor ID and
@@ -516,7 +531,9 @@ public:
 
     ConnectionPath      conn_path;
 
-    int DeserializeConnectionData( BufReader aInput, bool isLargeForwardOpen );
+    int DeserializeForwardOpen( BufReader aInput, bool isLargeForwardOpen );
+
+    int DeserializeForwardClose( BufReader aInput );
 
     /**
      * Function DeserializeConnectionPath
@@ -526,13 +543,13 @@ public:
      * @param aInput provides the encoded segments and should be length limited
      *   so this function knows when to stop consuming input bytes. Construct this
      *   BufReader using the word count which precedes most connection_paths.
-     * @param extended_status where to put the extended error code in case of error
+     * @param aExtError where to put the extended error code in case of error
      *
      * @return CipError - indicating success of the decoding
      *    - kCipErrorSuccess on success
      *    - On an error the general status code to be put into the response
      */
-    CipError DeserializeConnectionPath( BufReader aInput, ConnMgrStatus* extended_error );
+    CipError DeserializeConnectionPath( BufReader aInput, ConnMgrStatus* aExtError );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
@@ -619,12 +636,17 @@ public:
      * changes state of this CipConn to activated if it can, otherwise returns
      * an error.
      */
-    CipError Activate( Cpf* cpfd, ConnMgrStatus* extended_error,
+    CipError Activate( Cpf* cpfd, ConnMgrStatus* aExtError,
             EipUint16* aCorrectedOTz , EipUint16* aCorrectedTOz );
 
     void Clear( bool doConnectionDataToo = true );
 
-    void GeneralConnectionConfiguration();
+    /**
+     * Function GeneralConnectionConfiguration
+     * generates the ConnectionIDs and sets the general configuration
+     * parameters in this CipConn
+     */
+    void GeneralConnectionConfiguration( ConnectionData* aConnData, ConnInstanceType aType );
 
     CipConn& SetState( ConnState aNewState )
     {
@@ -646,6 +668,9 @@ public:
 
     ConnInstanceType InstanceType() const   { return instance_type; }
 
+    void SetSessionHandle( CipUdint aSessionHandle )    { encap_session = aSessionHandle; }
+    CipUdint SessionHandle() const                      { return encap_session; }
+
     bool IsIOConnection() const
     {
         // bit 0 is a 1 for all I/O connections, see enum ConnInstanceType
@@ -662,13 +687,13 @@ public:
         EipUint32   adjusted = aRateUSecs;
 
         // The requested packet interval parameter needs to be a multiple of
-        // kOpenerTimerTickInMicroSeconds from the user's header file
-        if( adjusted % kOpenerTimerTickInMicroSeconds )
+        // kCIPsterTimerTickInMicroSeconds from the user's header file
+        if( adjusted % kCIPsterTimerTickInMicroSeconds )
         {
             // Vol1 3-4.4.9 Since we are not an exact multiple, round up to
             // slower nearest integer multiple of our timer.
-            adjusted = ( adjusted / kOpenerTimerTickInMicroSeconds )
-                * kOpenerTimerTickInMicroSeconds + kOpenerTimerTickInMicroSeconds;
+            adjusted = ( adjusted / kCIPsterTimerTickInMicroSeconds )
+                * kCIPsterTimerTickInMicroSeconds + kCIPsterTimerTickInMicroSeconds;
         }
 
         CIPSTER_TRACE_INFO( "%s( %d ) adjusted=%d\n", __func__, aRateUSecs, adjusted );
@@ -869,15 +894,15 @@ protected:
 
     ConnInstanceType    instance_type;
 
-    ConnState     state;        // CIP Connection Instance attribute id 1
+    ConnState   state;          // CIP Connection Instance attribute id 1
 
     EipUint32   expected_packet_rate_usecs;
 
     EipInt32    inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
     EipInt32    transmission_trigger_timer_usecs;   // signed 32 bits, in usecs
 
-    int consuming_socket;
-    int producing_socket;
+    int         consuming_socket;
+    int         producing_socket;
 
     CipUdint    encap_session;          // session_handle, 0 is not used.
 
@@ -886,15 +911,6 @@ private:
     CipConn*    next;
     CipConn*    prev;
 };
-
-
-/** @brief Generate the ConnectionIDs and set the general configuration
- * parameter in the given connection object.
- *
- * @param cip_conn pointer to the connection object that should be set
- * up.
- */
-void GeneralConnectionConfiguration( CipConn* cip_conn );
 
 
 /**
@@ -906,7 +922,7 @@ class CipConnectionClass : public CipClass
 public:
     CipConnectionClass();
 
-    static CipError OpenIO( ConnectionData* aParams, Cpf* cpfd, ConnMgrStatus* extended_error_code );
+    static CipError OpenIO( ConnectionData* aParams, Cpf* cpfd, ConnMgrStatus* aExtError );
 };
 
 
