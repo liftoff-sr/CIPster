@@ -616,10 +616,11 @@ class CipConn : public ConnectionData
     friend class CipConnBox;
 
 public:
-
     CipConn();
 
     static EipStatus Init( EipUint16 unique_connection_id );
+
+    static int constructed_count;   // incremented and assigned to instance_id.
 
     /**
      * operator =
@@ -650,7 +651,7 @@ public:
 
     CipConn& SetState( ConnState aNewState )
     {
-        CIPSTER_TRACE_INFO( "%s( %s )\n", __func__, ShowState( aNewState ) );
+        CIPSTER_TRACE_INFO( "%s<%d>(%s)\n", __func__, instance_id, ShowState( aNewState ) );
         state = aNewState;
         return *this;
     }
@@ -661,12 +662,14 @@ public:
 
     CipConn& SetInstanceType( ConnInstanceType aType )
     {
-        CIPSTER_TRACE_INFO( "%s: %d\n", __func__, aType );
+        CIPSTER_TRACE_INFO( "%s<%d>(%s)\n", __func__, instance_id, ShowInstanceType( aType ) );
         instance_type = aType;
         return *this;
     }
 
     ConnInstanceType InstanceType() const   { return instance_type; }
+
+    static const char* ShowInstanceType( ConnInstanceType aType );
 
     void SetSessionHandle( CipUdint aSessionHandle )    { encap_session = aSessionHandle; }
     CipUdint SessionHandle() const                      { return encap_session; }
@@ -846,6 +849,10 @@ public:
     // Otherwise they are not used.
     ConnectionCloseFunction         hook_close;
     ConnectionTimeoutFunction       hook_timeout;
+
+    // constructor assigns in ascending sequence.  This is not a Cip ID (yet).
+    // Used for debugging messages.
+    int instance_id;
 
 protected:
 

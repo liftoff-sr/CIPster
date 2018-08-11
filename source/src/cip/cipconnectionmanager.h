@@ -24,15 +24,15 @@ public:
 
     /**
      * Function CloseClass3Connections
-     * closes all class 3 connections having @a aSessionId.
+     * closes all class 3 connections having @a aSessionHandle.
      * Since multiple CIP Class 3 connections can be instantiated all on the
      * same TCP connection, we could be deleting more than one here.
      *
-     * @param aSessionId is a session handle to match against.
+     * @param aSessionHandle is a session handle to match against.
      */
-    static void CloseClass3Connections( CipUdint aSessionId );
+    static void CloseClass3Connections( CipUdint aSessionHandle );
 
-    static void CheckForTimedOutConnectionsAndCloseTCPConnections( CipConn *aConn );
+    static void CheckForTimedOutConnectionsAndCloseTCPConnections( CipUdint aSessionHandle );
 
     /**
      * Function FindExsitingMatchingConnection

@@ -369,6 +369,12 @@ struct EncapSession
         Clear();
     }
 
+    void NoteTcpActivity()
+    {
+        CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, m_socket );
+        m_last_activity_usecs = g_current_usecs;    // last activity
+    }
+
     int         m_socket;
     SockAddr    m_peeraddr;             // peer's IP address, port, etc.
     uint64_t    m_last_activity_usecs;

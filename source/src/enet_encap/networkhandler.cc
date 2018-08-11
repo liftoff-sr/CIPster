@@ -867,7 +867,7 @@ EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput
 
     if( sent_count < 0 )
     {
-        CIPSTER_TRACE_ERR( "%s[%d]: error with sendto in sendUDPData: %s\n",
+        CIPSTER_TRACE_ERR( "%s[%d]: errno with sendto(): '%s'\n",
                 __func__, aSocket, strerrno().c_str() );
 
         return kEipStatusError;
@@ -945,7 +945,6 @@ int CreateUdpSocket( UdpDirection aDirection, const SockAddr& aSockAddr )
                     strerrno().c_str()
                     );
             goto close_and_exit;
-            return kSocketInvalid;
         }
 
         CIPSTER_TRACE_INFO( "%s[%d]: consuming on %s:%d\n",
@@ -999,7 +998,7 @@ int CreateUdpSocket( UdpDirection aDirection, const SockAddr& aSockAddr )
                 if( setsockopt( udp_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, 1 ) < 0 )
                 {
                     CIPSTER_TRACE_ERR(
-                            "%s[%d]: could not set the TTL to: %d, error: %s\n",
+                            "%s[%d]: could not set TTL to: %d, errno: '%s'\n",
                             __func__, udp_sock, ttl, strerrno().c_str() );
 
                     goto close_and_exit;

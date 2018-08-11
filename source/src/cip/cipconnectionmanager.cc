@@ -177,8 +177,9 @@ EipStatus CipConnMgrClass::ManageConnections()
                     if( active->trigger.Class() == kConnTransportClass3 )
                     {
                         CIPSTER_TRACE_INFO(
-                            "%s: >>> Connection class:%d timeOut on session with handle:%d\n",
+                            "%s<%d>: >>> c-class:%d timeOut on session id:%d\n",
                             __func__,
+                            active->instance_id,
                             active->trigger.Class(),
                             active->SessionHandle()
                             );
@@ -188,8 +189,9 @@ EipStatus CipConnMgrClass::ManageConnections()
                         // If this shows -1 as socket values, its because the other end
                         // closed the transport and we closed it in response already.
                         CIPSTER_TRACE_INFO(
-                            "%s: >>> Connection class:%d timeOut w/ consuming_socket:%d producing_socket:%d\n",
+                            "%s<%d>: >>> c-class:%d timeOut w/ consuming_socket:%d producing_socket:%d\n",
                             __func__,
+                            active->instance_id,
                             active->trigger.Class(),
                             active->ConsumingSocket(),
                             active->ProducingSocket()
@@ -228,9 +230,8 @@ EipStatus CipConnMgrClass::ManageConnections()
 
                         if( eip_status == kEipStatusError )
                         {
-                            CIPSTER_TRACE_ERR(
-                                "%s: sending of UDP data in manage Connection failed\n",
-                                __func__ );
+                            CIPSTER_TRACE_ERR( "%s<%d>: ERROR sending UDP\n",
+                                __func__, active->instance_id );
                         }
 
                         active->SetTransmissionTriggerTimerUSecs( active->ExpectedPacketRateUSecs() );
@@ -250,18 +251,17 @@ EipStatus CipConnMgrClass::ManageConnections()
 }
 
 
-void CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( CipConn *aConn )
+void CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( CipUdint aSessionHandle )
 {
-    CipUdint session_handle = aConn->SessionHandle();
-
     bool another_active_with_same_session_found = false;
 
     for( CipConnBox::iterator it = g_active_conns.begin();
-            it != g_active_conns.end();  ++it )
+                it != g_active_conns.end();  ++it )
     {
-        if( (CipConn*) it != aConn
-         && it->State() == kConnStateEstablished
-         && aConn->SessionHandle() == session_handle )
+        // This test assumes that caller first CipConn::Close()d the CIP connection
+        // that timed out, so we do not have to exclude it from comparison here
+        // because it is no longer in g_active_conns.
+        if( it->SessionHandle() == aSessionHandle )
         {
             another_active_with_same_session_found = true;
             break;
@@ -270,30 +270,29 @@ void CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( CipConn
 
     if( !another_active_with_same_session_found )
     {
-        ServerSessionMgr::CloseBySessionHandle( session_handle );
+        CIPSTER_TRACE_INFO( "%s: killing session:%d\n", __func_, aSessionHandle );
+        ServerSessionMgr::CloseBySessionHandle( aSessionHandle );
     }
 }
 
 
-void CipConnMgrClass::CloseClass3Connections( CipUdint aSessionId )
+void CipConnMgrClass::CloseClass3Connections( CipUdint aSessionHandle )
 {
     CipConnBox::iterator it = g_active_conns.begin();
 
     while( it != g_active_conns.end() )
     {
         if( it->trigger.Class() == kConnTransportClass3 &&
-            it->SessionHandle() == aSessionId )
+            it->SessionHandle() == aSessionHandle )
         {
             CIPSTER_TRACE_INFO( "%s: closing class 3 on session:%d\n",
-                __func__, aSessionId );
+                __func__, aSessionHandle );
 
             CipConnBox::iterator to_close = it;
 
             ++it;
-
             to_close->Close();
         }
-
         else
             ++it;
     }

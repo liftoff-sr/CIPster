@@ -714,8 +714,10 @@ int ConnectionData::SerializedCount( int aCtl ) const
 
 //-----<CipConn>----------------------------------------------------------------
 
+int CipConn::constructed_count;         // CipConn::instance_id is only for debugging
 
-CipConn::CipConn()
+CipConn::CipConn() :
+    instance_id( ++constructed_count )
 {
     Clear( false );
 }
@@ -786,6 +788,21 @@ const char* CipConn::ShowState( ConnState aState )
     }
 }
 
+
+const char* CipConn::ShowInstanceType( ConnInstanceType aType )
+{
+    switch( aType )
+    {
+    case kConnInstanceTypeExplicit:             return "Explicit";
+    case kConnInstanceTypeIoExclusiveOwner:     return "IoExclusiveOwner";
+    case kConnInstanceTypeIoInputOnly:          return "IoInputOnly";
+    case kConnInstanceTypeIoListenOnly:         return "IoListenOnly";
+    default:
+        return "???";
+    }
+}
+
+
 ConnMgrStatus CipConn::handleConfigData()
 {
     ConnMgrStatus result = kConnMgrStatusSuccess;
@@ -846,8 +863,8 @@ void CipConn::GeneralConnectionConfiguration(
         // the target shall choose the connection Id.
         SetConsumingConnectionId( CipConn::NewConnectionId() );
 
-        CIPSTER_TRACE_INFO( "%s: new PointToPoint CID:0x%x\n",
-            __func__, ConsumingConnectionId() );
+        CIPSTER_TRACE_INFO( "%s<%d>: new PointToPoint CID:0x%x\n",
+            __func__, instance_id, ConsumingConnectionId() );
 
         // Report assigned connection Id for possible forward_open response
         aConnData->SetConsumingConnectionId( ConsumingConnectionId() );
@@ -859,8 +876,8 @@ void CipConn::GeneralConnectionConfiguration(
         // target shall choose the connection Id.
         SetProducingConnectionId( CipConn::NewConnectionId() );
 
-        CIPSTER_TRACE_INFO( "%s: new Multicast PID:0x%x\n",
-            __func__, ProducingConnectionId() );
+        CIPSTER_TRACE_INFO( "%s<%d>: new Multicast PID:0x%x\n",
+            __func__, instance_id, ProducingConnectionId() );
 
         // Report assigned connection Id for possible forward_open response
         aConnData->SetProducingConnectionId( ProducingConnectionId() );
@@ -904,8 +921,8 @@ void CipConn::GeneralConnectionConfiguration(
     {
         // this is not an erro
         CIPSTER_TRACE_INFO(
-            "%s: no inactivity/Watchdog activated; epected_packet_rate is zero\n",
-            __func__ );
+            "%s<%d>: no inactivity/Watchdog activated; epected_packet_rate is zero\n",
+            __func__, instance_id );
     }
 
     SetInstanceType( aType );
@@ -914,6 +931,8 @@ void CipConn::GeneralConnectionConfiguration(
 
 void CipConn::Close()
 {
+    CIPSTER_TRACE_INFO( "%s<%d>\n", __func__, instance_id );
+
     if( hook_close )
         hook_close( this );
 
@@ -1184,9 +1203,20 @@ void CipConn::timeOut()
         }
     }
 
-    CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( this );
+    // grab session handle before Close() zeroes it out.
+    CipUdint session_handle = SessionHandle();
 
     Close();
+
+    // Vol2 2-5.5.2
+    // In the condition where a target’s CIP connections from an originator all
+    // time out, the target shall close the TCP connection from that originator
+    // immediately. The purpose of this behavior is to help prevent half-open
+    // CIP connections that can result from TCP retries at the originator due to
+    // link-lost conditions.
+
+    // check all "CIP connections", not just I/O connections.
+    CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( session_handle );
 }
 
 

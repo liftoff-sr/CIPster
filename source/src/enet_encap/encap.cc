@@ -110,7 +110,7 @@ EncapError ServerSessionMgr::RegisterTcpConnection( int aSocket )
 
     if( rc < 0 )
     {
-        CIPSTER_TRACE_ERR( "%s[%d]: could not get peername: %s\n",
+        CIPSTER_TRACE_ERR( "%s[%d]: errno for peername(): '%s'\n",
                 __func__, aSocket, strerrno().c_str() );
         return kEncapErrorIncorrectData;
     }
@@ -120,7 +120,7 @@ EncapError ServerSessionMgr::RegisterTcpConnection( int aSocket )
             __func__, aSocket, ses.m_peeraddr.AddrStr().c_str() );
     }
 
-    ses.m_last_activity_usecs = g_current_usecs;    // last activity
+    ses.NoteTcpActivity();             // last activity
 
     return kEncapErrorSuccess;
 }
@@ -183,8 +183,7 @@ EncapSession* ServerSessionMgr::UpdateRegisteredTcpConnection( int aSocket )
         return NULL;
     }
 
-    CIPSTER_TRACE_INFO( "%s[%d]: inactivity update\n", __func__, aSocket );
-    sessions[index].m_last_activity_usecs = g_current_usecs;
+    sessions[index].NoteTcpActivity();
 
     return &sessions[index];
 }
