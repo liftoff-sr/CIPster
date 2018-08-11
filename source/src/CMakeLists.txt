@@ -40,21 +40,12 @@ set( UTILS_SRCS
     )
 
 
-set( OBJECTS_SRCS
-    )
-
-add_subdirectory( cip_objects )
-
-
-#message( "OBJECTS_SRC:${OBJECTS_SRC}" )
-
 add_library( eip STATIC
     g_data.cc
     ${CIPster_ADD_CIP_OBJECTS}
     ${CIP_SRCS}
     ${ENCAP_SRCS}
     ${UTILS_SRCS}
-    ${OBJECTS_SRCS}
     )
 
 add_executable( test_byte_bufs EXCLUDE_FROM_ALL
