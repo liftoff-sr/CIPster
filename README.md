@@ -122,6 +122,10 @@ Then you can run the resultant program.
     ./sample ipaddress subnetmask gateway domainname hostaddress macaddress
     e.g. ./sample 192.168.0.2 255.255.255.0 192.168.0.1 test.com testdevice 00 15 C5 BF D0 87
 
+Recently USER_INCLUDE_DIR has become configurable in the outer sample projects also.
+This makes it possible to experiment using different settings by supplying different
+out of tree "cipster_user_conf.h" settings.
+
 ## Compiling on Linux for Windows
 
 You can build 32 bit or 64 bit windows libraries or programs on linux using the
