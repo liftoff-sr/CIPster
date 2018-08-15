@@ -67,12 +67,12 @@ enum ConnMgrStatus
     kConnMgrStatusErrorVendorIdOrProductcodeError = 0x0114,
     kConnMgrStatusErrorDeviceTypeError    = 0x0115,
     kConnMgrStatusErrorRevisionMismatch   = 0x0116,
+    kConnMgrStatusNonListenOnlyConnectionNotOpened    = 0x0119,
     kConnMgrStatusErrorPITGreaterThanRPI  = 0x011b,
     kConnMgrStatusInvalidConfigurationApplicationPath = 0x0129,
     kConnMgrStatusInvalidConsumingApllicationPath     = 0x012A,
     kConnMgrStatusInvalidProducingApplicationPath     = 0x012B,
     kConnMgrStatusInconsistentApplicationPathCombo    = 0x012F,
-    kConnMgrStatusNonListenOnlyConnectionNotOpened    = 0x0119,
     kConnMgrStatusErrorParameterErrorInUnconnectedSendService = 0x0205,
     kConnMgrStatusErrorInvalidSegmentTypeInPath   = 0x0315,
     kConnMgrStatusTargetObjectOutOfConnections    = 0x011A
@@ -141,12 +141,11 @@ enum UdpDirection
     kUdpProducing  = 1,    ///< Producing direction; sender
 };
 
-
 enum IoConnectionEvent
 {
-    kIoConnectionEventOpened,
-    kIoConnectionEventTimedOut,
-    kIoConnectionEventClosed
+    kIoConnectionEventOpened    = 0,
+    kIoConnectionEventTimedOut  = 1,
+    kIoConnectionEventClosed    = 2,
 };
 
 

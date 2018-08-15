@@ -53,7 +53,7 @@ void CipStackInit( EipUint16 unique_connection_id )
     eip_status = CipConn::Init( unique_connection_id );
     CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
-    eip_status = CipAssemblyInitialize();
+    eip_status = CipAssemblyClass::Init();
     CIPSTER_ASSERT( kEipStatusOk == eip_status );
 
 #if 0    // do this in caller after return from this function.

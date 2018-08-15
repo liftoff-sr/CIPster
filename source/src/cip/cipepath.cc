@@ -133,18 +133,15 @@ static int serialize( BufWriter& out, int seg_type, unsigned aValue )
 
     if( aValue < 256 )
     {
-        out.put8( seg_type );
-        out.put8( aValue );
+        out.put8( seg_type ).put8( aValue );
     }
     else if( aValue < 65536 )
     {
-        out.put8( seg_type | 1 );
-        out.put16( aValue );
+        out.put8( seg_type | 1 ).put16( aValue );
     }
     else
     {
-        out.put8( seg_type | 2 );
-        out.put32( aValue );
+        out.put8( seg_type | 2 ).put32( aValue );
     }
 
     return out.data() - start;
@@ -240,8 +237,11 @@ int CipAppPath::deserialize_logical( BufReader aInput, CipAppPath::Stuff aField,
     }
     else
     {
-        // should probably return -1.
+#if 1
+        throw std::runtime_error( "unsupported logical segment format" );
+#else
         value = 0;
+#endif
     }
 
     stuff[aField] = value;
@@ -264,9 +264,7 @@ inline int CipAppPath::deserialize_symbolic( BufReader aInput )
         int byte_count = in.get8();
 
         if( byte_count > (int) sizeof(tag)-1 )
-        {
-            return -1;
-        }
+            throw std::runtime_error( "CipAppPath has too big AnsiExtendedSymbol" );
 
         memcpy( tag, in.data(), byte_count );
         tag[byte_count] = 0;
@@ -280,15 +278,15 @@ inline int CipAppPath::deserialize_symbolic( BufReader aInput )
 
     else if( (first & 0xe0) == kSegmentTypeSymbolic )   // Symbolic Segment
     {
-        // cannot exceed 31 which is less than max of nul terminated 'this->tag'
+        // "and"ing clamps at 31, which is less than max of nul terminated 'this->tag'
         int symbol_size = first & 0x1f;
 
+#if 0
         if( symbol_size == 0 )
         {
-            CIPSTER_TRACE_ERR( "%s: saw unsupported 'extended' Symbolic Segment\n", __func__ );
-
-            return -1;
+            throw std::runtime_error( "zero length 'extended' Symbolic Segment" );
         }
+#endif
 
         ++in;    // ate first
 
@@ -535,7 +533,7 @@ int CipPortSegment::Serialize( BufWriter aOutput, int aCtl ) const
 
     if( link_address.size() > 255 )
     {
-        throw std::overflow_error(
+        throw std::runtime_error(
             "CipPortSegment::Serialize() cannot encode a link_address with length > 255" );
     }
 
@@ -746,8 +744,7 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
                 }
                 else
                 {
-                    CIPSTER_TRACE_ERR( "%s: unknown PIT_USECS format: %d\n", __func__, num_words );
-                    return aInput.data() - (in.data() - 1);    // return negative byte offset of error
+                    throw std::runtime_error( "unknown PIT_USECS format" );
                 }
                 SetPIT_USecs( value );
                 break;
@@ -789,7 +786,7 @@ int CipPortSegmentGroup::Serialize( BufWriter aOutput, int aCtl ) const
         unsigned msecs = GetPIT_MSecs();
 
         if( msecs > 255 )
-            throw std::overflow_error(
+            throw std::runtime_error(
                 "CipPortSegmentGroup::Serialize() cannot encode PIT msecs > 255" );
 
         out.put8( 0x43 );
@@ -860,7 +857,7 @@ int CipSimpleDataSegment::Serialize( BufWriter aOutput, int aCtl ) const
 
     if( words.size() > 255 )
     {
-        throw std::overflow_error( StrPrintf(
+        throw std::runtime_error( StrPrintf(
                 "CipSimpleDataSegment::Serialize() got %u words; too big to encode",
                 (unsigned) words.size() )
                 );

@@ -90,9 +90,9 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
 }
 
 
-AssemblyInstance::AssemblyInstance( int aInstanceId, BufWriter aBuffer ) :
+AssemblyInstance::AssemblyInstance( int aInstanceId, ByteBuf aBuffer ) :
     CipInstance( aInstanceId ),
-    byte_array( aBuffer.data(), aBuffer.capacity() )
+    byte_array( aBuffer )
 {
     // Attribute 3 is the byte array transfer of the assembly data itself
     AttributeInsert( 3, getAttrAssemblyData, false, setAttrAssemblyData, &byte_array );
@@ -102,13 +102,13 @@ AssemblyInstance::AssemblyInstance( int aInstanceId, BufWriter aBuffer ) :
 }
 
 
-CipInstance* CreateAssemblyInstance( int instance_id, BufWriter aBuffer )
+AssemblyInstance* CipAssemblyClass::CreateInstance( int aInstanceId, ByteBuf aBuffer )
 {
-    CipClass* clazz = GetCipClass( kCipAssemblyClass );
+    CipAssemblyClass* clazz = (CipAssemblyClass*) GetCipClass( kCipAssemblyClass );
 
     CIPSTER_ASSERT( clazz ); // Stack startup should have called CipAssemblyInitialize()
 
-    AssemblyInstance* i = new AssemblyInstance( instance_id, aBuffer );
+    AssemblyInstance* i = new AssemblyInstance( aInstanceId, aBuffer );
 
     if( !clazz->InstanceInsert( i ) )
     {
@@ -117,28 +117,11 @@ CipInstance* CreateAssemblyInstance( int instance_id, BufWriter aBuffer )
     }
     else
     {
-        CIPSTER_TRACE_INFO( "%s: created assembly instance_id %d\n", __func__, instance_id );
+        CIPSTER_TRACE_INFO( "%s: created assembly aInstanceId %d\n", __func__, aInstanceId );
     }
 
     return i;
 }
-
-
-class CipAssemblyClass : public CipClass
-{
-public:
-    CipAssemblyClass() :
-        CipClass( kCipAssemblyClass,
-            "Assembly",
-            MASK7( 1,2,3,4,5,6,7 ), // common class attributes mask
-            2                       // class revision
-            )
-    {
-    }
-
-    CipError OpenConnection( ConnectionData* aConnData,
-                Cpf* aCpf, ConnMgrStatus* aExtError ); // override
-};
 
 
 CipError CipAssemblyClass::OpenConnection( ConnectionData* aConnData,
@@ -148,7 +131,7 @@ CipError CipAssemblyClass::OpenConnection( ConnectionData* aConnData,
 }
 
 
-EipStatus CipAssemblyInitialize()
+EipStatus CipAssemblyClass::Init()
 {
     if( !GetCipClass( kCipAssemblyClass ) )
     {

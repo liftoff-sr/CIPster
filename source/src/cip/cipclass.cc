@@ -175,11 +175,8 @@ CipClass::~CipClass()
         // delete all the instances of this class
         while( instances.size() )
         {
-            delete *instances.begin();
-
-            // There could be a faster way, but this is not time critical
-            // because the program is terminating here.
-            instances.erase( instances.begin() );
+            delete instances.back();
+            instances.pop_back();
         }
 
         // The public class owns the meta-class.
@@ -198,9 +195,8 @@ CipClass::~CipClass()
         }
 #endif
 
-        delete *services.begin();
-
-        services.erase( services.begin() );
+        delete services.back();
+        services.pop_back();
     }
 }
 

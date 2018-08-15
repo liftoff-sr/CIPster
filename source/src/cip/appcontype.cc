@@ -190,17 +190,17 @@ CipConn* ExclusiveOwner::GetConnection( ConnectionData* aConnData, ConnMgrStatus
 {
     for( ExclusiveOwner::iterator it = s_exclusive_owner.begin();  it != s_exclusive_owner.end();  ++it )
     {
-        if( it->output_assembly == aConnData->conn_path.consuming_path.GetInstanceOrConnPt()
-         && it->input_assembly  == aConnData->conn_path.producing_path.GetInstanceOrConnPt()
-         && ( it->config_assembly == aConnData->conn_path.config_path.GetInstanceOrConnPt() ||
-            ( it->config_assembly == -1 && !aConnData->conn_path.config_path.HasAny() ) )
+        if( it->output_assembly == aConnData->ConsumingPath().GetInstanceOrConnPt()
+         && it->input_assembly  == aConnData->ProducingPath().GetInstanceOrConnPt()
+         && ( it->config_assembly == aConnData->ConfigPath().GetInstanceOrConnPt() ||
+            ( it->config_assembly == -1 && !aConnData->ConfigPath().HasAny() ) )
           )
         {
             // check if another connection point with the same output assembly is currently connected
-            if( GetConnectedOutputAssembly( aConnData->conn_path.consuming_path.GetInstanceOrConnPt() ) )
+            if( GetConnectedOutputAssembly( aConnData->ConsumingPath().GetInstanceOrConnPt() ) )
             {
                 CIPSTER_TRACE_INFO( "%s:ERROR. Matching consuming assembly id:%d\n",
-                    __func__, aConnData->conn_path.consuming_path.GetInstanceOrConnPt() );
+                    __func__, aConnData->ConsumingPath().GetInstanceOrConnPt() );
 
                 *aExtError = kConnMgrStatusErrorOwnershipConflict;
                 break;
@@ -219,15 +219,15 @@ CipConn* InputOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrStat
     for( InputOnlyConnSet::iterator it = s_input_only.begin();  it != s_input_only.end();  ++it )
     {
         // we have the same output assembly?
-        if( it->output_assembly == aConnData->conn_path.consuming_path.GetInstanceOrConnPt() )
+        if( it->output_assembly == aConnData->ConsumingPath().GetInstanceOrConnPt() )
         {
-            if( it->input_assembly != aConnData->conn_path.producing_path.GetInstanceOrConnPt() )
+            if( it->input_assembly != aConnData->ProducingPath().GetInstanceOrConnPt() )
             {
                 *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
                 break;
             }
 
-            if( it->config_assembly != aConnData->conn_path.config_path.GetInstanceOrConnPt() )
+            if( it->config_assembly != aConnData->ConfigPath().GetInstanceOrConnPt() )
             {
                 *aExtError = kConnMgrStatusInconsistentApplicationPathCombo;
                 break;
@@ -260,21 +260,21 @@ CipConn* ListenOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrSta
     for( ListenOnlyConnSet::iterator it = s_listen_only.begin();  it != s_listen_only.end(); ++it )
     {
                 // we have the same output assembly?
-        if( it->output_assembly == aConnData->conn_path.consuming_path.GetInstanceOrConnPt() )
+        if( it->output_assembly == aConnData->ConsumingPath().GetInstanceOrConnPt() )
         {
-            if( it->input_assembly != aConnData->conn_path.producing_path.GetInstanceOrConnPt() )
+            if( it->input_assembly != aConnData->ProducingPath().GetInstanceOrConnPt() )
             {
                 *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
                 break;
             }
 
-            if( it->config_assembly != aConnData->conn_path.config_path.GetInstanceOrConnPt() )
+            if( it->config_assembly != aConnData->ConfigPath().GetInstanceOrConnPt() )
             {
                 *aExtError = kConnMgrStatusInconsistentApplicationPathCombo;
                 break;
             }
 
-            if( NULL == GetExistingProducerMulticastConnection( aConnData->conn_path.producing_path.GetInstanceOrConnPt() ) )
+            if( NULL == GetExistingProducerMulticastConnection( aConnData->ProducingPath().GetInstanceOrConnPt() ) )
             {
                 *aExtError = kConnMgrStatusNonListenOnlyConnectionNotOpened;
                 break;
@@ -386,9 +386,9 @@ CipConn* GetExistingProducerMulticastConnection( int input_point )
         if( producer_multicast_connection->InstanceType() == kConnInstanceTypeIoExclusiveOwner
          || producer_multicast_connection->InstanceType() == kConnInstanceTypeIoInputOnly )
         {
-            if( input_point == producer_multicast_connection->conn_path.producing_path.GetInstanceOrConnPt()
+            if( input_point == producer_multicast_connection->ProducingPath().GetInstanceOrConnPt()
                 && producer_multicast_connection->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
-                && kSocketInvalid != producer_multicast_connection->ProducingSocket() )
+                && producer_multicast_connection->ProducingUdp() )
             {
                 // we have a connection that produces the same input assembly,
                 // is a multicast producer and manages the connection.
@@ -412,9 +412,9 @@ CipConn* GetNextNonControlMasterConnection( int input_point )
         if( c->InstanceType() == kConnInstanceTypeIoExclusiveOwner
          || c->InstanceType() == kConnInstanceTypeIoInputOnly )
         {
-            if( input_point == c->conn_path.producing_path.GetInstanceOrConnPt()
+            if( input_point == c->ProducingPath().GetInstanceOrConnPt()
              && c->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
-             && c->ProducingSocket() == kSocketInvalid )
+             && !c->ProducingUdp() )
             {
                 // we have a connection that produces the same input assembly,
                 // is a multicast producer and does not manages the connection.
@@ -435,11 +435,11 @@ void CloseAllConnectionsForInputWithSameType(
     while( c != g_active_conns.end() )
     {
         if( instance_type == c->InstanceType() &&
-            input_point   == c->conn_path.producing_path.GetInstanceOrConnPt() )
+            input_point   == c->ProducingPath().GetInstanceOrConnPt() )
         {
             CheckIoConnectionEvent(
-                    c->conn_path.consuming_path.GetInstanceOrConnPt(),
-                    c->conn_path.producing_path.GetInstanceOrConnPt(),
+                    c->ConsumingPath().GetInstanceOrConnPt(),
+                    c->ProducingPath().GetInstanceOrConnPt(),
                     kIoConnectionEventClosed );
 
             CipConn* to_close = c;
@@ -472,7 +472,7 @@ bool ConnectionWithSameConfigPointExists( int config_point )
 
     for( ; c != g_active_conns.end(); ++c )
     {
-        if( config_point == c->conn_path.config_path.GetInstanceOrConnPt() )
+        if( config_point == c->ConfigPath().GetInstanceOrConnPt() )
         {
             break;
         }

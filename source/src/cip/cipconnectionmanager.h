@@ -55,7 +55,9 @@ public:
      * received.
      *
      * This function should be invoked by the network layer.
-     * @param from_address address from which the data has been received. Only
+     *
+     * @param aSocket is the socket that the connected data arrived on.
+     * @param aFromAddress address from which the data has been received. Only
      *           data from the connections originator may be accepted. Avoids
      *           connection hijacking
      * @param aCommand received data buffer pointing just past the
@@ -63,8 +65,8 @@ public:
      * @param aReply where to put the reply and tells its maximum length.
      * @return EipStatus
      */
-    static EipStatus HandleReceivedConnectedData(
-        const SockAddr& from_address, BufReader aCommand );
+    static EipStatus HandleReceivedConnectedData( UdpSocket* aSocket,
+        const SockAddr& aFromAddress, BufReader aCommand );
 
     //-----<CipServiceFunctions>------------------------------------------------
     static EipStatus forward_open_service( CipInstance* instance,

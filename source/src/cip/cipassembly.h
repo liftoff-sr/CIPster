@@ -8,7 +8,7 @@
 
 #include <typedefs.h>
 #include "ciptypes.h"
-#include "cipinstance.h"
+#include "cipclass.h"
 
 
 /**
@@ -21,7 +21,7 @@
 class AssemblyInstance : public CipInstance
 {
 public:
-    AssemblyInstance( int aInstanceId, BufWriter aBuf );
+    AssemblyInstance( int aInstanceId, ByteBuf aBuf );
 
 //protected:
     ByteBuf     byte_array;
@@ -30,16 +30,9 @@ public:
 
 // public functions
 
-/** @brief Setup the Assembly object
- *
- * Creates the Assembly Class with zero instances and sets up all services.
- *
- * @return Returns kEipStatusOk if assembly object was successfully created, otherwise kEipStatusError
- */
-EipStatus CipAssemblyInitialize();
-
-
-/** @brief notify an Assembly object that data has been received for it.
+/**
+ * Function NofityAssemblyConnectedDataReceived
+ * notifies an Assembly object that data has been received for it.
  *
  *  The data will be copied into the assembly instance's attribute 3 and
  *  the application will be informed with the IApp_after_assembly_data_received function.
@@ -51,5 +44,34 @@ EipStatus CipAssemblyInitialize();
  *     - EIP_ERROR the received data was wrong
  */
 EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* aInstance, BufReader aInput );
+
+
+
+class CipAssemblyClass : public CipClass
+{
+public:
+    CipAssemblyClass() :
+        CipClass( kCipAssemblyClass,
+            "Assembly",
+            MASK7( 1,2,3,4,5,6,7 ), // common class attributes mask
+            2                       // class revision
+            )
+    {
+    }
+
+    CipError OpenConnection( ConnectionData* aConnData,
+                Cpf* aCpf, ConnMgrStatus* aExtError ); // override
+
+    static AssemblyInstance* CreateInstance( int aInstanceId, ByteBuf aBuffer );
+
+    /**
+     * Function Init
+     * sets up the Assembly Class with zero instances and sets up all services.
+     *
+     * @return EipStatus - kEipStatusOk if assembly object was successfully
+     *  created, otherwise kEipStatusError
+     */
+    static EipStatus Init();
+};
 
 #endif // CIPSTER_CIPASSEMBLY_H_

@@ -162,23 +162,25 @@ int EncodeData( CipDataType aDataType, const void* cip_data, BufWriter& aBuf );
  */
 int DecodeData( CipDataType aDataType, void* cip_data, BufReader& aBuf );
 
-/** @ingroup CIP_API
- * @brief Create an instance of an assembly object
+/**
+ * Function CreateAssemblyInstance
+ * creates an instance of an assembly
  *
  * @param aInstanceId  instance number of the assembly object to create
- * @param aBuffer      the data the assembly object should contain and its byte count.
- * @return CipInstance* - the instance of the created assembly object or NULL on error.
+ * @param aByteBuf     the data the assembly object should contain and its byte count.
  *
  * Assembly Objects for Configuration Data:
  *
- * The CIP stack treats configuration assembly objects the same way as any other
- * assembly object.
- * In order to support a configuration assembly object it has to be created with
- * this function.
+ * CIPster treats configuration assembly objects the same way as any other
+ * assembly object.  In order to support a configuration assembly object it
+ * has to be created with this function.
  * The notification on received configuration data is handled with the
- * IApp_after_receive function.
+ * NotifyAssemblyConnectedDataReceived() function.
  */
-CipInstance* CreateAssemblyInstance( int aInstanceId, BufWriter aBuffer );
+inline AssemblyInstance* CreateAssemblyInstance( int aInstanceId, ByteBuf aByteBuf )
+{
+    return CipAssemblyClass::CreateInstance( aInstanceId, aByteBuf );
+}
 
 class CipConn;
 
@@ -373,7 +375,7 @@ void RunIdleChanged( EipUint32 run_idle_value );
  */
 inline bool CloseSession( int aSocket )
 {
-    return ServerSessionMgr::CloseBySocket( aSocket );
+    return SessionMgr::CloseBySocket( aSocket );
 }
 
 /** @mainpage CIPster - Open Source EtherNet/IP(TM) Communication Stack
@@ -453,7 +455,7 @@ inline bool CloseSession( int aSocket )
  *       configured:
  *        - EipStatus ConfigureNetworkInterface(const char *ip_address,
  *        const char *subnet_mask, const char *gateway_address)
- *        - void ConfigureMACAddress(const EIP_UINT8 *mac_address)
+ *        - void ConfigureMACAddress(const CipByte *mac_address)
  *        - void ConfigureDomainName(const char *domain_name)
  *        - void ConfigureHostName(const char *host_name)
  *        .
@@ -489,20 +491,20 @@ inline bool CloseSession( int aSocket )
  *     encapsulation layer with the functions: \n
  *     int Encapsulation::HandleReceivedExplicitTcpData( int socket, BufReader aCommand, BufWriter aReply ),
  *     int Encapsulation::HandleReceivedExplicitUdpData(int socket_handle, const SockAddr&
- *  from_address, EIP_UINT8* buffer, unsigned buffer_length, int
+ *  aFromAddress, CipByte* buffer, unsigned buffer_length, int
  * *number_of_remaining_bytes).\n
  *     Depending if the data has been received from a TCP or from a UDP socket.
  *     As a result of this function a response may have to be sent. The data to
  *     be sent is in the given buffer pa_buf.
  *   - Create UDP sending and receiving sockets for implicit connected
  * messages\n
- *     CIPster will use function int CreateUdpSocket(
- *     UdpDirection aDirection, const SockAddr& aSockAddr)
+ *     CIPster will use function int CreateUdpSocket( const SockAddr& aSockAddr)
  *     for informing the platform specific code that a new connection is
  *     established and new sockets are necessary
  *   - Receive implicit connected data on a receiving UDP socket\n
  *     The received data has to be hand over to the Connection Manager Object
- *     with the function EipStatus HandleReceivedConnectedData( const SockAddr& from_address, BufReader aCommand );
+ *     with the function EipStatus HandleReceivedConnectedData( UdpSocket* aSocket,
+ *      const SockAddr& aFromAddress, BufReader aCommand );
  *   - Close UDP and TCP sockets:
  *      -# Requested by CIPster through the call back function: void
  * CloseSocket(int aSocket)
@@ -540,8 +542,8 @@ inline bool CloseSession( int aSocket )
  *   - S_CIP_Instance *AddCIPInstance(S_CIP_Class * cip_class, CipUdint
  * instance_id);
  *   - void InsertAttribute(S_CIP_Instance *instance, CipUint
- * attribute_number, EIP_UINT8 cip_type, void* data);
- *   - void InsertService(S_CIP_Class *class, EIP_UINT8 service_number,
+ * attribute_number, CipByte cip_type, void* data);
+ *   - void InsertService(S_CIP_Class *class, CipByte service_number,
  * CipServiceFunction service_function, char *service_name);
  *
  * @page license CIPster Open Source License
@@ -550,7 +552,7 @@ inline bool CloseSession( int aSocket )
  * guarding conditions for using CIPster in own products. For this please look
  * in license text as shown below:
  *
- * @include "license.txt"
+ * @include "../../license.txt"
  *
  */
 

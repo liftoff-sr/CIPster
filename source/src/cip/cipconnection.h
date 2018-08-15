@@ -45,10 +45,11 @@
 #include "cipepath.h"
 #include "cipclass.h"
 
-/// The port to be used per default for I/O messages on UDP, do not change this.
+/// The port to be used per default for I/O messages on UDP, do not change this,
+/// You may change g_data.cc's g_my_io_udp_port instead.
 const int kEIP_IoUdpPort = 0x08AE;      // = 2222
 
-
+class UdpSocket;
 
 /**
  * Enum ConnState
@@ -337,7 +338,7 @@ public:
         return *this;
     }
 
-    ConnTriggerType Trigger()  const
+    ConnTriggerType Trigger() const
     {
         return ConnTriggerType( (bits >> 4) & 7 );
     }
@@ -404,36 +405,64 @@ struct LinkObject
 class ConnectionPath : public Serializeable
 {
 public:
-    // They arrive in this order when all are present in a forward_open request:
-
-    CipPortSegmentGroup     port_segs;  // has optional electronic key.
-
-    // per 3-5.4.1.10 the application path names are relative to the target node.
-    // A consuming_path is for a O->T connection.
-    // A producing_path is for a T->O connection.
-
-    CipAppPath              config_path;
-    CipAppPath              consuming_path;     ///< consumption from my perspective, output from network's perspective
-    CipAppPath              producing_path;     ///< production from my perspective, input from network's perspective
-
-    CipSimpleDataSegment    data_seg;
-
-    std::string Format() const;
-
     void Clear()
     {
         port_segs.Clear();
-        config_path.Clear();
-        consuming_path.Clear();
-        producing_path.Clear();
+        app_path[0].Clear();
+        app_path[1].Clear();
+        app_path[2].Clear();
         data_seg.Clear();
     }
+
+    /**
+     * Function Deserialize
+     * decodes a connection path.  Useful when decoding a forward open request
+     * or forward close request.
+     *
+     * @param aInput provides the encoded segments and should be length limited
+     *   so this function knows when to stop consuming input bytes. Construct this
+     *   BufReader using the word count which precedes most connection_paths.
+     *
+     * @return int - the count of consumed bytes from aInput
+     * @throw std::overflow_error - on aInput overrrun or
+     *        std::range_error    - if problem with aInput's contents.
+     */
+    int Deserialize( BufReader aInput );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
     int SerializedCount( int aCtl = 0 ) const;
     //-----</Serializeable>-----------------------------------------------------
+
+   // They arrive in this order when all are present in a forward_open request:
+    CipPortSegmentGroup     port_segs;  // has optional electronic key.
+    CipAppPath              app_path[3];
+    CipSimpleDataSegment    data_seg;
+
+#define app_path1           app_path[0]
+#define app_path2           app_path[1]
+#define app_path3           app_path[2]
 };
+
+
+/*
+class ConnError : public std::runtime_error
+{
+public:
+    ConnError(
+            const char* aMsg,
+            CipError aGenStatus,
+            ConnMgrStatus aExtStatus = kConnMgrStatusSuccess
+            ) :
+        std::runtime_error( aMsg ),
+        gen_status( aGenStatus ),
+        ext_status( aExtStatus )
+    {}
+
+    CipError        gen_status;
+    ConnMgrStatus   ext_status;
+};
+*/
 
 
 /**
@@ -466,14 +495,25 @@ public:
             CipUdint a_T_to_O_RPI_usecs = 0
             );
 
-    CipByte             priority_timetick;
-    CipByte             timeout_ticks;
+    std::string Format() const;
 
     CipUdint    ConsumingConnectionId() const               { return consuming_connection_id; }
     void        SetConsumingConnectionId( CipUdint aCid )   { consuming_connection_id = aCid; }
 
     CipUdint    ProducingConnectionId() const               { return producing_connection_id; }
     void        SetProducingConnectionId( CipUdint aCid )   { producing_connection_id = aCid; }
+
+
+    // per Vol1 3-5.4.1.10 the application path names are relative to the target node.
+    // A consuming_path is for a O->T connection.
+    // A producing_path is for a T->O connection.
+
+    CipAppPath& ConfigPath() const      { return config_path    < 0 ? HasAny_No : (CipAppPath&) conn_path.app_path[config_path]; }
+    CipAppPath& ConsumingPath() const   { return consuming_path < 0 ? HasAny_No : (CipAppPath&) conn_path.app_path[consuming_path]; }
+    CipAppPath& ProducingPath() const   { return producing_path < 0 ? HasAny_No : (CipAppPath&) conn_path.app_path[producing_path]; }
+
+    CipByte             priority_timetick;
+    CipByte             timeout_ticks;
 
 protected:
     // In general, the consuming device selects the Network Connection ID for a
@@ -517,7 +557,7 @@ public:
         ConnTimeoutMultiplier ret =
             ConnTimeoutMultiplier( 1 << (2 + connection_timeout_multiplier_value) );
 
-        CIPSTER_TRACE_INFO( "%s: %d\n", __func__, ret );
+        //CIPSTER_TRACE_INFO( "%s: %d\n", __func__, ret );
         return ret;
     }
 
@@ -543,13 +583,19 @@ public:
      * @param aInput provides the encoded segments and should be length limited
      *   so this function knows when to stop consuming input bytes. Construct this
      *   BufReader using the word count which precedes most connection_paths.
-     * @param aExtError where to put the extended error code in case of error
      *
-     * @return CipError - indicating success of the decoding
-     *    - kCipErrorSuccess on success
-     *    - On an error the general status code to be put into the response
+     * @return int - the count of consumed bytes from aInput
+     * @throw std::overflow_error - on aInput overrrun or
+     *        std::range_error    - if problem with aInput's contents.
      */
-    CipError DeserializeConnectionPath( BufReader aInput, ConnMgrStatus* aExtError );
+    int DeserializeConnectionPath( BufReader aInput )
+    {
+        return conn_path.Deserialize( aInput );
+    }
+
+    CipError ResolveInstances( ConnMgrStatus* aExtError );
+    CipError VerifyForwardOpenParams( ConnMgrStatus* aExtError );
+    CipError CorrectSizes( ConnMgrStatus* aExtError );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
@@ -601,6 +647,15 @@ protected:
 
     // class id of the clazz->OpenConnection() virtual to call
     int                 mgmnt_class;
+
+private:
+
+    static CipAppPath   HasAny_No;       // indices below indicate this when -1
+
+    // indices into conn_path.app_path[], except that -1 indicates HasAny_No
+    CipSint             config_path;
+    CipSint             consuming_path;
+    CipSint             producing_path;
 };
 
 
@@ -637,17 +692,17 @@ public:
      * changes state of this CipConn to activated if it can, otherwise returns
      * an error.
      */
-    CipError Activate( Cpf* cpfd, ConnMgrStatus* aExtError,
-            EipUint16* aCorrectedOTz , EipUint16* aCorrectedTOz );
+    CipError Activate( Cpf* cpfd, ConnMgrStatus* aExtError );
 
     void Clear( bool doConnectionDataToo = true );
 
     /**
-     * Function GeneralConnectionConfiguration
+     * Function GeneralConfiguration
+     * was GeneralConnectionConfiguration() and
      * generates the ConnectionIDs and sets the general configuration
      * parameters in this CipConn
      */
-    void GeneralConnectionConfiguration( ConnectionData* aConnData, ConnInstanceType aType );
+    void GeneralConfiguration( ConnectionData* aConnData, ConnInstanceType aType );
 
     CipConn& SetState( ConnState aNewState )
     {
@@ -707,7 +762,7 @@ public:
     CipUdint TimeoutUSecs() const
     {
         CipUdint ret = expected_packet_rate_usecs * TimeoutMultiplier();
-        CIPSTER_TRACE_INFO( "%s: %d\n", __func__, ret );
+        //CIPSTER_TRACE_INFO( "%s: %d\n", __func__, ret );
         return ret;
     }
 
@@ -769,11 +824,19 @@ public:
      */
     void Close();
 
-    int ConsumingSocket() const             { return consuming_socket; }
-    void SetConsumingSocket( int aSocket )  { consuming_socket = aSocket; }
+    UdpSocket* ConsumingUdp() const  { return consuming_socket; }
+    UdpSocket* ProducingUdp() const  { return producing_socket; }
 
-    int ProducingSocket() const             { return producing_socket; }
-    void SetProducingSocket( int aSocket )  { producing_socket = aSocket; }
+
+    void SetConsumingUdp( UdpSocket* aSocket )
+    {
+        consuming_socket  = aSocket;
+    }
+
+    void SetProducingUdp( UdpSocket* aSocket )
+    {
+        producing_socket  = aSocket;
+    }
 
     /**
      * Function NewConnectionId
@@ -908,9 +971,8 @@ protected:
     EipInt32    inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
     EipInt32    transmission_trigger_timer_usecs;   // signed 32 bits, in usecs
 
-    int         consuming_socket;
-    int         producing_socket;
-
+    UdpSocket*  consuming_socket;
+    UdpSocket*  producing_socket;
     CipUdint    encap_session;          // session_handle, 0 is not used.
 
 private:

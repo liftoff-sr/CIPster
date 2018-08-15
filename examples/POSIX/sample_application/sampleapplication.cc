@@ -28,27 +28,27 @@ EipStatus ApplicationInitialization()
     // create 3 assembly object instances
     // INPUT
     CreateAssemblyInstance( DEMO_APP_INPUT_ASSEMBLY_NUM,
-        BufWriter( g_assembly_data064, sizeof(g_assembly_data064) ) );
+        ByteBuf( g_assembly_data064, sizeof(g_assembly_data064) ) );
 
     // OUTPUT
     CreateAssemblyInstance( DEMO_APP_OUTPUT_ASSEMBLY_NUM,
-        BufWriter( g_assembly_data096, sizeof(g_assembly_data096) ) );
+        ByteBuf( g_assembly_data096, sizeof(g_assembly_data096) ) );
 
     // CONFIG
     CreateAssemblyInstance( DEMO_APP_CONFIG_ASSEMBLY_NUM,
-        BufWriter( g_assembly_data097, sizeof(g_assembly_data097) ) );
+        ByteBuf( g_assembly_data097, sizeof(g_assembly_data097) ) );
 
     // Heart-beat output assembly for Input only connections
     CreateAssemblyInstance( DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM,
-        BufWriter( 0, 0 ) );
+        ByteBuf( 0, 0 ) );
 
     // Heart-beat output assembly for Listen only connections
     CreateAssemblyInstance( DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM,
-        BufWriter( 0, 0 ) );
+        ByteBuf( 0, 0 ) );
 
     // assembly for explicit messaging
     CreateAssemblyInstance( DEMO_APP_EXPLICT_ASSEMBLY_NUM,
-        BufWriter( g_assembly_data09A, sizeof(g_assembly_data09A) ) );
+        ByteBuf( g_assembly_data09A, sizeof(g_assembly_data09A) ) );
 
     // Reserve some connection instances for the above assemblies:
 

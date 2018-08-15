@@ -113,7 +113,6 @@ public:
             SetAttribute( aAttributeId );
     }
 
-
     /**
      * Function DeserializeAppPath
      * deserializes an application_path
@@ -121,17 +120,15 @@ public:
      * @param aInput starts at a possible app_path and can extend beyond it.
      *
      * @param aPreviousToInheritFrom is typically an immediately preceding CipAppPath
-     *  that this one is to inherit values from.  The value inherited are the
-     *  "more significant" fields than the first one encountered for this CipAppPath.
+     *  that this one is to inherit logical segment values from.  The values
+     *  inherited are the "more significant" fields than the first one encountered
+     *  for this CipAppPath.
      *
-     * @return int - Number of decoded bytes, or < 0 if error.  If negative, then
-     *  the absolute value of this result is the byte offset into the problem starting
-     *  from aSrc at zero.  If positive, it is not an error, even though not all the
-     *  available input bytes may have been consumed.  Parsing may stop at the first
-     *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
-     *  If zero, then the first bytes at aInput were not an application_path.
+     * @return int - Number of decoded bytes.  If zero, it means the first bytes
+     *  at aInput were not an application_path, or at least not supported.
      *
-     * @throw whatever BufReader throws on buffer overrun.
+     * @throw std::runtime_error if problem with aInput, or
+     *    std::overrun() from BufReader on buffer overrun.
      */
     int DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom = NULL );
 
@@ -417,12 +414,11 @@ public:
      *
      * @param aInput starts at a possible port segment group and can extend beyond it.
      *
-     * @return int - Number of decoded bytes, or <= 0 if error.  If error, then
-     *  the absolute value of this result is the byte offset of the problem starting
-     *  from aSrc at zero.  If positive, it is not an error, even though not all the
-     *  available input bytes may have been consumed.  Parsing may stop at the first
-     *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
-     *  If zero, then the first bytes at aInput do not pertain to this class.
+     * @return int - Number of decoded bytes.  Not all the bytes available from aInput
+     *  will necessarily be consumed.  Parsing may stop at the first
+     *  segment type not allowed into this SegmentGroup which can be before
+     *  aInput's limit is reached. If zero, then the first bytes at aInput do
+     *  not pertain to this segment type.
      *
      * @throw whatever BufReader will throw on buffer overrun.
      */

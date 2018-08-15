@@ -22,6 +22,23 @@ void LeaveStack( int signal );
 volatile bool g_end_stack;
 
 
+bool parse_mac( const char* mac_str, CipByte mac_out[6] )
+{
+    int b[6];
+
+    if( 6 == sscanf( mac_str, "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5] ) ||
+        6 == sscanf( mac_str, "%x-%x-%x-%x-%x-%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5] ) )
+    {
+        for( int i=0; i<6; ++i )
+            mac_out[i] = b[i];
+
+        return true;
+    }
+
+    return false;
+}
+
+
 int main( int argc, char* argv[] )
 {
     int ret = 0;
@@ -29,13 +46,13 @@ int main( int argc, char* argv[] )
     EipUint8    my_mac_address[6];
     EipUint16   unique_connection_id;
 
-    if( argc != 12 )
+    if( argc != 7 )
     {
         printf( "Wrong number of command line parameters! %d instead of 12\n", argc );
         printf( "The correct command line parameters are:\n" );
         printf( "%s ipaddress subnetmask gateway domainname hostaddress macaddress\n", argv[0] );
         printf( "e.g.\n" );
-        printf( "    %s 192.168.0.2 255.255.255.0 192.168.0.1 test.com testdevice 00 15 C5 BF D0 87\n", argv[0] );
+        printf( "    %s 192.168.0.2 255.255.255.0 192.168.0.1 test.com testdevice 00:15:C5:BF:D0:87\n", argv[0] );
         ret = 1;
         goto exit;
     }
@@ -52,12 +69,14 @@ int main( int argc, char* argv[] )
     ConfigureDomainName( argv[4] );
     ConfigureHostName( argv[5] );
 
-    my_mac_address[0]   = (EipUint8) strtoul( argv[6], NULL, 16 );
-    my_mac_address[1]   = (EipUint8) strtoul( argv[7], NULL, 16 );
-    my_mac_address[2]   = (EipUint8) strtoul( argv[8], NULL, 16 );
-    my_mac_address[3]   = (EipUint8) strtoul( argv[9], NULL, 16 );
-    my_mac_address[4]   = (EipUint8) strtoul( argv[10], NULL, 16 );
-    my_mac_address[5]   = (EipUint8) strtoul( argv[11], NULL, 16 );
+    if( !parse_mac( argv[6], my_mac_address ) )
+    {
+        printf( "Bad macaddress format. It can use either : or - to separate:\n"
+                " e.g. 00:15:C5:BF:D0:87 or 00-15-C5-BF-D0-87\n" );
+        ret = 2;
+        goto exit;
+    }
+
     ConfigureMacAddress( my_mac_address );
 
     // for a real device the serial number should be unique per device

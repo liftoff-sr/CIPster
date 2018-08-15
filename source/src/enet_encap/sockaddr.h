@@ -51,6 +51,12 @@ public:
         return *this;
     }
 
+    bool operator==( const SockAddr& other ) const
+    {
+        return sa.sin_addr.s_addr == other.sa.sin_addr.s_addr
+           &&  sa.sin_port == other.sa.sin_port;
+    }
+
     operator const sockaddr_in& () const    { return sa; }
     operator const sockaddr*    () const    { return (sockaddr*) &sa; }
     operator       sockaddr*    () const    { return (sockaddr*) &sa; }
@@ -78,6 +84,16 @@ public:
         return sa.sin_family == AF_INET
           &&   !memcmp( &sa.sin_zero[0], &sa.sin_zero[1], 7 )
           &&   !sa.sin_zero[0];
+    }
+
+    bool IsMulticast() const
+    {
+        // Vol2 3-5.3
+         const unsigned lo = 0xefc00100;  // same as "239.192.1.0" in host byte order
+         const unsigned hi = 0xefc00100 | 0x3ff;
+
+         unsigned addr = ntohl( sa.sin_addr.s_addr );
+         return lo <= addr && addr <= hi;
     }
 
 protected:

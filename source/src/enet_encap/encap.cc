@@ -63,12 +63,12 @@ struct DelayedMsg
 DelayedMsg DelayedMsg::messages[ENCAP_NUMBER_OF_SUPPORTED_DELAYED_ENCAP_MESSAGES];
 
 
-//-----<ServerSessionMgr>-------------------------------------------------------
+//-----<SessionMgr>-------------------------------------------------------
 
-EncapSession ServerSessionMgr::sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];
+EncapSession SessionMgr::sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];
 
 
-void ServerSessionMgr::Init()
+void SessionMgr::Init()
 {
     /* now done in static constructor
 
@@ -80,18 +80,29 @@ void ServerSessionMgr::Init()
     */
 }
 
-
-EncapError ServerSessionMgr::RegisterTcpConnection( int aSocket )
+inline int inc_wrap( int index )
 {
-    int index;
+    int r = index + 1;
 
-    for( index = 0; index < DIM(sessions); ++index )
+    if( r >= DIM(SessionMgr::sessions) )
+        r = 0;
+
+    return r;
+}
+
+EncapError SessionMgr::RegisterTcpConnection( int aSocket, CipUdint* aSessionHandleResult )
+{
+    static int index;
+    int i;
+
+    for( i=0, index = inc_wrap(index);
+        i < DIM(sessions); index = inc_wrap(index), ++i )
     {
         if( sessions[index].m_socket == kSocketInvalid )
             break;
     }
 
-    if( index == DIM(sessions) )
+    if( i == DIM(sessions) )
     {
         return kEncapErrorInsufficientMemory;
     }
@@ -122,11 +133,14 @@ EncapError ServerSessionMgr::RegisterTcpConnection( int aSocket )
 
     ses.NoteTcpActivity();             // last activity
 
+    if( aSessionHandleResult )
+        *aSessionHandleResult = index + 1;
+
     return kEncapErrorSuccess;
 }
 
 
-EncapError ServerSessionMgr::RegisterSession(
+EncapError SessionMgr::RegisterSession(
         int aSocket, CipUdint* aSessionHandleResult )
 {
     int index;
@@ -167,7 +181,7 @@ EncapError ServerSessionMgr::RegisterSession(
 }
 
 
-EncapSession* ServerSessionMgr::UpdateRegisteredTcpConnection( int aSocket )
+EncapSession* SessionMgr::UpdateRegisteredTcpConnection( int aSocket )
 {
     int index;
 
@@ -189,7 +203,7 @@ EncapSession* ServerSessionMgr::UpdateRegisteredTcpConnection( int aSocket )
 }
 
 
-EncapSession* ServerSessionMgr::CheckRegisteredSession(
+EncapSession* SessionMgr::CheckRegisteredSession(
         CipUdint aSessionHandle, int aSocket )
 {
     // a session handle of zero is not legal, we also check for that.
@@ -207,31 +221,32 @@ EncapSession* ServerSessionMgr::CheckRegisteredSession(
 }
 
 
-bool ServerSessionMgr::CloseBySessionHandle( CipUdint aSessionHandle )
+bool SessionMgr::CloseBySessionHandle( CipUdint aSessionHandle )
 {
     CIPSTER_ASSERT( aSessionHandle && aSessionHandle <= UDIM(sessions) );
 
     unsigned index = aSessionHandle - 1;
 
-    if( index < UDIM(sessions) && sessions[index].m_socket != kSocketInvalid )
+    if( index >= UDIM(sessions) )
     {
-        CIPSTER_TRACE_INFO( "%s[%d]: aSessionHandle:%d\n",
-            __func__, sessions[index].m_socket, aSessionHandle );
-
-        sessions[index].Close();
-        return true;
-    }
-    else
-    {
-        CIPSTER_TRACE_INFO( "%s: BAD or inactive aSessionHandle:%d\n",
+        CIPSTER_TRACE_INFO( "%s: BAD aSessionHandle:%d\n",
             __func__, aSessionHandle );
-
         return false;
     }
+
+    if( sessions[index].m_socket == kSocketInvalid )
+    {
+        CIPSTER_TRACE_INFO( "%s: inactive aSessionHandle:%d\n",
+            __func__, aSessionHandle );
+        return false;
+    }
+
+    sessions[index].Close();
+    return true;
 }
 
 
-bool ServerSessionMgr::CloseBySocket( int aSocket )
+bool SessionMgr::CloseBySocket( int aSocket )
 {
     CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, aSocket );
 
@@ -248,7 +263,7 @@ bool ServerSessionMgr::CloseBySocket( int aSocket )
 }
 
 
-EncapError ServerSessionMgr::UnregisterSession( CipUdint aSessionHandle, int aSocket )
+EncapError SessionMgr::UnregisterSession( CipUdint aSessionHandle, int aSocket )
 {
     CIPSTER_TRACE_INFO( "%s[%d]: session_id:%d\n",
         __func__, aSocket, aSessionHandle );
@@ -269,7 +284,7 @@ EncapError ServerSessionMgr::UnregisterSession( CipUdint aSessionHandle, int aSo
 }
 
 
-void ServerSessionMgr::AgeInactivity()
+void SessionMgr::AgeInactivity()
 {
     //CIPSTER_TRACE_INFO( "%s: \n", __func__ );
 
@@ -307,7 +322,7 @@ void ServerSessionMgr::AgeInactivity()
 }
 
 
-void ServerSessionMgr::Shutdown()
+void SessionMgr::Shutdown()
 {
     EncapSession* it  = sessions;
     EncapSession* end = it + DIM(sessions);
@@ -352,13 +367,13 @@ void Encapsulation::Init()
 
     srand( (unsigned) (uintptr_t) &stack_var );
 
-    ServerSessionMgr::Init();
+    SessionMgr::Init();
 }
 
 
 void Encapsulation::ShutDown()
 {
-    ServerSessionMgr::Shutdown();
+    SessionMgr::Shutdown();
 }
 
 
@@ -566,7 +581,7 @@ int Encapsulation::registerSession( int socket, BufReader aCommand, BufWriter aR
     // register session option parameter is zero.
     if( version && version <= kSupportedProtocolVersion && !options )
     {
-        *aEncapError = ServerSessionMgr::RegisterSession( socket, aSessionHandleResult );
+        *aEncapError = SessionMgr::RegisterSession( socket, aSessionHandleResult );
     }
     else    // protocol not supported
     {
@@ -668,7 +683,8 @@ int Encapsulation::handleReceivedListIdentityCommandDelayed(
 
 int Encapsulation::handleReceivedListInterfacesCommand( BufWriter aReply )
 {
-    // Vol2 2-4.3.3 At present no public items are defined for the ListInterfaces reply.
+    // Vol2_1.23 2-4.3.3
+    // Said no public items are defined for the ListInterfaces reply.
     aReply.put16( 0 );
 
     return 2;
@@ -698,7 +714,7 @@ int Encapsulation::handleReceivedListServicesCommand( BufWriter aReply )
 
         return out.data() - aReply.data();
     }
-    catch( const std::exception& e )
+    catch( const std::runtime_error& e )
     {
         CIPSTER_TRACE_ERR( "%s: buffer overrun\n", __func__ );
         return -1;
@@ -720,7 +736,7 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
     }
 
     // kick the TCP inactivity watchdog timer for this socket
-    ServerSessionMgr::UpdateRegisteredTcpConnection( aSocket );
+    SessionMgr::UpdateRegisteredTcpConnection( aSocket );
 
     Encapsulation encap;
 
@@ -797,21 +813,21 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
         break;
 
     case kEncapCmdUnregisterSession:
-        ServerSessionMgr::UnregisterSession( encap.SessionHandle(), aSocket );
+        SessionMgr::UnregisterSession( encap.SessionHandle(), aSocket );
 
         CIPSTER_TRACE_INFO(
             "%s[%d]: no reply required for encap UnregisterSession\n",
             __func__, aSocket );
 
-        // no reply, but since ServerSessionMgr::UnregisterSession() has already
-        // closed the socket, return 0 so caller does not also.
-        result = 0;
-        break;
+        // Do not reply.  SessionMgr::UnregisterSession() has already
+        // closed the socket, return 0 so caller does not also.  Do not
+        // flow to end of this function where result would be adjusted from 0.
+        return 0;
 
     case kEncapCmdSendRRData:
         if( command.size() )
         {
-            EncapSession* ses = ServerSessionMgr::CheckRegisteredSession(
+            EncapSession* ses = SessionMgr::CheckRegisteredSession(
                                     encap.SessionHandle(), aSocket );
 
             if( ses )
@@ -845,7 +861,7 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
     case kEncapCmdSendUnitData:
         if( command.size() )
         {
-            EncapSession* ses = ServerSessionMgr::CheckRegisteredSession(
+            EncapSession* ses = SessionMgr::CheckRegisteredSession(
                                     encap.SessionHandle(), aSocket );
 
             if( ses )
@@ -878,6 +894,7 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
         break;
     }
 
+    // Adjust result to include Encap Header length.
     if( result >= 0 )
     {
         encap.SetPayloadLength( result );

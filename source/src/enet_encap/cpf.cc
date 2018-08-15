@@ -52,7 +52,7 @@ Cpf::Cpf( const AddressItem& aAddr, CpfId aDataType ) :
 
 const SockAddr* Cpf::ClientAddr() const
 {
-    if( const EncapSession* s = ServerSessionMgr::GetSession( session_handle ) )
+    if( const EncapSession* s = SessionMgr::GetSession( session_handle ) )
     {
         return &s->m_peeraddr;
     }

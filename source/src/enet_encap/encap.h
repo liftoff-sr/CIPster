@@ -27,7 +27,6 @@ const int kSupportedProtocolVersion = 1;        ///< Supported Encapsulation pro
 
 
 /// Ethernet/IP standard port (44818) that all Ethernet/IP devices must support.
-/// This may not be moved: Vol2 2-2
 const int kEIP_Reserved_Port        = 0xAF12;
 
 
@@ -385,9 +384,8 @@ struct EncapSession
 
 
 /**
- * Class ServerSessionMgr
- * manages TCP connections and Ethernet/IP encapsulation sessions originated
- * TCP by clients to this node, of course in such a role this node is a server.
+ * Class SessionMgr
+ * manages TCP connections and Ethernet/IP encapsulation sessions.
  * <p>
  * Before a TCP connection can graduate to a registered EncapSession, it must
  * be registered as a mere TCP connection here.  Not every TCP connection will become
@@ -395,7 +393,7 @@ struct EncapSession
  * A registered TCP connection is stored as an EncapSesssion instance with the
  * m_is_registered bool set to false.
  */
-class ServerSessionMgr
+class SessionMgr
 {
 public:
 
@@ -407,7 +405,7 @@ public:
      * Function RegisterTcpConnection
      * must be called for aSocket before calling RegisterSession()
      */
-    static EncapError RegisterTcpConnection( int aSocket );
+    static EncapError RegisterTcpConnection( int aSocket, CipUdint* aSessionHandleResult = NULL );
 
     /// Register a client using the OS socket allocated when we accepted the TCP connection
     static EncapError RegisterSession( int aSocket, CipUdint* aSessionHandleResult );
@@ -488,6 +486,7 @@ public:
 
 private:
 
+    friend int inc_wrap( int index );
     static EncapSession sessions[CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS];
 };
 

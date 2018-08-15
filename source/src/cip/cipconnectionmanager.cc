@@ -45,10 +45,10 @@ CipConn* CipConnMgrClass::FindExistingMatchingConnection( const ConnectionData& 
 }
 
 
-EipStatus CipConnMgrClass::HandleReceivedConnectedData(
+EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
         const SockAddr& aFromAddress, BufReader aCommand )
 {
-    CIPSTER_TRACE_INFO( "%s: %zd bytes\n", __func__, aCommand.size() );
+    CIPSTER_TRACE_INFO( "%s[%d]: %zd bytes\n", __func__, aSocket->h(), aCommand.size() );
 
     Cpf cpfd;
 
@@ -71,8 +71,8 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
 
             if( !conn )
             {
-                CIPSTER_TRACE_INFO( "%s: no existing connection for CID:0x%x\n",
-                    __func__, cpfd.AddrConnId()
+                CIPSTER_TRACE_INFO( "%s[%d]: no existing connection for CID:0x%x\n",
+                    __func__, aSocket->h(), cpfd.AddrConnId()
                     );
                 return kEipStatusError;
             }
@@ -94,8 +94,9 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
             // only handle the data if it is coming from the originator
             if( conn->recv_address.Addr() == aFromAddress.Addr() )
             {
-                CIPSTER_TRACE_INFO( "%s: CID:0x%08x  cpf.seq=0x%08x  encap.seq=0x%08x\n",
+                CIPSTER_TRACE_INFO( "%s[%d]: CID:0x%08x  cpf.seq=0x%08x  encap.seq=0x%08x\n",
                     __func__,
+                    aSocket->h(),
                     conn->ConsumingConnectionId(),
                     cpfd.AddrEncapSeqNum(),
                     conn->eip_level_sequence_count_consuming
@@ -110,7 +111,8 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
                     conn->eip_level_sequence_count_consuming_first = false;
                 }
 
-                // only inform assembly object if the sequence counter is greater or equal, or
+                // Vol2 3-4.1:
+                // inform assembly object iff the sequence counter is greater or equal
                 if( SEQ_GT32( cpfd.AddrEncapSeqNum(),
                               conn->eip_level_sequence_count_consuming ) )
                 {
@@ -124,9 +126,10 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
                 else
                 {
                     CIPSTER_TRACE_INFO(
-                        "%s: received sequence number was not greater, no watchdog reset\n"
+                        "%s[%d]: received encap_sequence number was not greater, ignoring frame\n"
                         " received:%08x   connection seqn:%08x\n",
                         __func__,
+                        aSocket->h(),
                         cpfd.AddrEncapSeqNum(),
                         conn->eip_level_sequence_count_consuming
                         );
@@ -135,9 +138,10 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
             else
             {
                 CIPSTER_TRACE_WARN(
-                        "%s: I/O data received with wrong originator address.\n"
+                        "%s[%d]: I/O data received with wrong originator address.\n"
                         " from:%s   originator for provided CID:%s\n",
                         __func__,
+                        aSocket->h(),
                         aFromAddress.AddrStr().c_str(),
                         conn->recv_address.AddrStr().c_str()
                         );
@@ -146,6 +150,8 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData(
             }
         }
     }
+
+    (void) aSocket;
 
     return kEipStatusOk;
 }
@@ -189,12 +195,10 @@ EipStatus CipConnMgrClass::ManageConnections()
                         // If this shows -1 as socket values, its because the other end
                         // closed the transport and we closed it in response already.
                         CIPSTER_TRACE_INFO(
-                            "%s<%d>: >>> c-class:%d timeOut w/ consuming_socket:%d producing_socket:%d\n",
+                            "%s<%d>: >>> c-class:%d timeOut\n",
                             __func__,
                             active->instance_id,
-                            active->trigger.Class(),
-                            active->ConsumingSocket(),
-                            active->ProducingSocket()
+                            active->trigger.Class()
                             );
                     }
 
@@ -211,7 +215,7 @@ EipStatus CipConnMgrClass::ManageConnections()
                     && active->ExpectedPacketRateUSecs() != 0
 
                     // only produce for the master connection
-                    && active->ProducingSocket() != kSocketInvalid )
+                    && active->ProducingUdp() )
                 {
                     if( active->trigger.Trigger() != kConnTriggerTypeCyclic )
                     {
@@ -270,8 +274,8 @@ void CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( CipUdin
 
     if( !another_active_with_same_session_found )
     {
-        CIPSTER_TRACE_INFO( "%s: killing session:%d\n", __func_, aSessionHandle );
-        ServerSessionMgr::CloseBySessionHandle( aSessionHandle );
+        CIPSTER_TRACE_INFO( "%s: killing session:%d\n", __func__, aSessionHandle );
+        SessionMgr::CloseBySessionHandle( aSessionHandle );
     }
 }
 
@@ -328,7 +332,7 @@ CipConn* GetConnectedOutputAssembly( int output_assembly_id )
     {
         if( active->State() == kConnStateEstablished )
         {
-            if( active->conn_path.consuming_path.GetInstanceOrConnPt() == output_assembly_id )
+            if( active->ConsumingPath().GetInstanceOrConnPt() == output_assembly_id )
                 return active;
         }
     }
@@ -391,7 +395,7 @@ bool IsConnectedInputAssembly( int aInstanceId )
 
     for(  ; c != g_active_conns.end();  ++c )
     {
-        if( aInstanceId == c->conn_path.producing_path.GetInstanceOrConnPt() )
+        if( aInstanceId == c->ProducingPath().GetInstanceOrConnPt() )
             return true;
     }
 
@@ -405,7 +409,7 @@ bool IsConnectedOutputAssembly( int aInstanceId )
 
     for( ; c != g_active_conns.end(); ++c )
     {
-        if( aInstanceId == c->conn_path.consuming_path.GetInstanceOrConnPt() )
+        if( aInstanceId == c->ConsumingPath().GetInstanceOrConnPt() )
             return true;
     }
 
@@ -421,8 +425,8 @@ EipStatus TriggerConnections( int aOutputAssembly, int aInputAssembly )
 
     for(  ; c != g_active_conns.end(); ++c )
     {
-        if( aOutputAssembly == c->conn_path.consuming_path.GetInstanceOrConnPt()
-         && aInputAssembly  == c->conn_path.producing_path.GetInstanceOrConnPt() )
+        if( aOutputAssembly == c->ConsumingPath().GetInstanceOrConnPt()
+         && aInputAssembly  == c->ProducingPath().GetInstanceOrConnPt() )
         {
             if( c->trigger.Trigger() == kConnTriggerTypeApplication )
             {
@@ -464,7 +468,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         // do not even send a reply, the params where not all supplied in the request.
         return kEipStatusError;
     }
-    catch( const std::exception& e )
+    catch( const std::runtime_error& e )
     {
         // currently cannot happen except under Murphy's law.
         return kEipStatusError;
@@ -536,14 +540,31 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
 
     // At this point "in" has the exact correct size() for the connection path in bytes.
 
-    gen_status = params.DeserializeConnectionPath( in, &ext_status );
-    if( gen_status != kCipErrorSuccess )
+    try
     {
-
-        CIPSTER_TRACE_INFO( "%s: unable to parse connection path\n", __func__ );
-
+        in += params.DeserializeConnectionPath( in );
+    }
+    catch( const std::exception& ex )
+    {
+        CIPSTER_TRACE_INFO( "%s: %s\n", __func__, ex.what() );
         goto forward_open_response;
     }
+
+    // electronic key?
+    if( params.conn_path.port_segs.HasKey() )
+    {
+        ext_status = params.conn_path.port_segs.Key().Check();
+
+        if( ext_status != kConnMgrStatusSuccess )
+        {
+            CIPSTER_TRACE_ERR( "%s: checkElectronicKeyData failed\n", __func__ );
+            goto forward_open_response;
+        }
+    }
+
+    gen_status = params.ResolveInstances( &ext_status );
+    if( gen_status != kCipErrorSuccess )
+        goto forward_open_response;
 
     CIPSTER_TRACE_INFO( "%s: trigger_class:%d\n", __func__, params.trigger.Class() );
 
@@ -556,6 +577,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     CIPSTER_TRACE_INFO( "%s: t_to_o size:%d\n", __func__, params.t_to_o_ncp.ConnectionSize() );
     CIPSTER_TRACE_INFO( "%s: t_to_o priority:%d\n", __func__, params.t_to_o_ncp.Priority() );
     CIPSTER_TRACE_INFO( "%s: t_to_o type:%s\n", __func__, params.t_to_o_ncp.ShowConnectionType() );
+
 
     CipClass* clazz;
     clazz = GetCipClass( params.mgmnt_class );
@@ -699,7 +721,7 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
         // do not even send a reply, the params where not all supplied in the request.
         return kEipStatusError;
     }
-    catch( const std::exception& e )
+    catch( const std::runtime_error& e )
     {
         // currently cannot happen except under Murphy's law.
         return kEipStatusError;
@@ -718,15 +740,15 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
     }
 
 #if 0   // spec says this is optional
-    gen_status = params.DeserializeConnectionPath( in, &ext_status );
-
-    if( gen_status != kCipErrorSuccess )
+    try
+    {
+        in += params.DeserializeConnectionPath( in );
+    }
+    catch( const std::runtime_error& ex )
     {
         CIPSTER_TRACE_INFO( "%s: unable to parse connection path\n", __func__ );
         goto forward_close_reponse;
     }
-
-    gen_status = kCipErrorConnectionFailure;
 #endif
 
     CIPSTER_TRACE_INFO(

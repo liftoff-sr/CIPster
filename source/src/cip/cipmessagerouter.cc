@@ -208,7 +208,7 @@ CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConnData,
 
     else
     {
-        new_explicit->GeneralConnectionConfiguration( aConnData, kConnInstanceTypeExplicit );
+        new_explicit->GeneralConfiguration( aConnData, kConnInstanceTypeExplicit );
 
         // Save TCP client's IP address in order to qualify a future forward_close.
         CIPSTER_ASSERT( aCpf->ClientAddr() );

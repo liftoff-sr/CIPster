@@ -28,9 +28,11 @@ CipInstance::~CipInstance()
         }
     }
 
-    for( unsigned i = 0; i < attributes.size(); ++i )
-        delete attributes[i];
-    attributes.clear();
+    while( attributes.size() )
+    {
+        delete attributes.back();
+        attributes.pop_back();
+    }
 }
 
 
