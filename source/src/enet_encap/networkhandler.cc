@@ -162,14 +162,15 @@ bool SocketAsync( int aSocket, bool isAsync )
 #if defined(__linux__)
     int flags   = isAsync ? (O_RDWR | O_NONBLOCK) : O_RDWR;
     int ret     = fcntl( aSocket, F_SETFL, flags );
-#else
-    unsigned long mode = 1;
+#elif defined(_WIN32)
+    unsigned long mode = isAsync;
     int ret = ioctlsocket( aSocket, FIONBIO, &mode );
 #endif
 
     if( ret )
     {
-        CIPSTER_TRACE_ERR( "%s: errno:'%s'\n", __func__, strerrno().c_str() );
+        CIPSTER_TRACE_ERR( "%s[%d]: errno:'%s'\n",
+            __func__, aSocket, strerrno().c_str() );
     }
 
     return !ret;
@@ -196,7 +197,7 @@ void CloseSocket( int aSocket )
 
 /**
  * Function checkSocketSet
- * checks if the given socket is set in the read set and master_set.
+ * checks if the given socket is set in 'read_set' and 'master_set'.
  */
 static bool checkSocketSet( int aSocket )
 {
@@ -291,8 +292,8 @@ void CheckAndHandleTcpListenerSocket()
 
         if( new_socket == kSocketInvalid )
         {
-            CIPSTER_TRACE_ERR( "%s: error on accept: %s\n",
-                    __func__, strerrno().c_str() );
+            CIPSTER_TRACE_ERR( "%s[%d]: error on accept: %s\n",
+                    __func__, s_sockets.tcp_listener, strerrno().c_str() );
             return;
         }
 
@@ -301,11 +302,11 @@ void CheckAndHandleTcpListenerSocket()
         if( result != kEncapErrorSuccess )
         {
             CIPSTER_TRACE_ERR(
-                "%s: rejecting incoming TCP connection since count exceeds\n"
+                "%s[%d]: rejecting incoming TCP connection since count exceeds\n"
                 " CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS (= %d)\n",
-                    __func__,
-                    CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS
-                    );
+                __func__, new_socket,
+                CIPSTER_NUMBER_OF_SUPPORTED_SESSIONS
+                );
             return;
         }
 
@@ -348,9 +349,8 @@ void CheckAndHandleUdpLocalBroadcastSocket()
 
         // Handle UDP broadcast messages
         int received_size = recvfrom( s_sockets.udp_local_broadcast_listener,
-                (char*) s_buf,  S_BUFZ,
-                0, from_addr,
-                &from_addr_length );
+                (char*) s_buf,  S_BUFZ, 0,
+                from_addr, &from_addr_length );
 
         if( received_size <= 0 ) // got error
         {
@@ -465,11 +465,11 @@ static void checkAndHandleUdpSockets()
         exhausted.
     */
 
-    UdpSocketMgr::sockets& udp = UdpSocketMgr::GetAllSockets();
+    UdpSocketMgr::sockets& all = UdpSocketMgr::GetAllSockets(); // UDP only
 
     SockAddr    from_addr;
 
-    for( UdpSocketMgr::sock_iter it = udp.begin();  it != udp.end();  ++it )
+    for( UdpSocketMgr::sock_iter it = all.begin();  it != all.end();  ++it )
     {
         UdpSocket*  s = *it;
 
@@ -903,6 +903,7 @@ EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput
     return kEipStatusOk;
 }
 
+//-----<UdpSocketMgr<-----------------------------------------------------------
 
 UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr )
 {
@@ -955,7 +956,7 @@ bool UdpSocketMgr::ReleaseSocket( UdpSocket* aUdpSocket )
     }
     else
     {
-        // noting to do, keep socket open.
+        // nothing to do, keep non-multicasting socket open.
         --aUdpSocket->m_ref_count;
     }
 
@@ -973,7 +974,7 @@ int UdpSocketMgr::createSocket( const SockAddr& aSockAddr )
    if( udp_sock == kSocketInvalid )
    {
         CIPSTER_TRACE_ERR( "%s: errno creating UDP socket: '%s'\n",
-                __func__, strerrno().c_str() );
+            __func__, strerrno().c_str() );
         goto exit;
     }
 
@@ -983,10 +984,7 @@ int UdpSocketMgr::createSocket( const SockAddr& aSockAddr )
     {
         CIPSTER_TRACE_ERR(
             "%s[%d]: errorno with SO_REUSEADDR: '%s'\n",
-            __func__,
-            udp_sock,
-            strerrno().c_str()
-            );
+            __func__, udp_sock, strerrno().c_str() );
 
         goto close_and_exit;
     }
@@ -994,54 +992,33 @@ int UdpSocketMgr::createSocket( const SockAddr& aSockAddr )
     if( bind( udp_sock, aSockAddr, SADDRZ ) )
     {
         CIPSTER_TRACE_ERR( "%s[%d]: bind(%s:%d) errno: '%s'\n",
-                __func__,
-                udp_sock,
-                aSockAddr.AddrStr().c_str(),
-                aSockAddr.Port(),
-                strerrno().c_str()
-                );
+            __func__,
+            udp_sock,
+            aSockAddr.AddrStr().c_str(),
+            aSockAddr.Port(),
+            strerrno().c_str()
+            );
         goto close_and_exit;
     }
 
     CIPSTER_TRACE_INFO( "%s[%d]: bound on %s:%d\n",
-        __func__,
-        udp_sock,
-        aSockAddr.AddrStr().c_str(),
-        aSockAddr.Port()
-        );
+        __func__, udp_sock, aSockAddr.AddrStr().c_str(), aSockAddr.Port() );
 
-#if 1
-    // TODO move this elsewhere.
-    // We should be sending to a multicast address, we should not be binding a socket to one
-    // because Windows does not support that.
-
-    // Is it multicast?
-    if( htonl( aSockAddr.Addr() ) ==
-            CipTCPIPInterfaceClass::MultiCast( 1 ).starting_multicast_address )
     {
         char ttl = CipTCPIPInterfaceClass::TTL(1);
         if( 1 != ttl )
         {
             // set TTL for socket using a byte sized value
-            if( setsockopt( udp_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, 1 ) < 0 )
+            if( setsockopt( udp_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, 1 ) )
             {
                 CIPSTER_TRACE_ERR(
-                        "%s[%d]: could not set TTL to: %d, errno: '%s'\n",
-                        __func__, udp_sock, ttl, strerrno().c_str() );
+                    "%s[%d]: could not set TTL to: %d, errno: '%s'\n",
+                    __func__, udp_sock, ttl, strerrno().c_str() );
 
                 goto close_and_exit;
             }
         }
-
-        CIPSTER_TRACE_INFO( "%s[%d]: producing multicast on %s:%d\n",
-            __func__,
-            udp_sock,
-            aSockAddr.AddrStr().c_str(),
-            aSockAddr.Port()
-            );
     }
-#endif
-
 
     master_set_add( "UDP", udp_sock );
 
@@ -1055,8 +1032,30 @@ close_and_exit:
 }
 
 
+UdpSocket* UdpSocketMgr::alloc( const SockAddr& aSockAddr, int aSocket )
+{
+    UdpSocket* ret;
+
+    if( m_free.size() )
+    {
+        ret = m_free.back();
+        m_free.pop_back();
+
+        UdpSocket( ret ) ( aSockAddr, aSocket );    // in place construction
+    }
+    else
+    {
+        ret = new UdpSocket( aSockAddr, aSocket );
+    }
+
+    return ret;
+}
+
+
 UdpSocketMgr::sockets UdpSocketMgr::m_sockets;
 UdpSocketMgr::sockets UdpSocketMgr::m_free;
+
+//-----</UdpSocketMgr>---------------------------------------------------------
 
 
 #if defined(DEBUG)

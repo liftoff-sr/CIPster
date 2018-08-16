@@ -130,23 +130,8 @@ protected:
      */
     static int createSocket( const SockAddr& aSockAddr );
 
-    static UdpSocket*  alloc( const SockAddr& aSockAddr, int aSocket )
-    {
-        UdpSocket* ret;
-        if( m_free.size() )
-        {
-            ret = m_free.back();
-            m_free.pop_back();
-
-            UdpSocket( ret ) ( aSockAddr, aSocket );
-        }
-        else
-        {
-            ret = new UdpSocket( aSockAddr, aSocket );
-        }
-
-        return ret;
-    }
+    // Allocate and initialize a new UdpSocket
+    static UdpSocket*  alloc( const SockAddr& aSockAddr, int aSocket );
 
     static void free( UdpSocket* aUdpSocket )
     {
@@ -154,7 +139,7 @@ protected:
     }
 
     static sockets      m_sockets;
-    static sockets      m_free;
+    static sockets      m_free;         // recycling bin
 };
 
 

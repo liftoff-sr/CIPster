@@ -2,5 +2,7 @@
 
 *) Add group join support, do not bind to multicast sockets for Windows.
    Easy peasy.
+   @see: https://stackoverflow.com/questions/6140734/cannot-bind-to-multicast-address-windows
+
 
 
