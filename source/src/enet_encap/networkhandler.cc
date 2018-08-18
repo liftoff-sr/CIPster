@@ -993,8 +993,13 @@ bool UdpSocketMgr::ReleaseSocket( UdpSocket* aUdpSocket )
     if( aUdpSocket->m_sockaddr.IsMulticast() )
     {
         for( it = m_multicast.begin();  it != m_multicast.end();  ++it )
+        {
             if( *it == aUdpSocket )
+            {
                 group = *it;
+                break;
+            }
+        }
     }
 
     if( group )
@@ -1004,6 +1009,7 @@ bool UdpSocketMgr::ReleaseSocket( UdpSocket* aUdpSocket )
         if( --group->m_ref_count <= 0 )
         {
             m_multicast.erase( it );
+            UdpSocketMgr::free( group );
 
             ip_mreq mreq;
 
