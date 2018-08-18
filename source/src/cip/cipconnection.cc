@@ -154,8 +154,8 @@ ConnectionData::ConnectionData(
         CipUint aOriginatorVendorId,
         CipUdint aOriginatorSerialNumber,
         ConnTimeoutMultiplier aConnectionTimeoutMultiplier,
-        CipUdint a_O_to_T_RPI_usecs,
-        CipUdint a_T_to_O_RPI_usecs
+        CipUdint aConsumingRPI_usecs,
+        CipUdint aProcudingRPI_usecs
         ) :
     priority_timetick( aPriorityTimeTick ),
     timeout_ticks( aTimeoutTicks ),
@@ -164,10 +164,10 @@ ConnectionData::ConnectionData(
     connection_serial_number( aConnectionSerialNumber ),
     originator_vendor_id( aOriginatorVendorId ),
     originator_serial_number( aOriginatorSerialNumber ),
-    o_to_t_RPI_usecs( a_O_to_T_RPI_usecs ),
-    t_to_o_RPI_usecs( a_T_to_O_RPI_usecs ),
-    corrected_o_to_t_size( 0 ),
-    corrected_t_to_o_size( 0 ),
+    consuming_RPI_usecs( aConsumingRPI_usecs ),
+    producing_RPI_usecs( aProcudingRPI_usecs ),
+    corrected_consuming_size( 0 ),
+    corrected_producing_size( 0 ),
     consuming_instance( 0 ),
     producing_instance( 0 ),
     config_instance( 0 ),
@@ -251,7 +251,7 @@ static CipInstance* check_path( const CipAppPath& aPath,
 }
 
 
-int ConnectionData::DeserializeForwardOpen( BufReader aInput, bool isLarge )
+int ConnectionData::DeserializeForwardOpenRequest( BufReader aInput, bool isLarge )
 {
     BufReader in = aInput;
 
@@ -271,11 +271,11 @@ int ConnectionData::DeserializeForwardOpen( BufReader aInput, bool isLarge )
 
     in += 3;         // skip over 3 reserved bytes.
 
-    o_to_t_RPI_usecs = in.get32();
-    o_to_t_ncp.Set( isLarge ? in.get32() : in.get16(), isLarge );
+    consuming_RPI_usecs = in.get32();
+    consuming_ncp.Set( isLarge ? in.get32() : in.get16(), isLarge );
 
-    t_to_o_RPI_usecs = in.get32();
-    t_to_o_ncp.Set( isLarge ? in.get32() : in.get16(), isLarge );
+    producing_RPI_usecs = in.get32();
+    producing_ncp.Set( isLarge ? in.get32() : in.get16(), isLarge );
 
     /*
         For Forward_Open services that establish a class 0/1 bound connection
@@ -294,7 +294,123 @@ int ConnectionData::DeserializeForwardOpen( BufReader aInput, bool isLarge )
 }
 
 
-int ConnectionData::DeserializeForwardClose( BufReader aInput )
+int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
+{
+    BufWriter out = aOutput;
+
+    /*
+        This block is expected to execute only on an "originator". Originator
+        has a reverse interpretation the following than has a target:
+
+            O->T => Consuming, and T->O => Producing. Instead for originator:
+            O->T => Producing, and T->O => Consuming.
+
+        So swap the order of these values accordingly as we send
+        them so that the ConnectionData accessors are always correct, regardless
+        of the machine that they are executing on. Producing always means
+        producing and Consuming always means consuming.
+    */
+    if( aCtl & CTL_FORWARD_OPEN )
+    {
+        // Vol1 Table 3-5.17
+        out.put8( priority_timetick )
+        .put8( timeout_ticks )
+
+        .put32( ProducingConnectionId() )           // O->T
+        .put32( ConsumingConnectionId() )           // T->O
+
+        // The Connection Triad
+        .put16( connection_serial_number )
+        .put16( originator_vendor_id )
+        .put32( originator_serial_number )
+
+        .put8( connection_timeout_multiplier_value )
+
+        .fill( 3 )      // 3 reserved bytes.
+
+        .put32( ProducingRPI() );
+
+        ProducingNCP().Serialize( out );
+
+        out.put32( ConsumingRPI() );
+        ConsumingNCP().Serialize( out );
+
+        trigger.Serialize( out );
+    }
+
+    if( aCtl & (CTL_INCLUDE_CONN_PATH | CTL_FORWARD_OPEN) )
+    {
+        CipByte* cpathz_loc = out.data();
+
+        out += 1;   // skip over Connection_Path_Size location
+
+        int byte_count = conn_path.Serialize( out, aCtl );
+
+        *cpathz_loc = byte_count / 2;
+
+        out += byte_count;
+    }
+
+    return out.data() - aOutput.data();
+}
+
+
+int ConnectionData::SerializedCount( int aCtl ) const
+{
+    int count = 0;
+
+    if( aCtl & CTL_FORWARD_OPEN )
+    {
+        count += 31 + consuming_ncp.SerializedCount()
+                    + producing_ncp.SerializedCount();
+    }
+
+    if( aCtl & (CTL_INCLUDE_CONN_PATH | CTL_FORWARD_OPEN) )
+    {
+        count +=    1   // connection path size USINT
+                +   conn_path.SerializedCount( aCtl );
+    }
+
+    return count;
+}
+
+
+int ConnectionData::DeserializeForwardOpenResponse( BufReader aInput )
+{
+    // Vol1 Table 3-5.19
+
+    BufReader in = aInput;
+
+    /*
+        When executing this function, the host is acting as an "originator".
+        Originator has a reverse interpretation of "Consuming" and "Producing"
+        than does a target with respect to O->T nomenclature.
+
+            O->T => Consuming, and T->O => Producing.   Target's perspective
+            O->T => Producing, and T->O => Consuming.   Originator's perspective
+
+        So swap the order of these values accordingly as we retrieve
+        them so that the ConnectionData accessors are always correct, regardless
+        of the machine that they are executing on. Producing always means
+        producing and Consuming always means consuming on the host using the
+        accessors.
+    */
+
+    SetProducingConnectionId( in.get32() );         // O->T
+    SetConsumingConnectionId( in.get32() );         // T->O
+
+    connection_serial_number = in.get16();
+    originator_vendor_id     = in.get16();
+    originator_serial_number = in.get32();
+
+    SetProducingRPI( in.get32() );                  // O->T
+    SetConsumingRPI( in.get32() );                  // T->O
+
+    return in.data() - aInput.data();
+}
+
+
+int ConnectionData::DeserializeForwardCloseRequest( BufReader aInput )
 {
     BufReader in = aInput;
 
@@ -329,11 +445,11 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
 
     mgmnt_class = conn_path.app_path1.GetClass();
 
-    IOConnType o_to_t;
-    IOConnType t_to_o;
+    IOConnType o_t;
+    IOConnType t_o;
 
-    o_to_t = o_to_t_ncp.ConnectionType();
-    t_to_o = t_to_o_ncp.ConnectionType();
+    o_t = consuming_ncp.ConnectionType();
+    t_o = producing_ncp.ConnectionType();
 
     int path_count;
     path_count = 1 + conn_path.app_path2.HasAny() + conn_path.app_path3.HasAny();
@@ -343,7 +459,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
 
     // This 'if else if' block is coded to look like table
     // 3-5.13; which should reduce risk of error
-    if( o_to_t == kIOConnTypeNull && t_to_o == kIOConnTypeNull )
+    if( o_t == kIOConnTypeNull && t_o == kIOConnTypeNull )
     {
         if( conn_path.data_seg.HasAny() )
         {
@@ -374,7 +490,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
     }
 
     // Row 2
-    else if( o_to_t != kIOConnTypeNull && t_to_o == kIOConnTypeNull )
+    else if( o_t != kIOConnTypeNull && t_o == kIOConnTypeNull )
     {
         if( conn_path.data_seg.HasAny() )
         {
@@ -425,7 +541,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
     }
 
     // Row 3
-    else if( o_to_t == kIOConnTypeNull && t_to_o != kIOConnTypeNull )
+    else if( o_t == kIOConnTypeNull && t_o != kIOConnTypeNull )
     {
         if( conn_path.data_seg.HasAny() )
         {
@@ -478,7 +594,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
     }
 
     // Row 4
-    else if( o_to_t != kIOConnTypeNull && t_to_o != kIOConnTypeNull )
+    else if( o_t != kIOConnTypeNull && t_o != kIOConnTypeNull )
     {
         if( conn_path.data_seg.HasAny() )
         {
@@ -648,11 +764,11 @@ CipError ConnectionData::VerifyForwardOpenParams( ConnMgrStatus* aExtError )
         if( !conn_path.port_segs.HasPIT() )
         {
             // saw no PIT segment in the connection path, set PIT to one fourth of RPI
-            conn_path.port_segs.SetPIT_USecs( t_to_o_RPI_usecs / 4 );
+            conn_path.port_segs.SetPIT_USecs( producing_RPI_usecs / 4 );
         }
 
         // if production inhibit time has been provided it needs to be smaller than the RPI
-        else if( conn_path.port_segs.GetPIT_USecs() > t_to_o_RPI_usecs )
+        else if( conn_path.port_segs.GetPIT_USecs() > producing_RPI_usecs )
         {
             // see section C-1.4.3.3
             *aExtError = kConnMgrStatusErrorPITGreaterThanRPI;
@@ -666,14 +782,14 @@ CipError ConnectionData::VerifyForwardOpenParams( ConnMgrStatus* aExtError )
 
 CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
 {
-    IOConnType o_to_t = o_to_t_ncp.ConnectionType();
-    IOConnType t_to_o = t_to_o_ncp.ConnectionType();
+    IOConnType o_t = consuming_ncp.ConnectionType();
+    IOConnType t_o = producing_ncp.ConnectionType();
 
     int     data_size;
     int     diff_size;
     bool    is_heartbeat;
 
-    if( o_to_t != kIOConnTypeNull )    // setup consumer side
+    if( o_t != kIOConnTypeNull )    // setup consumer side
     {
         CIPSTER_ASSERT( consuming_instance );
 
@@ -686,7 +802,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         // an assembly object should always have an attribute 3
         CIPSTER_ASSERT( attribute );
 
-        data_size    = o_to_t_ncp.ConnectionSize();
+        data_size    = consuming_ncp.ConnectionSize();
         diff_size    = 0;
         is_heartbeat = ( attr_data->size() == 0 );
 
@@ -704,22 +820,22 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             diff_size += 4;
         }
 
-        if( ( o_to_t_ncp.IsFixed() && data_size != attr_data->size() )
+        if( ( consuming_ncp.IsFixed() && data_size != attr_data->size() )
           ||  data_size >  attr_data->size() )
         {
             // wrong connection size
-            corrected_o_to_t_size = attr_data->size() + diff_size;
+            corrected_consuming_size = attr_data->size() + diff_size;
 
             *aExtError = kConnMgrStatusErrorInvalidOToTConnectionSize;
 
             CIPSTER_TRACE_INFO(
                 "%s: assembly size(%d) != requested conn_size(%d) for consuming:'%s'\n"
-                " corrected_o_to_t:%d\n",
+                " corrected_o_t:%d\n",
                 __func__,
                 (int) attr_data->size(),
                 data_size,
                 ConsumingPath().Format().c_str(),
-                corrected_o_to_t_size
+                corrected_consuming_size
                 );
 
             return kCipErrorConnectionFailure;
@@ -733,7 +849,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             );
     }
 
-    if( t_to_o != kIOConnTypeNull )     // setup producer side
+    if( t_o != kIOConnTypeNull )     // setup producer side
     {
         CIPSTER_ASSERT( producing_instance );
 
@@ -746,10 +862,10 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         // an assembly object should always have an attribute 3
         CIPSTER_ASSERT( attribute );
 
-        data_size    = t_to_o_ncp.ConnectionSize();
+        data_size    = producing_ncp.ConnectionSize();
         diff_size    = 0;
 
-        // Note: spec never talks about a heartbeat t_to_o connection, so why this?
+        // Note: spec never talks about a heartbeat t_o connection, so why this?
         is_heartbeat = ( attr_data->size() == 0 );
 
         if( trigger.Class() == kConnTransportClass1 )
@@ -766,22 +882,22 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             diff_size += 4;
         }
 
-        if( ( t_to_o_ncp.IsFixed() && data_size != attr_data->size() )
+        if( ( producing_ncp.IsFixed() && data_size != attr_data->size() )
           ||  data_size >  attr_data->size() )
         {
             // wrong connection size
-            corrected_t_to_o_size = attr_data->size() + diff_size;
+            corrected_producing_size = attr_data->size() + diff_size;
 
             *aExtError = kConnMgrStatusErrorInvalidTToOConnectionSize;
 
             CIPSTER_TRACE_INFO(
                 "%s: assembly size(%d) != requested conn_size(%d) for producing:'%s'\n"
-                " corrected_t_to_o:%d\n",
+                " corrected_t_o:%d\n",
                 __func__,
                 (int) attr_data->size(),
                 data_size,
                 ProducingPath().Format().c_str(),
-                corrected_t_to_o_size
+                corrected_producing_size
                 );
             return kCipErrorConnectionFailure;
         }
@@ -797,66 +913,6 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
     return kCipErrorSuccess;
 }
 
-
-
-int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
-{
-    BufWriter out = aOutput;
-
-    out.put8( priority_timetick )
-    .put8( timeout_ticks )
-
-    .put32( consuming_connection_id )
-    .put32( producing_connection_id )
-
-    // The Connection Triad
-    .put16( connection_serial_number )
-    .put16( originator_vendor_id )
-    .put32( originator_serial_number )
-
-    .put8( connection_timeout_multiplier_value )
-
-    .fill( 3 )      // output 3 reserved bytes.
-
-    .put32( o_to_t_RPI_usecs );
-
-    o_to_t_ncp.Serialize( out );
-
-    out.put32( t_to_o_RPI_usecs );
-    t_to_o_ncp.Serialize( out );
-
-    trigger.Serialize( out );
-
-    if( aCtl & CTL_INCLUDE_CONN_PATH )
-    {
-        CipByte* cpathz_loc = out.data();
-
-        out += 1;   // skip over Connection_Path_Size location
-
-        int byte_count = conn_path.Serialize( out, aCtl );
-
-        *cpathz_loc = byte_count / 2;
-
-        out += byte_count;
-    }
-
-    return out.data() - aOutput.data();
-}
-
-
-int ConnectionData::SerializedCount( int aCtl ) const
-{
-    int count = 31 + o_to_t_ncp.SerializedCount()
-                   + t_to_o_ncp.SerializedCount();
-
-    if( aCtl & CTL_INCLUDE_CONN_PATH )
-    {
-        count +=    1   // connection path size USINT
-                +   conn_path.SerializedCount( aCtl );
-    }
-
-    return count;
-}
 
 std::string ConnectionData::Format() const
 {
@@ -1041,7 +1097,12 @@ void CipConn::GeneralConfiguration(
 {
     *this = *aConnData;     // copy all the ConnectionData stuff to start with.
 
-    if( o_to_t_ncp.ConnectionType() == kIOConnTypePointToPoint )
+    // In general, the consuming device selects the Network Connection ID for a
+    // point-to-point connection, and the producing device selects the Network
+    // Connection ID for a multicast connection.
+    // See Vol2 Table 3-3.2 Network Connection ID Selection
+
+    if( consuming_ncp.ConnectionType() == kIOConnTypePointToPoint )
     {
         // if we have a point to point connection for O->T
         // the target shall choose the connection Id.
@@ -1054,7 +1115,7 @@ void CipConn::GeneralConfiguration(
         aConnData->SetConsumingConnectionId( ConsumingConnectionId() );
     }
 
-    if( t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast )
+    if( producing_ncp.ConnectionType() == kIOConnTypeMulticast )
     {
         // if we have a multi-cast connection for T->O the
         // target shall choose the connection Id.
@@ -1079,7 +1140,7 @@ void CipConn::GeneralConfiguration(
 
     if( !trigger.IsServer() )  // Client Type Connection requested
     {
-        SetExpectedPacketRateUSecs( t_to_o_RPI_usecs );
+        SetExpectedPacketRateUSecs( producing_RPI_usecs );
 
         // As soon as we are ready we should produce on the connection.
         // With the 0 here we will produce with the next timer tick
@@ -1089,7 +1150,7 @@ void CipConn::GeneralConfiguration(
     else
     {
         // Server Type Connection requested
-        SetExpectedPacketRateUSecs( o_to_t_RPI_usecs );
+        SetExpectedPacketRateUSecs( consuming_RPI_usecs );
     }
 
     production_inhibit_timer_usecs = 0;
@@ -1131,7 +1192,7 @@ void CipConn::Close()
         if( InstanceType() == kConnInstanceTypeIoExclusiveOwner
          || InstanceType() == kConnInstanceTypeIoInputOnly )
         {
-            if( t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast && ProducingUdp() )
+            if( producing_ncp.ConnectionType() == kIOConnTypeMulticast && ProducingUdp() )
             {
                 CipConn* next_non_control_master =
                     GetNextNonControlMasterConnection( ProducingPath().GetInstanceOrConnPt() );
@@ -1196,6 +1257,10 @@ CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError )
             return kCipErrorConnectionFailure;
         }
     }
+
+    // Save TCP peer info for TCP inactivity timeouts, and for originator
+    // definition, before calling openCommunicationsChannels().
+    SetSessionHandle( aCpf->SessionHandle() );
 
     CipError result = openCommunicationChannels( aCpf, aExtError );
 
@@ -1376,7 +1441,7 @@ void CipConn::timeOut()
             kIoConnectionEventTimedOut
             );
 
-        if( t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast )
+        if( producing_ncp.ConnectionType() == kIOConnTypeMulticast )
         {
             switch( InstanceType() )
             {
@@ -1436,8 +1501,11 @@ void CipConn::timeOut()
     // CIP connections that can result from TCP retries at the originator due to
     // link-lost conditions.
 
-    // check all "CIP connections", not just I/O connections.
-    CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( session_handle );
+    if( session_handle )    // If we are a scanner, this could be 0, skip TCP killer
+    {
+        // check all "CIP connections", not just I/O connections.
+        CipConnMgrClass::CheckForTimedOutConnectionsAndCloseTCPConnections( session_handle );
+    }
 }
 
 
@@ -1475,7 +1543,7 @@ CipError CipConn::openConsumingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
 
     SockAddr remotes_source(                // a.k.a "peer"
                 g_my_io_udp_port,           // ignored remote src port
-                aCpf->ClientAddr()->Addr()  // IP of originator
+                aCpf->TcpPeerAddr()->Addr() // IP of TCP peer
                 );
 
     SetConsumingUdp( socket );
@@ -1487,7 +1555,7 @@ CipError CipConn::openConsumingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
 
 CipError CipConn::openProducingPointToPointConnection( Cpf* aCpf, ConnMgrStatus* aExtError )
 {
-    CIPSTER_ASSERT( aCpf->ClientAddr() );
+    CIPSTER_ASSERT( aCpf->TcpPeerAddr() );
 
     int destination_port;
 
@@ -1510,7 +1578,7 @@ CipError CipConn::openProducingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
 
     SockAddr destination(
             destination_port,
-            aCpf->ClientAddr()->Addr()  // TCP client originator
+            aCpf->TcpPeerAddr()->Addr()  // TCP client originator
             );
 
     SockAddr source(
@@ -1633,7 +1701,11 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
         // must be the registered port.
         remotes_destination.SetPort( kEIP_IoUdpPort );
 
-        UdpSocket* socket = UdpSocketMgr::GrabSocket( remotes_destination );
+        SockAddr base_multicast_socket(
+            kEIP_IoUdpPort,
+            ntohl( CipTCPIPInterfaceClass::IpAddress( 1 ) ) );
+
+        UdpSocket* socket = UdpSocketMgr::GrabSocket( base_multicast_socket, &remotes_destination );
 
         if( !socket )
         {
@@ -1690,14 +1762,14 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
 
 CipError CipConn::openCommunicationChannels( Cpf* aCpf, ConnMgrStatus* aExtError )
 {
-    IOConnType  o_to_t = o_to_t_ncp.ConnectionType();
-    IOConnType  t_to_o = t_to_o_ncp.ConnectionType();
+    IOConnType  o_t = consuming_ncp.ConnectionType();
+    IOConnType  t_o = producing_ncp.ConnectionType();
 
     // one, both, or no consuming/producing ends based on IOConnType for each
 
     //----<Consuming End>-------------------------------------------------------
 
-    if( o_to_t == kIOConnTypeMulticast )
+    if( o_t == kIOConnTypeMulticast )
     {
         CipError result = openMulticastConnection( kUdpConsuming, aCpf, aExtError );
 
@@ -1708,7 +1780,7 @@ CipError CipConn::openCommunicationChannels( Cpf* aCpf, ConnMgrStatus* aExtError
         }
     }
 
-    else if( o_to_t == kIOConnTypePointToPoint )
+    else if( o_t == kIOConnTypePointToPoint )
     {
         CipError result = openConsumingPointToPointConnection( aCpf, aExtError );
 
@@ -1721,7 +1793,7 @@ CipError CipConn::openCommunicationChannels( Cpf* aCpf, ConnMgrStatus* aExtError
 
     //----<Producing End>-------------------------------------------------------
 
-    if( t_to_o == kIOConnTypeMulticast )
+    if( t_o == kIOConnTypeMulticast )
     {
         CipError result = openProducingMulticastConnection( aCpf, aExtError );
 
@@ -1732,7 +1804,7 @@ CipError CipConn::openCommunicationChannels( Cpf* aCpf, ConnMgrStatus* aExtError
         }
     }
 
-    else if( t_to_o == kIOConnTypePointToPoint )
+    else if( t_o == kIOConnTypePointToPoint )
     {
         CipError result = openProducingPointToPointConnection( aCpf, aExtError );
 
@@ -1744,11 +1816,11 @@ CipError CipConn::openCommunicationChannels( Cpf* aCpf, ConnMgrStatus* aExtError
     }
 
 /*
-    if( t_to_o != kIOConnTypeNull || o_to_t != kIOConnTypeNull )
+    if( t_o != kIOConnTypeNull || o_t != kIOConnTypeNull )
     {
         // Save TCP client's IP address in order to qualify a future forward_close.
-        CIPSTER_ASSERT( aCpf->ClientAddr() );
-        openers_address = *aCpf->ClientAddr();
+        CIPSTER_ASSERT( aCpf->TcpPeerAddr() );
+        openers_address = *aCpf->TcpPeerAddr();
 
         // Save TCP connection session_handle for TCP inactivity timeouts.
         encap_session   = aCpf->SessionHandle();
@@ -1810,11 +1882,8 @@ CipError CipConnectionClass::OpenIO( ConnectionData* aConnData,
     if( gen_status == kCipErrorSuccess )
     {
         // Save TCP client's IP address in order to qualify a future forward_close.
-        CIPSTER_ASSERT( aCpf->ClientAddr() );
-        c->openers_address = *aCpf->ClientAddr();
-
-        // Save TCP connection session_handle for TCP inactivity timeouts.
-        c->SetSessionHandle( aCpf->SessionHandle() );
+        CIPSTER_ASSERT( aCpf->TcpPeerAddr() );
+        c->openers_address = *aCpf->TcpPeerAddr();
     }
 
     return gen_status;

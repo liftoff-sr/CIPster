@@ -249,7 +249,7 @@ CipConn* InputOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrStat
 
 CipConn* ListenOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrStatus* aExtError )
 {
-    if( aConnData->t_to_o_ncp.ConnectionType() != kIOConnTypeMulticast )
+    if( aConnData->ProducingNCP().ConnectionType() != kIOConnTypeMulticast )
     {
         // a listen only connection has to be a multicast connection.
         *aExtError = kConnMgrStatusNonListenOnlyConnectionNotOpened;
@@ -387,7 +387,7 @@ CipConn* GetExistingProducerMulticastConnection( int input_point )
          || producer_multicast_connection->InstanceType() == kConnInstanceTypeIoInputOnly )
         {
             if( input_point == producer_multicast_connection->ProducingPath().GetInstanceOrConnPt()
-                && producer_multicast_connection->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
+                && producer_multicast_connection->ProducingNCP().ConnectionType() == kIOConnTypeMulticast
                 && producer_multicast_connection->ProducingUdp() )
             {
                 // we have a connection that produces the same input assembly,
@@ -413,7 +413,7 @@ CipConn* GetNextNonControlMasterConnection( int input_point )
          || c->InstanceType() == kConnInstanceTypeIoInputOnly )
         {
             if( input_point == c->ProducingPath().GetInstanceOrConnPt()
-             && c->t_to_o_ncp.ConnectionType() == kIOConnTypeMulticast
+             && c->ProducingNCP().ConnectionType() == kIOConnTypeMulticast
              && !c->ProducingUdp() )
             {
                 // we have a connection that produces the same input assembly,

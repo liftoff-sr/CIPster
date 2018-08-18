@@ -428,7 +428,7 @@ EipStatus TriggerConnections( int aOutputAssembly, int aInputAssembly )
         if( aOutputAssembly == c->ConsumingPath().GetInstanceOrConnPt()
          && aInputAssembly  == c->ProducingPath().GetInstanceOrConnPt() )
         {
-            if( c->trigger.Trigger() == kConnTriggerTypeApplication )
+            if( c->Transport().Trigger() == kConnTriggerTypeApplication )
             {
                 // produce at the next allowed occurrence
                 c->SetTransmissionTriggerTimerUSecs( c->production_inhibit_timer_usecs );
@@ -460,7 +460,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
 
     try
     {
-        in += params.DeserializeForwardOpen( in, isLarge );
+        in += params.DeserializeForwardOpenRequest( in, isLarge );
         conn_path_byte_count = in.get8() * 2;
     }
     catch( const std::range_error& e )
@@ -500,7 +500,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         params.ProducingConnectionId()
         );
 
-    if( params.o_to_t_ncp.ConnectionType() == kIOConnTypeInvalid )
+    if( params.consuming_ncp.ConnectionType() == kIOConnTypeInvalid )
     {
         CIPSTER_TRACE_INFO( "%s: invalid O to T connection type\n", __func__ );
 
@@ -508,7 +508,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         goto forward_open_response;
     }
 
-    if( params.t_to_o_ncp.ConnectionType() == kIOConnTypeInvalid )
+    if( params.producing_ncp.ConnectionType() == kIOConnTypeInvalid )
     {
         CIPSTER_TRACE_INFO( "%s: invalid T to O connection type\n", __func__ );
 
@@ -568,15 +568,15 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
 
     CIPSTER_TRACE_INFO( "%s: trigger_class:%d\n", __func__, params.trigger.Class() );
 
-    CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, params.o_to_t_RPI_usecs );
-    CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, params.o_to_t_ncp.ConnectionSize() );
-    CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, params.o_to_t_ncp.Priority() );
-    CIPSTER_TRACE_INFO( "%s: o_to_t type:%s\n", __func__, params.o_to_t_ncp.ShowConnectionType() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, params.consuming_RPI_usecs );
+    CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, params.consuming_ncp.ConnectionSize() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, params.consuming_ncp.Priority() );
+    CIPSTER_TRACE_INFO( "%s: o_to_t type:%s\n", __func__, params.consuming_ncp.ShowConnectionType() );
 
-    CIPSTER_TRACE_INFO( "%s: t_to_o RPI_usecs:%u\n", __func__, params.t_to_o_RPI_usecs );
-    CIPSTER_TRACE_INFO( "%s: t_to_o size:%d\n", __func__, params.t_to_o_ncp.ConnectionSize() );
-    CIPSTER_TRACE_INFO( "%s: t_to_o priority:%d\n", __func__, params.t_to_o_ncp.Priority() );
-    CIPSTER_TRACE_INFO( "%s: t_to_o type:%s\n", __func__, params.t_to_o_ncp.ShowConnectionType() );
+    CIPSTER_TRACE_INFO( "%s: t_to_o RPI_usecs:%u\n", __func__, params.producing_RPI_usecs );
+    CIPSTER_TRACE_INFO( "%s: t_to_o size:%d\n", __func__, params.producing_ncp.ConnectionSize() );
+    CIPSTER_TRACE_INFO( "%s: t_to_o priority:%d\n", __func__, params.producing_ncp.Priority() );
+    CIPSTER_TRACE_INFO( "%s: t_to_o type:%s\n", __func__, params.producing_ncp.ShowConnectionType() );
 
 
     CipClass* clazz;
@@ -627,12 +627,12 @@ forward_open_response:
             {
             case kConnMgrStatusErrorInvalidOToTConnectionSize:
                 response->AddAdditionalSts( ext_status );
-                response->AddAdditionalSts( params.corrected_o_to_t_size );
+                response->AddAdditionalSts( params.corrected_consuming_size );
                 break;
 
             case kConnMgrStatusErrorInvalidTToOConnectionSize:
                 response->AddAdditionalSts( ext_status );
-                response->AddAdditionalSts( params.corrected_t_to_o_size );
+                response->AddAdditionalSts( params.corrected_producing_size );
                 break;
 
             default:
@@ -651,8 +651,8 @@ forward_open_response:
     {
         // Set the APIs (actual packet intervals) to caller's unadjusted rates.
         // Vol1 3-5.4.1.2 & Vol1 3-5.4.3 are not clear enough here.
-        out.put32( params.o_to_t_RPI_usecs );
-        out.put32( params.t_to_o_RPI_usecs );
+        out.put32( params.consuming_RPI_usecs );
+        out.put32( params.producing_RPI_usecs );
 
         out.put8( 0 );   // Application Reply Size
     }
@@ -711,10 +711,10 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
 
     try
     {
-        in += params.DeserializeForwardClose( in );
+        in += params.DeserializeForwardCloseRequest( in );
         conn_path_byte_count = in.get8() * 2;
 
-        ++in;       // skip "reserved" byte.  Note: forward_open does not have this.
+        ++in;   // skip "reserved" byte.  Note: forward_open does not have this.
     }
     catch( const std::range_error& e )
     {
@@ -724,6 +724,10 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
     catch( const std::runtime_error& e )
     {
         // currently cannot happen except under Murphy's law.
+        return kEipStatusError;
+    }
+    catch( const std::exception& e )
+    {
         return kEipStatusError;
     }
 
@@ -768,9 +772,9 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
     }
     else
     {
-        CIPSTER_ASSERT( response->CPF()->ClientAddr() );
+        CIPSTER_ASSERT( response->CPF()->TcpPeerAddr() );
 
-        if( response->CPF()->ClientAddr()->Addr() != match->openers_address.Addr() )
+        if( response->CPF()->TcpPeerAddr()->Addr() != match->openers_address.Addr() )
         {
             // Vol2 3-3.10 Forward_Close
             gen_status = kCipErrorPrivilegeViolation;

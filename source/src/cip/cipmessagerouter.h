@@ -82,6 +82,15 @@ public:
     Cpf* CPF() const                { return cpf; }
     void SetCPF( Cpf* aCpf )        { cpf = aCpf; }
 
+    /**
+     * Function DeserializeMRRes
+     * deserializes a message router response status as it comes back from a target.
+     * It stops after the generic status information.  After that a call to
+     * this->Reader() will return a reader which gives access to the service
+     * specific response.
+     *
+     * @return int - the number of bytes consumed.
+     */
     int DeserializeMRRes( BufReader aReply );
 
     //-----<Serializeable>------------------------------------------------------
@@ -124,7 +133,7 @@ public:
     //-----<Data buffer stuff >------------------------------------------------
 
     /// Return a BufWriter which defines a buffer to be filled with the
-    /// serialized reply.
+    /// serialized reply for sending.
     BufWriter  Writer() const               { return data; }
 
     void WriterAdvance( int aCount )
@@ -134,7 +143,15 @@ public:
         data = ByteBuf( b.data(), b.capacity() );
     }
 
-    void SetWriter( const BufWriter& w )    { data = ByteBuf( w.data(), w.capacity() ); }
+    void SetWriter( const BufWriter& w )    { data = w; }
+
+    // Set the bound of a readable payload that exists beyond the received response
+    // status on an originator's end.  Prepares for a call to this->Reader().
+    void SetReader( const BufReader& r )
+    {
+        data = r;
+        written_size = r.size();
+    }
 
     void SetWrittenSize( int aSize )        { written_size = aSize; }
     int WrittenSize() const                 { return written_size; }
@@ -154,8 +171,9 @@ public:
         CIPSTER_TRACE_INFO( " msg len:%zd\n", Reader().size() );
     }
 
-    /// Return a BufReader holding the Serialize()d CIP reply minus the status info.
-    BufReader   Reader() const                  { return BufReader( data.data(), written_size ); }
+    /// Return a BufReader holding the received Serialize()d CIP reply minus
+    /// the status info.
+    BufReader   Reader() const              { return BufReader( data.data(), written_size ); }
 
 protected:
 

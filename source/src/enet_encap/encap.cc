@@ -308,7 +308,7 @@ void SessionMgr::AgeInactivity()
                 // Only a registered session can have Class3 or 4 connections.
                 if( it->m_is_registered )
                 {
-                    // close any class3 connections associated with this socket.
+                    // close any class3 connections associated with this TCP socket.
                     CipUdint session_handle = (it - sessions) + 1;
 
                     CipConnMgrClass::CloseClass3Connections( session_handle );

@@ -191,17 +191,18 @@ public:
     CipUdint SessionHandle() const          { return session_handle; }
     void SetSessionHandle( CipUdint aHndl)
     {
-        CIPSTER_TRACE_INFO( "%s: %d\n", __func__, aHndl );
+        CIPSTER_TRACE_INFO( "%s(%d)\n", __func__, aHndl );
         session_handle = aHndl;
     }
 
     /**
      * Function DeserializeEncap
-     * grabs fields from serialized encapsulation header into this struct.
+     * grabs fields from serialized encapsulation header into this object.
      *
      * @param aSrc the received packet
      *
-     * @return int - no. bytes consumed, or -1 if error
+     * @return int - no. bytes consumed
+     * @throw BufReader's std::range_error if aSrc is too small.
      */
     int DeserializeEncap( BufReader aSrc );
 
@@ -223,7 +224,7 @@ protected:
     static int serializeListIdentityResponse( BufWriter aReply );
 
     static int handleReceivedListIdentityCommandDelayed(
-            int socket, const SockAddr& aFromAddress,
+            int aSocket, const SockAddr& aFromAddress,
             unsigned aMSecDelay, BufReader aCommand );
 
     /**
@@ -237,23 +238,25 @@ protected:
      *
      * @return int - num bytes serialized into aReply
      */
-    static int registerSession( int aSocket, BufReader aCommand, BufWriter aReply,
+    static int registerSession(
+            int aSocket,
+            BufReader aCommand,
+            BufWriter aReply,
             EncapError* aEncapError,
             CipUdint* aSessionHandleResult );
 
-
     EncapCmd    command;
-    unsigned                length;
-    CipUdint                session_handle;
-    CipUdint                status;
-    CipByte                 sender_context[8];
-    CipUdint                options;
+    unsigned    length;
+    CipUdint    session_handle;
+    CipUdint    status;
+    CipByte     sender_context[8];
+    CipUdint    options;
 
     // These are expected only for command == SendRRData or SendUnitData
-    CipUdint                interface_handle;
-    CipUint                 timeout;
+    CipUdint    interface_handle;
+    CipUint     timeout;
 
-    Cpf*                    payload;
+    Cpf*        payload;
 };
 
 
@@ -261,16 +264,22 @@ class ListIdentity //: public Serializeable
 {
 
 public:
-    ListIdentity() {}
+    ListIdentity() :
+        protocol_ver( 0 ),
+        vendor_id( 0 ),
+        device_type( 0 ),
+        product_code( 0 ),
+        revision( 0 ),
+        status( 0 ),
+        serial_num( 0 ),
+        state( 0 )
+    {}
 
     ListIdentity( int aIPAddress, CipUint aVendorId, CipUint aDeviceType,
             CipUint aProductCode, CipUint aRevision, CipUint aStatus,
             CipUdint aSerialNum, const std::string& aProductName, CipByte aState ) :
+        sockaddr( kEIP_Reserved_Port, aIPAddress ),
         protocol_ver( kSupportedProtocolVersion ),
-        sin_family( AF_INET ),
-        sin_port( kEIP_Reserved_Port ),
-        sin_addr( aIPAddress ),
-        sin_zero(),
         vendor_id( aVendorId ),
         device_type( aDeviceType ),
         product_code( aProductCode ),
@@ -282,11 +291,7 @@ public:
     {}
 
     CipUint                 protocol_ver;
-    CipInt                  sin_family;
-    CipUint                 sin_port;
-    CipUdint                sin_addr;
-    CipByte                 sin_zero[8];
-
+    SockAddr                sockaddr;
     CipUint                 vendor_id;
     CipUint                 device_type;
     CipUint                 product_code;
@@ -296,27 +301,24 @@ public:
     std::string             product_name;
     CipByte                 state;
 
-    int Deserialize( BufReader aReader )
+    int DeserializeListIdendityResponse( BufReader aInput )
     {
-        BufReader in = aReader;
+        BufReader in = aInput;
 
         int cip_id = in.get16();
 
         if( cip_id != 0xc )
-        {
-            return -1;
-        }
+            throw std::invalid_argument( "ListIdentity 'Item ID' not 0x0C" );
 
         int length = in.get16();
 
         protocol_ver = in.get16();
 
-        sin_family   = in.get16BE();
-        sin_port     = in.get16BE();
-        sin_addr     = in.get32BE();
+        sockaddr.SetFamily( in.get16BE() );
+        sockaddr.SetPort( in.get16BE() );
+        sockaddr.SetAddr( in.get32BE() );
 
-        for( int i=0; i<8; ++i )
-            sin_zero[i] = in.get8();
+        in += 8;    // sin_zero "ignored by receiver".
 
         vendor_id    = in.get16();
         device_type  = in.get16();
@@ -329,7 +331,7 @@ public:
 
         (void) length;
 
-        return in.data() - aReader.data();
+        return in.data() - aInput.data();
     }
 };
 

@@ -11,6 +11,8 @@
 
 #include "typedefs.h"
 
+class BufReader;
+class BufWriter;
 
 /**
  * Class ByteBuf
@@ -28,6 +30,9 @@ public:
         limit( aStart + aSize )
     {}
 
+    ByteBuf( const BufWriter& aWriter );
+    ByteBuf( const BufReader& aReader );
+
     CipByte*    data() const    { return start; }
     CipByte*    end() const     { return limit; }
     ssize_t     size() const    { return limit - start; }
@@ -36,9 +41,6 @@ protected:
     CipByte*    start;
     CipByte*    limit;          // points to one past last byte
 };
-
-
-class BufReader;
 
 
 /**
@@ -231,6 +233,17 @@ protected:
 };
 
 
+inline ByteBuf::ByteBuf( const BufReader& aReader ) :
+    start( (CipByte*) aReader.data() ),
+    limit( (CipByte*) aReader.end() )
+{}
+
+inline ByteBuf::ByteBuf( const BufWriter& aWriter ) :
+    start( aWriter.data() ),
+    limit( aWriter.end() )
+{}
+
+
 // this one is always inline
 inline BufWriter& BufWriter::append( const BufReader& aReader )
 {
@@ -241,6 +254,8 @@ inline BufWriter& BufWriter::append( const BufReader& aReader )
 enum
 {
     CTL_INCLUDE_CONN_PATH       = (1<<0),
+    CTL_FORWARD_OPEN            = (1<<1),
+    CTL_FORWARD_CLOSE           = (1<<2),
 };
 
 

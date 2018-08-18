@@ -470,7 +470,7 @@ public:
  * contains parameters identified in Vol1 3-5.4.1 as well as a ConnectionPath.
  * The members correspond to the fields in the forward open request.  For
  * deserialization, there are these functions:
- * DeserializeForwardOpen()
+ * DeserializeForwardOpenRequest()
  * DeserializeConnectionPath().
  * For serialization there is a need for only:
  * Serialize( BufWriter aOutput, int aCtl ) since the control bits can be embellished.
@@ -491,11 +491,25 @@ public:
             CipUint aOriginatorVendorId = 0,
             CipUdint aOriginatorSerialNumber = 0,
             ConnTimeoutMultiplier aConnectionTimeoutMultiplier = kConnTimeoutMultiplier4,
-            CipUdint a_O_to_T_RPI_usecs = 0,
-            CipUdint a_T_to_O_RPI_usecs = 0
+            CipUdint aConsumingRPI_usecs = 0,
+            CipUdint aProcudingRPI_usecs = 0
             );
 
     std::string Format() const;
+
+    TransportTrigger&   Transport() const                   { return (TransportTrigger&) trigger; }
+
+    CipByte     PriorityTimeTick() const                    { return priority_timetick; }
+    void        SetPriorityTimeTick( CipByte aValue )       { priority_timetick = aValue; }
+
+    CipByte     TimeoutTicks() const                        { return timeout_ticks; }
+    void        SetTimeoutTicks( CipByte aValue )           { timeout_ticks = aValue; }
+
+    CipUdint    ConsumingRPI() const                        { return consuming_RPI_usecs; }
+    void        SetConsumingRPI( CipUdint aPeriodUsecs)     { consuming_RPI_usecs = aPeriodUsecs; }
+
+    CipUdint    ProducingRPI() const                        { return producing_RPI_usecs; }
+    void        SetProducingRPI( CipUdint aPeriodUsecs)     { producing_RPI_usecs = aPeriodUsecs; }
 
     CipUdint    ConsumingConnectionId() const               { return consuming_connection_id; }
     void        SetConsumingConnectionId( CipUdint aCid )   { consuming_connection_id = aCid; }
@@ -503,6 +517,11 @@ public:
     CipUdint    ProducingConnectionId() const               { return producing_connection_id; }
     void        SetProducingConnectionId( CipUdint aCid )   { producing_connection_id = aCid; }
 
+    NetCnParams&    ConsumingNCP() const                    { return (NetCnParams&) consuming_ncp; }
+    NetCnParams&    ProducingNCP() const                    { return (NetCnParams&) producing_ncp; }
+
+
+    ConnectionPath& ConnPath() const                        { return (ConnectionPath&) conn_path; }
 
     // per Vol1 3-5.4.1.10 the application path names are relative to the target node.
     // A consuming_path is for a O->T connection.
@@ -511,31 +530,6 @@ public:
     CipAppPath& ConfigPath() const      { return config_path    < 0 ? HasAny_No : (CipAppPath&) conn_path.app_path[config_path]; }
     CipAppPath& ConsumingPath() const   { return consuming_path < 0 ? HasAny_No : (CipAppPath&) conn_path.app_path[consuming_path]; }
     CipAppPath& ProducingPath() const   { return producing_path < 0 ? HasAny_No : (CipAppPath&) conn_path.app_path[producing_path]; }
-
-    CipByte             priority_timetick;
-    CipByte             timeout_ticks;
-
-protected:
-    // In general, the consuming device selects the Network Connection ID for a
-    // point-to-point connection, and the producing device selects the Network
-    // Connection ID for a multicast connection.
-    // See Vol2 Table 3-3.2 Network Connection ID Selection
-    CipUdint            consuming_connection_id;
-    CipUdint            producing_connection_id;
-
-public:
-    //-----<ConnectionTriad>----------------------------------------------------
-    // The Connection Triad used in the Connection Manager specification includes
-    // the combination of Connection Serial Number, Originator Vendor ID and
-    // Originator Serial Number parameters.
-    CipUint             connection_serial_number;
-    CipUint             originator_vendor_id;
-
-    // The Originator Serial Number utilized in conjunction with the Connection
-    // Manager is a reference to the Identity object instance #1, attribute #6
-    // (Serial Number) of the connection originator.
-    CipUdint            originator_serial_number;
-    //-----</ConnectionTriad>---------------------------------------------------
 
     bool TriadEquals( const ConnectionData& aOther ) const
     {
@@ -561,19 +555,11 @@ public:
         return ret;
     }
 
-    CipUdint            o_to_t_RPI_usecs;
-    NetCnParams         o_to_t_ncp;
+    int DeserializeForwardOpenRequest( BufReader aInput, bool isLargeForwardOpen );
+    int DeserializeForwardOpenResponse( BufReader aInput );
 
-    CipUdint            t_to_o_RPI_usecs;
-    NetCnParams         t_to_o_ncp;
-
-    TransportTrigger    trigger;
-
-    ConnectionPath      conn_path;
-
-    int DeserializeForwardOpen( BufReader aInput, bool isLargeForwardOpen );
-
-    int DeserializeForwardClose( BufReader aInput );
+    int DeserializeForwardCloseRequest( BufReader aInput );
+    int DeserializeForwardCloseResponse( BufReader aInput );
 
     /**
      * Function DeserializeConnectionPath
@@ -613,17 +599,17 @@ public:
         originator_serial_number = 0;
         connection_timeout_multiplier_value = 0;
 
-        o_to_t_RPI_usecs = 0;
-        t_to_o_RPI_usecs = 0;
+        consuming_RPI_usecs = 0;
+        producing_RPI_usecs = 0;
 
-        o_to_t_ncp.Clear();
-        t_to_o_ncp.Clear();
+        consuming_ncp.Clear();
+        producing_ncp.Clear();
         trigger.Clear();
 
         conn_path.Clear();
 
-        corrected_o_to_t_size = 0;
-        corrected_t_to_o_size = 0;
+        corrected_consuming_size = 0;
+        corrected_producing_size = 0;
 
         consuming_instance = 0;
         producing_instance = 0;
@@ -631,15 +617,44 @@ public:
         mgmnt_class = 0;
     }
 
-private:
-    CipByte             connection_timeout_multiplier_value;
 
 protected:
+
+    //-----<ConnectionTriad>----------------------------------------------------
+    // The Connection Triad used in the Connection Manager specification includes
+    // the combination of Connection Serial Number, Originator Vendor ID and
+    // Originator Serial Number parameters.
+    CipUint             connection_serial_number;
+    CipUint             originator_vendor_id;
+
+    // The Originator Serial Number utilized in conjunction with the Connection
+    // Manager is a reference to the Identity object instance #1, attribute #6
+    // (Serial Number) of the connection originator.
+    CipUdint            originator_serial_number;
+    //-----</ConnectionTriad>---------------------------------------------------
+
+    TransportTrigger    trigger;
+
+    CipByte             priority_timetick;
+    CipByte             timeout_ticks;
+    CipByte             connection_timeout_multiplier_value;
+
+    CipUdint            consuming_RPI_usecs;
+    NetCnParams         consuming_ncp;
+    CipUdint            consuming_connection_id;
+
+    CipUdint            producing_RPI_usecs;
+    NetCnParams         producing_ncp;
+    CipUdint            producing_connection_id;
+
+    ConnectionPath      conn_path;
+
+    //-----<Validation Variables>-----------------------------------------------
     // The following variables do not come from the forward open request,
     // but are held here for the benefit of the deriving CipConn class and for
     // validation of forward open request.
-    EipUint16           corrected_o_to_t_size;
-    EipUint16           corrected_t_to_o_size;
+    EipUint16           corrected_consuming_size;
+    EipUint16           corrected_producing_size;
 
     CipInstance*        consuming_instance; ///< corresponds to conn_path.consuming_path
     CipInstance*        producing_instance; ///< corresponds to conn_path.producing_path
@@ -647,6 +662,8 @@ protected:
 
     // class id of the clazz->OpenConnection() virtual to call
     int                 mgmnt_class;
+    //-----</Validation Variables>----------------------------------------------
+
 
 private:
 

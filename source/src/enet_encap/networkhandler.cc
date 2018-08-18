@@ -67,19 +67,28 @@ std::string strerrno()
 {
     char    buf[256];
 
+    buf[0] = 0;
+
 #if defined(__linux__)
-    strerror_r( errno, buf, sizeof buf );
-    return buf;
+    // There are two versions of sterror_r() depending on age of glibc, try
+    // and handle both of them with this:
+    uintptr_t result = (uintptr_t) strerror_r( errno, buf, sizeof buf );
+
+    return buf[0] ? buf : (char*) result;
 
 #elif defined(_WIN32)
+
     int len = FormatMessage(
         FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL,
-        WSAGetLastError(),
+        NULL,                       // lpsource
+        WSAGetLastError(),          // message id
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         buf,
         sizeof buf,
         NULL );
+
+    if( !buf[0] )
+        len = snprintf( buf, sizeof buf, "%d", WSAGetLastError() );
 
     return std::string( buf, len );
 #endif
@@ -905,62 +914,164 @@ EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput
 
 //-----<UdpSocketMgr<-----------------------------------------------------------
 
-UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr )
+UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* aMulticast )
 {
-    for( sock_citer it = m_sockets.begin();  it != m_sockets.end();  ++it )
+    UdpSocket* iface = find( aSockAddr, m_sockets );
+
+    if( iface )
     {
-        if( (*it)->m_sockaddr == aSockAddr )
+        ++iface->m_ref_count;
+    }
+    else
+    {
+        int sock = createSocket( aSockAddr );
+
+        if( sock == kSocketInvalid )
         {
-            UdpSocket* ret = *it;
-            ++ret->m_ref_count;
-            return ret;
+            CIPSTER_TRACE_ERR( "%s: returning NULL\n", __func__ );
+            return NULL;
         }
+
+        iface = alloc( aSockAddr, sock );
+        m_sockets.push_back( iface );
     }
 
-    int sock = createSocket( aSockAddr );
-
-    if( sock == kSocketInvalid )
+    if( aMulticast )
     {
-        CIPSTER_TRACE_ERR( "%s: returning NULL\n", __func__ );
-        return NULL;
+        UdpSocket* group = find( *aMulticast, m_multicast );
+
+        if( group )
+        {
+            ++group->m_ref_count;
+        }
+        else
+        {
+            // Note that you can join several groups to the same socket, not just one.
+            ip_mreq mreq;
+
+            mreq.imr_multiaddr.s_addr = htonl( aMulticast->Addr() );
+            mreq.imr_interface.s_addr = htonl( iface->m_sockaddr.Addr() );
+
+            if( setsockopt( iface->m_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+                    (char*) &mreq,  sizeof(struct ip_mreq) ) )
+            {
+                CIPSTER_TRACE_ERR( "%s: unable to add group %s to interface %s\n",
+                    __func__,
+                    aMulticast->AddrStr().c_str(),
+                    iface->m_sockaddr.AddrStr().c_str() );
+
+                // reverse m_ref_count increment above, and keep socket close policy in one place.
+                ReleaseSocket( iface );
+                return NULL;
+            }
+            else
+            {
+                CIPSTER_TRACE_ERR( "%s: dropped group %s from interface %s OK.\n",
+                    __func__,
+                    aMulticast->AddrStr().c_str(),
+                    iface->m_sockaddr.AddrStr().c_str() );
+            }
+
+            group = alloc( *aMulticast, iface->m_socket );
+            group->m_underlying = iface;
+            m_multicast.push_back( group );
+        }
+
+        return group;
     }
 
-    m_sockets.push_back( alloc( aSockAddr, sock ) );
-
-    return m_sockets.back();
+    return iface;
 }
 
 
 bool UdpSocketMgr::ReleaseSocket( UdpSocket* aUdpSocket )
 {
-    sock_iter it;
-
-    for( it = m_sockets.begin();  it != m_sockets.end();  ++it )
-    {
-        if( *it == aUdpSocket )
-            break;
-    }
-
-    if( it == m_sockets.end() )
-        return false;
+    sock_iter   it;
+    UdpSocket*  group = NULL;
+    UdpSocket*  iface = NULL;
 
     if( aUdpSocket->m_sockaddr.IsMulticast() )
     {
-        if( --aUdpSocket->m_ref_count <= 0 )
+        for( it = m_multicast.begin();  it != m_multicast.end();  ++it )
+            if( *it == aUdpSocket )
+                group = *it;
+    }
+
+    if( group )
+    {
+        iface = group->m_underlying;
+
+        if( --group->m_ref_count <= 0 )
         {
-            master_set_rem( aUdpSocket->m_socket );
-            CloseSocket( aUdpSocket->m_socket );
-            m_sockets.erase( it );
-            UdpSocketMgr::free( aUdpSocket );
+            m_multicast.erase( it );
+
+            ip_mreq mreq;
+
+            mreq.imr_multiaddr.s_addr = htonl( group->m_sockaddr.Addr() );
+            mreq.imr_interface.s_addr = htonl( iface->m_sockaddr.Addr() );
+
+            if( setsockopt( iface->m_socket, IPPROTO_IP, IP_DROP_MEMBERSHIP,
+                    (char*) &mreq, sizeof(struct ip_mreq) ) )
+            {
+                CIPSTER_TRACE_ERR(
+                    "%s: unable to drop membership of group %s from interface %s\n",
+                    __func__,
+                    group->m_sockaddr.AddrStr().c_str(),
+                    iface->m_sockaddr.AddrStr().c_str() );
+            }
+            else
+            {
+                CIPSTER_TRACE_INFO(
+                    "%s: dropped membership of group %s from interface %s OK.\n",
+                    __func__,
+                    group->m_sockaddr.AddrStr().c_str(),
+                    iface->m_sockaddr.AddrStr().c_str() );
+            }
         }
     }
     else
     {
-        // nothing to do, keep non-multicasting socket open.
-        --aUdpSocket->m_ref_count;
+        for( it = m_sockets.begin();  it != m_sockets.end();  ++it )
+        {
+            if( *it == aUdpSocket )
+            {
+                iface = aUdpSocket;
+                break;
+            }
+        }
+    }
+
+    if( !iface )
+    {
+        CIPSTER_TRACE_ERR( "%s[%d]: ERROR releasing %s:%d\n",
+            __func__, aUdpSocket->m_socket,
+            aUdpSocket->m_sockaddr.AddrStr().c_str(),
+            aUdpSocket->m_sockaddr.Port()
+            );
+        return false;
+    }
+
+    if( --iface->m_ref_count <= 0 )
+    {
+#if 0   // should work with or without this:
+        master_set_rem( iface->m_socket );
+        CloseSocket( iface->m_socket );
+        m_sockets.erase( it );
+        UdpSocketMgr::free( iface );
+#endif
     }
 
     return true;
+}
+
+
+UdpSocket* UdpSocketMgr::find( const SockAddr& aSockAddr, const sockets& aList )
+{
+    for( sock_citer it = aList.begin();  it != aList.end();  ++it )
+        if( (*it)->m_sockaddr == aSockAddr )
+            return *it;
+
+    return NULL;
 }
 
 
@@ -1034,25 +1145,34 @@ close_and_exit:
 
 UdpSocket* UdpSocketMgr::alloc( const SockAddr& aSockAddr, int aSocket )
 {
-    UdpSocket* ret;
+    UdpSocket* result;
 
     if( m_free.size() )
     {
-        ret = m_free.back();
+        result = m_free.back();
+
         m_free.pop_back();
 
-        UdpSocket( ret ) ( aSockAddr, aSocket );    // in place construction
+        //new (result)  UdpSocket( aSockAddr, aSocket );    // in place construction
+        new(result) UdpSocket( aSockAddr, aSocket );    // in place construction
     }
     else
     {
-        ret = new UdpSocket( aSockAddr, aSocket );
+        result = new UdpSocket( aSockAddr, aSocket );
     }
 
-    return ret;
+    return result;
+}
+
+
+void UdpSocketMgr::free( UdpSocket* aUdpSocket )
+{
+    m_free.push_back( aUdpSocket );
 }
 
 
 UdpSocketMgr::sockets UdpSocketMgr::m_sockets;
+UdpSocketMgr::sockets UdpSocketMgr::m_multicast;
 UdpSocketMgr::sockets UdpSocketMgr::m_free;
 
 //-----</UdpSocketMgr>---------------------------------------------------------

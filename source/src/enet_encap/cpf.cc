@@ -50,12 +50,15 @@ Cpf::Cpf( const AddressItem& aAddr, CpfId aDataType ) :
 }
 
 
-const SockAddr* Cpf::ClientAddr() const
+const SockAddr* Cpf::TcpPeerAddr() const
 {
     if( const EncapSession* s = SessionMgr::GetSession( session_handle ) )
     {
         return &s->m_peeraddr;
     }
+
+    CIPSTER_ASSERT( !"no session for TcpPeerAddr" );
+
     return NULL;
 }
 

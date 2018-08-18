@@ -62,7 +62,8 @@ public:
     UdpSocket( const SockAddr& aSockAddr, int aSocket ) :
         m_sockaddr( aSockAddr ),
         m_socket( aSocket ),
-        m_ref_count( 1 )
+        m_ref_count( 1 ),
+        m_underlying( 0 )
     {
     }
 
@@ -82,10 +83,10 @@ public:
 
     int Recv( SockAddr* aAddr, const BufWriter& aWriter )
     {
-        socklen_t   from_address_length = SADDRZ;
+        socklen_t   from_addr_length = SADDRZ;
 
         return recvfrom( m_socket, (char*) aWriter.data(), aWriter.capacity(), 0,
-                    *aAddr, &from_address_length );
+                    *aAddr, &from_addr_length );
     }
 
     int h() const   { return m_socket; }
@@ -94,6 +95,7 @@ private:
     SockAddr    m_sockaddr; // what this socket is bound to with bind()
     int         m_socket;
     int         m_ref_count;
+    UdpSocket*  m_underlying;   // used by Multicast only.
 };
 
 
@@ -115,7 +117,24 @@ public:
 
     UdpSocketMgr()          { m_sockets.reserve( 10 ); }
 
-    static UdpSocket*       GrabSocket( const SockAddr& aSockAddr );
+    /**
+     * Function GrabSocket
+     * registers use of a UDP socket bound to aSockAddr, and creates it if
+     * necessary. Additionally, if aMulticastAddr is not NULL, it will register
+     * use of that group and join it to the socket associated with aSockAddr if it
+     * is not already.  Since reference counting is used both for the base socket
+     * and for the groups, you must balance the number of calls to GrabSocket with
+     * those to ReleaseSocket.
+     */
+    static UdpSocket*       GrabSocket( const SockAddr& aSockAddr, const SockAddr* aMulticastAddr=NULL );
+
+    /**
+     * Function RelaseSocket
+     * reduces the reference count associated with aUdpSocket which was obtained
+     * earlier with GrabSocket.  aUdpSocket may be a multicast group address if
+     * you want to drop a group membership, but that will only happen with the
+     * group's reference count goes to zero.
+     */
     static bool             ReleaseSocket( UdpSocket* aUdpSocket );
     static sockets&         GetAllSockets()  { return m_sockets; }
 
@@ -133,12 +152,13 @@ protected:
     // Allocate and initialize a new UdpSocket
     static UdpSocket*  alloc( const SockAddr& aSockAddr, int aSocket );
 
-    static void free( UdpSocket* aUdpSocket )
-    {
-        m_free.push_back( aUdpSocket );
-    }
+    static void free( UdpSocket* aUdpSocket );
+
+    // find aSockAddr in aList, return it or NULL if not found.
+    static UdpSocket* find( const SockAddr& aSockAddr, const sockets& aList );
 
     static sockets      m_sockets;
+    static sockets      m_multicast;    // these piggyback on a m_socket entry
     static sockets      m_free;         // recycling bin
 };
 

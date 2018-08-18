@@ -35,7 +35,7 @@ int CipMessageRouterRequest::Serialize( BufWriter aOutput, int aCtl ) const
 
     out += rplen;   // skip over path
 
-    out.append( Data().data(), Data().size() );
+    out.append( Data() );
 
     return out.data() - aOutput.data();
 }
@@ -114,6 +114,8 @@ void CipMessageRouterResponse::Clear()
 
 int CipMessageRouterResponse::DeserializeMRRes( BufReader aReply )
 {
+    // See Vol1 Table 2-4.2:
+
     BufReader in = aReply;
 
     reply_service = CIPServiceCode( in.get8() & 0x7f );
@@ -127,17 +129,16 @@ int CipMessageRouterResponse::DeserializeMRRes( BufReader aReply )
     for( int i = 0; i < size_of_additional_status;  ++i )
     {
         if( i == DIM(additional_status) )
-            throw std::overflow_error(
+            throw std::invalid_argument(
                 "CipMessageRouterRespoinse::DeserializeMRRes(): too many additional status words" );
 
         additional_status[i] = in.get16();
     }
 
-    // all of the remaining bytes are considered response_data
-    SetWriter( BufWriter( (CipByte*) in.data(), in.size() ) );
-    SetWrittenSize( in.size() );
+    // all of the remaining bytes are considered "non-status" response_data
+    SetReader( in );
 
-    return aReply.size();
+    return in.data() - aReply.data();
 }
 
 
@@ -211,8 +212,8 @@ CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConnData,
         new_explicit->GeneralConfiguration( aConnData, kConnInstanceTypeExplicit );
 
         // Save TCP client's IP address in order to qualify a future forward_close.
-        CIPSTER_ASSERT( aCpf->ClientAddr() );
-        new_explicit->openers_address = *aCpf->ClientAddr();
+        CIPSTER_ASSERT( aCpf->TcpPeerAddr() );
+        new_explicit->openers_address = *aCpf->TcpPeerAddr();
 
         // Save TCP connection session_handle for TCP inactivity timeouts.
         new_explicit->SetSessionHandle( aCpf->SessionHandle() );

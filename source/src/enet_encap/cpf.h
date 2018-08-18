@@ -333,13 +333,12 @@ public:
         return *this;
     }
 
-    const SockAddr* ClientAddr() const;
+    const SockAddr* TcpPeerAddr() const;
 
-    CipUdint  SessionHandle() const     { return session_handle; }
-
+    CipUdint  SessionHandle() const             { return session_handle; }
+    Cpf& SetSessionHandle( CipUdint aHndl )     { session_handle = aHndl;  return *this; }
 
 protected:
-
     static int serialize_sockaddr( const SockAddr& aSockAddr, BufWriter aOutput );
     static int deserialize_sockaddr( SockAddr* aSockAddr, BufReader aInput );
 
