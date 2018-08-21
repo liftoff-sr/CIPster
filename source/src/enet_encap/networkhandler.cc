@@ -486,10 +486,20 @@ static void checkAndHandleUdpSockets()
         {
             CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, s->h() );
 
-            // Drain the UDP socket completely.
             // Since it is non-blocking, call Recv() until
             // byte_count is <= 0.  Keep socket open for every case.
+
+#if 0
+            // Drain the UDP socket completely.
             for(;;)
+#else
+            // Drain each UDP socket up to some limit you can choose.
+            // This strategy contemplates that somebody might be bombing us,
+            // maybe even maliciously.  Anything we don't fetch out now
+            // will likely still be there on the next call to
+            // NetworkHandlerProcessOnce().
+            for( int attempt = 0;  attempt < 80;  ++attempt )
+#endif
             {
                 int byte_count = s->Recv( &from_addr, BufWriter( s_buf, S_BUFZ ) );
 

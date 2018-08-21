@@ -64,14 +64,10 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
 
             if( AfterAssemblyDataReceived( instance ) != kEipStatusOk )
             {
-                /* punt early without updating the status... though I don't know
-                 * how much this helps us here, as the attribute's data has already
-                 * been overwritten.
-                 *
-                 * however this is the task of the application side which will
-                 * take the data. In addition we have to inform the sender that the
-                 * data was not ok.
-                 */
+                // NOTE: the attribute's data has already been overwritten.
+                // Application did not like it.  Probably need a better
+                // interface which provides a Reader to the application
+                // so it can conditionally do the memcpy not us here.
                 response->SetGenStatus( kCipErrorInvalidAttributeValue );
             }
             else

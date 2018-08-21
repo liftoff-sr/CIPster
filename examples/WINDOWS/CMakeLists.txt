@@ -61,6 +61,14 @@ set( EIP_INCLUDE_DIR ${CIPSTER_DIR}/source/src )
 set( EIP_LIBRARIES   ${PREFIX}/libeip.a )
 
 
+if( NOT APPLE )
+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY}hidden" )
+endif()
+if( NOT APPLE )
+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY_INLINES_HIDDEN}" )
+endif()
+
+
 if( CMAKE_COMPILER_IS_GNUCXX )
     # statically link the gcc and socket libraries so that dynamic ones do not have to be
     # installed on the ultimate target separately.

@@ -60,6 +60,15 @@ ExternalProject_Add( eip
 set( EIP_INCLUDE_DIR ${CIPSTER_DIR}/source/src )
 set( EIP_LIBRARIES   ${PREFIX}/libeip.a )
 
+
+if( NOT APPLE )
+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY}hidden" )
+endif()
+if( NOT APPLE )
+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY_INLINES_HIDDEN}" )
+endif()
+
+
 include_directories(
     .
     ${EIP_INCLUDE_DIR}
