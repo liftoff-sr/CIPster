@@ -484,7 +484,7 @@ static void checkAndHandleUdpSockets()
 
         if( checkSocketSet( s->h() ) )
         {
-            //CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, s->h() );
+            CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, s->h() );
 
             // Drain the UDP socket completely.
             // Since it is non-blocking, call Recv() until
@@ -946,6 +946,10 @@ UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* 
         }
         else
         {
+            in_addr ip;
+            ip.s_addr = CipTCPIPInterfaceClass::IpAddress( 1 );
+            setsockopt( iface->m_socket, IPPROTO_IP, IP_MULTICAST_IF, (char*)&ip, sizeof ip );
+
             // Note that you can join several groups to the same socket, not just one.
             ip_mreq mreq;
 
@@ -953,10 +957,11 @@ UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* 
             mreq.imr_interface.s_addr = htonl( iface->m_sockaddr.Addr() );
 
             if( setsockopt( iface->m_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP,
-                    (char*) &mreq,  sizeof(struct ip_mreq) ) )
+                    (char*) &mreq,  sizeof mreq ) )
             {
-                CIPSTER_TRACE_ERR( "%s: unable to add group %s to interface %s\n",
+                CIPSTER_TRACE_ERR( "%s[%d]: unable to add group %s to interface %s\n",
                     __func__,
+                    iface->m_socket,
                     aMulticast->AddrStr().c_str(),
                     iface->m_sockaddr.AddrStr().c_str() );
 
@@ -964,13 +969,18 @@ UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* 
                 ReleaseSocket( iface );
                 return NULL;
             }
-            else
-            {
-                CIPSTER_TRACE_ERR( "%s: dropped group %s from interface %s OK.\n",
-                    __func__,
-                    aMulticast->AddrStr().c_str(),
-                    iface->m_sockaddr.AddrStr().c_str() );
-            }
+
+            CIPSTER_TRACE_ERR( "%s[%d]: added group %s:%d membership to interface %s:%d OK.\n",
+                __func__,
+                iface->m_socket,
+                aMulticast->AddrStr().c_str(),
+                aMulticast->Port(),
+                iface->m_sockaddr.AddrStr().c_str(),
+                iface->m_sockaddr.Port()
+                );
+
+            char loop = 0;
+            setsockopt( iface->m_socket, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, 1 );
 
             group = alloc( *aMulticast, iface->m_socket );
             group->m_underlying = iface;
@@ -1019,7 +1029,7 @@ bool UdpSocketMgr::ReleaseSocket( UdpSocket* aUdpSocket )
             if( setsockopt( iface->m_socket, IPPROTO_IP, IP_DROP_MEMBERSHIP,
                     (char*) &mreq, sizeof(struct ip_mreq) ) )
             {
-                CIPSTER_TRACE_ERR(
+                CIPSTER_TRACE_WARN(
                     "%s: unable to drop membership of group %s from interface %s\n",
                     __func__,
                     group->m_sockaddr.AddrStr().c_str(),
@@ -1028,10 +1038,11 @@ bool UdpSocketMgr::ReleaseSocket( UdpSocket* aUdpSocket )
             else
             {
                 CIPSTER_TRACE_INFO(
-                    "%s: dropped membership of group %s from interface %s OK.\n",
+                    "%s: dropped group %s:%d from interface %s:%d OK.\n",
                     __func__,
-                    group->m_sockaddr.AddrStr().c_str(),
-                    iface->m_sockaddr.AddrStr().c_str() );
+                    group->m_sockaddr.AddrStr().c_str(), group->m_sockaddr.Port(),
+                    iface->m_sockaddr.AddrStr().c_str(), iface->m_sockaddr.Port()
+                    );
             }
         }
     }

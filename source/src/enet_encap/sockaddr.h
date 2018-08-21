@@ -57,6 +57,8 @@ public:
            &&  sa.sin_port == other.sa.sin_port;
     }
 
+    bool operator!=( const SockAddr& other ) const  { return !(*this == other); }
+
     operator const sockaddr_in& () const    { return sa; }
     operator const sockaddr*    () const    { return (sockaddr*) &sa; }
     operator       sockaddr*    () const    { return (sockaddr*) &sa; }
@@ -89,11 +91,13 @@ public:
     bool IsMulticast() const
     {
         // Vol2 3-5.3
-         const unsigned lo = 0xefc00100;  // same as "239.192.1.0" in host byte order
-         const unsigned hi = 0xefc00100 | 0x3ff;
+        // https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml
+        // "The multicast addresses are in the range 224.0.0.0 through 239.255.255.255."
+        static const unsigned lo = ntohl( inet_addr( "224.0.0.0" ) );
+        static const unsigned hi = ntohl( inet_addr( "239.255.255.255" ) );
 
-         unsigned addr = ntohl( sa.sin_addr.s_addr );
-         return lo <= addr && addr <= hi;
+        unsigned addr = ntohl( sa.sin_addr.s_addr );
+        return lo <= addr && addr <= hi;
     }
 
 protected:

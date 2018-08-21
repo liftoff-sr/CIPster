@@ -115,7 +115,8 @@ public:
     typedef sockets::iterator           sock_iter;
     typedef sockets::const_iterator     sock_citer;
 
-    UdpSocketMgr()          { m_sockets.reserve( 10 ); }
+#define DEFAULT_BIND_IPADDR     INADDR_ANY
+//#define DEFAULT_BIND_IPADDR     ntohl( CipTCPIPInterfaceClass::IpAddress( 1 ) )
 
     /**
      * Function GrabSocket

@@ -253,7 +253,7 @@ inline BufWriter& BufWriter::append( const BufReader& aReader )
 /// Control bits for Serializeable::Serialize(), or SerializeCount()'s aCtl
 enum
 {
-    CTL_INCLUDE_CONN_PATH       = (1<<0),
+    //CTL_INCLUDE_CONN_PATH       = (1<<0),
     CTL_FORWARD_OPEN            = (1<<1),
     CTL_FORWARD_CLOSE           = (1<<2),
 };

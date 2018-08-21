@@ -48,7 +48,12 @@ CipConn* CipConnMgrClass::FindExistingMatchingConnection( const ConnectionData& 
 EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
         const SockAddr& aFromAddress, BufReader aCommand )
 {
-    CIPSTER_TRACE_INFO( "%s[%d]: %zd bytes\n", __func__, aSocket->h(), aCommand.size() );
+    CIPSTER_TRACE_INFO( "%s[%d]: %zd bytes from %s:%d\n",
+        __func__, aSocket->h(),
+        aCommand.size(),
+        aFromAddress.AddrStr().c_str(),
+        aFromAddress.Port()
+        );
 
     Cpf cpfd;
 
@@ -91,55 +96,13 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
                 );
             */
 
-            // only handle the data if it is coming from the originator
-            if( conn->recv_address.Addr() == aFromAddress.Addr() )
-            {
-                CIPSTER_TRACE_INFO( "%s[%d]: CID:0x%08x  cpf.seq=0x%08x  encap.seq=0x%08x\n",
-                    __func__,
-                    aSocket->h(),
-                    conn->ConsumingConnectionId(),
-                    cpfd.AddrEncapSeqNum(),
-                    conn->eip_level_sequence_count_consuming
-                    );
-
-                // if this is the first received frame
-                if( conn->eip_level_sequence_count_consuming_first )
-                {
-                    // put our tracking count within a half cycle of the leader.  Without this
-                    // there are many scenarios where the SEQ_GT32 below won't evaluate as true.
-                    conn->eip_level_sequence_count_consuming = cpfd.AddrEncapSeqNum() - 1;
-                    conn->eip_level_sequence_count_consuming_first = false;
-                }
-
-                // Vol2 3-4.1:
-                // inform assembly object iff the sequence counter is greater or equal
-                if( SEQ_GT32( cpfd.AddrEncapSeqNum(),
-                              conn->eip_level_sequence_count_consuming ) )
-                {
-                    // reset the watchdog timer
-                    conn->SetInactivityWatchDogTimerUSecs( conn->TimeoutUSecs() );
-
-                    conn->eip_level_sequence_count_consuming = cpfd.AddrEncapSeqNum();
-
-                    return conn->HandleReceivedIoConnectionData( BufReader( cpfd.DataRange() ) );
-                }
-                else
-                {
-                    CIPSTER_TRACE_INFO(
-                        "%s[%d]: received encap_sequence number was not greater, ignoring frame\n"
-                        " received:%08x   connection seqn:%08x\n",
-                        __func__,
-                        aSocket->h(),
-                        cpfd.AddrEncapSeqNum(),
-                        conn->eip_level_sequence_count_consuming
-                        );
-                }
-            }
-            else
+            // Only handle the data if it is coming from the peer.  Note that
+            // we do not test the port here, only the IP address.
+            if( aFromAddress.Addr() != conn->recv_address.Addr() )
             {
                 CIPSTER_TRACE_WARN(
                         "%s[%d]: I/O data received with wrong originator address.\n"
-                        " from:%s   originator for provided CID:%s\n",
+                        " from:%s  originator:%s for matching CID\n",
                         __func__,
                         aSocket->h(),
                         aFromAddress.AddrStr().c_str(),
@@ -147,6 +110,47 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
                         );
 
                 return kEipStatusError;
+            }
+
+            CIPSTER_TRACE_INFO( "%s[%d]: CID:0x%08x  cpf.seq=0x%08x  encap.seq=0x%08x\n",
+                __func__,
+                aSocket->h(),
+                conn->ConsumingConnectionId(),
+                cpfd.AddrEncapSeqNum(),
+                conn->eip_level_sequence_count_consuming
+                );
+
+            // if this is the first received frame
+            if( conn->eip_level_sequence_count_consuming_first )
+            {
+                // put our tracking count within a half cycle of the leader.  Without this
+                // there are many scenarios where the SEQ_GT32 below won't evaluate as true.
+                conn->eip_level_sequence_count_consuming = cpfd.AddrEncapSeqNum() - 1;
+                conn->eip_level_sequence_count_consuming_first = false;
+            }
+
+            // Vol2 3-4.1:
+            // inform assembly object iff the sequence counter is greater or equal
+            if( SEQ_GT32( cpfd.AddrEncapSeqNum(),
+                          conn->eip_level_sequence_count_consuming ) )
+            {
+                // reset the watchdog timer
+                conn->SetInactivityWatchDogTimerUSecs( conn->TimeoutUSecs() );
+
+                conn->eip_level_sequence_count_consuming = cpfd.AddrEncapSeqNum();
+
+                return conn->HandleReceivedIoConnectionData( BufReader( cpfd.DataRange() ) );
+            }
+            else
+            {
+                CIPSTER_TRACE_INFO(
+                    "%s[%d]: received encap_sequence number was not greater, ignoring frame\n"
+                    " received:%08x   connection seqn:%08x\n",
+                    __func__,
+                    aSocket->h(),
+                    cpfd.AddrEncapSeqNum(),
+                    conn->eip_level_sequence_count_consuming
+                    );
             }
         }
     }

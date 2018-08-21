@@ -299,11 +299,12 @@ int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
     BufWriter out = aOutput;
 
     /*
-        This block is expected to execute only on an "originator". Originator
-        has a reverse interpretation the following than has a target:
+        When executing this function, the host is acting as an "originator".
+        Originator has a reverse interpretation of "Consuming" and "Producing"
+        than does a target with respect to O->T nomenclature.
 
-            O->T => Consuming, and T->O => Producing. Instead for originator:
-            O->T => Producing, and T->O => Consuming.
+            O->T => Consuming, and T->O => Producing.   Target's perspective
+            O->T => Producing, and T->O => Consuming.   Originator's perspective
 
         So swap the order of these values accordingly as we send
         them so that the ConnectionData accessors are always correct, regardless
@@ -336,19 +337,40 @@ int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
         ConsumingNCP().Serialize( out );
 
         trigger.Serialize( out );
-    }
 
-    if( aCtl & (CTL_INCLUDE_CONN_PATH | CTL_FORWARD_OPEN) )
-    {
-        CipByte* cpathz_loc = out.data();
+        CipByte* cpathz_loc = out.data();   // note Connection_Path_Size location
 
         out += 1;   // skip over Connection_Path_Size location
 
         int byte_count = conn_path.Serialize( out, aCtl );
 
-        *cpathz_loc = byte_count / 2;
+        out += byte_count;
+
+        *cpathz_loc = byte_count / 2;       // words, not bytes
+    }
+
+    else if( aCtl & CTL_FORWARD_CLOSE )
+    {
+        // Vol1 Table 3-5.21 Forward_Close Service Request
+        out.put8( priority_timetick )
+        .put8( timeout_ticks )
+
+        // The Connection Triad
+        .put16( connection_serial_number )
+        .put16( originator_vendor_id )
+        .put32( originator_serial_number );
+
+        CipByte* cpathz_loc = out.data();   // note Connection_Path_Size location
+
+        out += 1;   // skip over Connection_Path_Size location &
+
+        out.put8( 0 );      // Reserved
+
+        int byte_count = conn_path.Serialize( out, aCtl );
 
         out += byte_count;
+
+        *cpathz_loc = byte_count / 2;       // words, not bytes
     }
 
     return out.data() - aOutput.data();
@@ -362,13 +384,14 @@ int ConnectionData::SerializedCount( int aCtl ) const
     if( aCtl & CTL_FORWARD_OPEN )
     {
         count += 31 + consuming_ncp.SerializedCount()
-                    + producing_ncp.SerializedCount();
+                    + producing_ncp.SerializedCount()
+                    + 1 // connection path size USINT
+                    + conn_path.SerializedCount( aCtl );
     }
 
-    if( aCtl & (CTL_INCLUDE_CONN_PATH | CTL_FORWARD_OPEN) )
+    if( aCtl & CTL_FORWARD_CLOSE )
     {
-        count +=    1   // connection path size USINT
-                +   conn_path.SerializedCount( aCtl );
+        count += 12 + conn_path.SerializedCount( aCtl );
     }
 
     return count;
@@ -1518,7 +1541,7 @@ CipError CipConn::openConsumingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
 
     SockAddr peers_destination(     // a.k.a "me"
                 g_my_io_udp_port,
-                ntohl( CipTCPIPInterfaceClass::IpAddress( 1 ) )
+                DEFAULT_BIND_IPADDR
                 );
 
     UdpSocket* socket = UdpSocketMgr::GrabSocket( peers_destination );
@@ -1537,7 +1560,8 @@ CipError CipConn::openConsumingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
     // using a port different than the 0x08AE.
     if( g_my_io_udp_port != kEIP_IoUdpPort )
     {
-        // See Vol1 table 3-3.3
+        // See Vol1 table 3-3.3.
+        // Originator ignores the IP address portion of peers_destination
         aCpf->AddTx( kSockAddr_O_T, peers_destination );
     }
 
@@ -1583,7 +1607,7 @@ CipError CipConn::openProducingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
 
     SockAddr source(
             g_my_io_udp_port,    // I chose my source port consistently for non-multicast producing
-            ntohl( CipTCPIPInterfaceClass::IpAddress( 1 ) )
+            DEFAULT_BIND_IPADDR
             );
 
     UdpSocket* socket = UdpSocketMgr::GrabSocket( source );
@@ -1659,15 +1683,15 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
     // see Vol2 3-3.9.4 Sockaddr Info Item Placement and Errors
     if( aDirection == kUdpConsuming )
     {
-        const SockAddr* saii = aCpf->SaiiRx( kSockAddr_O_T );
+        const SockAddr* saii = aCpf->SaiiRx( kSockAddr_T_O );
 
         // For consuming multicast connections the originator chooses the
-        // multicast address to use, so *must* supply the kSockAddr_O_T
+        // multicast address to use, so *must* supply the kSockAddr_T_O
 
         if( !saii )
         {
             CIPSTER_TRACE_ERR(
-                "%s: missing required SockAddr Info Item for consuming.\n",
+                "%s: missing required T->O SockAddr Info Item for consuming.\n",
                 __func__ );
 
             *aExtError = kConnMgrStatusErrorParameterErrorInUnconnectedSendService;
@@ -1703,7 +1727,8 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
 
         SockAddr base_multicast_socket(
             kEIP_IoUdpPort,
-            ntohl( CipTCPIPInterfaceClass::IpAddress( 1 ) ) );
+            DEFAULT_BIND_IPADDR
+            );
 
         UdpSocket* socket = UdpSocketMgr::GrabSocket( base_multicast_socket, &remotes_destination );
 
@@ -1718,15 +1743,20 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
             return kCipErrorConnectionFailure;
         }
 
+        SockAddr remotes_source(                // a.k.a "peer"
+                    kEIP_IoUdpPort,
+                    aCpf->TcpPeerAddr()->Addr() // IP of TCP peer
+                    );
+
         SetConsumingUdp( socket );
-        recv_address = remotes_destination;
+        recv_address = remotes_source;
     }
 
     else
     {
         SockAddr source(
                 g_my_io_udp_port,
-                ntohl( CipTCPIPInterfaceClass::IpAddress( 1 ) )
+                DEFAULT_BIND_IPADDR
                 );
 
         SockAddr destination(
