@@ -128,14 +128,14 @@ enum ConnTimeoutMultiplier
  * @param aConn The connection object which is closing the
  * connection
  */
-typedef void (* ConnectionCloseFunction)( CipConn* aConn );
+typedef std::function<void (CipConn*)> ConnectionCloseFunction;
 
 /** @ingroup CIP_API
  * @brief Function prototype for handling the timeout of connections
  *
  * @param aConn The connection object which connection timed out
  */
-typedef void (* ConnectionTimeoutFunction)( CipConn* aConn );
+typedef std::function<void (CipConn*)> ConnectionTimeoutFunction;
 
 
 /**

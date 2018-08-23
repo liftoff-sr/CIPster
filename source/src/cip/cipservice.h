@@ -53,8 +53,7 @@ enum CIPServiceCode
 
 
 /**
- * Typedef EipStatus (*CipServiceFunc)( CipInstance *,
- *    CipMessageRouterRequest*, CipMessageRouterResponse*)
+ * Typedef std::function<EipStatus (CipInstance*, CipMessageRouterRequest*, CipMessageRouterResponse*)> CipServiceFunction
  * is the function type for the implementation of CIP services.
  *
  * CIP services have to follow this signature in order to be handled correctly
@@ -68,8 +67,7 @@ enum CIPServiceCode
  * @return EipStatus - EipOKSend if service could be executed successfully
  *    and a response should be sent.
  */
-typedef EipStatus (*CipServiceFunction)( CipInstance* aInstance,
-        CipMessageRouterRequest* aRequest, CipMessageRouterResponse* aResponse );
+typedef std::function<EipStatus (CipInstance*, CipMessageRouterRequest*, CipMessageRouterResponse*)> CipServiceFunction;
 
 
 /**

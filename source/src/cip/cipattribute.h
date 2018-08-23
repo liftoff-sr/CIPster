@@ -9,6 +9,7 @@
 #ifndef CIPATTRIBUTE_H_
 #define CIPATTRIBUTE_H_
 
+#include <functional>
 #include "ciptypes.h"
 
 class CipMessageRouterRequest;
@@ -18,8 +19,7 @@ class CipInstance;
 
 
 /** @ingroup CIP_API
- * @typedef  EipStatus (*AttributeFunc)( CipAttribute *,
- *    CipMessageRouterRequest*, CipMessageRouterResponse*)
+ * @typedef  std::function<EipStatus (CipAttribute*, CipMessageRouterRequest*, CipMessageRouterResponse*)> AttributeFunc
  *
  * @brief Signature definition for the implementation of CIP services.
  *
@@ -34,10 +34,8 @@ class CipInstance;
  * @return kEipStatusOk_SEND if service could be executed successfully and a response
  *  should be sent
  */
-typedef EipStatus (*AttributeFunc)( CipAttribute* aAttribute,
-            CipMessageRouterRequest* aRequest,
-            CipMessageRouterResponse* aResponse );
 
+typedef std::function<EipStatus (CipAttribute*, CipMessageRouterRequest*, CipMessageRouterResponse*)> AttributeFunc;
 
 
 /**
