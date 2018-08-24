@@ -17,7 +17,9 @@
 // CipClass::AttributeInsert(), namely one that will set
 // CipAttribute::is_offset_from_instance_start = true before returning.
 // Will have to redefine INSTANCE_CLASS as explained below.
-#define memb_offs(Member) ((uint16_t)(uintptr_t)&(reinterpret_cast<INSTANCE_CLASS*>(0)->Member))
+// The '1' trick quiets older noisy compilers.
+#define memb_offs(Member) uint16_t( \
+    uintptr_t(&reinterpret_cast<INSTANCE_CLASS*>(1)->Member) - 1)
 
 /*
     For each class derived from CipInstance you may

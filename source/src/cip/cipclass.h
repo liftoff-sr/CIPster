@@ -218,31 +218,22 @@ public:
 
 
     /**
-     * Functions AttributeInsertI
-     * insert an instance attribute and returns a pointer to it if succes, else NULL.
+     * Functions AttributeInsert
+     * insert either an instance or class attribute and returns a pointer to
+     * it if succes, else NULL.
      *
-     * @return CipAttribute* - dynamically allocated by this function,
-     * or NULL if failure. Currently attributes may be overrridden, so any
-     * existing CipAttribute in the target container with the same attribute id
-     * will be deleted in favour of this one.
-     */
-
-    /**
-     * Functions AttributeInsertC
-     * insert a class attribute and returns a pointer to it if succes, else NULL.
+     * @param aCI is either _I or _C indicating "instance" or "class" respectively.
      *
-     * @return CipAttribute* - dynamically allocated by this function,
-     * or NULL if failure. Currently attributes may be overrridden, so any
-     * existing CipAttribute in the target container with the same attribute id
-     * will be deleted in favour of this one.
-     */
-
-    /**
      * @param aCookie is saved in the data member of the Attribute and will
      *  later be passed to either AttributeFunc provided.  It can point to anything
      *  convenient.
-     * @param isCookieAnInstanceOffset should be set to true if aData is a
+     * @param isCookieAnInstanceOffset should be set to true if aCookie is a
      *   data member of a CipInstance derivative
+
+     * @return CipAttribute* - dynamically allocated by this function,
+     * or NULL if failure. Currently attributes may be overrridden, so any
+     * existing CipAttribute in the target container with the same attribute id
+     * will be deleted in favour of this one.
      */
 
     CipAttribute* AttributeInsert( _CI aCI,
@@ -277,6 +268,8 @@ public:
     /**
      * Function AttributeInsert
      * inserts an attribute and returns true if succes, else false.
+     *
+     * @param aCI is either _I or _C indicating "instance" or "class" respectively.
      *
      * @param aAttribute is the one to insert, and may not already be inserted
      *  elsewhere. It must be dynamically allocated, not compiled in,
