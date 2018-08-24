@@ -16,7 +16,7 @@
 #include "trace.h"
 
 
-/// @brief Array of the available explicit connections
+/// Array of the available explicit connections
 static CipConn g_explicit_connections[CIPSTER_CIP_NUM_EXPLICIT_CONNS];
 
 
@@ -179,7 +179,7 @@ CipMessageRouterClass::CipMessageRouterClass() :
     // SetAttributeSingle.
     // Also, conformance test tool does not like SetAttributeSingle on this class,
     // delete the service which was established in CipClass constructor.
-    delete ServiceRemove( kSetAttributeSingle );
+    delete ServiceRemove( _I, kSetAttributeSingle );
 }
 
 
@@ -319,8 +319,8 @@ EipStatus CipMessageRouterClass::NotifyMR(
     // the order of these next two if() tests is very important.
 
     CipService* service = instance_id == 0 ?
-            clazz->Class()->Service( aRequest->Service() ) :  // meta-class
-            clazz->Service( aRequest->Service() );
+            clazz->ServiceC( aRequest->Service() ) :
+            clazz->ServiceI( aRequest->Service() );
 
     if( !service )
     {

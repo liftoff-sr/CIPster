@@ -21,28 +21,17 @@ class CipClass : public CipInstance
 {
 public:
 
-    typedef std::vector<CipInstance*>      CipInstances;
-    typedef std::vector<CipService*>       CipServices;
-
     /**
      * Constructor CipClass
      * is a base CIP Class and contains services and class (not instance) attributes.
      * The class attributes are held in the CipInstance from which this C++ class
      * is derived.
      *
-     * @param aClassId ID of the class
+     * @param aClassId the published class ID
      * @param aClassName name of class
      *
      * @param aClassAttributesMask is a bit map of desired common class attributes
      *  in this class.
-     *
-     * @param a_get_attribute_all_mask mask of which attribute Ids are included in the
-     *  class getAttributeAll. If the mask is 0 the getAttributeAll service will not
-     *  be added as class service.
-     *
-     * @param a_instance_attributes_get_attributes_all_mask  mask of which attributes
-     *  are included in the instance getAttributeAll. If the mask is 0 the getAttributeAll
-     *  service will not be added as class service.
      *
      * @param aRevision class revision
      */
@@ -55,8 +44,11 @@ public:
 
     virtual ~CipClass();
 
+
+    //-----<Class Registry Support>---------------------------------------------
+
     /**
-     * Delete all instances and classes the CIP stack
+     * Delete all instances and classes in the CIP stack
      */
     static void DeleteAll();
 
@@ -69,6 +61,9 @@ public:
     static EipStatus Register( CipClass* aClass );
 
     static CipClass* Get( int aClassId );
+
+    //-----</Class Registry Support>--------------------------------------------
+
 
     //-----<CipServiceFunctions>------------------------------------------------
 
@@ -119,13 +114,9 @@ public:
 
     //-----</CipServiceFunctions>-----------------------------------------------
 
-
-    /// Return true if this is a meta-class, false if public.
-    bool IsMetaClass() const    { return !owning_class; }
-
     /**
      * Function ServiceInsert
-     * inserts a service and returns true if succes, else false.
+     * inserts an instance service and returns true if succes, else false.
      *
      * @param aService is to be inserted and must not already be part of a CipClass.
      *  It must by dynamically allocated, not compiled in, because this container
@@ -135,26 +126,38 @@ public:
      *  currently this will not fail if the service_id already exists.  It will merely
      *  delete the existing one with the same service_id.
      */
-    bool ServiceInsert( CipService* aService );
+    bool ServiceInsert( _CI aCI, CipService* aService );
 
-    CipService* ServiceInsert( int aServiceId,
+    CipService* ServiceInsert( _CI aCI, int aServiceId,
         CipServiceFunction aServiceFunction, const char* aServiceName );
 
     /**
      * Function ServiceRemove
-     * removes a service given by @a aServiceId and returns ownership to caller
+     * removes an instance service given by @a aServiceId and returns ownership to caller
      * if it exists, else NULL.  Caller may delete it, and typically should.
      */
-    CipService* ServiceRemove( int aServiceId );
+    CipService* ServiceRemove( _CI aCI, int aServiceId );
 
     /// Get an existing CipService or return NULL if not found.
-    CipService* Service( int aServiceId ) const;
-
-    /// Return a read only collection of services
-    const CipServices& Services() const
+    CipService* ServiceI( int aServiceId ) const
     {
-        return services;
+        return Service( _I, aServiceId );
     }
+
+    /// Get an existing CipService or return NULL if not found.
+    CipService* ServiceC( int aServiceId ) const
+    {
+        return Service( _C, aServiceId );
+    }
+
+    CipService* Service( _CI aCI, int aServiceId ) const;
+
+    /// Return a read only collection of instance services
+    const CipServices& ServicesI() const    { return services[_I]; }
+
+    /// Return a read only collection of class services
+    const CipServices& ServicesC() const    { return services[_C]; }
+
 
     /**
      * Function InstanceInsert
@@ -199,6 +202,92 @@ public:
 
     int ClassId() const                     { return class_id; }
 
+    CipAttribute* AttributeI( int aAttributeId ) const
+    {
+        return Attribute( _I, aAttributeId );
+    }
+    CipAttribute* AttributeC( int aAttributeId ) const
+    {
+        return Attribute( _C, aAttributeId );
+    }
+    CipAttribute* Attribute( _CI aCI, int aAttributeId ) const;
+
+
+    const CipAttributes& AttributesI() const    { return attributes[_I]; }
+    const CipAttributes& AttributesC() const    { return attributes[_C]; }
+
+
+    /**
+     * Functions AttributeInsertI
+     * insert an instance attribute and returns a pointer to it if succes, else NULL.
+     *
+     * @return CipAttribute* - dynamically allocated by this function,
+     * or NULL if failure. Currently attributes may be overrridden, so any
+     * existing CipAttribute in the target container with the same attribute id
+     * will be deleted in favour of this one.
+     */
+
+    /**
+     * Functions AttributeInsertC
+     * insert a class attribute and returns a pointer to it if succes, else NULL.
+     *
+     * @return CipAttribute* - dynamically allocated by this function,
+     * or NULL if failure. Currently attributes may be overrridden, so any
+     * existing CipAttribute in the target container with the same attribute id
+     * will be deleted in favour of this one.
+     */
+
+    /**
+     * @param aCookie is saved in the data member of the Attribute and will
+     *  later be passed to either AttributeFunc provided.  It can point to anything
+     *  convenient.
+     * @param isCookieAnInstanceOffset should be set to true if aData is a
+     *   data member of a CipInstance derivative
+     */
+
+    CipAttribute* AttributeInsert( _CI aCI,
+        int             aAttributeId,
+        AttributeFunc   aGetter,
+        bool            isGetableAll = true,
+        AttributeFunc   aSetter = NULL,
+        uintptr_t       aCookie = 0,
+        bool            isCookieAnInstanceOffset = false,
+        CipDataType     aCipType = kCipAny
+        );
+
+
+    CipAttribute* AttributeInsert( _CI aCI,
+        int             aAttributeId,
+        CipDataType     aCipType,
+        void*           aCookie,
+        bool            isGetableSingle = true,
+        bool            isGetableAll = true,
+        bool            isSetableSingle = false
+        );
+    CipAttribute* AttributeInsert( _CI aCI,
+        int             aAttributeId,
+        CipDataType     aCipType,
+        // use non-pointer aCookie to indicate CipInstance offset:
+        uint16_t        aCookie,
+        bool            isGetableSingle = true,
+        bool            isGetableAll = true,
+        bool            isSetableSingle = false
+        );
+
+    /**
+     * Function AttributeInsert
+     * inserts an attribute and returns true if succes, else false.
+     *
+     * @param aAttribute is the one to insert, and may not already be inserted
+     *  elsewhere. It must be dynamically allocated, not compiled in,
+     *  because this container takes ownership of aAttribute.
+     *
+     * @return bool - true if success, else false if failed.  Currently attributes
+     *  may be overrridden, so any existing CipAttribute in this instance with the
+     *  same attribute_id will be deleted in favour of this one.
+     */
+    bool AttributeInsert( _CI aCI, CipAttribute* aAttribute );
+
     /**
      * Function FindUniqueFreeId
      * returns the first unused instance Id.
@@ -223,51 +312,36 @@ public:
 protected:
 
     //-----<AttributeFuncs>-----------------------------------------------------
-    static EipStatus getInstanceCount( CipAttribute* attr,
+    static EipStatus getInstanceCount( CipInstance* aInstance, CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response );
 
-    static EipStatus getLargestInstanceId( CipAttribute* attr,
+    static EipStatus getLargestInstanceId( CipInstance* aInstance, CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response );
 
-    static EipStatus getLargestInstanceAttributeId( CipAttribute* attr,
+    static EipStatus getLargestInstanceAttributeId( CipInstance* aInstance, CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response );
 
-    static EipStatus getLargestClassAttributeId( CipAttribute* attr,
+    static EipStatus getLargestClassAttributeId( CipInstance* aInstance, CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response );
     //-----</AttributeFuncs>----------------------------------------------------
 
-    int         revision;                   ///< class revision
-    int         class_id;                   ///< class ID
-    std::string class_name;                 ///< class name
+    int             revision;               ///< class revision
+    int             class_id;               ///< class ID
+    std::string     class_name;             ///< class name
 
-    /**
+    CipServices     services[2];            ///< collection of services
 
-        Constructor for the meta-class, and only called by public constructor
-        above. The constructor above constructs the "public" CIP class. This one
-        constructs the meta-class. The meta-class is "owned" by the public class,
-        i.e. ownership means "is responsible for deleting it".
+    CipAttributes   attributes[2];          ///< sorted pointer array to CipAttribute
 
-        A metaClass is a class that holds the attributes and services of the
-        single public class object. CIP can talk to an instance, therefore an
-        instance has a pointer to its class. CIP can talk to a class, therefore
-        CipClass is a subclass of CipInstance, and this base C++ class contains
-        a pointer to a CipClass used as the meta-class. CIP never explicitly
-        addresses a meta-class.
-
-    */
-
-    CipClass(
-            int         aClassId,           ///< should be same as public class
-            const char* aClassName          ///< without "meta-" prefix
-            );
+    int             inst_getable_all_mask;
+    int             clss_getable_all_mask;
 
     CipInstances    instances;              ///< collection of instances
-    CipServices     services;               ///< collection of services
 
-    void ShowServices()
+    void ShowServicesI()
     {
-        for( CipServices::const_iterator it = services.begin();
-            it != services.end();  ++it )
+        for( CipServices::const_iterator it = services[_I].begin();
+            it != services[_I].end();  ++it )
         {
             CIPSTER_TRACE_INFO( "id:%d %s\n",
                 (*it)->Id(),

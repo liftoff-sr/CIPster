@@ -50,14 +50,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* aInstance, BufReader
 class CipAssemblyClass : public CipClass
 {
 public:
-    CipAssemblyClass() :
-        CipClass( kCipAssemblyClass,
-            "Assembly",
-            MASK7( 1,2,3,4,5,6,7 ), // common class attributes mask
-            2                       // class revision
-            )
-    {
-    }
+    CipAssemblyClass();
 
     CipError OpenConnection( ConnectionData* aConnData,
                 Cpf* aCpf, ConnMgrStatus* aExtError ); // override

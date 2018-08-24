@@ -833,16 +833,16 @@ CipConnMgrClass::CipConnMgrClass() :
         )
 {
     // There are no attributes in instance of this class yet, so nothing to set.
-    delete ServiceRemove( kSetAttributeSingle );
+    delete ServiceRemove( _I, kSetAttributeSingle );
 
-    ServiceInsert( kForwardOpen,        forward_open_service,       "ForwardOpen" );
-    ServiceInsert( kLargeForwardOpen,   large_forward_open_service, "LargeForwardOpen" );
-    ServiceInsert( kForwardClose,       forward_close_service,      "ForwardClose" );
+    ServiceInsert( _I, kForwardOpen,        forward_open_service,       "ForwardOpen" );
+    ServiceInsert( _I, kLargeForwardOpen,   large_forward_open_service, "LargeForwardOpen" );
+    ServiceInsert( _I, kForwardClose,       forward_close_service,      "ForwardClose" );
 
     // Vol1 Table 3-5.4 limits what GetAttributeAll returns, but I want to support
     // attribute 3 also, so remove 3 from the auto generated
     // (via CipInstance::AttributeInsert()) bitmap.
-    getable_all_mask = MASK4( 1,2,6,7 );
+    inst_getable_all_mask = MASK4( 1,2,6,7 );
 }
 
 

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "cipattribute.h"
+#include "cipservice.h"
 
 
 /**
@@ -21,7 +22,12 @@ class CipInstance
     friend class CipClass;
 
 public:
-    typedef std::vector<CipAttribute*>      CipAttributes;
+
+    enum _CI
+    {
+        _I,         // Feature pertains to the Instance with id > 0
+        _C,         // Feature pertains to the Class, i.e. instance 0.
+    };
 
     CipInstance( int aInstanceId );
 
@@ -31,84 +37,61 @@ public:
 
     CipClass*   Class() const   { return owning_class; }
 
-    /**
-     * Function AttributeInsert
-     * inserts an attribute and returns true if succes, else false.
-     *
-     * @param aAttribute is the one to insert, and may not already be a member
-     *  of another instance.  It must be dynamically allocated, not compiled in,
-     *  because this container takes ownership of aAttribute.
-     *
-     * @return bool - true if success, else false if failed.  Currently attributes
-     *  may be overrridden, so any existing CipAttribute in this instance with the
-     *  same attribute_id will be deleted in favour of this one.
-     */
-    bool AttributeInsert( CipAttribute* aAttribute );
-
-    CipAttribute* AttributeInsert( int aAttributeId,
-        CipDataType     aCipType,
-        void*           aData,
-        bool            isGetableSingle = true,
-        bool            isGetableAll = true,
-        bool            isSetableSingle = false
-        );
-
-    /**
-     * Function AttributeInsert
-     * inserts an attribute and returns a pointer to it if succes, else NULL.
-     *
-     * @param aCookie is saved in the data member of the Attribute and will
-     *  later be passed to either AttributeFunc provided.  It can point to anything
-     *  convenient.
-     *
-     * @return CipAttribute* - dynamically allocated by this function,
-     * or NULL if failure. Currently attributes may be overrridden, so any
-     * existing CipAttribute in this instance with the same attribute id
-     * will be deleted in favour of this one.
-     */
-    CipAttribute* AttributeInsert( int aAttributeId,
-        AttributeFunc   aGetter,
-        bool            isGetableAll = true,
-        AttributeFunc   aSetter = NULL,
-        void*           aCookie = NULL,
-        CipDataType     aCipType = kCipAny
-        );
+    /// If this a CipClass at instance_id == 0 then return _C,
+    /// else return _I because it is an instance.
+    _CI CI_() const
+    {
+        return reinterpret_cast<const CipInstance*>(owning_class) == this ?
+            _C : _I;
+    }
 
     /**
      * Function Attribute
-     * returns a CipAttribute or NULL if not found.
+     * returns a CipAttribute of this instance or NULL if not found.
      */
     CipAttribute* Attribute( int aAttributeId ) const;
 
-    const CipAttributes& Attributes() const
-    {
-        return attributes;
-    }
-
-protected:
-
-    void setClass( CipClass* aClass )
-    {
-        owning_class = aClass;
-    }
-
-    int             instance_id;    ///< this instance's number (unique within the class)
-    CipClass*       owning_class;   ///< class the instance belongs to or NULL if none.
-    CipAttributes   attributes;     ///< sorted pointer array to CipAttribute, unique to this instance
-    int             getable_all_mask;
+    const CipAttributes& Attributes() const;
 
     void ShowAttributes()
     {
-        for( CipAttributes::const_iterator it = attributes.begin();
-            it != attributes.end();  ++it )
+        const CipAttributes& all = Attributes();
+
+        for( CipAttributes::const_iterator it = all.begin();
+            it != all.end();  ++it )
         {
             CIPSTER_TRACE_INFO( "id:%d\n", (*it)->Id() );
         }
     }
 
+    void* Data( const CipAttribute* aAttribute )
+    {
+        return  aAttribute->is_offset_from_instance_start ?
+                    (char*) this + aAttribute->where :
+                    (char*) aAttribute->where;
+    }
+
+    /**
+     * Function Service
+     * returns a CipService or NULL if not found.
+     * If this instance is a CipClass (w/ instance_id == 0) then
+     * the class service is returned, else the instance service is returned.
+     */
+    CipService* Service( int aServiceId ) const;
+
+protected:
+
+    int             instance_id;    ///< this instance's number (unique within the class)
+    CipClass*       owning_class;   ///< class the instance belongs to or NULL if none.
+
+    void setClass( CipClass* aClass )       { owning_class = aClass; }
+
+
 private:
     CipInstance( CipInstance& );                    // private because not implemented
     CipInstance& operator=( const CipInstance& );   // private because not implemented
 };
+
+typedef std::vector<CipInstance*>      CipInstances;
 
 #endif // CIPINSTANCE_H_

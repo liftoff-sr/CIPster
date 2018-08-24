@@ -11,32 +11,31 @@
 #include <cipster_api.h>
 #include "cipconnectionmanager.h"
 
+#undef  INSTANCE_CLASS
+#define INSTANCE_CLASS  AssemblyInstance
 
 // getter and setter of type AssemblyFunc, specific to this CIP class called "Assembly"
 
-static EipStatus getAttrAssemblyData( CipAttribute* attr,
+static EipStatus getAttrAssemblyData( CipInstance* aInstance, CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    if( attr->Data() )
+    if( aInstance->Data(attr) )
     {
-        BeforeAssemblyDataSend( attr->Instance() );
+        BeforeAssemblyDataSend( aInstance );
 
-        return CipAttribute::GetAttrData( attr, request, response );
+        return CipAttribute::GetAttrData( aInstance, attr, request, response );
     }
 
     return kEipStatusOkSend;
 }
 
 
-static EipStatus setAttrAssemblyData( CipAttribute* attr,
+static EipStatus setAttrAssemblyData( CipInstance* aInstance, CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    if( attr->Data() )
+    if( ByteBuf* byte_array = (ByteBuf*) aInstance->Data( attr ) )
     {
-        ByteBuf*        byte_array = (ByteBuf*) attr->Data();
-        CipInstance*    instance = attr->Instance();
-
-        if( IsConnectedInputAssembly( instance->Id() ) )
+        if( IsConnectedInputAssembly( aInstance->Id() ) )
         {
             CIPSTER_TRACE_WARN( "%s: received data for connected input assembly\n", __func__ );
             response->SetGenStatus( kCipErrorAttributeNotSetable );
@@ -57,12 +56,12 @@ static EipStatus setAttrAssemblyData( CipAttribute* attr,
                 "%s: writing %d bytes to assembly_id: %d.\n",
                 __func__,
                 (int) request->Data().size(),
-                instance->Id()
+                aInstance->Id()
                 );
 
             memcpy( byte_array->data(), request->Data().data(), byte_array->size() );
 
-            if( AfterAssemblyDataReceived( instance ) != kEipStatusOk )
+            if( AfterAssemblyDataReceived( aInstance ) != kEipStatusOk )
             {
                 // NOTE: the attribute's data has already been overwritten.
                 // Application did not like it.  Probably need a better
@@ -90,11 +89,21 @@ AssemblyInstance::AssemblyInstance( int aInstanceId, ByteBuf aBuffer ) :
     CipInstance( aInstanceId ),
     byte_array( aBuffer )
 {
-    // Attribute 3 is the byte array transfer of the assembly data itself
-    AttributeInsert( 3, getAttrAssemblyData, false, setAttrAssemblyData, &byte_array );
+}
 
-    // Attribute 4 Number of bytes in Attribute 3
-    AttributeInsert( 4, kCipByteArrayLength, &byte_array, true, false );
+
+CipAssemblyClass::CipAssemblyClass() :
+    CipClass( kCipAssemblyClass,
+        "Assembly",
+        MASK7( 1,2,3,4,5,6,7 ), // common class attributes mask
+        2                       // class revision
+        )
+{
+    // Attribute 3 is the byte array transfer of the assembly data itself
+    AttributeInsert( _I, 3, getAttrAssemblyData, false, setAttrAssemblyData, memb_offs(byte_array) );
+
+    // Attribute 4: is no. of bytes in Attribute 3
+    AttributeInsert( _I, 4, kCipByteArrayLength, memb_offs(byte_array), true, false );
 }
 
 
@@ -150,7 +159,7 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, BufReader 
     CipAttribute* attr3 = instance->Attribute( 3 );
     CIPSTER_ASSERT( attr3 );
 
-    ByteBuf* byte_array = (ByteBuf*) attr3->Data();
+    ByteBuf* byte_array = (ByteBuf*) instance->Data( attr3 );
     CIPSTER_ASSERT( byte_array );
 
     if( byte_array->size() != aBuffer.size() )
@@ -169,4 +178,3 @@ EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* instance, BufReader 
     // notify application that new data arrived
     return AfterAssemblyDataReceived( instance );
 }
-

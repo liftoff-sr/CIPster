@@ -55,10 +55,7 @@ enum CIPServiceCode
 /**
  * Typedef EipStatus (*CipServiceFunc)( CipInstance *,
  *    CipMessageRouterRequest*, CipMessageRouterResponse*)
- * is the function type for the implementation of CIP services.
- *
- * CIP services have to follow this signature in order to be handled correctly
- * by the stack.
+ * is a CIP service function pointer.
  *
  * @param aInstance which was referenced in the service request
  * @param aRequest holds "data" coming from client, and it includes a length.
@@ -99,5 +96,8 @@ protected:
     std::string         service_name;
     int                 service_id;
 };
+
+typedef std::vector<CipService*>       CipServices;
+
 
 #endif  // CIPSERVICE_H_

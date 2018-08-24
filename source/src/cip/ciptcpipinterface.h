@@ -56,11 +56,13 @@ struct CipTcpIpInterfaceConfiguration
         name_server_2( 0 )
     {}
 
+    // network byte order for each of these:
     CipUdint    ip_address;
     CipUdint    network_mask;
     CipUdint    gateway;
     CipUdint    name_server;
     CipUdint    name_server_2;
+
     std::string domain_name;
 };
 
@@ -117,35 +119,55 @@ protected:
 
     //-----<AttrubuteFuncs>-----------------------------------------------------
 
-    static EipStatus get_attr_4( CipAttribute* aAttribute,
+    static EipStatus get_attr_4( CipInstance* aInstance,
+            CipAttribute* aAttribute,
             CipMessageRouterRequest* aRequest,
             CipMessageRouterResponse* aResponse );
 
-    static EipStatus get_attr_5( CipAttribute* aAttribute,
+    static EipStatus get_attr_5( CipInstance* aInstance,
+            CipAttribute* aAttribute,
             CipMessageRouterRequest* aRequest,
             CipMessageRouterResponse* aResponse );
 
-    static EipStatus get_multicast_config( CipAttribute* aAttribute,
+    static EipStatus get_multicast_config( CipInstance* aInstance,
+            CipAttribute* aAttribute,
             CipMessageRouterRequest* aRequest,
             CipMessageRouterResponse* aResponse );
 
-    static EipStatus set_multicast_config( CipAttribute* aAttribute,
+    static EipStatus set_multicast_config( CipInstance* aInstance,
+            CipAttribute* aAttribute,
             CipMessageRouterRequest* aRequest,
             CipMessageRouterResponse* aResponse );
 
-    static EipStatus get_attr_7( CipAttribute* aAttribute,
+    static EipStatus get_attr_7( CipInstance* aInstance,
+            CipAttribute* aAttribute,
             CipMessageRouterRequest* aRequest,
             CipMessageRouterResponse* aResponse );
 
-    static EipStatus set_attr_13( CipAttribute* aAttribute,
+    static EipStatus set_attr_13( CipInstance* aInstance,
+            CipAttribute* aAttribute,
             CipMessageRouterRequest* aRequest,
             CipMessageRouterResponse* aResponse );
 
-    static EipStatus set_TTL( CipAttribute* aAttribute,
+    static EipStatus set_TTL( CipInstance* aInstance,
+            CipAttribute* aAttribute,
             CipMessageRouterRequest* aRequest,
             CipMessageRouterResponse* aResponse );
 
     //-----</AttrubuteFuncs>----------------------------------------------------
+
+    //-----<CipServiceFunctions>------------------------------------------------
+
+    // overload GetAttributeAll because we have to fill in gaps
+    // for "not implemented" attributes.
+    // This is supplied because the TCIP/IP class spec wants ALL attributes to
+    // be returned up to and including the last implemented one, WITH NO GAPS.
+    // This means we have to make up unimplemented attributes to fill in the holes.
+    // The standard CipClass::GetAttributeAll() function does not do this.
+    static EipStatus get_all( CipInstance* aInstance,
+        CipMessageRouterRequest* aRequest, CipMessageRouterResponse* aResponse );
+
+    //-----</CipServiceFunctions>-----------------------------------------------
 };
 
 
@@ -168,15 +190,6 @@ public:
      * cleans up the allocated data of the TCP/IP interface objects
      */
     static void Shutdown();
-
-    //-----<CipServiceFunctions>------------------------------------------------
-
-    // overload GetAttributeAll because we have to fill in gaps
-    // for "not implemented" attributes.
-    static EipStatus get_all( CipInstance* aInstance,
-        CipMessageRouterRequest* aRequest, CipMessageRouterResponse* aResponse );
-
-    //-----</CipServiceFunctions>-----------------------------------------------
 
     static const MulticastAddressConfiguration& MultiCast( int aInstanceId );
 

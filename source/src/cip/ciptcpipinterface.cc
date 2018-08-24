@@ -16,6 +16,9 @@
 #include <cipethernetlink.h>
 #include <cipster_api.h>
 
+#undef  INSTANCE_CLASS
+#define INSTANCE_CLASS  CipTCPIPInterfaceInstance
+
 
 // A static pointer to the only class object, this avoids Registry lookup,
 // thus improving speed in the API Functions.
@@ -41,30 +44,13 @@ CipTCPIPInterfaceInstance::CipTCPIPInterfaceInstance( int aInstanceId ) :
     configuration_control( 0 ),
     time_to_live( 1 )
 {
-    AttributeInsert( 1, kCipDword, &status );
-    AttributeInsert( 2, kCipDword, &configuration_capability );
-    AttributeInsert( 3, kCipDword, &configuration_control );
-    AttributeInsert( 4, get_attr_4 );
-    AttributeInsert( 5, get_attr_5 );
-    AttributeInsert( 6, kCipString, &hostname );
-
-    //AttributeInsert( 7, get_attr_7 );
-
-    // Use a standard method to Get the attribute, but a custom one to Set it.
-    AttributeInsert( 8, CipAttribute::GetAttrData, true, set_TTL, &time_to_live, kCipUsint );
-
-    AttributeInsert( 9, get_multicast_config, true, set_multicast_config );
-
-    // Use a standard method to Get the attribute, but a custom one to Set it.
-    // This would also be a good place to read it from disk or non volatile storage.
-    AttributeInsert( 13, CipAttribute::GetAttrData, true, set_attr_13, &inactivity_timeout_secs, kCipUint );
 }
 
 
 //-----<AttrubuteFuncs>-----------------------------------------------------
 
-
-EipStatus CipTCPIPInterfaceInstance::get_attr_4( CipAttribute* attribute,
+EipStatus CipTCPIPInterfaceInstance::get_attr_4( CipInstance* aInstance,
+        CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
@@ -74,7 +60,7 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_4( CipAttribute* attribute,
     CipAppPath app_path;
 
     app_path.SetClass( kCipEthernetLinkClass );
-    app_path.SetInstance( attribute->Instance()->Id() );
+    app_path.SetInstance( aInstance->Id() );
 
     int result = app_path.Serialize( out + 2 );
 
@@ -88,13 +74,14 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_4( CipAttribute* attribute,
 }
 
 
-EipStatus CipTCPIPInterfaceInstance::get_attr_5( CipAttribute* attribute,
+EipStatus CipTCPIPInterfaceInstance::get_attr_5( CipInstance* aInstance,
+        CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
     BufWriter   out = aResponse->Writer();
 
-    CipTCPIPInterfaceInstance* inst = static_cast<CipTCPIPInterfaceInstance*>( attribute->Instance() );
+    CipTCPIPInterfaceInstance* inst = static_cast<CipTCPIPInterfaceInstance*>( aInstance );
 
     const CipTcpIpInterfaceConfiguration& c = inst->interface_configuration;
 
@@ -112,14 +99,15 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_5( CipAttribute* attribute,
 
 
 // Attribute 9
-EipStatus CipTCPIPInterfaceInstance::get_multicast_config( CipAttribute* attribute,
+EipStatus CipTCPIPInterfaceInstance::get_multicast_config( CipInstance* aInstance,
+        CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
     EipStatus   status = kEipStatusOkSend;
     BufWriter   out = aResponse->Writer();
 
-    CipTCPIPInterfaceInstance* i = static_cast<CipTCPIPInterfaceInstance*>( attribute->Instance() );
+    CipTCPIPInterfaceInstance* i = static_cast<CipTCPIPInterfaceInstance*>( aInstance );
 
     out.put8( i->multicast_configuration.alloc_control );
     out.put8( 0 );
@@ -133,12 +121,13 @@ EipStatus CipTCPIPInterfaceInstance::get_multicast_config( CipAttribute* attribu
 }
 
 
-EipStatus CipTCPIPInterfaceInstance::set_multicast_config( CipAttribute* attribute,
+EipStatus CipTCPIPInterfaceInstance::set_multicast_config( CipInstance* aInstance,
+        CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
     BufReader   in = aRequest->Data();
-    CipTCPIPInterfaceInstance* i = static_cast<CipTCPIPInterfaceInstance*>( attribute->Instance() );
+    CipTCPIPInterfaceInstance* i = static_cast<CipTCPIPInterfaceInstance*>( aInstance );
     MulticastAddressConfiguration* mc = &i->multicast_configuration;
 
     mc->alloc_control = in.get8();
@@ -150,14 +139,15 @@ EipStatus CipTCPIPInterfaceInstance::set_multicast_config( CipAttribute* attribu
 }
 
 
-EipStatus CipTCPIPInterfaceInstance::get_attr_7( CipAttribute* attribute,
+EipStatus CipTCPIPInterfaceInstance::get_attr_7( CipInstance* aInstance,
+        CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
     BufWriter out = aResponse->Writer();
 
     // insert 6 zeros for the required empty safety network number
-    // according to Table 5-4.15
+    // according to Vol2 Table 5-4.15
     out.fill( 6 );
 
     aResponse->SetWrittenSize( 6 );
@@ -166,7 +156,8 @@ EipStatus CipTCPIPInterfaceInstance::get_attr_7( CipAttribute* attribute,
 }
 
 
-EipStatus CipTCPIPInterfaceInstance::set_attr_13( CipAttribute* attribute,
+EipStatus CipTCPIPInterfaceInstance::set_attr_13( CipInstance* aInstance,
+        CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
@@ -180,7 +171,8 @@ EipStatus CipTCPIPInterfaceInstance::set_attr_13( CipAttribute* attribute,
 
 
 // This is here to protect against setting to zero
-EipStatus CipTCPIPInterfaceInstance::set_TTL( CipAttribute* attribute,
+EipStatus CipTCPIPInterfaceInstance::set_TTL( CipInstance* aInstance,
+        CipAttribute* attribute,
         CipMessageRouterRequest* aRequest,
         CipMessageRouterResponse* aResponse )
 {
@@ -189,7 +181,7 @@ EipStatus CipTCPIPInterfaceInstance::set_TTL( CipAttribute* attribute,
     if( ttl == 0 )
         aResponse->SetGenStatus( kCipErrorInvalidAttributeValue );
     else
-        *(uint8_t*)attribute->Data() = ttl;
+        *(uint8_t*) aInstance->Data( attribute ) = ttl;
 
     // [write it to disk here?]
 
@@ -223,52 +215,10 @@ EipStatus CipTCPIPInterfaceInstance::configureNetworkInterface(
 
 //-----</AttrubuteFuncs>--------------------------------------------------------
 
-//-----</CipTCPIPInterfaceInstance>---------------------------------------------
-
-
-//-----<CipTCPIPInterfaceClass>-------------------------------------------------
-
-CipTCPIPInterfaceClass::CipTCPIPInterfaceClass() :
-    CipClass( kCipTcpIpInterfaceClass,
-        "TCP/IP Interface",
-#if 0
-        MASK7(1,2,3,4,5,6,7),   // common class attributes mask
-#else
-        // The Vol2 spec for this class says 4-7 are optional,
-        // but conformance test software may whine about 4 & 5 so omit them.
-        MASK5(1,2,3,6,7),       // common class attributes mask
-#endif
-        4                         // version
-        )
-{
-    // overload an instance service
-    ServiceInsert( kGetAttributeAll, get_all, "GetAttributeAll" );
-}
-
-
-CipTCPIPInterfaceInstance* CipTCPIPInterfaceClass::Instance( int aInstanceId )
-{
-#if 1
-    // will throw if you have a bad aInstanceId or used non contiguous ids
-    // during construction. But this is the fastest strategy.
-    CipTCPIPInterfaceInstance* inst = static_cast<CipTCPIPInterfaceInstance*>( instances[aInstanceId-1] );
-#else
-    CipTCPIPInterfaceInstance* inst = static_cast<CipTCPIPInterfaceInstance*>( CipClass::Instance( aInstanceId ) );
-    if( !inst )
-        throw std::range_error( "bad tcpip instance no." );
-#endif
-
-    return inst;
-}
-
 
 //-----<CipServiceFunctions>-----------------------------------------------------------
 
-// This is supplied because the TCIP/IP class spec wants ALL attributes to
-// be returned up to and including the last implemented one, WITH NO GAPS.
-// This means we have to make up unimplemented attributes to fill in the holes.
-// The standard CipClass::GetAttributeAll() function does not do this.
-EipStatus CipTCPIPInterfaceClass::get_all( CipInstance* aInstance,
+EipStatus CipTCPIPInterfaceInstance::get_all( CipInstance* aInstance,
         CipMessageRouterRequest* aRequest, CipMessageRouterResponse* aResponse )
 {
     CipTCPIPInterfaceInstance* i = static_cast< CipTCPIPInterfaceInstance* >( aInstance );
@@ -318,7 +268,7 @@ EipStatus CipTCPIPInterfaceClass::get_all( CipInstance* aInstance,
     out.put8( 0 );
 
     // attribute 11
-    out.put8( 0 ).fill( 6 ).fill( 28 );
+    out.put8( 0 ).fill( 6+28 );
 
     // attribute 12
     out.put8( 0 );
@@ -332,6 +282,63 @@ EipStatus CipTCPIPInterfaceClass::get_all( CipInstance* aInstance,
 }
 
 //-----</CipServiceFunctions>---------------------------------------------------
+
+
+//-----</CipTCPIPInterfaceInstance>---------------------------------------------
+
+
+//-----<CipTCPIPInterfaceClass>-------------------------------------------------
+
+CipTCPIPInterfaceClass::CipTCPIPInterfaceClass() :
+    CipClass( kCipTcpIpInterfaceClass,
+        "TCP/IP Interface",
+#if 0
+        MASK7(1,2,3,4,5,6,7),   // common class attributes mask
+#else
+        // The Vol2 spec for this class says 4-7 are optional,
+        // but conformance test software may whine about 4 & 5 so omit them.
+        MASK5(1,2,3,6,7),       // common class attributes mask
+#endif
+        4                         // version
+        )
+{
+    // overload an instance service
+    ServiceInsert( _I, kGetAttributeAll, CipTCPIPInterfaceInstance::get_all, "GetAttributeAll" );
+
+    AttributeInsert( _I, 1, kCipDword, memb_offs(status) );
+    AttributeInsert( _I, 2, kCipDword, memb_offs(configuration_capability) );
+    AttributeInsert( _I, 3, kCipDword, memb_offs(configuration_control) );
+    AttributeInsert( _I, 4, CipTCPIPInterfaceInstance::get_attr_4 );
+    AttributeInsert( _I, 5, CipTCPIPInterfaceInstance::get_attr_5 );
+    AttributeInsert( _I, 6, kCipString, &CipTCPIPInterfaceInstance::hostname );
+
+    //AttributeInsert( _I, 7, get_attr_7 );
+
+    // Use a standard method to Get the attribute, but a custom one to Set it.
+    AttributeInsert( _I, 8, CipAttribute::GetAttrData, true, CipTCPIPInterfaceInstance::set_TTL, memb_offs(time_to_live), true, kCipUsint );
+
+    AttributeInsert( _I, 9, CipTCPIPInterfaceInstance::get_multicast_config, true, CipTCPIPInterfaceInstance::set_multicast_config );
+
+    // Use a standard method to Get the attribute, but a custom one to Set it.
+    // This would also be a good place to read it from disk or non volatile storage.
+    AttributeInsert( _I, 13, CipAttribute::GetAttrData, true, CipTCPIPInterfaceInstance::set_attr_13, (uintptr_t) &CipTCPIPInterfaceInstance::inactivity_timeout_secs, false, kCipUint );
+}
+
+
+CipTCPIPInterfaceInstance* CipTCPIPInterfaceClass::Instance( int aInstanceId )
+{
+#if 1
+    // will throw if you have a bad aInstanceId or used non contiguous ids
+    // during construction. But this is the fastest strategy.
+    CipTCPIPInterfaceInstance* inst = static_cast<CipTCPIPInterfaceInstance*>( instances[aInstanceId-1] );
+#else
+    CipTCPIPInterfaceInstance* inst = static_cast<CipTCPIPInterfaceInstance*>( CipClass::Instance( aInstanceId ) );
+    if( !inst )
+        throw std::range_error( "bad tcpip instance no." );
+#endif
+
+    return inst;
+}
 
 
 //----<API Funcs>---------------------------------------------------------------

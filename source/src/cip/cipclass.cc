@@ -85,119 +85,87 @@ CipClass::CipClass(
     CipInstance( 0 ),       // instance_id of public class is always 0
     class_id( aClassId ),
     class_name( aClassName ),
-    revision( aRevision )
+    revision( aRevision ),
+    clss_getable_all_mask( 0 ),
+    inst_getable_all_mask( 0 )
 {
-    // The public class holds services for the instances, and attributes for itself.
+    owning_class = this;
 
-    // class of "this" public class is meta_class, call meta-class special constructor.
-    CipClass* meta_class = new CipClass(
-                aClassId,
-                aClassName
-                );
-
-    // The meta class has no attributes, but holds services for the public class.
-
-    // The meta class has only one instance and it is the public class and it
-    // is not owned by the meta-class (will not delete it during destruction).
-    // But in fact the public class owns the meta-class.
-    meta_class->InstanceInsert( this );     // sets this->cip_class also.
+    ServiceInsert( _C, kGetAttributeSingle, GetAttributeSingle, "GetAttributeSingle" );
+    ServiceInsert( _C, kGetAttributeAll,    GetAttributeAll,    "GetAttributeAll" );
+    ServiceInsert( _C, kReset,              Reset,              "Reset" );
 
     // Create the standard class attributes as requested.
     // See Vol 1 Table 4-4.2
 
     if( aClassAttributesMask & (1<<1) )
-        AttributeInsert( 1, kCipUint, &revision );
+        AttributeInsert( _C, 1, kCipUint, &revision );
 
     // largest instance id
     if( aClassAttributesMask & (1<<2) )
-        AttributeInsert( 2, getLargestInstanceId );
+        AttributeInsert( _C, 2, getLargestInstanceId );
 
     // number of instances currently existing
     if( aClassAttributesMask & (1<<3) )
-        AttributeInsert( 3, getInstanceCount );
+        AttributeInsert( _C, 3, getInstanceCount );
 
     // optional attribute list - default = 0
     if( aClassAttributesMask & (1<<4) )
-        AttributeInsert( 4, kCipUint, &Zero );
+        AttributeInsert( _C, 4, kCipUint, &Zero );
 
     // optional service list - default = 0
     if( aClassAttributesMask & (1<<5) )
-        AttributeInsert( 5, kCipUint, &Zero );
+        AttributeInsert( _C, 5, kCipUint, &Zero );
 
     // max class attribute number
     if( aClassAttributesMask & (1<<6) )
-        AttributeInsert( 6, getLargestClassAttributeId );
+        AttributeInsert( _C, 6, getLargestClassAttributeId );
 
     // max instance attribute number
     if( aClassAttributesMask & (1<<7) )
-        AttributeInsert( 7, getLargestInstanceAttributeId );
+        AttributeInsert( _C, 7, getLargestInstanceAttributeId );
 
     // create the standard instance services
-    ServiceInsert( kGetAttributeSingle, GetAttributeSingle, "GetAttributeSingle" );
-    ServiceInsert( kSetAttributeSingle, SetAttributeSingle, "SetAttributeSingle" );
+    ServiceInsert( _I, kGetAttributeSingle, GetAttributeSingle, "GetAttributeSingle" );
+    ServiceInsert( _I, kSetAttributeSingle, SetAttributeSingle, "SetAttributeSingle" );
 
-    if( getable_all_mask )
-        ServiceInsert( kGetAttributeAll, GetAttributeAll, "GetAttributeAll" );
-}
-
-
-// meta-class constructor
-CipClass::CipClass(
-        int aClassId,
-        const char* aClassName
-        ) :
-    CipInstance( -1 ),              // instance_id and NULL class
-    class_id( aClassId ),
-    class_name( std::string( "meta-" ) + aClassName ),
-    revision( 0 )
-{
-    /*
-        A metaClass is a class that holds the class services.
-        CIP can talk to an instance, therefore an instance has a pointer to
-        its class. CIP can talk to a class, therefore a class struct is a
-        subclass of the instance struct, and contains a pointer to a
-        metaclass. CIP never explicitly addresses a metaclass.
-    */
-
-    ServiceInsert( kGetAttributeSingle, GetAttributeSingle, "GetAttributeSingle" );
-    ServiceInsert( kGetAttributeAll,    GetAttributeAll,    "GetAttributeAll" );
-    ServiceInsert( kReset,              Reset,              "Reset" );
+    if( inst_getable_all_mask )
+        ServiceInsert( _I, kGetAttributeAll, GetAttributeAll, "GetAttributeAll" );
 }
 
 
 CipClass::~CipClass()
 {
+    // delete all the instances of this class
+    while( instances.size() )
+    {
+        delete instances.back();
+        instances.pop_back();
+    }
+
+    while( services[_I].size() )
+    {
+        delete services[_I].back();
+        services[_I].pop_back();
+    }
+    while( services[_C].size() )
+    {
+        delete services[_C].back();
+        services[_C].pop_back();
+    }
+
+    while( attributes[_I].size() )
+    {
+        delete attributes[_I].back();
+        attributes[_I].pop_back();
+    }
+    while( attributes[_C].size() )
+    {
+        delete attributes[_C].back();
+        attributes[_C].pop_back();
+    }
+
     CIPSTER_TRACE_INFO( "deleting class '%s'\n", class_name.c_str() );
-
-    // a meta-class does not own its one public class instance
-    if( !IsMetaClass() )
-    {
-        // delete all the instances of this class
-        while( instances.size() )
-        {
-            delete instances.back();
-            instances.pop_back();
-        }
-
-        // The public class owns the meta-class.
-        // Delete the meta-class, which invokes a small bit of recursion
-        // back into this function, but on the nested call cip_class will
-        // be NULL for the meta-class, and IsMetaClass() returns true.
-        delete owning_class;
-    }
-
-    while( services.size() )
-    {
-#if 0
-        if( class_name == "TCP/IP Interface" )
-        {
-            ShowServices();
-        }
-#endif
-
-        delete services.back();
-        services.pop_back();
-    }
 }
 
 
@@ -245,22 +213,6 @@ int CipClass::FindUniqueFreeId() const
     }
 
     return last_id + 1;
-}
-
-
-CipService* CipClass::Service( int aServiceId ) const
-{
-    CipServices::const_iterator  it;
-
-    // binary search thru vector of pointers looking for attribute_id
-    it = vec_search( services.begin(), services.end(), aServiceId );
-
-    if( it != services.end() )
-        return *it;
-
-    CIPSTER_TRACE_WARN( "service %d not defined\n", aServiceId );
-
-    return NULL;
 }
 
 
@@ -342,48 +294,68 @@ CipInstance* CipClass::Instance( int aInstanceId ) const
 }
 
 
-CipClass::CipInstances::const_iterator CipClass::InstanceNext( int aInstanceId ) const
+CipInstances::const_iterator CipClass::InstanceNext( int aInstanceId ) const
 {
     CipInstances::const_iterator it = vec_search_gte( instances.begin(), instances.end(), aInstanceId );
     return it;
 }
 
 
-bool CipClass::ServiceInsert( CipService* aService )
+CipService* CipClass::Service( _CI aCI, int aServiceId ) const
+{
+    CipServices::const_iterator  it;
+
+    const CipServices& slist = services[aCI];
+
+    // binary search thru vector of pointers looking for attribute_id
+    it = vec_search( slist.begin(), slist.end(), aServiceId );
+
+    if( it != slist.end() )
+        return *it;
+
+    CIPSTER_TRACE_WARN( "service %d not defined\n", aServiceId );
+
+    return NULL;
+}
+
+
+bool CipClass::ServiceInsert( _CI aCI, CipService* aService )
 {
     CipServices::iterator it;
 
+    CipServices& s = services[aCI];
+
     // Keep sorted by id
-    for( it = services.begin();  it != services.end();  ++it )
+    for( it = s.begin();  it != s.end();  ++it )
     {
         if( aService->Id() < (*it)->Id() )
             break;
 
         else if( aService->Id() == (*it)->Id() )
         {
-            CIPSTER_TRACE_ERR( "class '%s' already has service %d, overriding.\n",
-                class_name.c_str(), aService->Id()
-                );
+            CIPSTER_TRACE_ERR(
+                "%s: class '%s' already has service %d, overriding.\n",
+                __func__, class_name.c_str(), aService->Id() );
 
             // re-use this slot given by position 'it'.
             delete *it;             // delete existing CipService
-            services.erase( it );   // will re-gap service st::vector with following insert()
+            s.erase( it );   // will re-gap service st::vector with following insert()
             break;
         }
     }
 
-    services.insert( it, aService );
+    s.insert( it, aService );
 
     return true;
 }
 
 
-CipService* CipClass::ServiceInsert( int aServiceId,
+CipService* CipClass::ServiceInsert( _CI aCI, int aServiceId,
         CipServiceFunction aServiceFunction, const char* aServiceName )
 {
     CipService* service = new CipService( aServiceName, aServiceId, aServiceFunction );
 
-    if( !ServiceInsert( service ) )
+    if( !ServiceInsert( aCI, service ) )
     {
         delete service;
         service = NULL;     // return NULL on failure
@@ -393,11 +365,13 @@ CipService* CipClass::ServiceInsert( int aServiceId,
 }
 
 
-CipService* CipClass::ServiceRemove( int aServiceId )
+CipService* CipClass::ServiceRemove( _CI aCI, int aServiceId )
 {
     CipService* ret = NULL;
 
-    for( CipServices::iterator it = services.begin();  it != services.end();  ++it )
+    CipServices& s = services[aCI];
+
+    for( CipServices::iterator it = s.begin();  it != s.end();  ++it )
     {
         if( aServiceId == (*it)->Id() )
         {
@@ -408,7 +382,7 @@ CipService* CipClass::ServiceRemove( int aServiceId )
                 );
 
             ret = *it;              // pass ownership to ret
-            services.erase( it );   // close gap
+            s.erase( it );      // close gap
             break;
         }
     }
@@ -416,12 +390,202 @@ CipService* CipClass::ServiceRemove( int aServiceId )
     return ret;
 }
 
+
+bool CipClass::AttributeInsert(  _CI aCI, CipAttribute* aAttribute )
+{
+    CipAttributes::iterator it;
+
+    CipAttributes& a = attributes[aCI];
+
+    CIPSTER_ASSERT( !aAttribute->owning_class );  // only un-owned attributes may be inserted
+
+    bool is_class = (aCI == _C);
+
+    // Keep sorted by id
+    for( it = a.begin(); it != a.end();  ++it )
+    {
+        if( aAttribute->Id() < (*it)->Id() )
+            break;
+
+        else if( aAttribute->Id() == (*it)->Id() )
+        {
+            CIPSTER_TRACE_ERR(
+                "%s: class '%s' already has %s attribute %d, overriding\n",
+                __func__,
+                owning_class->ClassName().c_str(),
+                is_class ? "a class" : "an instance",
+                aAttribute->Id()
+                );
+
+            // Re-use this slot given by position 'it'.
+            delete *it;
+            a.erase( it );    // will re-insert at this position below
+            break;
+        }
+    }
+
+    a.insert( it, aAttribute );
+
+    aAttribute->owning_class = this; // until now there was no owner of this attribute.
+
+    if( aAttribute->Id() < 32 )
+    {
+        if( aAttribute->IsGetableAll() )
+        {
+            if( is_class )
+                clss_getable_all_mask |= 1 << aAttribute->Id();
+            else
+                inst_getable_all_mask |= 1 << aAttribute->Id();
+        }
+    }
+
+    return true;
+}
+
+
+CipAttribute* CipClass::AttributeInsert( _CI aCI,
+        int             aAttributeId,
+        AttributeFunc   aGetter,
+        bool            isGetableAll,
+        AttributeFunc   aSetter,
+        uintptr_t       aCookie,
+        bool            isCookieAnInstanceOffset,
+        CipDataType     aDataType
+        )
+{
+    CipAttribute* attribute = new CipAttribute(
+            aAttributeId,
+            aDataType,
+            aGetter,
+            aSetter,
+            (uintptr_t) aCookie,
+            isGetableAll,
+            isCookieAnInstanceOffset
+            );
+
+    if( !AttributeInsert( aCI, attribute ) )
+    {
+        delete attribute;
+        attribute = NULL;   // return NULL on failure
+    }
+
+    return attribute;
+}
+
+#if 0
+CipAttribute* CipClass::AttributeInsert( _CI aCI,
+        int             aAttributeId,
+        AttributeFunc   aGetter,
+        bool            isGetableAll,
+        AttributeFunc   aSetter,
+        uint16_t        aCookie,
+        bool            isCookieAnInstanceOffset,
+        CipDataType     aDataType
+        )
+{
+    CipAttribute* attribute = new CipAttribute(
+            aAttributeId,
+            aDataType,
+            aGetter,
+            aSetter,
+            aCookie,
+            isGetableAll,
+            isCookieAnInstanceOffset
+            );
+
+    if( !AttributeInsert( aCI, attribute ) )
+    {
+        delete attribute;
+        attribute = NULL;   // return NULL on failure
+    }
+
+    return attribute;
+}
+#endif
+
+
+CipAttribute* CipClass::AttributeInsert( _CI aCI,
+        int             aAttributeId,
+        CipDataType     aCipType,
+        void*           aCookie,
+        bool            isGetableSingle,
+        bool            isGetableAll,
+        bool            isSetableSingle
+        )
+{
+    CipAttribute* attribute = new CipAttribute(
+            aAttributeId,
+            aCipType,
+            isGetableSingle ? CipAttribute::GetAttrData : NULL,
+            isSetableSingle ? CipAttribute::SetAttrData : NULL,
+            (uintptr_t) aCookie,
+            isGetableAll,
+            false                   // isDataAnInstanceOffset
+            );
+
+    if( !AttributeInsert( aCI, attribute ) )
+    {
+        delete attribute;
+        attribute = NULL;   // return NULL on failure
+    }
+
+    return attribute;
+}
+
+
+CipAttribute* CipClass::AttributeInsert( _CI aCI,
+        int             aAttributeId,
+        CipDataType     aCipType,
+        uint16_t        aCookie,
+        bool            isGetableSingle,
+        bool            isGetableAll,
+        bool            isSetableSingle
+        )
+{
+    CipAttribute* attribute = new CipAttribute(
+            aAttributeId,
+            aCipType,
+            isGetableSingle ? CipAttribute::GetAttrData : NULL,
+            isSetableSingle ? CipAttribute::SetAttrData : NULL,
+            aCookie,
+            isGetableAll,
+            true                    // isDataAnInstanceOffset
+            );
+
+    if( !AttributeInsert( aCI, attribute ) )
+    {
+        delete attribute;
+        attribute = NULL;   // return NULL on failure
+    }
+
+    return attribute;
+}
+
+
+CipAttribute* CipClass::Attribute( _CI aCI, int aAttributeId ) const
+{
+    CipAttributes::const_iterator  it;
+
+    const CipAttributes& list = attributes[aCI];
+
+    // a binary search thru the vector of pointers looking for aAttributeId
+    it = vec_search( list.begin(), list.end(), aAttributeId );
+
+    if( it != list.end() )
+        return *it;
+
+    CIPSTER_TRACE_WARN( "attribute %d not defined\n", aAttributeId );
+
+    return NULL;
+}
+
+
 //----<AttrubuteFuncs>-------------------------------------------------------
 
-EipStatus CipClass::getInstanceCount( CipAttribute* attr,
+EipStatus CipClass::getInstanceCount( CipInstance* aInstance, CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    CipClass* clazz = dynamic_cast<CipClass*>( attr->Instance() );
+    CipClass* clazz = attr->owning_class;
 
     // This func must be invoked only on a class attribute,
     // because on an instance attribute clazz will be NULL since
@@ -441,10 +605,10 @@ EipStatus CipClass::getInstanceCount( CipAttribute* attr,
 }
 
 
-EipStatus CipClass::getLargestInstanceId( CipAttribute* attr,
+EipStatus CipClass::getLargestInstanceId( CipInstance* aInstance, CipAttribute* attr,
     CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    CipClass* clazz = dynamic_cast<CipClass*>( attr->Instance() );
+    CipClass* clazz = attr->owning_class;
 
     // This func must be invoked only on a class attribute,
     // because on an instance attribute clazz will be NULL since
@@ -470,24 +634,22 @@ EipStatus CipClass::getLargestInstanceId( CipAttribute* attr,
 }
 
 
-EipStatus CipClass::getLargestInstanceAttributeId( CipAttribute* attr,
+EipStatus CipClass::getLargestInstanceAttributeId( CipInstance* aInstance, CipAttribute* attr,
     CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    CipInstance* inst = attr->Instance();
+    CipClass* clazz = attr->owning_class;
 
-    if( inst )
+    if( clazz )
     {
         EipUint16 largest_id = 0;
 
-        if( inst->Attributes().size() )
+        if( clazz->AttributesI().size() )
         {
             // attributes are sorted by Id(), so last one is highest.
-            largest_id = inst->Attributes().back()->Id();
+            largest_id = clazz->AttributesI().back()->Id();
         }
 
-        BufWriter out = response->Writer();
-
-        out.put16( largest_id );
+        response->Writer().put16( largest_id );
         response->SetWrittenSize( 2 );
 
         return kEipStatusOkSend;
@@ -496,27 +658,22 @@ EipStatus CipClass::getLargestInstanceAttributeId( CipAttribute* attr,
 }
 
 
-EipStatus CipClass::getLargestClassAttributeId( CipAttribute* attr,
+EipStatus CipClass::getLargestClassAttributeId( CipInstance* aInstance, CipAttribute* attr,
     CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    CipClass* clazz = dynamic_cast<CipClass*>( attr->Instance() );
+    CipClass* clazz = attr->owning_class;
 
-    // This func must be invoked only on a class attribute,
-    // because on an instance attribute clazz will be NULL since
-    // Instance() is not a CipClass and dynamic_cast<> returns NULL.
     if( clazz )
     {
         EipUint16 largest_id = 0;
 
-        if( clazz->Attributes().size() )
+        if( clazz->AttributesC().size() )
         {
             // attributes are sorted by Id(), so last one is highest.
-            largest_id = clazz->Attributes().back()->Id();
+            largest_id = clazz->AttributesC().back()->Id();
         }
 
-        BufWriter out = response->Writer();
-
-        out.put16( largest_id );
+        response->Writer().put16( largest_id );
         response->SetWrittenSize( 2 );
 
         return kEipStatusOkSend;
@@ -550,7 +707,7 @@ EipStatus CipClass::GetAttributeSingle( CipInstance* instance,
         return kEipStatusOkSend;
     }
 
-    return attribute->Get( request, response );
+    return attribute->Get( instance, request, response );
 }
 
 
@@ -561,7 +718,7 @@ EipStatus CipClass::GetAttributeAll( CipInstance* instance,
     BufWriter start = response->Writer();
 
     // Implement GetAttributeAll() by calling GetAttributeSingle() in a loop.
-    CipService* service = instance->Class()->Service( kGetAttributeSingle );
+    CipService* service = instance->Service( kGetAttributeSingle );
 
     if( !service )
     {
@@ -576,7 +733,7 @@ EipStatus CipClass::GetAttributeAll( CipInstance* instance,
     }
 #endif
 
-    const CipInstance::CipAttributes& attributes = instance->Attributes();
+    const CipAttributes& attributes = instance->Attributes();
 
     if( !attributes.size() )
     {
@@ -585,9 +742,11 @@ EipStatus CipClass::GetAttributeAll( CipInstance* instance,
     }
     else
     {
-        int get_mask = instance->getable_all_mask;
+        int get_mask = instance->Id() ?
+                        instance->owning_class->inst_getable_all_mask :
+                        instance->owning_class->clss_getable_all_mask;
 
-        for( CipInstance::CipAttributes::const_iterator it = attributes.begin();
+        for( CipAttributes::const_iterator it = attributes.begin();
                 it != attributes.end(); ++it )
         {
             int attribute_id = (*it)->Id();
@@ -637,7 +796,7 @@ EipStatus CipClass::SetAttributeSingle( CipInstance* instance,
         return kEipStatusOkSend;
     }
 
-    return attribute->Set( request, response );
+    return attribute->Set( instance, request, response );
 }
 
 

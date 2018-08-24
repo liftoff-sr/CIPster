@@ -14,16 +14,13 @@
 #include <cipster_api.h>
 #include <cipclass.h>
 
+#undef  INSTANCE_CLASS
+#define INSTANCE_CLASS  CipEthernetLinkInstance
 
 
 CipEthernetLinkInstance* CipEthernetLinkClass::CreateInstance()
 {
     CipEthernetLinkInstance* i = new CipEthernetLinkInstance( Instances().size() + 1 );
-
-    i->AttributeInsert( 1, kCipUdint,  &i->interface_speed );
-    i->AttributeInsert( 2, kCipDword,  &i->interface_flags );
-    i->AttributeInsert( 3, kCip6Usint, &i->physical_address );
-
     InstanceInsert( i );
 
     return i;
@@ -37,6 +34,9 @@ CipEthernetLinkClass::CipEthernetLinkClass() :
               1                     // version
               )
 {
+    AttributeInsert( _I, 1, kCipUdint,  memb_offs(interface_speed) );
+    AttributeInsert( _I, 2, kCipDword,  memb_offs(interface_flags) );
+    AttributeInsert( _I, 3, kCip6Usint, memb_offs(physical_address) );
 }
 
 

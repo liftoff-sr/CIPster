@@ -820,10 +820,10 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         ConsumingPath().SetAttribute( 3 );
 
         CipAttribute* attribute = consuming_instance->Attribute( 3 );
-        ByteBuf* attr_data = (ByteBuf*) attribute->Data() ;
-
         // an assembly object should always have an attribute 3
         CIPSTER_ASSERT( attribute );
+
+        ByteBuf* attr_data = (ByteBuf*) consuming_instance->Data( attribute );
 
         data_size    = consuming_ncp.ConnectionSize();
         diff_size    = 0;
@@ -880,10 +880,12 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         ProducingPath().SetAttribute( 3 );
 
         CipAttribute* attribute = producing_instance->Attribute( 3 );
-        ByteBuf* attr_data = (ByteBuf*) attribute->Data() ;
 
         // an assembly object should always have an attribute 3
         CIPSTER_ASSERT( attribute );
+
+        ByteBuf* attr_data = (ByteBuf*) producing_instance->Data( attribute );
+
 
         data_size    = producing_ncp.ConnectionSize();
         diff_size    = 0;
@@ -1080,7 +1082,8 @@ ConnMgrStatus CipConn::handleConfigData()
         // we have to have the same data as already present in the config point,
         // else it's an error.  And if same, no reason to write it.
 
-        ByteBuf* p = (ByteBuf*) instance->Attribute( 3 )->Data();
+        CipAttribute* attr = instance->Attribute(3);
+        ByteBuf* p = (ByteBuf*) instance->Data( attr );
 
         if( p->size() != words.size() * 2  ||
             memcmp( p->data(), words.data(), p->size() ) != 0 )
@@ -1361,7 +1364,7 @@ EipStatus CipConn::SendConnectedData()
     CipAttribute* attr3 = producing_instance->Attribute( 3 );
     CIPSTER_ASSERT( attr3 );
 
-    ByteBuf* attr3_byte_array = (ByteBuf*) attr3->Data();
+    ByteBuf* attr3_byte_array = (ByteBuf*) producing_instance->Data( attr3 );
     CIPSTER_ASSERT( attr3_byte_array );
 
     int length = cpfd.Serialize( out );
@@ -1870,8 +1873,8 @@ CipConnectionClass::CipConnectionClass() :
         )
 {
     // There are no attributes in instance of this class yet.
-    delete ServiceRemove( kSetAttributeSingle );
-    delete ServiceRemove( kGetAttributeSingle );
+    delete ServiceRemove( _I, kSetAttributeSingle );
+    delete ServiceRemove( _I, kGetAttributeSingle );
 }
 
 

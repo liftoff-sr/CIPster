@@ -108,8 +108,8 @@ struct SaiiPair
         has_T_O( false )
     {}
 
-    char        has_O_T;
-    char        has_T_O;
+    bool        has_O_T;
+    bool        has_T_O;
     SockAddr    O_T;
     SockAddr    T_O;
 };

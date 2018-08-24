@@ -11,140 +11,40 @@
 
 CipInstance::CipInstance( int aInstanceId ) :
     instance_id( aInstanceId ),
-    owning_class( 0 ),       // NULL (not owned) until I am inserted into a CipClass
-    getable_all_mask( 0 )
+    owning_class( 0 )      // NULL (not owned) until I am inserted into a CipClass
 {
 }
 
 
 CipInstance::~CipInstance()
 {
-    if( owning_class )      // if not nested in a meta-class
+    if( instance_id )   // if not nested in a public class, then I am an instance.
     {
-        if( instance_id )   // and not nested in a public class, then I am an instance.
-        {
-            CIPSTER_TRACE_INFO( "deleting instance %d of class '%s'\n",
-                instance_id, owning_class->ClassName().c_str() );
-        }
-    }
-
-    while( attributes.size() )
-    {
-        delete attributes.back();
-        attributes.pop_back();
+        CIPSTER_TRACE_INFO( "deleting instance %d of class '%s'\n",
+            instance_id, owning_class->ClassName().c_str() );
     }
 }
 
 
-bool CipInstance::AttributeInsert( CipAttribute* aAttribute )
+CipService* CipInstance::Service( int aServiceId ) const
 {
-    CipAttributes::iterator it;
+    CIPSTER_ASSERT( owning_class );
 
-    CIPSTER_ASSERT( !aAttribute->owning_instance );  // only un-owned attributes may be inserted
-
-    // Keep sorted by id
-    for( it = attributes.begin(); it != attributes.end();  ++it )
-    {
-        if( aAttribute->Id() < (*it)->Id() )
-            break;
-
-        else if( aAttribute->Id() == (*it)->Id() )
-        {
-            CIPSTER_TRACE_ERR( "class '%s' instance %d already has attribute %d, overriding\n",
-                owning_class ? owning_class->ClassName().c_str() : "meta-something",
-                instance_id,
-                aAttribute->Id()
-                );
-
-            // Re-use this slot given by position 'it'.
-            delete *it;
-            attributes.erase( it );    // will re-insert at this position below
-            break;
-        }
-    }
-
-    attributes.insert( it, aAttribute );
-
-    aAttribute->owning_instance = this; // until now there was no owner of this attribute.
-
-    if( aAttribute->Id() < 32 )
-    {
-        if( aAttribute->IsGetableAll() )
-            getable_all_mask |= 1 << aAttribute->Id();
-    }
-
-    return true;
-}
-
-
-CipAttribute* CipInstance::AttributeInsert(
-        int             aAttributeId,
-        CipDataType     aCipType,
-        void*           aData,
-        bool            isGetableSingle,
-        bool            isGetableAll,
-        bool            isSetableSingle
-        )
-{
-    CipAttribute* attribute = new CipAttribute(
-            aAttributeId,
-            aCipType,
-            isGetableSingle ? CipAttribute::GetAttrData : NULL,
-            isSetableSingle ? CipAttribute::SetAttrData : NULL,
-            aData,
-            isGetableAll
-            );
-
-    if( !AttributeInsert( attribute ) )
-    {
-        delete attribute;
-        attribute = NULL;   // return NULL on failure
-    }
-
-    return attribute;
-}
-
-
-CipAttribute* CipInstance::AttributeInsert(
-        int             aAttributeId,
-        AttributeFunc   aGetter,
-        bool            isGetableAll,
-        AttributeFunc   aSetter,
-        void*           aCookie,
-        CipDataType     aDataType
-        )
-{
-    CipAttribute* attribute = new CipAttribute(
-            aAttributeId,
-            aDataType,
-            aGetter,
-            aSetter,
-            aCookie,
-            isGetableAll
-            );
-
-    if( !AttributeInsert( attribute ) )
-    {
-        delete attribute;
-        attribute = NULL;   // return NULL on failure
-    }
-
-    return attribute;
+    return owning_class->Service( CI_(), aServiceId );
 }
 
 
 CipAttribute* CipInstance::Attribute( int aAttributeId ) const
 {
-    CipAttributes::const_iterator  it;
+    CIPSTER_ASSERT( owning_class );
 
-    // a binary search thru the vector of pointers looking for aAttributeId
-    it = vec_search( attributes.begin(), attributes.end(), aAttributeId );
-
-    if( it != attributes.end() )
-        return *it;
-
-    CIPSTER_TRACE_WARN( "attribute %d not defined\n", aAttributeId );
-
-    return NULL;
+    return owning_class->Attribute( CI_(), aAttributeId );
 }
 
+
+const CipAttributes& CipInstance::Attributes() const
+{
+    return CI_() == _I ?
+        owning_class->AttributesI() :
+        owning_class->AttributesC();
+}

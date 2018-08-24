@@ -150,19 +150,46 @@ static CipInstance* createIdentityInstance()
 
     CipInstance* i = new CipInstance( clazz->Instances().size() + 1 );
 
-    i->AttributeInsert( 1, kCipUint, &vendor_id_ );
-    i->AttributeInsert( 2, kCipUint, &device_type_ );
-    i->AttributeInsert( 3, kCipUint, &product_code_ );
-    i->AttributeInsert( 4, kCipUsintUsint, &revision_ );
-
-    i->AttributeInsert( 5, kCipWord, &status_ );
-    i->AttributeInsert( 6, kCipUdint, &serial_number_ );
-
-    i->AttributeInsert( 7, kCipShortString, &product_name_ );
-
     clazz->InstanceInsert( i );
 
     return i;
+}
+
+
+class CipIdentityClass : public CipClass
+{
+public:
+    CipIdentityClass();
+};
+
+
+CipIdentityClass::CipIdentityClass() :
+    CipClass(
+        kCipIdentityClass,
+        "Identity",                     // class name
+        // Vol1 5A-2.1 says class attributes 3 thru 7 are optional.
+        MASK4( 1, 2, 6, 7 ),
+
+        // 24-Jul-2018: conformance tool whines erroneously when we
+        // report kCipErrorAttributeNotSupported for GetAttributeSingle
+        // against attributes 3, 4, 5.  I think this is their bug.
+
+        1                               // class revision
+        )
+{
+    // All attributes are read only, and the conformance tool wants error code
+    // 0x08 not 0x14 when testing for SetAttributeSingle
+    delete ServiceRemove( _I, kSetAttributeSingle );
+
+    ServiceInsert( _I, kReset, reset_service, "Reset" );
+
+    AttributeInsert( _I, 1, kCipUint, &vendor_id_ );
+    AttributeInsert( _I, 2, kCipUint, &device_type_ );
+    AttributeInsert( _I, 3, kCipUint, &product_code_ );
+    AttributeInsert( _I, 4, kCipUsintUsint, &revision_ );
+    AttributeInsert( _I, 5, kCipWord, &status_ );
+    AttributeInsert( _I, 6, kCipUdint, &serial_number_ );
+    AttributeInsert( _I, 7, kCipShortString, &product_name_ );
 }
 
 
@@ -170,26 +197,9 @@ EipStatus CipIdentityInit()
 {
     if( !GetCipClass( kCipIdentityClass ) )
     {
-        CipClass* clazz = new CipClass(
-                kCipIdentityClass,
-                "Identity",                     // class name
-                // Vol1 5A-2.1 says class attributes 3 thru 7 are optional.
-                MASK4( 1, 2, 6, 7 ),
-
-                // 24-Jul-2018: conformance tool whines erroneously when we
-                // report kCipErrorAttributeNotSupported for GetAttributeSingle
-                // against attributes 3, 4, 5.  I think this is their bug.
-
-                1                               // class revision
-                );
-
-        // All attributes are read only, and the conformance tool wants error code
-        // 0x08 not 0x14 when testing for SetAttributeSingle
-        delete clazz->ServiceRemove( kSetAttributeSingle );
+        CipClass* clazz = new CipIdentityClass();
 
         RegisterCipClass( clazz );
-
-        clazz->ServiceInsert( kReset, reset_service, "Reset" );
 
         createIdentityInstance();
     }

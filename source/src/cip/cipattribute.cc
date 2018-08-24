@@ -16,42 +16,39 @@ CipAttribute::CipAttribute(
         CipDataType     aType,
         AttributeFunc   aGetter,
         AttributeFunc   aSetter,
-        void*           aData,
-        bool            isGetableAll
+        uintptr_t       aData,
+        bool            isGetableAll,
+        bool            isDataAnInstanceOffset
         ) :
     attribute_id( aAttributeId ),
     type( aType ),
     is_getable_all( isGetableAll ),
-    data( aData ),
-    owning_instance( 0 ),
+    where( aData ),
+    owning_class( 0 ),
     getter( aGetter ),
-    setter( aSetter )
+    setter( aSetter ),
+    is_offset_from_instance_start( isDataAnInstanceOffset )
 {
 }
 
 
-CipAttribute::~CipAttribute()
-{
-}
-
-
-EipStatus CipAttribute::GetAttrData( CipAttribute* attr,
+EipStatus CipAttribute::GetAttrData( CipInstance* aInstance, CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     BufWriter out = response->Writer();
 
-    response->SetWrittenSize( EncodeData( attr->Type(), attr->Data(), out ) );
+    response->SetWrittenSize( EncodeData( attr->Type(), aInstance->Data(attr), out ) );
 
     return kEipStatusOkSend;
 }
 
 
-EipStatus CipAttribute::SetAttrData( CipAttribute* attr,
+EipStatus CipAttribute::SetAttrData( CipInstance* aInstance, CipAttribute* attr,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     BufReader in = request->Data();
 
-    int out_count = DecodeData( attr->Type(), attr->Data(), in );
+    int out_count = DecodeData( attr->Type(), aInstance->Data(attr), in );
 
     if( out_count >= 0 )
         return kEipStatusOkSend;
@@ -60,7 +57,8 @@ EipStatus CipAttribute::SetAttrData( CipAttribute* attr,
 }
 
 
-EipStatus CipAttribute::Get( CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+EipStatus CipAttribute::Get( CipInstance* aInstance,
+        CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     if( !IsGetableSingle() )
     {
@@ -78,12 +76,15 @@ EipStatus CipAttribute::Get( CipMessageRouterRequest* request, CipMessageRouterR
             "%s: attribute:%d  class:'%s'  instance:%d\n",
             __func__,
             request->Path().GetAttribute(),
-            Instance()->Id() == 0 ? ((CipClass*)Instance())->ClassName().c_str() :
-                                    Instance()->Class()->ClassName().c_str(),
-            Instance()->Id()
+            aInstance->Class()->ClassName().c_str(),
+            aInstance->Id()
             );
 
-        EipStatus ret = getter( this, request, response );
+#if USE_MEMBER_FUNC_FOR_ATTRIBUTE_FUNC
+        EipStatus ret = (aInstance->*getter)( this, request, response );
+#else
+        EipStatus ret = getter( aInstance, this, request, response );
+#endif
 
         CIPSTER_TRACE_INFO( "%s: attribute_id:%d  len:%u\n",
             __func__, Id(), response->WrittenSize() );
@@ -93,7 +94,7 @@ EipStatus CipAttribute::Get( CipMessageRouterRequest* request, CipMessageRouterR
 }
 
 
-EipStatus CipAttribute::Set( CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+EipStatus CipAttribute::Set( CipInstance* aInstance, CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     if( !IsSetableSingle() )
     {
@@ -103,7 +104,6 @@ EipStatus CipAttribute::Set( CipMessageRouterRequest* request, CipMessageRouterR
     }
     else
     {
-        return setter( this, request, response );
+        return setter( aInstance, this, request, response );
     }
 }
-
