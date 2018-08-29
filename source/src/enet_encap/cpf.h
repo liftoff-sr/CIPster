@@ -64,8 +64,8 @@ struct AddressItem
 
     CpfId       type_id;
     CipUint     length;
-    EipUint32   connection_identifier;
-    EipUint32   encap_sequence_number;
+    uint32_t    connection_identifier;
+    uint32_t    encap_sequence_number;
 };
 
 
@@ -83,8 +83,8 @@ struct DataItem
     {}
 
     CpfId       type_id;
-    EipUint16   length;
-    EipByte*    data;
+    uint16_t    length;
+    uint8_t*    data;
 };
 
 

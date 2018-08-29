@@ -24,7 +24,7 @@ TEST( EndianConversion, GetIntFromMessage )
 {
     CipOctet test_message[] = { 8, 60 };
     CipOctet*   message = test_message;
-    EipUint16   returned_value = GetIntFromMessage( &message );
+    uint16_t   returned_value = GetIntFromMessage( &message );
 
     LONGS_EQUAL( 15368, returned_value );
     POINTERS_EQUAL( test_message + 2, message );
@@ -35,7 +35,7 @@ TEST( EndianConversion, GetDintFromMessage )
 {
     CipOctet test_message[] = { 28, 53, 41, 37 };
     CipOctet*   message = test_message;
-    EipUint32   returned_value = GetDintFromMessage( &message );
+    uint32_t   returned_value = GetDintFromMessage( &message );
 
     LONGS_EQUAL( 623457564, returned_value );
     POINTERS_EQUAL( test_message + 4, message );
@@ -46,7 +46,7 @@ TEST( EndianConversion, GetLintFromMessage )
 {
     CipOctet test_message[] = { 81, 126, 166, 15, 70, 97, 208, 236 };
     CipOctet*   message = test_message;
-    EipUint64   returned_value = GetLintFromMessage( &message );
+    uint64_t   returned_value = GetLintFromMessage( &message );
 
     LONGS_EQUAL( 5872313548673241324, returned_value );
     POINTERS_EQUAL( test_message + 8, message );

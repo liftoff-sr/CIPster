@@ -25,7 +25,7 @@ class BufWriter;
 class ByteBuf
 {
 public:
-    ByteBuf( CipByte* aStart, size_t aSize ) :
+    ByteBuf( uint8_t* aStart, size_t aSize ) :
         start( aStart ),
         limit( aStart + aSize )
     {}
@@ -33,13 +33,13 @@ public:
     ByteBuf( const BufWriter& aWriter );
     ByteBuf( const BufReader& aReader );
 
-    CipByte*    data() const    { return start; }
-    CipByte*    end() const     { return limit; }
+    uint8_t*    data() const    { return start; }
+    uint8_t*    end() const     { return limit; }
     ssize_t     size() const    { return limit - start; }
 
 protected:
-    CipByte*    start;
-    CipByte*    limit;          // points to one past last byte
+    uint8_t*    start;
+    uint8_t*    limit;          // points to one past last byte
 };
 
 
@@ -53,7 +53,7 @@ protected:
 class BufWriter
 {
 public:
-    BufWriter( CipByte* aStart, size_t aCount ) :
+    BufWriter( uint8_t* aStart, size_t aCount ) :
         start( aStart ),
         limit( aStart + aCount )
     {}
@@ -68,8 +68,8 @@ public:
         limit( 0 )
     {}
 
-    CipByte*    data() const    { return start; }
-    CipByte*    end() const     { return limit; }
+    uint8_t*    data() const    { return start; }
+    uint8_t*    end() const     { return limit; }
 
     /// Return the unused size of the buffer, the remaining capacity which is empty.
     /// A negative value would indicate an overrun, but that also indicates a bug in
@@ -82,7 +82,7 @@ public:
 
     BufWriter operator+( size_t n );
 
-    CipByte& operator * ();
+    uint8_t& operator * ();
 
     /// prefix ++
     BufWriter& operator++();
@@ -97,13 +97,13 @@ public:
         return *this;
     }
 
-    BufWriter& put8( CipByte aValue );
+    BufWriter& put8( uint8_t aValue );
 
-    BufWriter& put16( EipUint16 aValue );
+    BufWriter& put16( uint16_t aValue );
 
-    BufWriter& put32( EipUint32 aValue );
+    BufWriter& put32( uint32_t aValue );
 
-    BufWriter& put64( EipUint64 aValue );
+    BufWriter& put64( uint64_t aValue );
 
     BufWriter& put_float( float aValue );
 
@@ -119,20 +119,20 @@ public:
     BufWriter& put_STRING2( const std::string& aString );
 
     // Put 16 bit integer Big Endian
-    BufWriter& put16BE( EipUint16 aValue );
+    BufWriter& put16BE( uint16_t aValue );
 
     // Put 32 bit integer Big Endian
-    BufWriter& put32BE( EipUint32 aValue );
+    BufWriter& put32BE( uint32_t aValue );
 
-    BufWriter& append( const EipByte* aStart, size_t aCount );
+    BufWriter& append( const uint8_t* aStart, size_t aCount );
 
     BufWriter& append( const BufReader& aReader );
 
-    BufWriter& fill( size_t aCount, EipByte aValue = 0 );
+    BufWriter& fill( size_t aCount, uint8_t aValue = 0 );
 
 protected:
-    CipByte*    start;
-    CipByte*    limit;          // points to one past last byte
+    uint8_t*    start;
+    uint8_t*    limit;          // points to one past last byte
 
     void        overrun() const;
 };
@@ -153,7 +153,7 @@ public:
         limit( 0 )
     {}
 
-    BufReader( const CipByte* aStart, size_t aCount ) :
+    BufReader( const uint8_t* aStart, size_t aCount ) :
         start( aStart ),
         limit( aStart + aCount )
     {}
@@ -168,8 +168,8 @@ public:
         limit( aBuf.end() )
     {}
 
-    const CipByte*  data() const    { return start; }
-    const CipByte*  end()  const    { return limit; }
+    const uint8_t*  data() const    { return start; }
+    const uint8_t*  end()  const    { return limit; }
 
     /// Return the un-consumed size of the buffer, the count of bytes remaining
     /// in the buffer.
@@ -189,7 +189,7 @@ public:
     /// postfix ++
     BufReader operator++(int);
 
-    CipByte operator * () const;
+    uint8_t operator * () const;
 
     BufReader& operator=( const ByteBuf& aRange )
     {
@@ -198,13 +198,13 @@ public:
         return *this;
     }
 
-    CipByte get8();
+    uint8_t get8();
 
-    EipUint16 get16();
+    uint16_t get16();
 
-    EipUint32 get32();
+    uint32_t get32();
 
-    EipUint64 get64();
+    uint64_t get64();
 
     float get_float();
 
@@ -220,22 +220,22 @@ public:
     std::string get_STRING2();
 
     /// Get a 16 bit integer as Big Endian
-    EipUint16 get16BE();
+    uint16_t get16BE();
 
     /// Get a 32 bit integer as Big Endian
-    EipUint32 get32BE();
+    uint32_t get32BE();
 
 protected:
-    const CipByte*  start;
-    const CipByte*  limit;          // points to one past last byte
+    const uint8_t*  start;
+    const uint8_t*  limit;          // points to one past last byte
 
     void overrun() const;
 };
 
 
 inline ByteBuf::ByteBuf( const BufReader& aReader ) :
-    start( (CipByte*) aReader.data() ),
-    limit( (CipByte*) aReader.end() )
+    start( (uint8_t*) aReader.data() ),
+    limit( (uint8_t*) aReader.end() )
 {}
 
 inline ByteBuf::ByteBuf( const BufWriter& aWriter ) :
@@ -253,7 +253,7 @@ inline BufWriter& BufWriter::append( const BufReader& aReader )
 /// Control bits for Serializeable::Serialize(), or SerializeCount()'s aCtl
 enum
 {
-    //CTL_INCLUDE_CONN_PATH       = (1<<0),
+    CTL_OMIT_CONN_PATH          = (1<<0),
     CTL_FORWARD_OPEN            = (1<<1),
     CTL_FORWARD_CLOSE           = (1<<2),
 };

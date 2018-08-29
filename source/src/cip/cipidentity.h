@@ -53,12 +53,12 @@ EipStatus CipIdentityInit();
 
 
 // Publics from the CIP identity object
-extern EipUint16        vendor_id_;
-extern EipUint16        device_type_;
-extern EipUint16        product_code_;
+extern uint16_t         vendor_id_;
+extern uint16_t         device_type_;
+extern uint16_t         product_code_;
 extern CipRevision      revision_;
-extern EipUint16        status_;
-extern EipUint32        serial_number_;
+extern uint16_t         status_;
+extern uint32_t         serial_number_;
 extern std::string      product_name_;
 
 

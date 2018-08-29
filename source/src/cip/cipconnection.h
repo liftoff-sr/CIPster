@@ -3,8 +3,8 @@
  * Copyright (c) 2016, SoftPLC Corporation.
  *
  ******************************************************************************/
-#ifndef CIPIOCONNECTION_H_
-#define CIPIOCONNECTION_H_
+#ifndef CIPCONNECTION_H_
+#define CIPCONNECTION_H_
 
 #include "../enet_encap/sockaddr.h"
 
@@ -45,7 +45,7 @@
 #include "cipepath.h"
 #include "cipclass.h"
 
-/// The port to be used per default for I/O messages on UDP, do not change this,
+/// The port to be used per default for I/O messages on UDP, do not change this.
 /// You may change g_data.cc's g_my_io_udp_port instead.
 const int kEIP_IoUdpPort = 0x08AE;      // = 2222
 
@@ -260,7 +260,7 @@ public:
         return *this;
     }
 
-    void Set( EipUint32 aNCP, bool isLarge )
+    void Set( uint32_t aNCP, bool isLarge )
     {
         bits = aNCP;
         not_large = !isLarge;
@@ -284,7 +284,7 @@ public:
 
 private:
     bool        not_large;
-    EipUint32   bits;
+    uint32_t   bits;
 };
 
 
@@ -327,7 +327,7 @@ public:
         bits = 0;
     }
 
-    void Set( EipByte aByte )   { bits = aByte; }
+    void Set( uint8_t aByte )   { bits = aByte; }
 
     /// Return true if server else false for client.
     bool IsServer() const       { return bits & 0x80; }
@@ -354,10 +354,10 @@ public:
         aOutput.put8( bits );
     }
 
-    CipByte Bits()  const       { return bits; }
+    uint8_t Bits()  const       { return bits; }
 
 protected:
-    EipByte     bits;
+    uint8_t     bits;
 };
 
 
@@ -376,14 +376,14 @@ enum WatchdogTimeoutAction
 struct LinkConsumer
 {
     ConnState state;
-    EipUint16       connection_id;
+    uint16_t       connection_id;
 };
 
 
 struct LinkProducer
 {
     ConnState state;
-    EipUint16       connection_id;
+    uint16_t       connection_id;
 };
 
 
@@ -405,6 +405,12 @@ struct LinkObject
 class ConnectionPath : public Serializeable
 {
 public:
+    ConnectionPath() :
+        config_path( 0 ),
+        consuming_path( 1 ),
+        producing_path( 2 )
+    {}
+
     void Clear()
     {
         port_segs.Clear();
@@ -436,12 +442,36 @@ public:
 
    // They arrive in this order when all are present in a forward_open request:
     CipPortSegmentGroup     port_segs;  // has optional electronic key.
-    CipAppPath              app_path[3];
-    CipSimpleDataSegment    data_seg;
 
+    CipAppPath              app_path[3];
 #define app_path1           app_path[0]
 #define app_path2           app_path[1]
 #define app_path3           app_path[2]
+
+    CipSimpleDataSegment    data_seg;
+
+    // per Vol1 3-5.4.1.10 the application path names are relative to the target node.
+    // A consuming_path is for a O->T connection.
+    // A producing_path is for a T->O connection.
+
+    CipAppPath& ConfigPath() const      { return config_path    < 0 ? HasAny_No : (CipAppPath&) app_path[config_path]; }
+    CipAppPath& ConsumingPath() const   { return consuming_path < 0 ? HasAny_No : (CipAppPath&) app_path[consuming_path]; }
+    CipAppPath& ProducingPath() const   { return producing_path < 0 ? HasAny_No : (CipAppPath&) app_path[producing_path]; }
+
+    void AssignAppPaths( CipSint aConfig, CipSint aConsuming, CipSint aProducing )
+    {
+        config_path    = aConfig;
+        consuming_path = aConsuming;
+        producing_path = aProducing;
+    }
+
+protected:
+    static CipAppPath   HasAny_No;       // indices below indicate this when -1
+
+    // indices into conn_path.app_path[], except that -1 indicates HasAny_No
+    CipSint             config_path;
+    CipSint             consuming_path;
+    CipSint             producing_path;
 };
 
 
@@ -483,8 +513,8 @@ class ConnectionData : public Serializeable
 
 public:
     ConnectionData(
-            CipByte aPriorityTimeTick = 0,
-            CipByte aTimeoutTicks = 0,
+            uint8_t aPriorityTimeTick = 0,
+            uint8_t aTimeoutTicks = 0,
             CipUdint aConsumingConnectionId = 0,
             CipUdint aProducingConnectionId = 0,
             CipUint aConnectionSerialNumber = 0,
@@ -499,11 +529,11 @@ public:
 
     TransportTrigger&   Transport() const                   { return (TransportTrigger&) trigger; }
 
-    CipByte     PriorityTimeTick() const                    { return priority_timetick; }
-    void        SetPriorityTimeTick( CipByte aValue )       { priority_timetick = aValue; }
+    uint8_t     PriorityTimeTick() const                    { return priority_timetick; }
+    void        SetPriorityTimeTick( uint8_t aValue )       { priority_timetick = aValue; }
 
-    CipByte     TimeoutTicks() const                        { return timeout_ticks; }
-    void        SetTimeoutTicks( CipByte aValue )           { timeout_ticks = aValue; }
+    uint8_t     TimeoutTicks() const                        { return timeout_ticks; }
+    void        SetTimeoutTicks( uint8_t aValue )           { timeout_ticks = aValue; }
 
     CipUdint    ConsumingRPI() const                        { return consuming_RPI_usecs; }
     void        SetConsumingRPI( CipUdint aPeriodUsecs)     { consuming_RPI_usecs = aPeriodUsecs; }
@@ -520,16 +550,15 @@ public:
     NetCnParams&    ConsumingNCP() const                    { return (NetCnParams&) consuming_ncp; }
     NetCnParams&    ProducingNCP() const                    { return (NetCnParams&) producing_ncp; }
 
-
     ConnectionPath& ConnPath() const                        { return (ConnectionPath&) conn_path; }
 
     // per Vol1 3-5.4.1.10 the application path names are relative to the target node.
     // A consuming_path is for a O->T connection.
     // A producing_path is for a T->O connection.
 
-    CipAppPath& ConfigPath() const      { return config_path    < 0 ? HasAny_No : (CipAppPath&) conn_path.app_path[config_path]; }
-    CipAppPath& ConsumingPath() const   { return consuming_path < 0 ? HasAny_No : (CipAppPath&) conn_path.app_path[consuming_path]; }
-    CipAppPath& ProducingPath() const   { return producing_path < 0 ? HasAny_No : (CipAppPath&) conn_path.app_path[producing_path]; }
+    CipAppPath& ConfigPath() const      { return conn_path.ConfigPath(); }
+    CipAppPath& ConsumingPath() const   { return conn_path.ConsumingPath(); }
+    CipAppPath& ProducingPath() const   { return conn_path.ProducingPath(); }
 
     bool TriadEquals( const ConnectionData& aOther ) const
     {
@@ -635,9 +664,9 @@ protected:
 
     TransportTrigger    trigger;
 
-    CipByte             priority_timetick;
-    CipByte             timeout_ticks;
-    CipByte             connection_timeout_multiplier_value;
+    uint8_t             priority_timetick;
+    uint8_t             timeout_ticks;
+    uint8_t             connection_timeout_multiplier_value;
 
     CipUdint            consuming_RPI_usecs;
     NetCnParams         consuming_ncp;
@@ -653,8 +682,8 @@ protected:
     // The following variables do not come from the forward open request,
     // but are held here for the benefit of the deriving CipConn class and for
     // validation of forward open request.
-    EipUint16           corrected_consuming_size;
-    EipUint16           corrected_producing_size;
+    uint16_t           corrected_consuming_size;
+    uint16_t           corrected_producing_size;
 
     CipInstance*        consuming_instance; ///< corresponds to conn_path.consuming_path
     CipInstance*        producing_instance; ///< corresponds to conn_path.producing_path
@@ -663,16 +692,6 @@ protected:
     // class id of the clazz->OpenConnection() virtual to call
     int                 mgmnt_class;
     //-----</Validation Variables>----------------------------------------------
-
-
-private:
-
-    static CipAppPath   HasAny_No;       // indices below indicate this when -1
-
-    // indices into conn_path.app_path[], except that -1 indicates HasAny_No
-    CipSint             config_path;
-    CipSint             consuming_path;
-    CipSint             producing_path;
 };
 
 
@@ -690,7 +709,7 @@ class CipConn : public ConnectionData
 public:
     CipConn();
 
-    static EipStatus Init( EipUint16 unique_connection_id );
+    static EipStatus Init( uint16_t unique_connection_id );
 
     static int constructed_count;   // incremented and assigned to instance_id.
 
@@ -752,14 +771,14 @@ public:
         return instance_type & 1;
     }
 
-    EipUint32   ExpectedPacketRateUSecs() const
+    uint32_t   ExpectedPacketRateUSecs() const
     {
         return expected_packet_rate_usecs;
     }
 
-    CipConn& SetExpectedPacketRateUSecs( EipUint32 aRateUSecs )
+    CipConn& SetExpectedPacketRateUSecs( uint32_t aRateUSecs )
     {
-        EipUint32   adjusted = aRateUSecs;
+        uint32_t   adjusted = aRateUSecs;
 
         // The requested packet interval parameter needs to be a multiple of
         // kCIPsterTimerTickInMicroSeconds from the user's header file
@@ -783,29 +802,29 @@ public:
         return ret;
     }
 
-    EipInt32 TransmissionTriggerTimerUSecs() const
+    int32_t TransmissionTriggerTimerUSecs() const
     {
         return transmission_trigger_timer_usecs;
     }
 
-    CipConn& SetTransmissionTriggerTimerUSecs( EipInt32 aValue )
+    CipConn& SetTransmissionTriggerTimerUSecs( int32_t aValue )
     {
         //CIPSTER_TRACE_INFO( "%s( %d ) CID:0x%08x PID:0x%08x\n", __func__, aValue, consuming_connection_id, producing_connection_id );
         transmission_trigger_timer_usecs = aValue;
         return *this;
     }
 
-    CipConn& AddToTransmissionTriggerTimerUSecs( EipInt32 aUSecs )
+    CipConn& AddToTransmissionTriggerTimerUSecs( int32_t aUSecs )
     {
         return SetTransmissionTriggerTimerUSecs( transmission_trigger_timer_usecs + aUSecs );
     }
 
-    EipInt32 InactivityWatchDogTimerUSecs() const
+    int32_t InactivityWatchDogTimerUSecs() const
     {
         return inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
     }
 
-    CipConn& SetInactivityWatchDogTimerUSecs( EipInt32 aUSecs )
+    CipConn& SetInactivityWatchDogTimerUSecs( int32_t aUSecs )
     {
         //CIPSTER_TRACE_INFO( "%s( %d )\n", __func__, aUSecs );
         inactivity_watchdog_timer_usecs = aUSecs;
@@ -862,9 +881,9 @@ public:
      *
      * A unique connectionID is formed from the boot-time-specified "incarnation ID"
      * and the per-new-connection-incremented connection number/counter.
-     * @return EipUint32 - new connection id
+     * @return uint32_t - new connection id
      */
-    static EipUint32 NewConnectionId();
+    static uint32_t NewConnectionId();
 
     //LinkObject      link_object;
 
@@ -873,28 +892,28 @@ public:
     /** EIP level sequence Count for Class 0/1.
      *  Producing Connections may have a different value than this.
      */
-    EipUint32 eip_level_sequence_count_producing;
+    uint32_t eip_level_sequence_count_producing;
 
     /**
      * EIP level sequence Count for Class 0/1.
      * Producing Connections may have a different value than this.
      */
-    EipUint32 eip_level_sequence_count_consuming;
+    uint32_t eip_level_sequence_count_consuming;
 
     bool eip_level_sequence_count_consuming_first;  ///< true up until first received frame.
 
     /// sequence Count for Class 1 producing connections
-    EipUint16 sequence_count_producing;
+    uint16_t sequence_count_producing;
 
     /// sequence Count for Class 1 consuming connections
-    EipUint16 sequence_count_consuming;
+    uint16_t sequence_count_consuming;
 
     /**
      * Function GetProductionInhibitTimeUSecs
      * returns the minimal time between the production of two application triggered
      * or change of state triggered I/O connection messages
      */
-    EipUint32 GetPIT_USecs() const
+    uint32_t GetPIT_USecs() const
     {
         return conn_path.port_segs.GetPIT_USecs();
     }
@@ -904,14 +923,14 @@ public:
         return conn_path.port_segs.HasPIT();
     }
 
-    void SetPIT_USecs( EipUint32 aUSECS )
+    void SetPIT_USecs( uint32_t aUSECS )
     {
         conn_path.port_segs.SetPIT_USecs( aUSECS );
     }
 
     /// Timer for the production inhibition of application triggered or
     /// change-of-state I/O connections.
-    EipInt32 production_inhibit_timer_usecs;
+    int32_t production_inhibit_timer_usecs;
 
     /// Destination IP address for the optional producing CIP connection held
     /// by this CipConnection instance.
@@ -983,10 +1002,10 @@ protected:
 
     ConnState   state;          // CIP Connection Instance attribute id 1
 
-    EipUint32   expected_packet_rate_usecs;
+    uint32_t    expected_packet_rate_usecs;
 
-    EipInt32    inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
-    EipInt32    transmission_trigger_timer_usecs;   // signed 32 bits, in usecs
+    int32_t     inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
+    int32_t     transmission_trigger_timer_usecs;   // signed 32 bits, in usecs
 
     UdpSocket*  consuming_socket;
     UdpSocket*  producing_socket;
@@ -996,6 +1015,7 @@ private:
     // for active connection doubly linked list at g_active_conns
     CipConn*    next;
     CipConn*    prev;
+    bool        on_list;
 };
 
 
@@ -1011,6 +1031,4 @@ public:
     static CipError OpenIO( ConnectionData* aParams, Cpf* cpfd, ConnMgrStatus* aExtError );
 };
 
-
-
-#endif // CIPIOCONNECTION_H_
+#endif // CIPCONNECTION_H_

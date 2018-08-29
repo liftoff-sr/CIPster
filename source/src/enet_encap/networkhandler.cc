@@ -34,7 +34,7 @@
  *  This buffer size will be used for any received message.
  *  The same buffer is used for the replied explicit message.
  */
-static EipByte s_buf[CIPSTER_ETHERNET_BUFFER_SIZE];
+static uint8_t s_buf[CIPSTER_ETHERNET_BUFFER_SIZE];
 #define S_BUFZ                      sizeof(s_buf)
 
 #define MAX_NO_OF_TCP_SOCKETS       10
@@ -1206,7 +1206,7 @@ UdpSocketMgr::sockets UdpSocketMgr::m_free;
 
 
 #if defined(DEBUG)
-void byte_dump( const char* aPrompt, EipByte* aBytes, int aCount )
+void byte_dump( const char* aPrompt, uint8_t* aBytes, int aCount )
 {
     int len = printf( "%s:", aPrompt );
 

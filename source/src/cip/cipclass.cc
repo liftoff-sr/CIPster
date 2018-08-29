@@ -12,7 +12,7 @@
 #include <cipmessagerouter.h>
 
 
-static EipUint16 Zero = 0;
+static uint16_t Zero = 0;
 
 
 
@@ -592,7 +592,7 @@ EipStatus CipClass::getInstanceCount( CipInstance* aInstance, CipAttribute* attr
     // Instance() is not a CipClass and dynamic_cast<> returns NULL.
     if( clazz )
     {
-        EipUint16 instance_count = clazz->InstanceCount();
+        uint16_t instance_count = clazz->InstanceCount();
 
         BufWriter out = response->Writer();
 
@@ -615,7 +615,7 @@ EipStatus CipClass::getLargestInstanceId( CipInstance* aInstance, CipAttribute* 
     // Instance() is not a CipClass and dynamic_cast<> returns NULL.
     if( clazz )
     {
-        EipUint16 largest_id = 0;
+        uint16_t largest_id = 0;
 
         if( clazz->InstanceCount() )
         {
@@ -641,7 +641,7 @@ EipStatus CipClass::getLargestInstanceAttributeId( CipInstance* aInstance, CipAt
 
     if( clazz )
     {
-        EipUint16 largest_id = 0;
+        uint16_t largest_id = 0;
 
         if( clazz->AttributesI().size() )
         {
@@ -665,7 +665,7 @@ EipStatus CipClass::getLargestClassAttributeId( CipInstance* aInstance, CipAttri
 
     if( clazz )
     {
-        EipUint16 largest_id = 0;
+        uint16_t largest_id = 0;
 
         if( clazz->AttributesC().size() )
         {

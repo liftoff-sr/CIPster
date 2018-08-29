@@ -199,7 +199,7 @@ protected:
     // messages.  However, hide that strategy so it can be easily changed in
     // the future.
 
-    static std::vector<EipByte>     mmr_temp;
+    static std::vector<uint8_t>     mmr_temp;
 };
 
 

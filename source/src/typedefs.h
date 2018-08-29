@@ -8,33 +8,6 @@
 #include <inttypes.h>
 #include <stddef.h>
 
-/** @file typedefs.h
- *  Do not use interface types for internal variables, such as "int i;", which is
- *  commonly used for loop counters or counting things.
- *
- *  Do not over-constrain data types. Prefer the use of the native "int" and
- *  "unsigned" types.
- *
- *  Use char for native character strings.
- *
- *  Do not use "char" for data buffers - use "unsigned char" instead. Using char
- *  for data buffers can occasionally blow up in your face rather nastily.
- */
-
-/** @brief EIP Data type definitions
- */
-typedef uint8_t     EipByte;    ///< unsigned byte
-typedef int8_t      EipInt8;    ///< 8-bit signed number
-typedef int16_t     EipInt16;   ///< 16-bit signed number
-typedef int32_t     EipInt32;   ///< 32-bit signed number
-typedef uint8_t     EipUint8;   ///< 8-bit unsigned number
-typedef uint16_t    EipUint16;  ///< 16-bit unsigned number
-typedef uint32_t    EipUint32;  ///< 32-bit unsigned number
-typedef int64_t     EipInt64;   ///< 64-bit signed number
-typedef uint64_t    EipUint64;  ///< 64-bit unsigned number
-typedef float       EipFloat;   ///< IEEE 754 32-bit floating point number
-typedef double      EipDfloat;  ///< IEEE 754 64-bit floating point number
-
 
 /** @brief Data types as defined in the CIP Specification Vol 1 Appendix C
  */

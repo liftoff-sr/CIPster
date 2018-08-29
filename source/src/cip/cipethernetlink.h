@@ -31,9 +31,9 @@ public:
 
 
 protected:
-    EipUint32   interface_speed;
-    EipUint32   interface_flags;
-    EipUint8    physical_address[6];
+    uint32_t   interface_speed;
+    uint32_t   interface_flags;
+    uint8_t    physical_address[6];
 };
 
 
@@ -50,7 +50,7 @@ public:
      */
     static EipStatus Init();
 
-    static void ConfigureMacAddress( int aInstanceId, const EipUint8* mac_address );
+    static void ConfigureMacAddress( int aInstanceId, const uint8_t* mac_address );
 
     CipEthernetLinkClass();
 

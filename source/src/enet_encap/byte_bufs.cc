@@ -101,8 +101,8 @@ void BufWriter::overrun() const
 
 BufWriter& BufWriter::put_SHORT_STRING( const std::string& aString, bool doEvenByteCountPadding )
 {
-    put8( (EipByte) aString.size() );
-    append( (EipByte*) aString.c_str(), aString.size() );
+    put8( (uint8_t) aString.size() );
+    append( (uint8_t*) aString.c_str(), aString.size() );
 
     // !(size() & 1) means length is even, but since length of length byte
     // itself is odd sum can be odd when length is even.
@@ -117,7 +117,7 @@ BufWriter& BufWriter::put_STRING( const std::string& aString, bool doEvenByteCou
 {
     put16( aString.size() );
 
-    append( (EipByte*) aString.c_str(), aString.size() );
+    append( (uint8_t*) aString.c_str(), aString.size() );
     if( doEvenByteCountPadding && ( aString.size() & 1 )  )
         put8( 0 );
     return *this;
@@ -149,7 +149,7 @@ BufWriter& BufWriter::put_STRING2( const std::string& aString )
             break;
         }
 
-        append( (EipByte*) buf, sizeof(buf) - dst_size );
+        append( (uint8_t*) buf, sizeof(buf) - dst_size );
     }
 
 #else
@@ -283,7 +283,7 @@ int ByteSerializer::SerializedCount( int aCtl ) const
 // compile only with C++11 or greater?
 // https://en.cppreference.com/w/cpp/language/string_literal
 
-EipByte buf[400];
+uint8_t buf[400];
 
 
 int main( int argc, char** argv )

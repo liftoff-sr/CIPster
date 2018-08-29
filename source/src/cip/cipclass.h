@@ -242,7 +242,7 @@ public:
         bool            isGetableAll = true,
         AttributeFunc   aSetter = NULL,
         uintptr_t       aCookie = 0,
-        bool            isCookieAnInstanceOffset = false,
+        bool            isCookieAnInstanceOffset = true,
         CipDataType     aCipType = kCipAny
         );
 
@@ -352,7 +352,8 @@ protected:
     }
 
 private:
-    CipClass( CipClass& );                  // private because not implemented
+    CipClass( CipClass& );                      // private because not implemented
+    CipClass& operator=( const CipClass& );
 };
 
 #endif // CIPCLASS_H_

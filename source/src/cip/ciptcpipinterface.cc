@@ -113,7 +113,7 @@ EipStatus CipTCPIPInterfaceInstance::get_multicast_config( CipInstance* aInstanc
     out.put8( 0 );
     out.put16( i->multicast_configuration.number_of_allocated_multicast_addresses );
 
-    EipUint32 ma = ntohl( i->multicast_configuration.starting_multicast_address );
+    uint32_t ma = ntohl( i->multicast_configuration.starting_multicast_address );
     out.put32( ma );
 
     aResponse->SetWrittenSize( out.data() - aResponse->Writer().data() );
@@ -202,7 +202,7 @@ EipStatus CipTCPIPInterfaceInstance::configureNetworkInterface(
 
     // Calculate the CIP multicast address. The multicast address is calculated, not input.
     // See CIP spec Vol2 3-5.3 for multicast address algorithm.
-    EipUint32 host_id = ntohl( interface_configuration.ip_address )
+    uint32_t host_id = ntohl( interface_configuration.ip_address )
                         & ~ntohl( interface_configuration.network_mask );
     host_id -= 1;
     host_id &= 0x3ff;
@@ -261,7 +261,7 @@ EipStatus CipTCPIPInterfaceInstance::get_all( CipInstance* aInstance,
     out.put8( i->multicast_configuration.alloc_control );
     out.put8( 0 );
     out.put16( i->multicast_configuration.number_of_allocated_multicast_addresses );
-    EipUint32 ma = ntohl( i->multicast_configuration.starting_multicast_address );
+    uint32_t ma = ntohl( i->multicast_configuration.starting_multicast_address );
     out.put32( ma );
 
     // attribute 10
@@ -358,7 +358,7 @@ const CipTcpIpInterfaceConfiguration& CipTCPIPInterfaceClass::InterfaceConf( int
 }
 
 
-EipByte CipTCPIPInterfaceClass::TTL( int aInstanceId )
+uint8_t CipTCPIPInterfaceClass::TTL( int aInstanceId )
 {
     CipTCPIPInterfaceInstance* inst = s_tcp->Instance( aInstanceId );
     return inst->time_to_live;

@@ -8,7 +8,7 @@
 #include "ciptypes.h"
 #include "cipcommon.h"
 
-typedef std::vector<EipByte>    Bytes;
+typedef std::vector<uint8_t>    Bytes;
 typedef std::vector<CipWord>    Words;
 
 
@@ -368,7 +368,7 @@ public:
         link_address.clear();
     }
 
-    void Set( int aPort, EipByte* aSrc, int aByteCount )
+    void Set( int aPort, uint8_t* aSrc, int aByteCount )
     {
         port = aPort;
         link_address.clear();
@@ -436,7 +436,7 @@ public:
     bool HasPIT() const                 { return pbits & ((1<<PIT_USECS) | (1<<PIT_MSECS)); }
     bool HasKey() const                 { return pbits & (1<<KEY); }
 
-    void SetCipPortSegment( int aPort, EipByte* aSrc, int aByteCount )
+    void SetCipPortSegment( int aPort, uint8_t* aSrc, int aByteCount )
     {
         port.Set( aPort, aSrc, aByteCount );
         pbits |= 1 << PORT;

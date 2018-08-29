@@ -46,10 +46,10 @@ struct DelayedMsg
         message_size( 0 )
     {}
 
-    EipInt32    time_out_usecs;     // must be signed 32 bits
+    int32_t     time_out_usecs;     // must be signed 32 bits
     int         socket;
     SockAddr    receiver;
-    EipByte     message[ENCAP_MAX_DELAYED_ENCAP_MESSAGE_SIZE];
+    uint8_t     message[ENCAP_MAX_DELAYED_ENCAP_MESSAGE_SIZE];
     unsigned    message_size;
 
     BufReader Payload() const
@@ -377,7 +377,7 @@ void Encapsulation::ShutDown()
 }
 
 
-int Encapsulation::EnsuredTcpRecv( int aSocket, EipByte* aDest, int aByteCount )
+int Encapsulation::EnsuredTcpRecv( int aSocket, uint8_t* aDest, int aByteCount )
 {
     int i;
     int numRead;
@@ -408,7 +408,7 @@ int Encapsulation::EnsuredTcpRecv( int aSocket, EipByte* aDest, int aByteCount )
  */
 static int disposeOfLargePacket( int aSocket, unsigned aCount )
 {
-    EipByte chunk[256];
+    uint8_t chunk[256];
     int     total = 0;
 
     CIPSTER_TRACE_INFO( "%s[%d]: count:%d\n", __func__, aSocket, aCount );
@@ -440,7 +440,7 @@ static int disposeOfLargePacket( int aSocket, unsigned aCount )
 
 int Encapsulation::ReceiveTcpMsg( int aSocket, BufWriter aMsg )
 {
-    EipByte* start = aMsg.data();
+    uint8_t* start = aMsg.data();
 
     CIPSTER_TRACE_INFO( "%s[%d]:\n", __func__, aSocket );
 
@@ -701,7 +701,7 @@ int Encapsulation::handleReceivedListServicesCommand( BufWriter aReply )
 {
     BufWriter out = aReply;
 
-    static const EipByte name_of_service[16] = "Communications";
+    static const uint8_t name_of_service[16] = "Communications";
 
     try
     {
@@ -1065,7 +1065,7 @@ int Encapsulation::Serialize( BufWriter aDst, int aCtl ) const
     .put16( len )
     .put32( session_handle )
     .put32( status )
-    .append( (EipByte*) sender_context, 8 )
+    .append( (uint8_t*) sender_context, 8 )
     .put32( options );
 
     if( IsBigHdr() )

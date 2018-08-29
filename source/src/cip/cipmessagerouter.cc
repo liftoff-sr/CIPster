@@ -91,7 +91,7 @@ int CipMessageRouterRequest::DeserializeMRReq( BufReader aRequest )
 
 //-----<CipMessageRounterResponse>----------------------------------------------
 
-std::vector<EipByte> CipMessageRouterResponse::mmr_temp( CIPSTER_MESSAGE_DATA_REPLY_BUFFER );
+std::vector<uint8_t> CipMessageRouterResponse::mmr_temp( CIPSTER_MESSAGE_DATA_REPLY_BUFFER );
 
 CipMessageRouterResponse::CipMessageRouterResponse( Cpf* aCpf ) :
     data ( mmr_temp.data(), mmr_temp.size() ),
@@ -219,6 +219,7 @@ CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConnData,
         new_explicit->SetSessionHandle( aCpf->SessionHandle() );
 
         g_active_conns.Insert( new_explicit );
+        new_explicit->SetState( kConnStateEstablished );
     }
 
     return ret;

@@ -25,7 +25,7 @@ volatile bool g_end_stack;
 
 
 
-bool parse_mac( const char* mac_str, CipByte mac_out[6] )
+bool parse_mac( const char* mac_str, uint8_t mac_out[6] )
 {
     int b[6];
 
@@ -46,8 +46,8 @@ int main( int argc, char* argv[] )
 {
     int ret = 0;
 
-    EipUint8    my_mac_address[6];
-    EipUint16   unique_connection_id;
+    uint8_t    my_mac_address[6];
+    uint16_t   unique_connection_id;
 
     if( argc != 7 )
     {

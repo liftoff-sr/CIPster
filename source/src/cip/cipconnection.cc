@@ -17,9 +17,9 @@
 #include "cipcommon.h"
 
 
-EipUint32 g_run_idle_state;    //*< buffer for holding the run idle information.
+uint32_t g_run_idle_state;    //*< buffer for holding the run idle information.
 
-
+//-----<ConnectionPath>---------------------------------------------------------
 
 int ConnectionPath::Deserialize( BufReader aInput )
 {
@@ -145,9 +145,15 @@ int ConnectionPath::SerializedCount( int aCtl ) const
 }
 
 
+// Something to point to when one of the app_paths is empty.
+CipAppPath ConnectionPath::HasAny_No;
+
+
+//-----<ConnectionData>---------------------------------------------------------
+
 ConnectionData::ConnectionData(
-        CipByte aPriorityTimeTick,
-        CipByte aTimeoutTicks,
+        uint8_t aPriorityTimeTick,
+        uint8_t aTimeoutTicks,
         CipUdint aConsumingConnectionId,
         CipUdint aProducingConnectionId,
         CipUint aConnectionSerialNumber,
@@ -171,10 +177,7 @@ ConnectionData::ConnectionData(
     consuming_instance( 0 ),
     producing_instance( 0 ),
     config_instance( 0 ),
-    mgmnt_class( 0 ),
-    config_path( 0 ),
-    consuming_path( 1 ),
-    producing_path( 2 )
+    mgmnt_class( 0 )
 {
     SetTimeoutMultiplier( aConnectionTimeoutMultiplier );
 }
@@ -182,7 +185,7 @@ ConnectionData::ConnectionData(
 
 ConnectionData& ConnectionData::SetTimeoutMultiplier( ConnTimeoutMultiplier aMultiplier )
 {
-    EipByte  value = 0;
+    uint8_t  value = 0;
     unsigned m = aMultiplier >> 3;
 
     while( m )
@@ -338,15 +341,18 @@ int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
 
         trigger.Serialize( out );
 
-        CipByte* cpathz_loc = out.data();   // note Connection_Path_Size location
+        if( !(CTL_OMIT_CONN_PATH & aCtl) )
+        {
+            uint8_t* cpathz_loc = out.data();   // note Connection_Path_Size location
 
-        out += 1;   // skip over Connection_Path_Size location
+            out += 1;   // skip over Connection_Path_Size location
 
-        int byte_count = conn_path.Serialize( out, aCtl );
+            int byte_count = conn_path.Serialize( out, aCtl );
 
-        out += byte_count;
+            out += byte_count;
 
-        *cpathz_loc = byte_count / 2;       // words, not bytes
+            *cpathz_loc = byte_count / 2;       // words, not bytes
+        }
     }
 
     else if( aCtl & CTL_FORWARD_CLOSE )
@@ -360,7 +366,7 @@ int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
         .put16( originator_vendor_id )
         .put32( originator_serial_number );
 
-        CipByte* cpathz_loc = out.data();   // note Connection_Path_Size location
+        uint8_t* cpathz_loc = out.data();   // note Connection_Path_Size location
 
         out += 1;   // skip over Connection_Path_Size location &
 
@@ -476,6 +482,8 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
 
     int path_count;
     path_count = 1 + conn_path.app_path2.HasAny() + conn_path.app_path3.HasAny();
+
+    CipSint config_path, consuming_path, producing_path;
 
     // Set all three to default to not used unless set otherwise below.
     config_path = consuming_path = producing_path = -1;
@@ -758,6 +766,8 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
         ;
     }
 
+    conn_path.AssignAppPaths( config_path, consuming_path, producing_path );
+
     CIPSTER_TRACE_INFO( "%s: forward_open conn_path: %s\n",
         __func__,
         Format().c_str()
@@ -973,10 +983,6 @@ std::string ConnectionData::Format() const
     return dest;
 }
 
-
-// Something to point to when one of the app_paths is empty.
-CipAppPath ConnectionData::HasAny_No;
-
 //-----<CipConn>----------------------------------------------------------------
 
 int CipConn::constructed_count;         // CipConn::instance_id is only for debugging
@@ -1029,6 +1035,7 @@ void CipConn::Clear( bool doConnectionDataToo )
 
     next = NULL;
     prev = NULL;
+    on_list = false;
 
     expected_packet_rate_usecs = 0;
 }
@@ -1095,7 +1102,7 @@ ConnMgrStatus CipConn::handleConfigData()
 
     // Put the data into the configuration assembly object
     else if( kEipStatusOk != NotifyAssemblyConnectedDataReceived( instance,
-             BufReader( (EipByte*)  words.data(),  words.size() * 2 ) ) )
+             BufReader( (uint8_t*)  words.data(),  words.size() * 2 ) ) )
     {
         CIPSTER_TRACE_WARN( "Configuration data was invalid\n" );
         result = kConnMgrStatusInvalidConfigurationApplicationPath;
@@ -1108,7 +1115,7 @@ ConnMgrStatus CipConn::handleConfigData()
 // Holds the connection ID's "incarnation ID" in upper 16 bits
 static CipUdint s_incarnation_id;
 
-EipUint32 CipConn::NewConnectionId()
+uint32_t CipConn::NewConnectionId()
 {
     static CipUint connection_id = 18;
 
@@ -1202,6 +1209,13 @@ void CipConn::GeneralConfiguration(
 
 void CipConn::Close()
 {
+    if( state == kConnStateNonExistent )
+    {
+        CIPSTER_TRACE_WARN( "%s<%d> NO! its an already closed connection\n",
+            __func__, instance_id );
+        return;
+    }
+
     CIPSTER_TRACE_INFO( "%s<%d>\n", __func__, instance_id );
 
     if( hook_close )
@@ -1255,18 +1269,19 @@ void CipConn::Close()
     if( ConsumingUdp() )
     {
         UdpSocketMgr::ReleaseSocket( ConsumingUdp() );
+        SetConsumingUdp( NULL );
     }
-    SetConsumingUdp( NULL );
 
     if( ProducingUdp() )
     {
         UdpSocketMgr::ReleaseSocket( ProducingUdp() );
+        SetProducingUdp( NULL );
     }
-    SetProducingUdp( NULL );
 
     encap_session = 0;
 
     g_active_conns.Remove( this );
+    SetState( kConnStateNonExistent );
 }
 
 
@@ -1297,6 +1312,7 @@ CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError )
     }
 
     g_active_conns.Insert( this );
+    SetState( kConnStateEstablished );
 
     CheckIoConnectionEvent(
         ConsumingPath().GetInstanceOrConnPt(),
@@ -1415,7 +1431,7 @@ EipStatus CipConn::HandleReceivedIoConnectionData( BufReader aInput )
     if( trigger.Class() == kConnTransportClass1 )
     {
         // consume first 2 bytes for the sequence count
-        EipUint16 sequence = aInput.get16();
+        uint16_t sequence = aInput.get16();
 
         if( SEQ_LEQ16( sequence, sequence_count_consuming ) )
         {
@@ -1434,7 +1450,7 @@ EipStatus CipConn::HandleReceivedIoConnectionData( BufReader aInput )
         // may not contain a run_idle header.
         if( kCIPsterConsumedDataHasRunIdleHeader )
         {
-            EipUint32 new_run_idle = aInput.get32();
+            uint32_t new_run_idle = aInput.get32();
 
             if( g_run_idle_state != new_run_idle )
             {
@@ -1923,7 +1939,7 @@ CipError CipConnectionClass::OpenIO( ConnectionData* aConnData,
 }
 
 
-EipStatus CipConn::Init( EipUint16 unique_connection_id )
+EipStatus CipConn::Init( uint16_t unique_connection_id )
 {
     if( !GetCipClass( kCipConnectionClass ) )
     {

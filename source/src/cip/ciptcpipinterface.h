@@ -102,7 +102,7 @@ protected:
      *
      * Currently we implement it non set-able and with the default value of 1.
      */
-    EipUint8 time_to_live;
+    uint8_t time_to_live;
 
     /**
      * #9 The multicast configuration for this device
@@ -195,7 +195,7 @@ public:
 
     static const CipTcpIpInterfaceConfiguration& InterfaceConf( int aInstanceId );
 
-    static EipByte TTL( int aInstanceId );
+    static uint8_t TTL( int aInstanceId );
 
     /// Return an instance's IP address in network byte oder.  The instance
     /// ids for this class must be allocated contiguously starting at 1.

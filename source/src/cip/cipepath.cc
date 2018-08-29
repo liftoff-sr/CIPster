@@ -129,7 +129,7 @@ CipAttribute* CipAppPath::Attribute( int aAttrId ) const
 // make static so compiler has option of inlining this
 static int serialize( BufWriter& out, int seg_type, unsigned aValue )
 {
-    EipByte* start = out.data();
+    uint8_t* start = out.data();
 
     if( aValue < 256 )
     {
@@ -159,7 +159,7 @@ int CipAppPath::Serialize( BufWriter aOutput, int aCtl ) const
         out.put8( kDataSegmentTypeAnsiExtendedSymbolMessage );
         out.put8( tag_size );
 
-        out.append( (EipByte*) tag, tag_size );
+        out.append( (uint8_t*) tag, tag_size );
 
         if( (out.data() - aOutput.data()) & 1 )
             out.put8( 0 );               // output possible pad byte
@@ -204,7 +204,7 @@ int CipAppPath::Serialize( BufWriter aOutput, int aCtl ) const
 
 int CipAppPath::SerializedCount( int aCtl ) const
 {
-    EipByte stack_buf[200];
+    uint8_t stack_buf[200];
 
     // For this class, its not that much runtime overhead to simply serialize
     // and then measure the consumption.  This strategy uses small code space.
@@ -582,7 +582,7 @@ int CipPortSegment::Serialize( BufWriter aOutput, int aCtl ) const
 
 int CipPortSegment::SerializedCount( int aCtl ) const
 {
-    EipByte stack_buf[256];
+    uint8_t stack_buf[256];
 
     return Serialize( BufWriter( stack_buf, sizeof stack_buf ), aCtl );
 }
@@ -692,7 +692,7 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
 {
     BufReader in = aInput;
 
-    EipUint32   value;
+    uint32_t   value;
 
     Clear();
 

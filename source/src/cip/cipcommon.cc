@@ -24,11 +24,11 @@
 
 
 // global public variables
-EipByte g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
+uint8_t g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
 
 // private functions
 
-void CipStackInit( EipUint16 unique_connection_id )
+void CipStackInit( uint16_t unique_connection_id )
 {
     EipStatus eip_status;
 
@@ -83,7 +83,7 @@ void ShutdownCipStack()
 
 int EncodeData( CipDataType aDataType, const void* input, BufWriter& aBuf )
 {
-    EipByte*    start = aBuf.data();
+    uint8_t*    start = aBuf.data();
 
     switch( aDataType )
     {
@@ -91,27 +91,27 @@ int EncodeData( CipDataType aDataType, const void* input, BufWriter& aBuf )
     case kCipSint:
     case kCipUsint:
     case kCipByte:
-        aBuf.put8( *(EipUint8*) input );
+        aBuf.put8( *(uint8_t*) input );
         break;
 
     case kCipInt:
     case kCipUint:
     case kCipWord:
-        aBuf.put16( *(EipUint16*) input );
+        aBuf.put16( *(uint16_t*) input );
         break;
 
     case kCipDint:
     case kCipUdint:
     case kCipDword:
     case kCipReal:
-        aBuf.put32( *(EipUint32*) input );
+        aBuf.put32( *(uint32_t*) input );
         break;
 
     case kCipLint:
     case kCipUlint:
     case kCipLword:
     case kCipLreal:
-        aBuf.put64( *(EipUint64*) input );
+        aBuf.put64( *(uint64_t*) input );
         break;
 
     case kCipStime:
@@ -155,7 +155,7 @@ int EncodeData( CipDataType aDataType, const void* input, BufWriter& aBuf )
         break;
 
     case kCip6Usint:
-        aBuf.append( (const EipByte*) input, 6 );
+        aBuf.append( (const uint8_t*) input, 6 );
         break;
 
     case kCipMemberList:
@@ -186,7 +186,7 @@ int EncodeData( CipDataType aDataType, const void* input, BufWriter& aBuf )
 
 int DecodeData( CipDataType aDataType, void* data, BufReader& aBuf )
 {
-    const EipByte* start = aBuf.data();
+    const uint8_t* start = aBuf.data();
 
     switch( aDataType )
     {
@@ -194,25 +194,25 @@ int DecodeData( CipDataType aDataType, void* data, BufReader& aBuf )
     case kCipSint:
     case kCipUsint:
     case kCipByte:
-        *(EipUint8*) data = aBuf.get8();
+        *(uint8_t*) data = aBuf.get8();
         break;
 
     case kCipInt:
     case kCipUint:
     case kCipWord:
-        *(EipUint16*) data = aBuf.get16();
+        *(uint16_t*) data = aBuf.get16();
         break;
 
     case kCipDint:
     case kCipUdint:
     case kCipDword:
-        *(EipUint32*) data = aBuf.get32();
+        *(uint32_t*) data = aBuf.get32();
         break;
 
     case kCipLint:
     case kCipUlint:
     case kCipLword:
-        *(EipUint64*) data = aBuf.get64();
+        *(uint64_t*) data = aBuf.get64();
         break;
 
     // The CipByteArray is implemented using a ByteBuf instance.

@@ -68,7 +68,7 @@ MAYBE_INLINE BufWriter& BufWriter::put8( CipByte aValue )
     return *this;
 }
 
-MAYBE_INLINE BufWriter& BufWriter::put16( EipUint16 aValue )
+MAYBE_INLINE BufWriter& BufWriter::put16( uint16_t aValue )
 {
     if( start + 2 > limit )
         overrun();
@@ -78,7 +78,7 @@ MAYBE_INLINE BufWriter& BufWriter::put16( EipUint16 aValue )
     return *this;
 }
 
-MAYBE_INLINE BufWriter& BufWriter::put32( EipUint32 aValue )
+MAYBE_INLINE BufWriter& BufWriter::put32( uint32_t aValue )
 {
     if( start + 4 > limit )
         overrun();
@@ -90,7 +90,7 @@ MAYBE_INLINE BufWriter& BufWriter::put32( EipUint32 aValue )
     return *this;
 }
 
-MAYBE_INLINE BufWriter& BufWriter::put64( EipUint64 aValue )
+MAYBE_INLINE BufWriter& BufWriter::put64( uint64_t aValue )
 {
     if( start + 8 > limit )
         overrun();
@@ -110,7 +110,7 @@ MAYBE_INLINE BufWriter& BufWriter::put_float( float aValue )
 {
     union {
         float       f;
-        EipUint32   i;
+        uint32_t   i;
     } t;
 
     t.f = aValue;
@@ -122,7 +122,7 @@ MAYBE_INLINE BufWriter& BufWriter::put_double( double aValue )
 {
     union {
         double      d;
-        EipUint64   i;
+        uint64_t   i;
     } t;
 
     t.d = aValue;
@@ -131,7 +131,7 @@ MAYBE_INLINE BufWriter& BufWriter::put_double( double aValue )
 }
 
 
-MAYBE_INLINE BufWriter& BufWriter::put16BE( EipUint16 aValue )
+MAYBE_INLINE BufWriter& BufWriter::put16BE( uint16_t aValue )
 {
     if( start + 2 > limit )
         overrun();
@@ -142,7 +142,7 @@ MAYBE_INLINE BufWriter& BufWriter::put16BE( EipUint16 aValue )
 }
 
 
-MAYBE_INLINE BufWriter& BufWriter::put32BE( EipUint32 aValue )
+MAYBE_INLINE BufWriter& BufWriter::put32BE( uint32_t aValue )
 {
     if( start + 4 > limit )
         overrun();
@@ -155,7 +155,7 @@ MAYBE_INLINE BufWriter& BufWriter::put32BE( EipUint32 aValue )
 }
 
 
-MAYBE_INLINE BufWriter& BufWriter::append( const EipByte* aStart, size_t aCount )
+MAYBE_INLINE BufWriter& BufWriter::append( const uint8_t* aStart, size_t aCount )
 {
     if( start + aCount > limit )
         overrun();
@@ -165,7 +165,7 @@ MAYBE_INLINE BufWriter& BufWriter::append( const EipByte* aStart, size_t aCount 
 }
 
 
-MAYBE_INLINE BufWriter& BufWriter::fill( size_t aCount, EipByte aValue )
+MAYBE_INLINE BufWriter& BufWriter::fill( size_t aCount, uint8_t aValue )
 {
     if( start + aCount > limit )
         overrun();
@@ -225,23 +225,23 @@ MAYBE_INLINE CipByte BufReader::get8()
     return *start++;
 }
 
-MAYBE_INLINE EipUint16 BufReader::get16()
+MAYBE_INLINE uint16_t BufReader::get16()
 {
     if( start + 2 > limit )
         overrun();
 
-    EipUint16 ret = (start[0] << 0) |
+    uint16_t ret = (start[0] << 0) |
                     (start[1] << 8);
     start += 2;
     return ret;
 }
 
-MAYBE_INLINE EipUint32 BufReader::get32()
+MAYBE_INLINE uint32_t BufReader::get32()
 {
     if( start + 4 > limit )
         overrun();
 
-    EipUint32 ret = (start[0] << 0 ) |
+    uint32_t ret = (start[0] << 0 ) |
                     (start[1] << 8 ) |
                     (start[2] << 16) |
                     (start[3] << 24) ;
@@ -249,19 +249,19 @@ MAYBE_INLINE EipUint32 BufReader::get32()
     return ret;
 }
 
-MAYBE_INLINE EipUint64 BufReader::get64()
+MAYBE_INLINE uint64_t BufReader::get64()
 {
     if( start + 8 > limit )
         overrun();
 
-    EipUint64 ret = ((EipUint64) start[0] << 0 ) |
-                    ((EipUint64) start[1] << 8 ) |
-                    ((EipUint64) start[2] << 16) |
-                    ((EipUint64) start[3] << 24) |
-                    ((EipUint64) start[4] << 32) |
-                    ((EipUint64) start[5] << 40) |
-                    ((EipUint64) start[6] << 48) |
-                    ((EipUint64) start[7] << 56) ;
+    uint64_t ret = ((uint64_t) start[0] << 0 ) |
+                    ((uint64_t) start[1] << 8 ) |
+                    ((uint64_t) start[2] << 16) |
+                    ((uint64_t) start[3] << 24) |
+                    ((uint64_t) start[4] << 32) |
+                    ((uint64_t) start[5] << 40) |
+                    ((uint64_t) start[6] << 48) |
+                    ((uint64_t) start[7] << 56) ;
     start += 8;
     return ret;
 }
@@ -270,7 +270,7 @@ MAYBE_INLINE float BufReader::get_float()
 {
     union {
         float       f;
-        EipUint32   i;
+        uint32_t   i;
     } t;
 
     t.i = get32();
@@ -282,30 +282,30 @@ MAYBE_INLINE double BufReader::get_double()
 {
     union {
         double      d;
-        EipUint64   i;
+        uint64_t   i;
     } t;
 
     t.i = get64();
     return t.d;
 }
 
-MAYBE_INLINE EipUint16 BufReader::get16BE()
+MAYBE_INLINE uint16_t BufReader::get16BE()
 {
     if( start + 2 > limit )
         overrun();
 
-    EipUint16 ret = (start[1] << 0) |
+    uint16_t ret = (start[1] << 0) |
                     (start[0] << 8);
     start += 2;
     return ret;
 }
 
-MAYBE_INLINE EipUint32 BufReader::get32BE()
+MAYBE_INLINE uint32_t BufReader::get32BE()
 {
     if( start + 4 > limit )
         overrun();
 
-    EipUint32 ret = (start[3] << 0 ) |
+    uint32_t ret = (start[3] << 0 ) |
                     (start[2] << 8 ) |
                     (start[1] << 16) |
                     (start[0] << 24) ;

@@ -17,32 +17,58 @@
  #include <ws2tcpip.h>
 #endif
 
+#include <stdexcept>
+
 
 const int SADDRZ = sizeof(sockaddr);
 
 std::string IpAddrStr( in_addr aIP );
 
 
+class socket_error : public std::runtime_error
+{
+public:
+    socket_error( const std::string& aMessage ) :
+        std::runtime_error( aMessage ),
+#if defined(__linux__)
+        error_code( errno )
+#elif defined(_WIN32)
+    error_code( WSAGetLastError() )
+#endif
+    {}
+
+    socket_error( const std::string& aMessage, int aError ) :
+        std::runtime_error( aMessage ),
+        error_code( aError )
+    {}
+
+    int error_code;
+};
+
+
 /**
- * Struct SockAddr
+ * Class SockAddr
  * is a wrapper for a sock_addr_in.  It provides host endian accessors so that
- * client code can forget about network endianess.  It also provides an operator
- * to convert itself directly into a (sockaddr_in*) for use in BSD sockets calls.
+ * client code can mostly forget about network endianess.  It also provides an
+ * operator to convert itself directly into a (sockaddr_in*) for use in BSD
+ * sockets calls.
  *
  * @see #Cpf which knows how to serialize and deserialize this for its
- *   own needs and on the wire it is called a "SockAddr Info Item".
+ *   own needs, and on the wire it is called a "SockAddr Info Item".
  */
 class SockAddr
 {
 public:
     SockAddr(
-            int aPort = 0,
-            int aIP = INADDR_ANY       // INADDR_ANY is zero
+            unsigned aPort = 0,
+            unsigned aIP = INADDR_ANY       // INADDR_ANY is zero
             );
 
     SockAddr( const sockaddr_in& aSockAddr ) :
         sa( aSockAddr )
     {}
+
+    SockAddr( const char* aNameOrIPAddr, unsigned aPort );
 
     /// assign from a sockaddr_in to this
     SockAddr& operator=( const sockaddr_in& rhs )
@@ -66,13 +92,13 @@ public:
     // All accessors take and return host endian values.  Internally,
     // sin_port and sin_addr.s_addr are stored in network byte order (big endian).
 
-    SockAddr&   SetFamily( int aFamily )    { sa.sin_family = aFamily;                  return *this; }
-    SockAddr&   SetPort( int aPort )        { sa.sin_port = htons( aPort );             return *this; }
-    SockAddr&   SetAddr( int aIPAddr )      { sa.sin_addr.s_addr = htonl( aIPAddr );    return *this; }
+    SockAddr&   SetFamily( unsigned aFamily )   { sa.sin_family = aFamily;                  return *this; }
+    SockAddr&   SetPort( unsigned aPort )       { sa.sin_port = htons( aPort );             return *this; }
+    SockAddr&   SetAddr( unsigned aIPAddr )     { sa.sin_addr.s_addr = htonl( aIPAddr );    return *this; }
 
-    int Family() const          { return sa.sin_family; }
-    int Port() const            { return ntohs( sa.sin_port ); }
-    int Addr() const            { return ntohl( sa.sin_addr.s_addr ); }
+    unsigned Family() const     { return sa.sin_family; }
+    unsigned Port() const       { return ntohs( sa.sin_port ); }
+    unsigned Addr() const       { return ntohl( sa.sin_addr.s_addr ); }
 
     std::string AddrStr() const { return IpAddrStr( sa.sin_addr ); }
 
@@ -90,14 +116,10 @@ public:
 
     bool IsMulticast() const
     {
+        return (0xf0000000 & Addr()) == 0xe0000000;
         // Vol2 3-5.3
         // https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml
         // "The multicast addresses are in the range 224.0.0.0 through 239.255.255.255."
-        static const unsigned lo = ntohl( inet_addr( "224.0.0.0" ) );
-        static const unsigned hi = ntohl( inet_addr( "239.255.255.255" ) );
-
-        unsigned addr = ntohl( sa.sin_addr.s_addr );
-        return lo <= addr && addr <= hi;
     }
 
 protected:

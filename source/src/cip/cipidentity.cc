@@ -39,11 +39,11 @@
 // attributes in CIP Identity Object, some are public so they can be examined
 // when testing electronic key validity.
 
-EipUint16 vendor_id_ = CIPSTER_DEVICE_VENDOR_ID;         //*< Attribute 1: Vendor ID
+uint16_t vendor_id_ = CIPSTER_DEVICE_VENDOR_ID;         //*< Attribute 1: Vendor ID
 
-EipUint16 device_type_ = CIPSTER_DEVICE_TYPE;            //*< Attribute 2: Device Type
+uint16_t device_type_ = CIPSTER_DEVICE_TYPE;            //*< Attribute 2: Device Type
 
-EipUint16 product_code_ = CIPSTER_DEVICE_PRODUCT_CODE;   //*< Attribute 3: Product Code
+uint16_t product_code_ = CIPSTER_DEVICE_PRODUCT_CODE;   //*< Attribute 3: Product Code
 
 CipRevision revision_ =
 {
@@ -52,20 +52,20 @@ CipRevision revision_ =
     CIPSTER_DEVICE_MINOR_REVISION
 };
 
-EipUint16 status_ = 0;               //*< Attribute 5: Status
+uint16_t status_ = 0;               //*< Attribute 5: Status
 
-EipUint32 serial_number_ = 0;        //*< Attribute 6: Serial Number, has to be set prior to CIPster initialization
+uint32_t serial_number_ = 0;        //*< Attribute 6: Serial Number, has to be set prior to CIPster initialization
 
 std::string product_name_ = CIPSTER_DEVICE_NAME;
 
 
-void SetDeviceSerialNumber( EipUint32 serial_number )
+void SetDeviceSerialNumber( uint32_t serial_number )
 {
     serial_number_ = serial_number;
 }
 
 
-void SetDeviceStatus( EipUint16 status )
+void SetDeviceStatus( uint16_t status )
 {
     status_ = status;
 }

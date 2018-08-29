@@ -119,6 +119,7 @@ const int kCIPsterProducedDataHasRunIdleHeader = 0;
 
 #ifndef NDEBUG      // for "Debug" builds
 
+#if 0
 #define CIPSTER_ASSERT(assertion) \
     do { \
       if(!(assertion)) { \
@@ -126,6 +127,10 @@ const int kCIPsterProducedDataHasRunIdleHeader = 0;
         while(1){;} \
       } \
     } while(0)
+#else
+#include <assert.h>
+#define CIPSTER_ASSERT(assertion)   assert(assertion)
+#endif
 
 // could use standard assert()
 //#include <assert.h>

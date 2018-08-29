@@ -56,7 +56,7 @@ EipStatus CipEthernetLinkClass::Init()
 }
 
 
-void CipEthernetLinkClass::ConfigureMacAddress( int aInstanceId, const EipUint8* mac_address )
+void CipEthernetLinkClass::ConfigureMacAddress( int aInstanceId, const uint8_t* mac_address )
 {
     CipClass* clazz = GetCipClass( kCipEthernetLinkClass );
 

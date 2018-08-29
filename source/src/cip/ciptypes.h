@@ -151,13 +151,13 @@ enum IoConnectionEvent
 
 struct CipRevision
 {
-    CipRevision( EipUint8 aMajor = 0, EipUint8 aMinor = 0 ) :
+    CipRevision( uint8_t aMajor = 0, uint8_t aMinor = 0 ) :
         major_revision( aMajor ),
         minor_revision( aMinor )
     {}
 
-    EipUint8    major_revision;
-    EipUint8    minor_revision;
+    uint8_t    major_revision;
+    uint8_t    minor_revision;
 };
 
 

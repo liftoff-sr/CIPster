@@ -345,8 +345,15 @@ CipConn* GetConnectedOutputAssembly( int output_assembly_id )
 }
 
 
-void CipConnBox::Insert( CipConn* aConn )
+bool CipConnBox::Insert( CipConn* aConn )
 {
+    if( aConn->on_list )
+    {
+        CIPSTER_TRACE_WARN( "%s<%d>: called with aConn already on list\n",
+            __func__, aConn->instance_id );
+        return false;
+    }
+
     if( aConn->trigger.Class() == kConnTransportClass1 )
     {
         //CIPSTER_TRACE_INFO( "%s: consuming_connection_id:%d\n", __func__, aConn->ConsumingConnectionId() );
@@ -361,13 +368,21 @@ void CipConnBox::Insert( CipConn* aConn )
     }
 
     head = aConn;
+    aConn->on_list = true;
 
-    aConn->SetState( kConnStateEstablished );
+    return true;
 }
 
 
-void CipConnBox::Remove( CipConn* aConn )
+bool CipConnBox::Remove( CipConn* aConn )
 {
+    if( !aConn->on_list )
+    {
+        CIPSTER_TRACE_WARN( "%s<%d>: called with aConn not on list\n",
+            __func__, aConn->instance_id );
+        return false;
+    }
+
     if( aConn->trigger.Class() == kConnTransportClass1 )
     {
         //CIPSTER_TRACE_INFO( "%s: consuming_connection_id:%d\n", __func__, aConn->ConsumingConnectionId() );
@@ -389,7 +404,8 @@ void CipConnBox::Remove( CipConn* aConn )
 
     aConn->prev  = NULL;
     aConn->next  = NULL;
-    aConn->SetState( kConnStateNonExistent );
+    aConn->on_list = false;
+    return true;
 }
 
 

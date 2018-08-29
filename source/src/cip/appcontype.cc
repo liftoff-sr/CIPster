@@ -12,7 +12,7 @@
 
 /**
  * Class ExclusiveOwner
- * is contains a static allocation pool for exclusive owner connections.  Each
+ * contains a static allocation pool for exclusive owner connections.  Each
  * instance is a registration of an expectation.
  * Each ExclusiveOnwer in the collection
  * is first created by calling ExclusiveOwner::AddExpectation()
@@ -83,7 +83,7 @@ public:
 
     CipConn* Alloc()
     {
-        for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
+        for( int j = 0; j < DIM( connection );  ++j )
         {
             if( kConnStateNonExistent == connection[j].State() )
             {
@@ -141,7 +141,7 @@ public:
 
     CipConn* Alloc()
     {
-        for( int j = 0; j < CIPSTER_CIP_NUM_LISTEN_ONLY_CONNS_PER_CON_PATH; j++ )
+        for( int j = 0; j < DIM( connection );  ++j )
         {
             if( kConnStateNonExistent == connection[j].State() )
             {

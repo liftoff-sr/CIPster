@@ -1,1 +1,17 @@
-*) Get rid of Eip integer typedefs.  They seem needless given the Cip typedefs.
+Volunteer contributions welcome for these:
+
+
+*) Enhance documentation.  Note that @brief is ugly and it is being removed.
+   We have Javadoc flag enabled in Doxygen which does basically the same thing.
+
+*) Revive and/or replace unit tests.
+
+*) Python bindings?
+
+*) Redo IO connection timing, decrementing the timeout for each connection
+   may not be optimal as compared to calculating a delta from current time
+   as is done in the TCP inactivity timer scheme.
+
+*) Enhance sample applications to at least know their own IP address.
+
+

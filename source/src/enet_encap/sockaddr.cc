@@ -6,6 +6,10 @@
 
 #include "sockaddr.h"
 
+#if defined(__linux__)
+ #include <netdb.h>
+#endif
+
 std::string IpAddrStr( in_addr aIP )
 {
     // inet_ntoa uses a static buffer, so capture that into a std::string
@@ -14,7 +18,7 @@ std::string IpAddrStr( in_addr aIP )
 }
 
 
-SockAddr::SockAddr( int aPort, int aIP )
+SockAddr::SockAddr( unsigned aPort, unsigned aIP )
 {
     sa.sin_family      = AF_INET;
     sa.sin_port        = htons( aPort );
@@ -24,3 +28,32 @@ SockAddr::SockAddr( int aPort, int aIP )
 }
 
 
+SockAddr::SockAddr( const char* aNameOrIPAddr, unsigned aPort )
+{
+    sa.sin_family      = AF_INET;
+    sa.sin_port        = htons( aPort );
+
+    sa.sin_addr.s_addr = inet_addr( aNameOrIPAddr );
+    if( sa.sin_addr.s_addr == INADDR_NONE )
+    {
+        hostent* ent = gethostbyname( aNameOrIPAddr );
+        if( !ent )
+        {
+            const char* errmsg = "gethostbyname";
+
+            switch( h_errno )
+            {
+            case HOST_NOT_FOUND:    errmsg = "host is unknown";     break;
+            case NO_DATA:           errmsg = "host has no IP";      break;
+            case NO_RECOVERY:       errmsg = "name server error";   break;
+            case TRY_AGAIN:         errmsg = "try again later";     break;
+            }
+
+            throw socket_error( errmsg, h_errno );
+        }
+
+        sa.sin_addr.s_addr = *(int*) ent->h_addr_list[0];
+    }
+
+    memset( &sa.sin_zero, 0, sizeof sa.sin_zero );
+}

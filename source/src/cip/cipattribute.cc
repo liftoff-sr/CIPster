@@ -4,10 +4,8 @@
  *
  ******************************************************************************/
 
+#include <trace.h>
 #include <byte_bufs.h>
-#include <cipattribute.h>
-#include <cipclass.h>
-#include <cipmessagerouter.h>
 #include <cipster_api.h>
 
 
@@ -29,6 +27,15 @@ CipAttribute::CipAttribute(
     setter( aSetter ),
     is_offset_from_instance_start( isDataAnInstanceOffset )
 {
+    /*
+        Is there a problem with one of the calls to CipClass::AttributeInsert()?
+        Likely you want either:
+        1) an offset from instance start, in which case aData's upper bits should be 0.
+        2) a full address in aData with is_offset_from_instance_start == false.
+    */
+
+    CIPSTER_ASSERT( ( is_offset_from_instance_start && !(0xffff0000 & aData))
+        ||          (!is_offset_from_instance_start &&  (0xffff0000 & aData)) );
 }
 
 

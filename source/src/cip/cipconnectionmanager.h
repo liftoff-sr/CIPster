@@ -231,10 +231,17 @@ public:
      * production inhibit, etc).
      *
      * @param aConn the connection to be added at the beginning.
+     * @return bool - true if it was successfully inserted, else false because
+     *  aConn was already on the list.
      */
-    void Insert( CipConn* aConn );
+    bool Insert( CipConn* aConn );
 
-    void Remove( CipConn* aConn );
+    /**
+     * Function Remove
+     * @return bool - true if it was successfully removed, else false because
+     *  aConn was not previously on the list.
+     */
+    bool Remove( CipConn* aConn );
 
     iterator end()      const   { return iterator( NULL ); }
     iterator begin()    const   { return iterator( head ); }

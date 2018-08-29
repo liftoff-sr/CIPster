@@ -17,10 +17,10 @@
 
 // global variables for demo application (4 assembly data fields)  ***********
 
-EipUint8    g_assembly_data064[128];    // Input
-EipUint8    g_assembly_data096[128];    // Output
-EipUint8    g_assembly_data097[64];     // Config
-EipUint8    g_assembly_data09A[128];    // Explicit
+uint8_t    g_assembly_data064[128];    // Input
+uint8_t    g_assembly_data096[128];    // Output
+uint8_t    g_assembly_data097[64];     // Config
+uint8_t    g_assembly_data09A[128];    // Explicit
 
 
 EipStatus ApplicationInitialization()
@@ -163,7 +163,7 @@ EipStatus ResetDeviceToInitialConfiguration( bool also_reset_comm_params )
 }
 
 
-void RunIdleChanged( EipUint32 run_idle_value )
+void RunIdleChanged( uint32_t run_idle_value )
 {
     (void) run_idle_value;
 }

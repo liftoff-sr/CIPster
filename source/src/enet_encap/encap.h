@@ -113,7 +113,7 @@ public:
      * end of the TCP connection closes its socket.
      * @return int - the requested number of bytes or 0 if the other end closes or -1 if error.
      */
-    static int EnsuredTcpRecv( int aSocket, EipByte* aDest, int aByteCount );
+    static int EnsuredTcpRecv( int aSocket, uint8_t* aDest, int aByteCount );
 
     /**
      * Function ReceiveTcpMsg
@@ -249,7 +249,7 @@ protected:
     unsigned    length;
     CipUdint    session_handle;
     CipUdint    status;
-    CipByte     sender_context[8];
+    uint8_t     sender_context[8];
     CipUdint    options;
 
     // These are expected only for command == SendRRData or SendUnitData
@@ -277,7 +277,7 @@ public:
 
     ListIdentity( int aIPAddress, CipUint aVendorId, CipUint aDeviceType,
             CipUint aProductCode, CipUint aRevision, CipUint aStatus,
-            CipUdint aSerialNum, const std::string& aProductName, CipByte aState ) :
+            CipUdint aSerialNum, const std::string& aProductName, uint8_t aState ) :
         sockaddr( kEIP_Reserved_Port, aIPAddress ),
         protocol_ver( kSupportedProtocolVersion ),
         vendor_id( aVendorId ),
@@ -299,7 +299,7 @@ public:
     CipUint                 status;
     CipUdint                serial_num;
     std::string             product_name;
-    CipByte                 state;
+    uint8_t                 state;
 
     int DeserializeListIdendityResponse( BufReader aInput )
     {

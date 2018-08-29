@@ -53,7 +53,7 @@ inline EipStatus ConfigureNetworkInterface( const char* ip_address, const char* 
  *  @param mac_address  the hardware MAC address of the network interface
  *  @return kEipStatusOk if the configuring worked otherwise EIP_ERROR
  */
-inline void ConfigureMacAddress( const EipByte* mac_address )
+inline void ConfigureMacAddress( const uint8_t* mac_address )
 {
     CipEthernetLinkClass::ConfigureMacAddress( 1, mac_address );
 }
@@ -83,14 +83,14 @@ inline void ConfigureHostName( const char* host_name )
  *
  * @param serial_number unique 32 bit number identifying the device
  */
-void SetDeviceSerialNumber( EipUint32 serial_number );
+void SetDeviceSerialNumber( uint32_t serial_number );
 
 /** @ingroup CIP_API
  * @brief Set the current status of the device.
  *
  * @param device_status the new status value
  */
-void SetDeviceStatus( EipUint16 device_status );
+void SetDeviceStatus( uint16_t device_status );
 
 /** @ingroup CIP_API
  * @brief Initialize and setup the CIP-stack
@@ -98,7 +98,7 @@ void SetDeviceStatus( EipUint16 device_status );
  * @param unique_connection_id value passed to Connection_Manager_Init() to form
  * a "per boot" unique connection ID.
  */
-void CipStackInit( EipUint16 unique_connection_id );
+void CipStackInit( uint16_t unique_connection_id );
 
 /** @ingroup CIP_API
  * @brief Shutdown of the CIP stack
@@ -363,7 +363,7 @@ EipStatus ResetDeviceToInitialConfiguration( bool also_reset_comm_parameters );
  * @param run_idle_value the current value of the run/idle flag according to CIP
  * spec Vol 1 3-6.5
  */
-void RunIdleChanged( EipUint32 run_idle_value );
+void RunIdleChanged( uint32_t run_idle_value );
 
 
 /** @ingroup CIP_API
@@ -455,7 +455,7 @@ inline bool CloseSession( int aSocket )
  *       configured:
  *        - EipStatus ConfigureNetworkInterface(const char *ip_address,
  *        const char *subnet_mask, const char *gateway_address)
- *        - void ConfigureMACAddress(const CipByte *mac_address)
+ *        - void ConfigureMACAddress(const uint8_t *mac_address)
  *        - void ConfigureDomainName(const char *domain_name)
  *        - void ConfigureHostName(const char *host_name)
  *        .
@@ -491,7 +491,7 @@ inline bool CloseSession( int aSocket )
  *     encapsulation layer with the functions: \n
  *     int Encapsulation::HandleReceivedExplicitTcpData( int socket, BufReader aCommand, BufWriter aReply ),
  *     int Encapsulation::HandleReceivedExplicitUdpData(int socket_handle, const SockAddr&
- *  aFromAddress, CipByte* buffer, unsigned buffer_length, int
+ *  aFromAddress, uint8_t* buffer, unsigned buffer_length, int
  * *number_of_remaining_bytes).\n
  *     Depending if the data has been received from a TCP or from a UDP socket.
  *     As a result of this function a response may have to be sent. The data to
@@ -542,8 +542,8 @@ inline bool CloseSession( int aSocket )
  *   - S_CIP_Instance *AddCIPInstance(S_CIP_Class * cip_class, CipUdint
  * instance_id);
  *   - void InsertAttribute(S_CIP_Instance *instance, CipUint
- * attribute_number, CipByte cip_type, void* data);
- *   - void InsertService(S_CIP_Class *class, CipByte service_number,
+ * attribute_number, uint8_t cip_type, void* data);
+ *   - void InsertService(S_CIP_Class *class, uint8_t service_number,
  * CipServiceFunction service_function, char *service_name);
  *
  * @page license CIPster Open Source License
@@ -557,7 +557,7 @@ inline bool CloseSession( int aSocket )
  */
 
 #if defined(DEBUG)
-void byte_dump( const char* aPrompt, CipByte* aBytes, int aCount );
+void byte_dump( const char* aPrompt, uint8_t* aBytes, int aCount );
 #endif
 
 #endif  // CIPSTER_CIPSTER_API_H_

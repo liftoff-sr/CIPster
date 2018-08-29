@@ -232,7 +232,7 @@ int Cpf::DeserializeCpf( BufReader aSrc )
         case kCpfIdConnectedDataItem:
         case kCpfIdUnconnectedDataItem:
             SetDataType( type_id );
-            SetDataRange( ByteBuf( (CipByte*) in.data(), length ) );
+            SetDataRange( ByteBuf( (uint8_t*) in.data(), length ) );
             in += length;               // might throw exception
             break;
 
