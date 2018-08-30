@@ -11,7 +11,7 @@
 
 #define UNICODE     "UTF16LE"   // UTF16LE is UNICODE with fixes to shortsighted-ness.
 
-#define UTF8        "UTF8"      // The best way go deal with all unicode chars in a
+#define UTF8        "UTF8"      // The best way to deal with all unicode chars in a
                                 // platform independent way using 8 bit multibyte
                                 // characters.
 
@@ -44,7 +44,7 @@ public:
         iconv_close( to_utf8 );
     }
 
-    // return the number of bytes
+    // return the number of bytes consumed at destination
     int ToUTF8( char** src_ptr, size_t* src_size, char** dst_ptr, size_t* dst_size )
     {
         size_t  dst_startz = *dst_size;
@@ -61,6 +61,7 @@ public:
         return r;
     }
 
+    // return the number of bytes consumed at destination
     int ToUNICODE( char** src_ptr, size_t* src_size, char** dst_ptr, size_t* dst_size )
     {
         size_t  dst_startz = *dst_size;

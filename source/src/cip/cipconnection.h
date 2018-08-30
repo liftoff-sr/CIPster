@@ -234,15 +234,18 @@ public:
 
     bool IsFixed() const
     {
-        return not_large ? ((bits>>9) & 1) : ((bits>>25) & 1);
+        // Vol1 Table 3-5.9
+        return not_large ? !((bits>>9) & 1) : !((bits>>25) & 1);
     }
 
     NetCnParams& SetFixed( bool isFixed )
     {
+        // Vol1 Table 3-5.9
+        bool isVariable = !isFixed;
         if( not_large )
-            bits = ( bits & ~(1 << 9)) | (isFixed << 9);
+            bits = ( bits & ~(1 << 9)) | (isVariable << 9);
         else
-            bits = ( bits & ~(1 << 25)) | (isFixed << 25);
+            bits = ( bits & ~(1 << 25)) | (isVariable << 25);
         return *this;
     }
 

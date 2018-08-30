@@ -763,16 +763,21 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
         return 0;       // This is not an error, but we should not reply.
     }
 
-    if( encap.Status() )  // all commands have 0 in status, else ignore with no reply
+    // Vol2 Table 2-4.9 says tolerate non-zero Status and Options fields if command
+    // is kEncapCmdUnregisterSession
+    if( encap.Command() != kEncapCmdUnregisterSession )
     {
-        CIPSTER_TRACE_INFO( "%s[%d]: header status != 0\n", __func__, aSocket );
-        return 0;       // Zero keeps the TCP connection open, but omits a reply.
-    }
+        if( encap.Status() )  // all commands have 0 in status, else ignore with no reply
+        {
+            CIPSTER_TRACE_INFO( "%s[%d]: header status != 0\n", __func__, aSocket );
+            return 0;       // Zero keeps the TCP connection open, but omits a reply.
+        }
 
-    if( encap.Options() )  // all commands have 0 in options, else ignore with no reply
-    {
-        CIPSTER_TRACE_INFO( "%s[%d]: header status != 0\n", __func__, aSocket );
-        return 0;       // Zero keeps the TCP connection open, but omits a reply.
+        if( encap.Options() )  // all commands have 0 in options, else ignore with no reply
+        {
+            CIPSTER_TRACE_INFO( "%s[%d]: header status != 0\n", __func__, aSocket );
+            return 0;       // Zero keeps the TCP connection open, but omits a reply.
+        }
     }
 
     // Establish default Encapsulation length field, maybe adjusted at bottom here.
