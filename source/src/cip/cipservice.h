@@ -82,6 +82,8 @@ public:
         service_id( aServiceId ),
         service_function( aServiceFunction )
     {
+        // replies often or in 0x80 to service code, so stay below
+        CIPSTER_ASSERT( aServiceId > 0 && aServiceId < 0x80 );
     }
 
     virtual ~CipService() {}

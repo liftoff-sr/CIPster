@@ -218,6 +218,8 @@ int CipClass::FindUniqueFreeId() const
 
 bool CipClass::InstanceInsert( CipInstance* aInstance )
 {
+    CIPSTER_ASSERT( aInstance->Id() > 0 && aInstance->Id() <= 65535 );
+
     if( aInstance->Class() )
     {
         CIPSTER_TRACE_ERR( "%s: aInstance id:%d is already owned\n",

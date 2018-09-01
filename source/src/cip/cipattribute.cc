@@ -36,6 +36,8 @@ CipAttribute::CipAttribute(
 
     CIPSTER_ASSERT( ( is_offset_from_instance_start && !(0xffff0000 & aData))
         ||          (!is_offset_from_instance_start &&  (0xffff0000 & aData)) );
+
+    CIPSTER_ASSERT( aAttributeId > 0 && aAttributeId <= 65535 );
 }
 
 

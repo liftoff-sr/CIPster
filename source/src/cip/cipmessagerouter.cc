@@ -93,8 +93,8 @@ int CipMessageRouterRequest::DeserializeMRReq( BufReader aRequest )
 
 std::vector<uint8_t> CipMessageRouterResponse::mmr_temp( CIPSTER_MESSAGE_DATA_REPLY_BUFFER );
 
-CipMessageRouterResponse::CipMessageRouterResponse( Cpf* aCpf ) :
-    data ( mmr_temp.data(), mmr_temp.size() ),
+CipMessageRouterResponse::CipMessageRouterResponse( Cpf* aCpf, BufWriter aOutput ) :
+    data ( aOutput ),
     cpf( aCpf )
 {
     Clear();
@@ -120,7 +120,7 @@ int CipMessageRouterResponse::DeserializeMRRes( BufReader aReply )
 
     reply_service = CIPServiceCode( in.get8() & 0x7f );
 
-    in.get8();      // gobble "reserved"
+    ++in;      // gobble "reserved"
 
     SetGenStatus( (CipError) in.get8() );
 
@@ -259,7 +259,7 @@ EipStatus CipMessageRouterClass::Init()
 EipStatus CipMessageRouterClass::NotifyMR(
         CipMessageRouterRequest* aRequest, CipMessageRouterResponse* aResponse )
 {
-    CIPSTER_TRACE_INFO( "%s: routing unconnected message\n", __func__ );
+    CIPSTER_TRACE_INFO( "%s: routing...\n", __func__ );
 
     aResponse->SetService( aRequest->Service() );
 
@@ -353,7 +353,7 @@ EipStatus CipMessageRouterClass::NotifyMR(
     }
 
     CIPSTER_TRACE_INFO(
-        "%s: targeting '%s' instance %d with service %s\n",
+        "%s: targeting '%s' instance:%d service:'%s'\n",
         __func__,
         clazz->ClassName().c_str(),
         instance_id,

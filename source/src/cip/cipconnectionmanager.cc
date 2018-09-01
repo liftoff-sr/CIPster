@@ -55,7 +55,7 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
         aFromAddress.Port()
         );
 
-    Cpf cpfd;
+    Cpf cpfd( aFromAddress, 0 );
 
     if( cpfd.DeserializeCpf( aCommand ) <= 0 )
     {

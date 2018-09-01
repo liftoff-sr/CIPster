@@ -38,13 +38,14 @@ int ConnectionPath::Deserialize( BufReader aInput )
         }
 
         /*
-           There can be 1-3 application_paths in a connection_path.  Depending on the
-           O->T_connection_parameters and T->O_connection_parameters fields and the
-           presence of a data segment, one or more encoded application paths shall
-           be specified. In general, the application paths are in the order of
-           Configuration path, Consumption path, and Production path. However, a
-           single encoded path can be used when configuration, consumption, and/or
-           production use the same path.  See Vol1 table 3-5.13.
+           There can be 1-3 application_paths in a connection_path. Depending on
+           the O->T_connection_parameters and T->O_connection_parameters fields
+           and the presence of a data segment, one or more encoded application
+           paths shall be specified. In general, the application paths are in
+           the order of Configuration path, Consumption path, and Production
+           path. However, a single encoded path can be used when configuration,
+           consumption, and/or production use the same path. See Vol1 table
+           3-5.13.
         */
 
         if( in.size() )
@@ -182,6 +183,8 @@ ConnectionData::ConnectionData(
     SetTimeoutMultiplier( aConnectionTimeoutMultiplier );
 }
 
+
+CipUint ConnectionData::serial_number_allocator;
 
 ConnectionData& ConnectionData::SetTimeoutMultiplier( ConnTimeoutMultiplier aMultiplier )
 {
@@ -483,7 +486,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
     int path_count;
     path_count = 1 + conn_path.app_path2.HasAny() + conn_path.app_path3.HasAny();
 
-    CipSint config_path, consuming_path, producing_path;
+    int8_t config_path, consuming_path, producing_path;
 
     // Set all three to default to not used unless set otherwise below.
     config_path = consuming_path = producing_path = -1;
@@ -743,6 +746,8 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
         }
     }
 
+    conn_path.AssignAppPaths( config_path, consuming_path, producing_path );
+
     switch( trigger.Class() )
     {
     case kConnTransportClass3:
@@ -765,8 +770,6 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
     default:
         ;
     }
-
-    conn_path.AssignAppPaths( config_path, consuming_path, producing_path );
 
     CIPSTER_TRACE_INFO( "%s: forward_open conn_path: %s\n",
         __func__,
@@ -845,7 +848,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             diff_size += 2;
         }
 
-        if( kCIPsterConsumedDataHasRunIdleHeader && data_size >= 4
+        if( kCIPsterConsumedDataHasRunIdleHeader // && data_size >= 4
             // only expect a run idle header if it is not a heartbeat connection
             && !is_heartbeat )
         {
@@ -909,7 +912,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             diff_size += 2;
         }
 
-        if( kCIPsterProducedDataHasRunIdleHeader && data_size >= 4
+        if( kCIPsterProducedDataHasRunIdleHeader // && data_size >= 4
             // only have a run idle header if it is not a heartbeat connection
             && !is_heartbeat )
         {
@@ -918,7 +921,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         }
 
         if( ( producing_ncp.IsFixed() && data_size != attr_data->size() )
-          ||  data_size >  attr_data->size() )
+          ||  data_size > attr_data->size() )
         {
             // wrong connection size
             corrected_producing_size = attr_data->size() + diff_size;
@@ -1125,10 +1128,10 @@ uint32_t CipConn::NewConnectionId()
 }
 
 
-void CipConn::GeneralConfiguration(
-            ConnectionData* aConnData, ConnInstanceType aType )
+void CipConn::GeneralConfiguration( ConnectionData* aConnData, ConnInstanceType aType )
 {
-    *this = *aConnData;     // copy all the ConnectionData stuff to start with.
+    if( aConnData != static_cast<CipConn*>( this ) )
+        *this = *aConnData;     // copy all the ConnectionData stuff to start with.
 
     // In general, the consuming device selects the Network Connection ID for a
     // point-to-point connection, and the producing device selects the Network
@@ -1863,18 +1866,6 @@ CipError CipConn::openCommunicationChannels( Cpf* aCpf, ConnMgrStatus* aExtError
             return result;
         }
     }
-
-/*
-    if( t_o != kIOConnTypeNull || o_t != kIOConnTypeNull )
-    {
-        // Save TCP client's IP address in order to qualify a future forward_close.
-        CIPSTER_ASSERT( aCpf->TcpPeerAddr() );
-        openers_address = *aCpf->TcpPeerAddr();
-
-        // Save TCP connection session_handle for TCP inactivity timeouts.
-        encap_session   = aCpf->SessionHandle();
-    }
-*/
 
     return kCipErrorSuccess;
 }

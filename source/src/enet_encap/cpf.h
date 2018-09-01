@@ -129,7 +129,7 @@ public:
      * saved in this instance for use by stack functions which need to know
      * from which TCP peer that this request originated from.
      */
-    Cpf( CipUdint aSessionHandle = 0 );
+    Cpf( const SockAddr& aPeer, CipUdint aSessionHandle );
 
     Cpf( CpfId aAddrType, CpfId aDataType, Serializeable* aPayload = NULL );
 
@@ -333,7 +333,7 @@ public:
         return *this;
     }
 
-    const SockAddr* TcpPeerAddr() const;
+    const SockAddr* TcpPeerAddr() const         { return &tcp_peer; }
 
     CipUdint  SessionHandle() const             { return session_handle; }
     Cpf& SetSessionHandle( CipUdint aHndl )     { session_handle = aHndl;  return *this; }
@@ -351,9 +351,14 @@ protected:
     Serializeable*      payload;
 
     CipUdint            session_handle;
+    SockAddr            tcp_peer;
 
 private:
-    //Cpf( const Cpf& );  // not implemented
+    /*
+    // not implemented
+    Cpf( const Cpf& );
+    Cpf& operator=(const Cpf&);
+    */
 };
 
 

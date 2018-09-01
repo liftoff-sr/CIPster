@@ -228,7 +228,7 @@ public:
         if( not_large )
             bits = ( bits & ~(3 << 10)) | (aPriority << 10);
         else
-            bits = ( bits & ~(3 << 26)) | (aPriority <<26 );
+            bits = ( bits & ~(3 << 26)) | (aPriority << 26 );
         return *this;
     }
 
@@ -287,7 +287,7 @@ public:
 
 private:
     bool        not_large;
-    uint32_t   bits;
+    uint32_t    bits;
 };
 
 
@@ -461,7 +461,7 @@ public:
     CipAppPath& ConsumingPath() const   { return consuming_path < 0 ? HasAny_No : (CipAppPath&) app_path[consuming_path]; }
     CipAppPath& ProducingPath() const   { return producing_path < 0 ? HasAny_No : (CipAppPath&) app_path[producing_path]; }
 
-    void AssignAppPaths( CipSint aConfig, CipSint aConsuming, CipSint aProducing )
+    void AssignAppPaths( int8_t aConfig, int8_t aConsuming, int8_t aProducing )
     {
         config_path    = aConfig;
         consuming_path = aConsuming;
@@ -472,9 +472,9 @@ protected:
     static CipAppPath   HasAny_No;       // indices below indicate this when -1
 
     // indices into conn_path.app_path[], except that -1 indicates HasAny_No
-    CipSint             config_path;
-    CipSint             consuming_path;
-    CipSint             producing_path;
+    int8_t              config_path;
+    int8_t              consuming_path;
+    int8_t              producing_path;
 };
 
 
@@ -562,6 +562,12 @@ public:
     CipAppPath& ConfigPath() const      { return conn_path.ConfigPath(); }
     CipAppPath& ConsumingPath() const   { return conn_path.ConsumingPath(); }
     CipAppPath& ProducingPath() const   { return conn_path.ProducingPath(); }
+
+    CipUint ConnectionSerialNumber() const  { return connection_serial_number; }
+    void SetConnectionSerialNumber( CipUint aNumber = ++serial_number_allocator )
+    {
+        connection_serial_number = aNumber;
+    }
 
     bool TriadEquals( const ConnectionData& aOther ) const
     {
@@ -651,6 +657,8 @@ public:
 
 
 protected:
+
+    static CipUint serial_number_allocator;
 
     //-----<ConnectionTriad>----------------------------------------------------
     // The Connection Triad used in the Connection Manager specification includes

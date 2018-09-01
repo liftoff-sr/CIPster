@@ -837,7 +837,7 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
 
             if( ses )
             {
-                Cpf cpf( encap.SessionHandle() ) ;
+                Cpf cpf( ses->m_peeraddr, encap.SessionHandle() ) ;
 
                 result = cpf.NotifyCommonPacketFormat(
                             command,    // past encap header (headerz)
@@ -871,7 +871,7 @@ int Encapsulation::HandleReceivedExplicitTcpData( int aSocket,
 
             if( ses )
             {
-                Cpf cpf( encap.SessionHandle() ) ;
+                Cpf cpf( ses->m_peeraddr, encap.SessionHandle() ) ;
 
                 result = cpf.NotifyConnectedCommonPacketFormat(
                             command,    // past encap header

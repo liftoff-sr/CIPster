@@ -16,8 +16,9 @@
 #include "trace.h"
 
 
-Cpf::Cpf( CipUdint aSessionHandle ) :
+Cpf::Cpf( const SockAddr& aTcpPeer, CipUdint aSessionHandle ) :
     payload( 0 ),
+    tcp_peer( aTcpPeer ),
     session_handle( aSessionHandle )
 {
     Clear();
@@ -50,6 +51,7 @@ Cpf::Cpf( const AddressItem& aAddr, CpfId aDataType ) :
 }
 
 
+/*
 const SockAddr* Cpf::TcpPeerAddr() const
 {
     if( const EncapSession* s = SessionMgr::GetSession( session_handle ) )
@@ -61,7 +63,7 @@ const SockAddr* Cpf::TcpPeerAddr() const
 
     return NULL;
 }
-
+*/
 
 int Cpf::NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply )
 {

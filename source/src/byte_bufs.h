@@ -35,7 +35,7 @@ public:
 
     uint8_t*    data() const    { return start; }
     uint8_t*    end() const     { return limit; }
-    ssize_t     size() const    { return limit - start; }
+    ssize_t     size() const    { return limit - start; }   // ssize_t is signed
 
 protected:
     uint8_t*    start;

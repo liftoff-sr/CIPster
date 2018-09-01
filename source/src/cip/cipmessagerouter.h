@@ -75,7 +75,8 @@ class Cpf;
 class CipMessageRouterResponse : public Serializeable
 {
 public:
-    CipMessageRouterResponse( Cpf* aCpf );
+    CipMessageRouterResponse( Cpf* aCpf,
+        BufWriter aOutput = BufWriter( mmr_temp.data(), mmr_temp.size() ) );
 
     void Clear();
 
@@ -116,7 +117,6 @@ public:
     }
 
     CipError GenStatus() const      { return general_status; }
-
 
     /// Append an additional status word to response
     CipMessageRouterResponse& AddAdditionalSts( CipUint aStsWord )
