@@ -48,7 +48,6 @@ protected:
 class CipSimpleDataSegment : public SegmentGroup
 {
 public:
-
     CipSimpleDataSegment()
     {
         Clear();

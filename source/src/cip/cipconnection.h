@@ -106,6 +106,19 @@ enum ConnPriority
 
 
 /**
+ * Enum IOConnRealTimeFmt
+ * is the set of real time formats as described in Vol1 3-6.1
+ */
+enum IOConnRealTimeFmt
+{
+    kRealTimeFmtModeless,
+    kRealTimeFmtZeroLengthData,
+    kRealTimeFmtHeartbeat,
+    kRealTimeFmt32BitHeader,
+};
+
+
+/**
  * Enum ConnTimeoutMultiplier
  * is the set of legal values for the right column of Vol1 Table 3-5.12
  */
@@ -346,10 +359,21 @@ public:
         return ConnTriggerType( (bits >> 4) & 7 );
     }
 
+    TransportTrigger& SetTrigger( ConnTriggerType aTrigger )
+    {
+        bits = (bits & ~(7 << 4)) | (aTrigger << 4);
+        return *this;
+    }
 
     ConnTransportClass Class() const
     {
         return ConnTransportClass( bits & 15 );
+    }
+
+    TransportTrigger& SetClass( ConnTransportClass aClass )
+    {
+        bits = (bits & ~15) | aClass;
+        return *this;
     }
 
     void Serialize( BufWriter& aOutput ) const
@@ -444,13 +468,16 @@ public:
     //-----</Serializeable>-----------------------------------------------------
 
    // They arrive in this order when all are present in a forward_open request:
-    CipPortSegmentGroup     port_segs;  // has optional electronic key.
+    CipPortSegmentGroup     port_segs;      // has optional electronic key.
 
     CipAppPath              app_path[3];
 #define app_path1           app_path[0]
 #define app_path2           app_path[1]
 #define app_path3           app_path[2]
 
+    // An encoding can contain more than one data segment if required, but that
+    // is not supported here.  That is what is used to overcome the 255 word limit
+    // of the simple data segment.
     CipSimpleDataSegment    data_seg;
 
     // per Vol1 3-5.4.1.10 the application path names are relative to the target node.
@@ -532,28 +559,56 @@ public:
 
     TransportTrigger&   Transport() const                   { return (TransportTrigger&) trigger; }
 
-    uint8_t     PriorityTimeTick() const                    { return priority_timetick; }
-    void        SetPriorityTimeTick( uint8_t aValue )       { priority_timetick = aValue; }
+    /// See Vol1 Table 3-5.11 Time Tick Value
+    uint8_t     TickTime() const                            { return priority_timetick & 0xf; }
+    void        SetTickTime( uint8_t aTickTime )
+    {
+        priority_timetick = (priority_timetick & ~0xf) | aTickTime;
+    }
 
     uint8_t     TimeoutTicks() const                        { return timeout_ticks; }
     void        SetTimeoutTicks( uint8_t aValue )           { timeout_ticks = aValue; }
 
-    CipUdint    ConsumingRPI() const                        { return consuming_RPI_usecs; }
-    void        SetConsumingRPI( CipUdint aPeriodUsecs)     { consuming_RPI_usecs = aPeriodUsecs; }
+    static unsigned RequestMSecs( unsigned aTickTime, unsigned aTickCount )
+    {
+        // Vol1 3-5.4.1.2.1
+        return unsigned( 1 << aTickTime ) * aTickCount;
+    }
 
-    CipUdint    ProducingRPI() const                        { return producing_RPI_usecs; }
-    void        SetProducingRPI( CipUdint aPeriodUsecs)     { producing_RPI_usecs = aPeriodUsecs; }
+    /**
+     * Function OriginatorTimeout
+     * returns how long the originator intends to wait for a forward_open
+     * request before considering the request a failure.  This returned value
+     * will not ever exceed 8355840 msecs because of bit field width limits.
+     */
+    unsigned    OriginatorTimeoutMSecs() const
+    {
+        return RequestMSecs( TickTime(), TimeoutTicks() );
+    }
+    void        SetOriginatorTimeoutMSecs( unsigned aTimeoutMSecs );
 
-    CipUdint    ConsumingConnectionId() const               { return consuming_connection_id; }
-    void        SetConsumingConnectionId( CipUdint aCid )   { consuming_connection_id = aCid; }
+    CipUdint    ConsumingRPI() const                            { return consuming_RPI_usecs; }
+    ConnectionData& SetConsumingRPI( CipUdint aPeriodUSecs )    { consuming_RPI_usecs = aPeriodUSecs; return *this; }
 
-    CipUdint    ProducingConnectionId() const               { return producing_connection_id; }
-    void        SetProducingConnectionId( CipUdint aCid )   { producing_connection_id = aCid; }
+    CipUdint    ProducingRPI() const                            { return producing_RPI_usecs; }
+    ConnectionData& SetProducingRPI( CipUdint aPeriodUSecs)     { producing_RPI_usecs = aPeriodUSecs; return *this; }
 
-    NetCnParams&    ConsumingNCP() const                    { return (NetCnParams&) consuming_ncp; }
-    NetCnParams&    ProducingNCP() const                    { return (NetCnParams&) producing_ncp; }
+    CipUdint    ConsumingConnectionId() const                   { return consuming_connection_id; }
+    ConnectionData& SetConsumingConnectionId( CipUdint aCid )   { consuming_connection_id = aCid; return *this; }
 
-    ConnectionPath& ConnPath() const                        { return (ConnectionPath&) conn_path; }
+    CipUdint    ProducingConnectionId() const                   { return producing_connection_id; }
+    ConnectionData& SetProducingConnectionId( CipUdint aCid )   { producing_connection_id = aCid; return *this; }
+
+    NetCnParams&    ConsumingNCP() const                        { return (NetCnParams&) consuming_ncp; }
+    NetCnParams&    ProducingNCP() const                        { return (NetCnParams&) producing_ncp; }
+
+    ConnectionData& SetConsumingRTFmt( IOConnRealTimeFmt aFmt ) { consuming_fmt = aFmt; return *this; }
+    IOConnRealTimeFmt ConsumingRTFmt() const                    { return consuming_fmt; }
+
+    ConnectionData& SetProducingRTFmt( IOConnRealTimeFmt aFmt ) { producing_fmt = aFmt; return *this; }
+    IOConnRealTimeFmt ProducingRTFmt() const                    { return producing_fmt; }
+
+    ConnectionPath& ConnPath() const                            { return (ConnectionPath&) conn_path; }
 
     // per Vol1 3-5.4.1.10 the application path names are relative to the target node.
     // A consuming_path is for a O->T connection.
@@ -693,8 +748,8 @@ protected:
     // The following variables do not come from the forward open request,
     // but are held here for the benefit of the deriving CipConn class and for
     // validation of forward open request.
-    uint16_t           corrected_consuming_size;
-    uint16_t           corrected_producing_size;
+    uint16_t            corrected_consuming_size;
+    uint16_t            corrected_producing_size;
 
     CipInstance*        consuming_instance; ///< corresponds to conn_path.consuming_path
     CipInstance*        producing_instance; ///< corresponds to conn_path.producing_path
@@ -703,6 +758,9 @@ protected:
     // class id of the clazz->OpenConnection() virtual to call
     int                 mgmnt_class;
     //-----</Validation Variables>----------------------------------------------
+
+    IOConnRealTimeFmt   consuming_fmt;
+    IOConnRealTimeFmt   producing_fmt;
 };
 
 

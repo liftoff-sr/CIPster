@@ -152,6 +152,8 @@ CipAppPath ConnectionPath::HasAny_No;
 
 //-----<ConnectionData>---------------------------------------------------------
 
+CipUint ConnectionData::serial_number_allocator;
+
 ConnectionData::ConnectionData(
         uint8_t aPriorityTimeTick,
         uint8_t aTimeoutTicks,
@@ -178,13 +180,49 @@ ConnectionData::ConnectionData(
     consuming_instance( 0 ),
     producing_instance( 0 ),
     config_instance( 0 ),
-    mgmnt_class( 0 )
+    mgmnt_class( 0 ),
+
+    // kRealTimeFmtHeartbeat is set later when applicable.
+    producing_fmt( kCIPsterProducedDataHasRunIdleHeader ?
+        kRealTimeFmt32BitHeader : kRealTimeFmtModeless ),
+
+    consuming_fmt( kCIPsterConsumedDataHasRunIdleHeader ?
+        kRealTimeFmt32BitHeader : kRealTimeFmtModeless )
 {
     SetTimeoutMultiplier( aConnectionTimeoutMultiplier );
 }
 
 
-CipUint ConnectionData::serial_number_allocator;
+void ConnectionData::SetOriginatorTimeoutMSecs( unsigned aTimeoutMSecs )
+{
+    // use the smallest possible tick time
+    unsigned tick_time;
+    for( tick_time = 0; tick_time <= 15;  ++tick_time )
+    {
+        if( RequestMSecs( tick_time, 255 ) >= aTimeoutMSecs )
+            break;
+    }
+
+    CIPSTER_ASSERT( tick_time <= 15 );  // aTimeoutMSecs could be illegal (>8355840)
+
+    unsigned time_per_tick = 1 << tick_time;
+    unsigned tick_counts   = (aTimeoutMSecs + time_per_tick - 1) / time_per_tick;
+
+    CIPSTER_TRACE_INFO(
+        "%s: tick_time:%u  tick_counts:%u  RequestMSecs:%u  aTimeoutMSecs:%u\n",
+        __func__,
+        tick_time,
+        tick_counts,
+        RequestMSecs( tick_time, tick_counts ),
+        aTimeoutMSecs
+        );
+
+    CIPSTER_ASSERT( RequestMSecs( tick_time, tick_counts ) >= aTimeoutMSecs );
+
+    SetTickTime( tick_time );
+    SetTimeoutTicks( tick_counts );
+}
+
 
 ConnectionData& ConnectionData::SetTimeoutMultiplier( ConnTimeoutMultiplier aMultiplier )
 {
@@ -260,6 +298,8 @@ static CipInstance* check_path( const CipAppPath& aPath,
 int ConnectionData::DeserializeForwardOpenRequest( BufReader aInput, bool isLarge )
 {
     BufReader in = aInput;
+
+    // Vol1 Table 3-5.17 Forward_Open / Large_Forward_Open Request
 
     priority_timetick = in.get8();
     timeout_ticks     = in.get8();
@@ -818,14 +858,11 @@ CipError ConnectionData::VerifyForwardOpenParams( ConnMgrStatus* aExtError )
 
 CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
 {
-    IOConnType o_t = consuming_ncp.ConnectionType();
-    IOConnType t_o = producing_ncp.ConnectionType();
-
     int     data_size;
     int     diff_size;
     bool    is_heartbeat;
 
-    if( o_t != kIOConnTypeNull )    // setup consumer side
+    if( consuming_ncp.ConnectionType() != kIOConnTypeNull ) // setup consumer side
     {
         CIPSTER_ASSERT( consuming_instance );
 
@@ -848,11 +885,12 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             diff_size += 2;
         }
 
-        if( kCIPsterConsumedDataHasRunIdleHeader // && data_size >= 4
+        if( consuming_fmt == kRealTimeFmt32BitHeader
             // only expect a run idle header if it is not a heartbeat connection
+            // and is not kRealTimeFmtModeless
             && !is_heartbeat )
         {
-            data_size -= 4;       // remove the 4 bytes needed for run/idle header
+            data_size -= 4;     // remove the 4 bytes needed for run/idle header
             diff_size += 4;
         }
 
@@ -885,7 +923,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             );
     }
 
-    if( t_o != kIOConnTypeNull )     // setup producer side
+    if( producing_ncp.ConnectionType() != kIOConnTypeNull ) // setup producer side
     {
         CIPSTER_ASSERT( producing_instance );
 
@@ -899,7 +937,6 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
 
         ByteBuf* attr_data = (ByteBuf*) producing_instance->Data( attribute );
 
-
         data_size    = producing_ncp.ConnectionSize();
         diff_size    = 0;
 
@@ -912,8 +949,9 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             diff_size += 2;
         }
 
-        if( kCIPsterProducedDataHasRunIdleHeader // && data_size >= 4
+        if( producing_fmt == kRealTimeFmt32BitHeader
             // only have a run idle header if it is not a heartbeat connection
+            // and is not kRealTimeFmtModeless
             && !is_heartbeat )
         {
             data_size -= 4;   // remove the 4 bytes needed for run/idle header
@@ -1394,7 +1432,7 @@ EipStatus CipConn::SendConnectedData()
 
     int data_len = attr3_byte_array->size();
 
-    if( kCIPsterProducedDataHasRunIdleHeader )
+    if( producing_fmt == kRealTimeFmt32BitHeader && data_len )
     {
         data_len += 4;
     }
@@ -1411,7 +1449,7 @@ EipStatus CipConn::SendConnectedData()
         out.put16( data_len );
     }
 
-    if( kCIPsterProducedDataHasRunIdleHeader )
+    if( producing_fmt == kRealTimeFmt32BitHeader && data_len )
     {
         out.put32( g_run_idle_state );
     }
@@ -1451,7 +1489,7 @@ EipStatus CipConn::HandleReceivedIoConnectionData( BufReader aInput )
     {
         // We have no heartbeat connection, because a heartbeat payload
         // may not contain a run_idle header.
-        if( kCIPsterConsumedDataHasRunIdleHeader )
+        if( consuming_fmt == kRealTimeFmt32BitHeader )
         {
             uint32_t new_run_idle = aInput.get32();
 
@@ -1462,12 +1500,22 @@ EipStatus CipConn::HandleReceivedIoConnectionData( BufReader aInput )
 
             g_run_idle_state = new_run_idle;
         }
+        else
+        {
+            // It is kRealTimeFmtModeless
+        }
 
         if( NotifyAssemblyConnectedDataReceived( consuming_instance, aInput ) != 0 )
         {
             return kEipStatusError;
         }
     }
+    else
+    {
+        // It is kRealTimeFmtHeartbeat
+    }
+
+    // kRealTimeFmtZeroLengthData is not currently supported but would be easy.
 
     return kEipStatusOk;
 }

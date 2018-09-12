@@ -558,7 +558,8 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         goto forward_open_response;
     }
 
-    // At this point "in" has the exact correct size() for the connection path in bytes.
+    // At this point "in" has the exact correct BufReader::size()
+    // for the connection path in bytes.
 
     try
     {

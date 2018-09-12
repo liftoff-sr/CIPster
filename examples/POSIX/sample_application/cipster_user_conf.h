@@ -101,15 +101,34 @@
 const unsigned kCIPsterTimerTickInMicroSeconds = 10000;
 
 /**
- * If RUN IDLE data is expected in consumed data
+ * The setting of this affects the real time format of
+ * the consuming half of a kConnTransportClass0 or kConnTransportClass1
+ * I/O connection.
+ * Tells whether the 32 bit RUN IDLE dword is expected in consumed data.
+ * When this is set to true, then the real time format is
+ * 32-bit header format.  When false then modeless.  You may change these
+ * settings for every IO connection separately using
+ * ConnectionData::SetConsumingFmt() and ConnectionData::SetProducingRTFmt() if
+ * the defaults controlled by this constant do not meet your needs.  But that
+ * would make what the EDS file advertises as being inconsistent.
+ * @see Vol1 3-6.1
  */
-const int kCIPsterConsumedDataHasRunIdleHeader = 1;
+const bool kCIPsterConsumedDataHasRunIdleHeader = true;
 
 /**
- * If RUN IDLE data is to be sent with produced data
+ * The setting of this affects the real time format of
+ * the consuming half of a kConnTransportClass0 or kConnTransportClass1
+ * I/O connection.
+ * Tells whether the 32 bit RUN IDLE dword is expected in consumed data.
+ * When this is set to true, then the real time format is
+ * 32-bit header format.  When false then modeless.  You may change these
+ * settings for every IO connection separately using
+ * ConnectionData::SetConsumingFmt() and ConnectionData::SetProducingRTFmt() if
+ * the defaults controlled by this constant do not meet your needs.  But that
+ * would make what the EDS file advertises as being inconsistent.
+ * @see Vol1 3-6.1
  */
-const int kCIPsterProducedDataHasRunIdleHeader = 0;
-
+const bool kCIPsterProducedDataHasRunIdleHeader = false;
 
 #ifdef CIPSTER_WITH_TRACES
 // If we have tracing enabled provide print tracing macro
