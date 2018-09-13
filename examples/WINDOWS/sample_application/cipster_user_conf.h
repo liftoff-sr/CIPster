@@ -105,8 +105,8 @@ const unsigned kCIPsterTimerTickInMicroSeconds = 10000;
  * I/O connection.
  * Tells whether the 32 bit RUN IDLE dword is expected in consumed data.
  * When this is set to true, then the real time format is
- * 32-bit header format.  When false then modeless.  You may change these
- * settings for every IO connection separately using
+ * kRealTimeFmt32BitHeader.  When false then kRealTimeFmtModeless.
+ * You may change these settings for every IO connection separately using
  * ConnectionData::SetConsumingFmt() and ConnectionData::SetProducingRTFmt() if
  * the defaults controlled by this constant do not meet your needs.  But that
  * would make what the EDS file advertises as being inconsistent.
@@ -116,12 +116,12 @@ const bool kCIPsterConsumedDataHasRunIdleHeader = true;
 
 /**
  * The setting of this affects the real time format of
- * the consuming half of a kConnTransportClass0 or kConnTransportClass1
+ * the producing half of a kConnTransportClass0 or kConnTransportClass1
  * I/O connection.
- * Tells whether the 32 bit RUN IDLE dword is expected in consumed data.
+ * Tells whether the 32 bit RUN IDLE dword is expected in produced data.
  * When this is set to true, then the real time format is
- * 32-bit header format.  When false then modeless.  You may change these
- * settings for every IO connection separately using
+ * kRealTimeFmt32BitHeader.  When false then kRealTimeFmtModeless.
+ * You may change these settings for every IO connection separately using
  * ConnectionData::SetConsumingFmt() and ConnectionData::SetProducingRTFmt() if
  * the defaults controlled by this constant do not meet your needs.  But that
  * would make what the EDS file advertises as being inconsistent.
