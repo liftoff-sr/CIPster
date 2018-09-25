@@ -103,7 +103,8 @@ EipStatus CipAttribute::Get( CipInstance* aInstance,
 }
 
 
-EipStatus CipAttribute::Set( CipInstance* aInstance, CipMessageRouterRequest* request, CipMessageRouterResponse* response )
+EipStatus CipAttribute::Set( CipInstance* aInstance,
+    CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
     if( !IsSetableSingle() )
     {

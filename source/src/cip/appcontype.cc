@@ -8,7 +8,7 @@
 #include <string.h>
 
 #include "appcontype.h"
-#include <cipster_api.h>            // CheckIoConnectionEvent()
+#include <cipster_api.h>            // NotifyIoConnectionEvent()
 
 /**
  * Class ExclusiveOwner
@@ -437,10 +437,7 @@ void CloseAllConnectionsForInputWithSameType(
         if( instance_type == c->InstanceType() &&
             input_point   == c->ProducingPath().GetInstanceOrConnPt() )
         {
-            CheckIoConnectionEvent(
-                    c->ConsumingPath().GetInstanceOrConnPt(),
-                    c->ProducingPath().GetInstanceOrConnPt(),
-                    kIoConnectionEventClosed );
+            NotifyIoConnectionEvent( c, kIoConnectionEventClosed );
 
             CipConn* to_close = c;
 

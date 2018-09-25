@@ -12,8 +12,6 @@
 #include "sockaddr.h"
 #include "../cip/ciptypes.h"
 
-extern uint64_t g_current_usecs;
-
 
 /**
  * Function NetworkHandlerInitialize
@@ -89,7 +87,9 @@ public:
                     *aAddr, &from_addr_length );
     }
 
-    int h() const   { return m_socket; }
+    const SockAddr& SocketAddress() const   { return m_sockaddr; }
+    int h() const                           { return m_socket; }
+    int RefCount() const                    { return m_ref_count; }
 
 private:
     SockAddr    m_sockaddr; // what this socket is bound to with bind()

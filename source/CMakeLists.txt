@@ -12,7 +12,9 @@ cmake_minimum_required( VERSION 2.8.3 )
 
 project( CIPster )
 
-cmake_policy(SET CMP0056 OLD)
+if( CMAKE_VERSION VERSION_GREATER 3.1 )
+    cmake_policy(SET CMP0056 OLD)
+endif()
 
 set( CIPster_VERSION_MAJOR 1 )
 set( CIPster_VERSION_MINOR 0 )
@@ -50,7 +52,13 @@ else()
     message( STATUS "WARNING - Doxygen not found - doxygen-docs (Source Docs) target not created" )
 endif()
 
-find_package( Iconv )
+if( CMAKE_VERSION VERSION_GREATER 3.1 )
+    find_package( Iconv )
+else()
+    set( CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY "-fvisibility=" )
+    set( CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY_INLINES_HIDDEN "-fvisibility-inlines-hidden" )
+endif()
+
 if( Iconv_FOUND )
     if( NOT Iconv_IS_BUILT_IN )
         include_directories( ${Iconv_INCLUDE_DIR} )

@@ -18,10 +18,13 @@ CipInstance::CipInstance( int aInstanceId ) :
 
 CipInstance::~CipInstance()
 {
-    if( instance_id )   // if not nested in a public class, then I am an instance.
+    if( instance_id )   // not a public class, then I am an instance.
     {
-        CIPSTER_TRACE_INFO( "deleting instance %d of class '%s'\n",
-            instance_id, owning_class->ClassName().c_str() );
+        if( owning_class )      // if I was inserted int a class, then this is non-NULL
+        {
+            CIPSTER_TRACE_INFO( "deleting instance %d of class '%s'\n",
+                instance_id, owning_class->ClassName().c_str() );
+        }
     }
 }
 

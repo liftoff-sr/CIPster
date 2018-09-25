@@ -130,6 +130,11 @@ public:
 
     int AdditionalStsCount() const  { return size_of_additional_status; }
 
+    ConnMgrStatus ExtStatus() const
+    {
+        return ConnMgrStatus( size_of_additional_status ? additional_status[ 0 ] : 0 );
+    }
+
     //-----<Data buffer stuff >------------------------------------------------
 
     /// Return a BufWriter which defines a buffer to be filled with the
@@ -138,9 +143,7 @@ public:
 
     void WriterAdvance( int aCount )
     {
-        BufWriter b( data );
-        b += aCount;        // advance using BufWriter which protects against overruns
-        data = ByteBuf( b.data(), b.capacity() );
+        data = BufWriter( data ) + aCount;
     }
 
     void SetWriter( const BufWriter& w )    { data = w; }

@@ -426,19 +426,19 @@ std::string CipAppPath::Format() const
 
     if( HasClass() )
     {
-        dest += "Class:";
-        StrPrintf( &dest, "%d", GetClass() );
-
-        if( HasInstance() )
+        if( GetClass() == kCipAssemblyClass )
         {
-            dest += " Instance:";
-            StrPrintf( &dest, "%d", GetInstance() );
+            StrPrintf( &dest, "assembly %d", GetInstanceOrConnPt() );
         }
-
-        if( HasConnPt() )
+        else
         {
-            dest += " ConnPt:";
-            StrPrintf( &dest, "%d", GetConnPt() );
+            StrPrintf( &dest, "Class:%d", GetClass() );
+
+            if( HasInstance() )
+                StrPrintf( &dest, " Instance:%d", GetInstance() );
+
+            if( HasConnPt() )
+                StrPrintf( &dest, " ConnPt:%d", GetConnPt() );
         }
     }
     else if( HasSymbol() )

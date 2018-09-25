@@ -16,19 +16,19 @@
 /** @def CIPSTER_TRACE_LEVEL_ERROR Enable tracing of error messages. This is the
  *  default if no trace level is given.
  */
-#define CIPSTER_TRACE_LEVEL_ERROR        (1<<0)
+#define CIPSTER_TRACE_LEVEL_ERROR       (1<<0)
 
 //* @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of warning messages
-#define CIPSTER_TRACE_LEVEL_WARNING      (1<<1)
+#define CIPSTER_TRACE_LEVEL_WARNING     (1<<1)
 
 //* @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of state messages
-#define CIPSTER_TRACE_LEVEL_STATE        (1<<2)
+#define CIPSTER_TRACE_LEVEL_STATE       (1<<2)
 
 //* @def CIPSTER_TRACE_LEVEL_INFO Enable tracing of info messages
-#define CIPSTER_TRACE_LEVEL_INFO         (1<<3)
+#define CIPSTER_TRACE_LEVEL_INFO        (1<<3)
 
 
-extern int g_CIPSTER_TRACE_LEVEL;       // defined in cipcommon.c
+extern int g_CIPSTER_TRACE_LEVEL;       // defined in g_data.cc
 
 
 #ifdef CIPSTER_WITH_TRACES
@@ -41,7 +41,7 @@ extern int g_CIPSTER_TRACE_LEVEL;       // defined in cipcommon.c
 #warning CIPSTER_TRACE_LEVEL was not defined setting it to CIPSTER_TRACE_LEVEL_ERROR
 #endif
 
-#define CIPSTER_TRACE_LEVEL CIPSTER_TRACE_LEVEL_ERROR
+#define CIPSTER_TRACE_LEVEL             CIPSTER_TRACE_LEVEL_ERROR
 #endif
 
 // @def CIPSTER_TRACE_ENABLED Can be used for conditional code compilation
@@ -87,8 +87,9 @@ extern int g_CIPSTER_TRACE_LEVEL;       // defined in cipcommon.c
         LOG_TRACE(__VA_ARGS__);  \
   } while (0)
 
-
 #else       // define the tracing macros empty in order to save space
+
+#pragma message( "CIPSTER_WITH_TRACES was not defined" )
 
 #undef CIPSTER_TRACE_LEVEL
 #define CIPSTER_TRACE_LEVEL 0

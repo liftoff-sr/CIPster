@@ -291,24 +291,24 @@ EipStatus TriggerConnections( int output_assembly_id, int input_assembly_id );
 void HandleApplication();
 
 /** @ingroup CIP_CALLBACK_API
- * @brief Inform the application on changes occurred for a connection
+ * Function NotifyIoConnectionEvent
+ * informs the application of changes to a connection.
  *
- * @param output_assembly_id the output assembly connection point of the
- * connection
- * @param input_assembly_id the input assembly connection point of the
- * connection
- * @param io_connection_event information on the change occurred
+ * @param aConn which connection
+ * @param aEvent what kind of change occurred
  */
-void CheckIoConnectionEvent( int output_assembly_id, int input_assembly_id,
-        IoConnectionEvent io_connection_event );
+void NotifyIoConnectionEvent( CipConn* aConn, IoConnectionEvent aEvent );
 
 /** @ingroup CIP_CALLBACK_API
- * @brief Call back function to inform application on received data for an
+ * Function AfterAssemblyDataReceived
+ * is a callback function to inform application on received data for an
  * assembly object.
  *
  * This function has to be implemented by the user of the CIP-stack.
- * @param instance pointer to the assembly object data was received for
- * @return Information if the data could be processed
+ *
+ * @param aInstance the assembly instance that data was received for
+ *
+ * @return EipStatus - whether data could be processed
  *     - kEipStatusOk the received data was ok
  *     - EIP_ERROR the received data was wrong (especially needed for
  * configuration data assembly objects)
@@ -318,21 +318,23 @@ void CheckIoConnectionEvent( int output_assembly_id, int input_assembly_id,
  * The length of the data is already checked within the stack. Therefore the
  * user only has to check if the data is valid.
  */
-EipStatus AfterAssemblyDataReceived( CipInstance* instance );
+EipStatus AfterAssemblyDataReceived( AssemblyInstance* aInstance );
 
 /** @ingroup CIP_CALLBACK_API
- * @brief Inform the application that the data of an assembly
- * object will be sent.
+ * Function BeforeAssemblyDataSend
+ * informs the application that the data of an assembly object will be sent.
+ * The application's duty is to update the data at @ aBuf with new data.
  *
  * Within this function the user can update the data of the assembly object
  * before it gets sent. The application can inform the stack if data has
- * changed.
+ * changed.  Use AssemblyInstance::Buffer() and SizeBytes().
  * @param aInstance is the assembly instance that should send data.
+ *
  * @return data has changed:
  *          - true assembly data has changed
  *          - false assembly data has not changed
  */
-bool BeforeAssemblyDataSend( CipInstance* aInstance );
+bool BeforeAssemblyDataSend( AssemblyInstance* aInstance );
 
 /** @ingroup CIP_CALLBACK_API
  * @brief Emulate as close a possible a power cycle of the device
@@ -503,7 +505,7 @@ inline bool CloseSession( int aSocket )
  *     established and new sockets are necessary
  *   - Receive implicit connected data on a receiving UDP socket\n
  *     The received data has to be hand over to the Connection Manager Object
- *     with the function EipStatus HandleReceivedConnectedData( UdpSocket* aSocket,
+ *     with the function EipStatus RecvConnectedData( UdpSocket* aSocket,
  *      const SockAddr& aFromAddress, BufReader aCommand );
  *   - Close UDP and TCP sockets:
  *      -# Requested by CIPster through the call back function: void

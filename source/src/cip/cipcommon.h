@@ -74,4 +74,10 @@ extern uint8_t g_message_data_reply_buffer[CIPSTER_MESSAGE_DATA_REPLY_BUFFER];
 /// messages on other than the standard port number.
 extern int g_my_io_udp_port;
 
+extern uint64_t g_current_usecs;
+
+/// Return the least significant 32 bits of uint64_t g_current_usecs
+inline uint32_t CurrentUSecs32()    { return uint32_t( g_current_usecs ); }
+
+
 #endif    // CIPSTER_CIPCOMMON_H_

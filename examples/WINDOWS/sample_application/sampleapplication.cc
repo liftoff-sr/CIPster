@@ -4,7 +4,7 @@
  *
  ******************************************************************************/
 
-#include "cipster_api.h"
+#include <cipster_api.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -81,18 +81,16 @@ void HandleApplication()
 }
 
 
-void CheckIoConnectionEvent( int output_assembly_id, int input_assembly_id,
-        IoConnectionEvent io_connection_event )
+void NotifyIoConnectionEvent( CipConn* aConn, IoConnectionEvent aEvent )
 {
     // maintain a correct output state according to the connection state
-
-    (void) output_assembly_id;  // suppress compiler warning
-    (void) input_assembly_id;   // suppress compiler warning
-    (void) io_connection_event; // suppress compiler warning
+    // maintain a correct output state according to the connection state
+    int consuming_id = aConn->ConsumingPath().GetInstanceOrConnPt();
+    int producing_id = aConn->ProducingPath().GetInstanceOrConnPt();
 }
 
 
-EipStatus AfterAssemblyDataReceived( CipInstance* instance )
+EipStatus AfterAssemblyDataReceived( AssemblyInstance* instance )
 {
     EipStatus status = kEipStatusOk;
 
@@ -125,7 +123,7 @@ EipStatus AfterAssemblyDataReceived( CipInstance* instance )
 }
 
 
-bool BeforeAssemblyDataSend( CipInstance* instance )
+bool BeforeAssemblyDataSend( AssemblyInstance* instance )
 {
     // update data to be sent e.g., read inputs of the device
     /*In this sample app we mirror the data from out to inputs on data receive

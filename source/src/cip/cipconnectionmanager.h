@@ -38,10 +38,12 @@ public:
      * Function FindExsitingMatchingConnection
      * finds an existing matching established connection.
      *
-     * The comparison is done according to the definitions in the CIP specification Section 3-5.5.2:
-     * The following elements have to be equal: Vendor ID, Connection Serial Number, Originator Serial Number
+     * The comparison is done according to the definitions in the CIP
+     * specification Section 3-5.5.2: The following elements have to be equal:
+     * Vendor ID, Connection Serial Number, Originator Serial Number
      *
-     * @param aConn connection instance containing the comparison elements from the forward open request
+     * @param aConn connection instance containing the comparison elements from
+     *   the forward open request
      *
      * @return CipConn*
      *    - NULL if no equal established connection exists
@@ -50,11 +52,12 @@ public:
     static CipConn* FindExistingMatchingConnection( const ConnectionData& params );
 
     /**
-     * Function HandleReceivedConnectedData
+     * Function RecvConnectedData
      * notifies the connection manager that data for a connection has been
      * received.
      *
-     * This function should be invoked by the network layer.
+     * This function is called by the networkhandler.cc code when a consumable
+     * UDP frame has arrived on a socket known to be in use for an i/o connection.
      *
      * @param aSocket is the socket that the connected data arrived on.
      * @param aFromAddress address from which the data has been received. Only
@@ -65,7 +68,7 @@ public:
      * @param aReply where to put the reply and tells its maximum length.
      * @return EipStatus
      */
-    static EipStatus HandleReceivedConnectedData( UdpSocket* aSocket,
+    static EipStatus RecvConnectedData( UdpSocket* aSocket,
         const SockAddr& aFromAddress, BufReader aCommand );
 
     //-----<CipServiceFunctions>------------------------------------------------

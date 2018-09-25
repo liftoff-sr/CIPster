@@ -7,6 +7,7 @@
 #define CIPCONNECTION_H_
 
 #include "../enet_encap/sockaddr.h"
+#include "cipidentity.h"            // serial_number_
 
 /**
  * @file cipconnection.h
@@ -133,6 +134,15 @@ enum ConnTimeoutMultiplier
     kConnTimeoutMultiplier256   = 256,
     kConnTimeoutMultiplier512   = 512,
 };
+
+
+enum IoConnectionEvent
+{
+    kIoConnectionEventOpened,
+    kIoConnectionEventTimedOut,
+    kIoConnectionEventClosed,
+};
+
 
 
 /** @ingroup CIP_API
@@ -269,6 +279,8 @@ public:
 
     NetCnParams& SetConnectionSize( int aSize )
     {
+        //CIPSTER_TRACE_INFO( "%s: aSize:%d\n", __func__, aSize );
+
         if( not_large )
             bits = (bits & ~0x1fff) | aSize;
         else
@@ -467,6 +479,8 @@ public:
     int SerializedCount( int aCtl = 0 ) const;
     //-----</Serializeable>-----------------------------------------------------
 
+    std::string Format() const;
+
    // They arrive in this order when all are present in a forward_open request:
     CipPortSegmentGroup     port_segs;      // has optional electronic key.
 
@@ -494,6 +508,10 @@ public:
         consuming_path = aConsuming;
         producing_path = aProducing;
     }
+
+    void AssignConfigPath( int8_t aConfigNdx )              { config_path = aConfigNdx; }
+    void AssignConsumingPath( int8_t aConsumingNdx )        { consuming_path = aConsumingNdx; }
+    void AssignProducingPath( int8_t aProducingNdx )        { producing_path = aProducingNdx; }
 
 protected:
     static CipAppPath   HasAny_No;       // indices below indicate this when -1
@@ -548,14 +566,14 @@ public:
             CipUdint aConsumingConnectionId = 0,
             CipUdint aProducingConnectionId = 0,
             CipUint aConnectionSerialNumber = 0,
-            CipUint aOriginatorVendorId = 0,
-            CipUdint aOriginatorSerialNumber = 0,
+            CipUint aOriginatorVendorId = CIPSTER_DEVICE_VENDOR_ID,
+            CipUdint aOriginatorSerialNumber = serial_number_,
             ConnTimeoutMultiplier aConnectionTimeoutMultiplier = kConnTimeoutMultiplier4,
             CipUdint aConsumingRPI_usecs = 0,
             CipUdint aProcudingRPI_usecs = 0
             );
 
-    std::string Format() const;
+    std::string Format() const                              { return conn_path.Format(); }
 
     TransportTrigger&   Transport() const                   { return (TransportTrigger&) trigger; }
 
@@ -578,8 +596,9 @@ public:
     /**
      * Function OriginatorTimeout
      * returns how long the originator intends to wait for a forward_open
-     * request before considering the request a failure.  This returned value
-     * will not ever exceed 8355840 msecs because of bit field width limits.
+     * or forward_close request before considering the request a failure.
+     * This returned value will not ever exceed 8355840 msecs because of
+     * bit field width limits.
      */
     unsigned    OriginatorTimeoutMSecs() const
     {
@@ -594,10 +613,20 @@ public:
     ConnectionData& SetProducingRPI( CipUdint aPeriodUSecs)     { producing_RPI_usecs = aPeriodUSecs; return *this; }
 
     CipUdint    ConsumingConnectionId() const                   { return consuming_connection_id; }
-    ConnectionData& SetConsumingConnectionId( CipUdint aCid )   { consuming_connection_id = aCid; return *this; }
+    ConnectionData& SetConsumingConnectionId( CipUdint aCid )
+    {
+        CIPSTER_TRACE_INFO( "%s: 0x%08x\n", __func__, aCid );
+        consuming_connection_id = aCid;
+        return *this;
+    }
 
     CipUdint    ProducingConnectionId() const                   { return producing_connection_id; }
-    ConnectionData& SetProducingConnectionId( CipUdint aCid )   { producing_connection_id = aCid; return *this; }
+    ConnectionData& SetProducingConnectionId( CipUdint aCid )
+    {
+        CIPSTER_TRACE_INFO( "%s: 0x%08x\n", __func__, aCid );
+        producing_connection_id = aCid;
+        return *this;
+    }
 
     NetCnParams&    ConsumingNCP() const                        { return (NetCnParams&) consuming_ncp; }
     NetCnParams&    ProducingNCP() const                        { return (NetCnParams&) producing_ncp; }
@@ -624,6 +653,9 @@ public:
         connection_serial_number = aNumber;
     }
 
+    CipUint OriginatorVendorId() const      { return originator_vendor_id; }
+    CipUdint OriginatorSerialNumber() const { return originator_serial_number; }
+
     bool TriadEquals( const ConnectionData& aOther ) const
     {
         return connection_serial_number == aOther.connection_serial_number
@@ -649,7 +681,7 @@ public:
     }
 
     int DeserializeForwardOpenRequest( BufReader aInput, bool isLargeForwardOpen );
-    int DeserializeForwardOpenResponse( BufReader aInput );
+    int DeserializeForwardOpenResponse( BufReader aInput, CipError aResponseGenStatus );
 
     int DeserializeForwardCloseRequest( BufReader aInput );
     int DeserializeForwardCloseResponse( BufReader aInput );
@@ -688,9 +720,10 @@ public:
         consuming_connection_id = 0;
         producing_connection_id = 0;
         connection_serial_number = 0;
-        originator_vendor_id = 0;
-        originator_serial_number = 0;
+        originator_vendor_id = CIPSTER_DEVICE_VENDOR_ID;
+        originator_serial_number = serial_number_;
         connection_timeout_multiplier_value = 0;
+        remaining_path_size = 0;
 
         consuming_RPI_usecs = 0;
         producing_RPI_usecs = 0;
@@ -713,7 +746,7 @@ public:
 
 protected:
 
-    static CipUint serial_number_allocator;
+    static CipUint      serial_number_allocator;
 
     //-----<ConnectionTriad>----------------------------------------------------
     // The Connection Triad used in the Connection Manager specification includes
@@ -733,6 +766,7 @@ protected:
     uint8_t             priority_timetick;
     uint8_t             timeout_ticks;
     uint8_t             connection_timeout_multiplier_value;
+    uint8_t             remaining_path_size;    // for forward_open error response
 
     CipUdint            consuming_RPI_usecs;
     NetCnParams         consuming_ncp;
@@ -811,7 +845,7 @@ public:
 
     CipConn& SetState( ConnState aNewState )
     {
-        CIPSTER_TRACE_INFO( "%s<%d>(%s)\n", __func__, instance_id, ShowState( aNewState ) );
+        CIPSTER_TRACE_INFO( "   CipConn::%s<%d>(%s)\n", __func__, instance_id, ShowState( aNewState ) );
         state = aNewState;
         return *this;
     }
@@ -840,11 +874,7 @@ public:
         return instance_type & 1;
     }
 
-    uint32_t   ExpectedPacketRateUSecs() const
-    {
-        return expected_packet_rate_usecs;
-    }
-
+    uint32_t ExpectedPacketRateUSecs() const            { return expected_packet_rate_usecs; }
     CipConn& SetExpectedPacketRateUSecs( uint32_t aRateUSecs )
     {
         uint32_t   adjusted = aRateUSecs;
@@ -853,7 +883,7 @@ public:
         // kCIPsterTimerTickInMicroSeconds from the user's header file
         if( adjusted % kCIPsterTimerTickInMicroSeconds )
         {
-            // Vol1 3-4.4.9 Since we are not an exact multiple, round up to
+            // Vol1 3-4.4.9 Since aRateUSecs is not an exact multiple, round up to
             // slower nearest integer multiple of our timer.
             adjusted = ( adjusted / kCIPsterTimerTickInMicroSeconds )
                 * kCIPsterTimerTickInMicroSeconds + kCIPsterTimerTickInMicroSeconds;
@@ -864,45 +894,49 @@ public:
         return *this;
     }
 
-    CipUdint TimeoutUSecs() const
+    CipUdint RxTimeoutUSecs() const
     {
         CipUdint ret = expected_packet_rate_usecs * TimeoutMultiplier();
         //CIPSTER_TRACE_INFO( "%s: %d\n", __func__, ret );
         return ret;
     }
 
-    int32_t TransmissionTriggerTimerUSecs() const
+    int32_t ProductionInhibitTimerUSecs() const
     {
-        return transmission_trigger_timer_usecs;
+        int32_t ret = production_inhibit_timer_usecs - CurrentUSecs32();
+        //CIPSTER_TRACE_INFO( "%s<%d>: %d\n", __func__, instance_id, ret );
+        return ret;
     }
-
-    CipConn& SetTransmissionTriggerTimerUSecs( int32_t aValue )
+    CipConn& SetProductionInhibitTimerUSecs( int32_t aValue )
     {
-        //CIPSTER_TRACE_INFO( "%s( %d ) CID:0x%08x PID:0x%08x\n", __func__, aValue, consuming_connection_id, producing_connection_id );
-        transmission_trigger_timer_usecs = aValue;
+        production_inhibit_timer_usecs = CurrentUSecs32() + aValue;
         return *this;
     }
 
-    CipConn& AddToTransmissionTriggerTimerUSecs( int32_t aUSecs )
+    int32_t TransmissionTriggerTimerUSecs() const
     {
-        return SetTransmissionTriggerTimerUSecs( transmission_trigger_timer_usecs + aUSecs );
+        int32_t ret = transmission_trigger_timer_usecs - CurrentUSecs32();
+        //CIPSTER_TRACE_INFO( "%s<%d>: %d\n", __func__, instance_id, ret );
+        return ret;
+    }
+    CipConn& SetTransmissionTriggerTimerUSecs( int32_t aValue )
+    {
+        //CIPSTER_TRACE_INFO( "%s<%d>( %d ) CID:0x%08x PID:0x%08x\n", __func__, instance_id, aValue, consuming_connection_id, producing_connection_id );
+        transmission_trigger_timer_usecs = CurrentUSecs32() + aValue;
+        return *this;
     }
 
     int32_t InactivityWatchDogTimerUSecs() const
     {
-        return inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
+        int32_t ret = inactivity_watchdog_timer_usecs - CurrentUSecs32();
+        //CIPSTER_TRACE_INFO( "%s<%d>: %d\n", __func__, instance_id, ret );
+        return ret;
     }
-
     CipConn& SetInactivityWatchDogTimerUSecs( int32_t aUSecs )
     {
-        //CIPSTER_TRACE_INFO( "%s( %d )\n", __func__, aUSecs );
-        inactivity_watchdog_timer_usecs = aUSecs;
+        //CIPSTER_TRACE_INFO( "%s<%d>( %d )\n", __func__, instance_id, aUSecs );
+        inactivity_watchdog_timer_usecs = CurrentUSecs32() + aUSecs;
         return *this;
-    }
-
-    CipConn& AddToInactivityWatchDogTimerUSecs( int aUSecs )
-    {
-        return SetInactivityWatchDogTimerUSecs( inactivity_watchdog_timer_usecs + aUSecs );
     }
 
     /// Some connections never timeout, some do.  Vol1 3-4.5.3
@@ -931,7 +965,6 @@ public:
 
     UdpSocket* ConsumingUdp() const  { return consuming_socket; }
     UdpSocket* ProducingUdp() const  { return producing_socket; }
-
 
     void SetConsumingUdp( UdpSocket* aSocket )
     {
@@ -997,10 +1030,6 @@ public:
         conn_path.port_segs.SetPIT_USecs( aUSECS );
     }
 
-    /// Timer for the production inhibition of application triggered or
-    /// change-of-state I/O connections.
-    int32_t production_inhibit_timer_usecs;
-
     /// Destination IP address for the optional producing CIP connection held
     /// by this CipConnection instance.
     SockAddr send_address;
@@ -1012,11 +1041,6 @@ public:
     /// Address of the node that did the forward_open and established
     /// this connection, needed for forward_close.
     SockAddr openers_address;
-
-    // Hooks for special events that a user or debugging task can install.
-    // Otherwise they are not used.
-    ConnectionCloseFunction         hook_close;
-    ConnectionTimeoutFunction       hook_timeout;
 
     // constructor assigns in ascending sequence.  This is not a Cip ID (yet).
     // Used for debugging messages.
@@ -1075,6 +1099,10 @@ protected:
 
     int32_t     inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
     int32_t     transmission_trigger_timer_usecs;   // signed 32 bits, in usecs
+
+    // Timer for the production inhibition of application triggered or
+    // change-of-state I/O connections.
+    int32_t     production_inhibit_timer_usecs;
 
     UdpSocket*  consuming_socket;
     UdpSocket*  producing_socket;

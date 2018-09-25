@@ -146,6 +146,35 @@ int ConnectionPath::SerializedCount( int aCtl ) const
 }
 
 
+std::string ConnectionPath::Format() const
+{
+    std::string dest;
+
+    if( ConfigPath().HasAny() )
+    {
+        dest += "(config ";
+        dest += ConfigPath().Format();
+        dest += ')';
+    }
+
+    if( ConsumingPath().HasAny() )
+    {
+        dest += "(consuming ";
+        dest += ConsumingPath().Format();
+        dest += ')';
+    }
+
+    if( ProducingPath().HasAny() )
+    {
+        dest += "(producing ";
+        dest += ProducingPath().Format();
+        dest += ')';
+    }
+
+    return dest;
+}
+
+
 // Something to point to when one of the app_paths is empty.
 CipAppPath ConnectionPath::HasAny_No;
 
@@ -409,17 +438,20 @@ int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
         .put16( originator_vendor_id )
         .put32( originator_serial_number );
 
-        uint8_t* cpathz_loc = out.data();   // note Connection_Path_Size location
+        if( !(CTL_OMIT_CONN_PATH & aCtl) )
+        {
+            uint8_t* cpathz_loc = out.data();   // note Connection_Path_Size location
 
-        out += 1;   // skip over Connection_Path_Size location &
+            out += 1;   // skip over Connection_Path_Size location &
 
-        out.put8( 0 );      // Reserved
+            out.put8( 0 );      // Reserved
 
-        int byte_count = conn_path.Serialize( out, aCtl );
+            int byte_count = conn_path.Serialize( out, aCtl );
 
-        out += byte_count;
+            out += byte_count;
 
-        *cpathz_loc = byte_count / 2;       // words, not bytes
+            *cpathz_loc = byte_count / 2;       // words, not bytes
+        }
     }
 
     return out.data() - aOutput.data();
@@ -444,41 +476,6 @@ int ConnectionData::SerializedCount( int aCtl ) const
     }
 
     return count;
-}
-
-
-int ConnectionData::DeserializeForwardOpenResponse( BufReader aInput )
-{
-    // Vol1 Table 3-5.19
-
-    BufReader in = aInput;
-
-    /*
-        When executing this function, the host is acting as an "originator".
-        Originator has a reverse interpretation of "Consuming" and "Producing"
-        than does a target with respect to O->T nomenclature.
-
-            O->T => Consuming, and T->O => Producing.   Target's perspective
-            O->T => Producing, and T->O => Consuming.   Originator's perspective
-
-        So swap the order of these values accordingly as we retrieve
-        them so that the ConnectionData accessors are always correct, regardless
-        of the machine that they are executing on. Producing always means
-        producing and Consuming always means consuming on the host using the
-        accessors.
-    */
-
-    SetProducingConnectionId( in.get32() );         // O->T
-    SetConsumingConnectionId( in.get32() );         // T->O
-
-    connection_serial_number = in.get16();
-    originator_vendor_id     = in.get16();
-    originator_serial_number = in.get32();
-
-    SetProducingRPI( in.get32() );                  // O->T
-    SetConsumingRPI( in.get32() );                  // T->O
-
-    return in.data() - aInput.data();
 }
 
 
@@ -580,7 +577,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
                 break;
 
             case 2:
-                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T-O(null)" );
+                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T->O(null)" );
                 if( !instance2 )
                 {
                     *aExtError = kConnMgrStatusInvalidConsumingApllicationPath;
@@ -631,7 +628,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
                 break;
 
             case 2:
-                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(null) T-O(non-null)" );
+                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(null) T->O(non-null)" );
                 if( !instance2 )
                 {
                     *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
@@ -686,7 +683,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
                 break;
 
             case 2:
-                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T-O(non-null)" );
+                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T->O(non-null)" );
                 if( !instance2 )
                 {
                     *aExtError = kConnMgrStatusInvalidConsumingApllicationPath;
@@ -704,14 +701,14 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
                 break;
 
             case 3:
-                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T-O(non-null)" );
+                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T->O(non-null)" );
                 if( !instance2 )
                 {
                     *aExtError = kConnMgrStatusInvalidConsumingApllicationPath;
                     goto L_exit_error;
                 }
 
-                instance3 = check_path( conn_path.app_path3, NULL, "app_path3 O->T(non-null) T-O(non-null)" );
+                instance3 = check_path( conn_path.app_path3, NULL, "app_path3 O->T(non-null) T->O(non-null)" );
                 if( !instance3 )
                 {
                     *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
@@ -743,7 +740,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
 
             case 2:
                 // app_path1 is for consumption, app_path2 is for production
-                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T-O(non-null)" );
+                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T->O(non-null)" );
                 if( !instance2 )
                 {
                     *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
@@ -759,14 +756,14 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
 
             case 3:
                 // first path is ignored, app_path2 is for consumption, app_path3 is for production
-                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T-O(non-null)" );
+                instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T->O(non-null)" );
                 if( !instance2 )
                 {
                     *aExtError = kConnMgrStatusInvalidConsumingApllicationPath;
                     goto L_exit_error;
                 }
 
-                instance3 = check_path( conn_path.app_path3, NULL, "app_path3 O->T(non-null) T-O(non-null)" );
+                instance3 = check_path( conn_path.app_path3, NULL, "app_path3 O->T(non-null) T->O(non-null)" );
                 if( !instance3 )
                 {
                     *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
@@ -990,40 +987,6 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
 }
 
 
-std::string ConnectionData::Format() const
-{
-    std::string dest;
-
-    if( ConfigPath().HasAny() )
-    {
-        dest += "config_path=\"";
-        dest += ConfigPath().Format();
-        dest += '"';
-    }
-
-    if( ConsumingPath().HasAny() )
-    {
-        if( dest.size() )
-            dest += ' ';
-
-        dest += "consuming_path=\"";
-        dest += ConsumingPath().Format();
-        dest += '"';
-    }
-
-    if( ProducingPath().HasAny() )
-    {
-        if( dest.size() )
-            dest += ' ';
-
-        dest += "producing_path=\"";
-        dest += ProducingPath().Format();
-        dest += '"';
-    }
-
-    return dest;
-}
-
 //-----<CipConn>----------------------------------------------------------------
 
 int CipConn::constructed_count;         // CipConn::instance_id is only for debugging
@@ -1057,17 +1020,13 @@ void CipConn::Clear( bool doConnectionDataToo )
     sequence_count_producing = 0;
     sequence_count_consuming = 0;
 
-    transmission_trigger_timer_usecs = 0;
-    inactivity_watchdog_timer_usecs = 0;
-
-    production_inhibit_timer_usecs = 0;
+    SetTransmissionTriggerTimerUSecs( 0 );
+    SetInactivityWatchDogTimerUSecs( 0 );
+    SetProductionInhibitTimerUSecs( 0 );
 
     memset( &send_address,    0, sizeof send_address );
     memset( &recv_address,    0, sizeof recv_address );
     memset( &openers_address, 0, sizeof openers_address );
-
-    hook_close = NULL;
-    hook_timeout = NULL;
 
     SetConsumingUdp( NULL );
     SetProducingUdp( NULL );
@@ -1120,7 +1079,7 @@ ConnMgrStatus CipConn::handleConfigData()
 {
     ConnMgrStatus result = kConnMgrStatusSuccess;
 
-    CipInstance* instance = config_instance;
+    AssemblyInstance* instance = static_cast<AssemblyInstance*>( config_instance );
 
     Words& words = conn_path.data_seg.words;
 
@@ -1130,11 +1089,10 @@ ConnMgrStatus CipConn::handleConfigData()
         // we have to have the same data as already present in the config point,
         // else it's an error.  And if same, no reason to write it.
 
-        CipAttribute* attr = instance->Attribute(3);
-        ByteBuf* p = (ByteBuf*) instance->Data( attr );
+        ByteBuf bytes = instance->Buffer();
 
-        if( p->size() != words.size() * 2  ||
-            memcmp( p->data(), words.data(), p->size() ) != 0 )
+        if( bytes.size() != words.size() * 2  ||
+            memcmp( bytes.data(), words.data(), bytes.size() ) != 0 )
         {
             CIPSTER_TRACE_INFO( "%s: config data mismatch\n", __func__ );
             result = kConnMgrStatusErrorOwnershipConflict;
@@ -1214,28 +1172,24 @@ void CipConn::GeneralConfiguration( ConnectionData* aConnData, ConnInstanceType 
 
     if( !trigger.IsServer() )  // Client Type Connection requested
     {
-        SetExpectedPacketRateUSecs( producing_RPI_usecs );
-
         // As soon as we are ready we should produce on the connection.
         // With the 0 here we will produce with the next timer tick
         // which should be sufficiently soon.
         SetTransmissionTriggerTimerUSecs( 0 );
     }
-    else
-    {
-        // Server Type Connection requested
-        SetExpectedPacketRateUSecs( consuming_RPI_usecs );
-    }
 
-    production_inhibit_timer_usecs = 0;
+    // Server Type Connection requested
+    SetExpectedPacketRateUSecs( consuming_RPI_usecs );
+
+    SetProductionInhibitTimerUSecs( 0 );
 
     SetPIT_USecs( 0 );
 
     // Vol1 3-4.5.2, says to set *initial* value to greater of 10 seconds or
     // "expected_packet_rate x connection_timeout_multiplier".  Initial value
     // is called a "pre-consumption" timeout value.
-    if( TimeoutUSecs() )
-        SetInactivityWatchDogTimerUSecs( std::max( TimeoutUSecs(), 10000000u ) );
+    if( RxTimeoutUSecs() )
+        SetInactivityWatchDogTimerUSecs( std::max( RxTimeoutUSecs(), 10000000u ) );
     else
     {
         // this is not an erro
@@ -1259,16 +1213,9 @@ void CipConn::Close()
 
     CIPSTER_TRACE_INFO( "%s<%d>\n", __func__, instance_id );
 
-    if( hook_close )
-        hook_close( this );
-
     if( IsIOConnection() )
     {
-        CheckIoConnectionEvent(
-                ConsumingPath().GetInstanceOrConnPt(),
-                ProducingPath().GetInstanceOrConnPt(),
-                kIoConnectionEventClosed
-                );
+        NotifyIoConnectionEvent( this, kIoConnectionEventClosed );
 
         if( InstanceType() == kConnInstanceTypeIoExclusiveOwner
          || InstanceType() == kConnInstanceTypeIoInputOnly )
@@ -1329,7 +1276,7 @@ void CipConn::Close()
 CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError )
 {
     // If config data is present in forward_open request
-    if( conn_path.data_seg.HasAny() )
+    if( conn_path.ConfigPath().HasAny() && conn_path.data_seg.HasAny() )
     {
         *aExtError = handleConfigData();
 
@@ -1355,11 +1302,7 @@ CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError )
     g_active_conns.Insert( this );
     SetState( kConnStateEstablished );
 
-    CheckIoConnectionEvent(
-        ConsumingPath().GetInstanceOrConnPt(),
-        ProducingPath().GetInstanceOrConnPt(),
-        kIoConnectionEventOpened
-        );
+    NotifyIoConnectionEvent( this, kIoConnectionEventOpened );
 
     return result;
 }
@@ -1372,6 +1315,8 @@ EipStatus CipConn::SendConnectedData()
         order to pre-setup the whole message on connection opening and just
         change the variable data items e.g., sequence number
     */
+
+    AssemblyInstance* assembly = static_cast<AssemblyInstance*>( producing_instance );
 
     EipStatus result;
 
@@ -1405,12 +1350,12 @@ EipStatus CipConn::SendConnectedData()
 
     // Notify the application that Assembly data pertinent to provided instance
     // will be sent immediately after the call.  If application returns true,
-    // this means the Assembly data has changed or should be reported as been
+    // this means the Assembly data has changed or should be reported as
     // having updated depending on transportation class.
-    if( BeforeAssemblyDataSend( producing_instance ) )
+    if( BeforeAssemblyDataSend( assembly ) )
     {
         // Notify consumer that the data has changed or has been updated as
-        // the case may according to this connection's transportation class.
+        // the case may be according to this connection's transportation class.
         // Implementor of BeforeAssemblyDataSend() must know which of the
         // 2 strategies to employ based on connection class.
         ++sequence_count_producing;
@@ -1418,11 +1363,7 @@ EipStatus CipConn::SendConnectedData()
 
     //----<DataInfoItem>--------------------------------------------------------
 
-    CipAttribute* attr3 = producing_instance->Attribute( 3 );
-    CIPSTER_ASSERT( attr3 );
-
-    ByteBuf* attr3_byte_array = (ByteBuf*) producing_instance->Data( attr3 );
-    CIPSTER_ASSERT( attr3_byte_array );
+    ByteBuf attr3 = assembly->Buffer();
 
     int length = cpfd.Serialize( out );
 
@@ -1430,7 +1371,7 @@ EipStatus CipConn::SendConnectedData()
     // prepare to re-write that 16 bit field below, ergo -2
     out += (length - 2);
 
-    int data_len = attr3_byte_array->size();
+    int data_len = attr3.size();
 
     if( producing_fmt == kRealTimeFmt32BitHeader && data_len )
     {
@@ -1454,9 +1395,20 @@ EipStatus CipConn::SendConnectedData()
         out.put32( g_run_idle_state );
     }
 
-    out.append( attr3_byte_array->data(), attr3_byte_array->size() );
+    out.append( attr3 );
 
     length += data_len;
+
+    CIPSTER_TRACE_INFO(
+        "%s[%d]@%u:  PID:0x%08x  len:%d  dst:%s:%d\n",
+        __func__,
+        ProducingUdp()->h(),
+        (uint32_t)g_current_usecs,
+        producing_connection_id,
+        length,
+        send_address.AddrStr().c_str(),
+        send_address.Port()
+        );
 
     // send out onto UDP wire
     result = ProducingUdp()->Send( send_address,
@@ -1505,7 +1457,8 @@ EipStatus CipConn::HandleReceivedIoConnectionData( BufReader aInput )
             // It is kRealTimeFmtModeless
         }
 
-        if( NotifyAssemblyConnectedDataReceived( consuming_instance, aInput ) != 0 )
+        if( NotifyAssemblyConnectedDataReceived(
+                static_cast<AssemblyInstance*>( consuming_instance ), aInput ) != 0 )
         {
             return kEipStatusError;
         }
@@ -1523,16 +1476,9 @@ EipStatus CipConn::HandleReceivedIoConnectionData( BufReader aInput )
 
 void CipConn::timeOut()
 {
-    if( hook_timeout )
-        hook_timeout( this );
-
     if( IsIOConnection() )
     {
-        CheckIoConnectionEvent(
-            ConsumingPath().GetInstanceOrConnPt(),
-            ProducingPath().GetInstanceOrConnPt(),
-            kIoConnectionEventTimedOut
-            );
+        NotifyIoConnectionEvent( this, kIoConnectionEventTimedOut );
 
         if( producing_ncp.ConnectionType() == kIOConnTypeMulticast )
         {
@@ -1952,13 +1898,16 @@ CipError CipConnectionClass::OpenIO( ConnectionData* aConnData,
 
     if( !c )
     {
-        CIPSTER_TRACE_ERR(
-            "%s: no reserved IO connection was found for:\n"
-            " %s.\n"
-            " All anticipated IO connections must be reserved with Configure<*>ConnectionPoint()\n",
-            __func__,
-            aConnData->Format().c_str()
-            );
+        if( *aExtError == kConnMgrStatusInconsistentApplicationPathCombo )
+        {
+            CIPSTER_TRACE_ERR(
+                "%s: no reserved IO connection was found for:\n"
+                " %s.\n"
+                " All anticipated IO connections must be reserved with Configure<*>ConnectionPoint()\n",
+                __func__,
+                aConnData->Format().c_str()
+                );
+        }
 
         return kCipErrorConnectionFailure;
     }

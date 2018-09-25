@@ -20,10 +20,14 @@
  */
 class AssemblyInstance : public CipInstance
 {
+    friend class CipAssemblyClass;
 public:
     AssemblyInstance( int aInstanceId, ByteBuf aBuf );
 
-//protected:
+    unsigned SizeBytes() const      { return byte_array.size(); }
+    const ByteBuf& Buffer() const   { return byte_array; }
+
+protected:
     ByteBuf     byte_array;
 };
 
@@ -43,7 +47,7 @@ public:
  *     - kEipStatusOk the received data was okay
  *     - EIP_ERROR the received data was wrong
  */
-EipStatus NotifyAssemblyConnectedDataReceived( CipInstance* aInstance, BufReader aInput );
+EipStatus NotifyAssemblyConnectedDataReceived( AssemblyInstance* aInstance, BufReader aInput );
 
 
 
@@ -65,6 +69,14 @@ public:
      *  created, otherwise kEipStatusError
      */
     static EipStatus Init();
+
+protected:
+
+    static EipStatus get_assembly_data_attr( CipInstance* aInstance, CipAttribute* attr,
+        CipMessageRouterRequest* request, CipMessageRouterResponse* response );
+
+    static EipStatus set_assembly_data_attr( CipInstance* aInstance, CipAttribute* attr,
+        CipMessageRouterRequest* request, CipMessageRouterResponse* response );
 };
 
 #endif // CIPSTER_CIPASSEMBLY_H_

@@ -459,7 +459,7 @@ void CheckAndHandleUdpGlobalBroadcastSocket()
 /**
  * Function checkAndHandleUdpSockets
  * checks all open UDP sockets for inbound data, and passes any packets
- * up to HandleReceivedConnectedData() for filtering.
+ * up to RecvConnectedData() for filtering.
  */
 static void checkAndHandleUdpSockets()
 {
@@ -484,22 +484,20 @@ static void checkAndHandleUdpSockets()
 
         if( checkSocketSet( s->h() ) )
         {
-            CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, s->h() );
+            //CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, s->h() );
 
             // Since it is non-blocking, call Recv() until
             // byte_count is <= 0.  Keep socket open for every case.
 
-#if 0
-            // Drain the UDP socket completely.
-            for(;;)
-#else
             // Drain each UDP socket up to some limit you can choose.
             // This strategy contemplates that somebody might be bombing us,
             // maybe even maliciously.  Anything we don't fetch out now
             // will likely still be there on the next call to
             // NetworkHandlerProcessOnce().
-            for( int attempt = 0;  attempt < 80;  ++attempt )
-#endif
+            int limit = 64 * s->RefCount();
+
+            int attempt;
+            for( attempt = 0;  attempt < limit;  ++attempt )
             {
                 int byte_count = s->Recv( &from_addr, BufWriter( s_buf, S_BUFZ ) );
 
@@ -514,8 +512,14 @@ static void checkAndHandleUdpSockets()
                     break;
                 }
 
-                CipConnMgrClass::HandleReceivedConnectedData(
+                CipConnMgrClass::RecvConnectedData(
                     s, from_addr, BufReader( s_buf, byte_count ) );
+            }
+
+            if( attempt == limit )
+            {
+                CIPSTER_TRACE_ERR( "%s[%d]: too much inbound UDP traffic\n",
+                    __func__, s->h() );
             }
         }
     }
@@ -543,7 +547,7 @@ EipStatus HandleDataOnTcpSocket( int aSocket )
 
     if( replyz > 0 )
     {
-#if defined(DEBUG)
+#if defined(DEBUG) && 0
         byte_dump( "sTCP", s_buf, replyz );
 #endif
         int sent_count = send( aSocket, (char*) s_buf, replyz, 0 );
@@ -619,7 +623,7 @@ EipStatus NetworkHandlerInitialize()
 
     // Activates address reuse
     if( setsockopt( s_sockets.tcp_listener, SOL_SOCKET, SO_REUSEADDR,
-                (char*) &one, sizeof(one) ) == -1 )
+                (char*) &one, sizeof(one) ) )
     {
         CIPSTER_TRACE_ERR(
                 "error setting socket option SO_REUSEADDR on tcp_listener\n" );
@@ -630,7 +634,7 @@ EipStatus NetworkHandlerInitialize()
         SockAddr address( kEIP_Reserved_Port, ntohl( c.ip_address ) );
 
         // bind the new socket to port 0xAF12 (CIP)
-        if( bind( s_sockets.tcp_listener, address, SADDRZ ) == -1 )
+        if( bind( s_sockets.tcp_listener, address, SADDRZ ) )
         {
             CIPSTER_TRACE_ERR( "%s: bind(%s) error for tcp_listener: %s\n",
                 __func__, address.AddrStr().c_str(), strerrno().c_str() );
@@ -650,7 +654,7 @@ EipStatus NetworkHandlerInitialize()
 
     // Activates address reuse
     if( setsockopt( s_sockets.udp_global_broadcast_listener, SOL_SOCKET, SO_REUSEADDR,
-            (char*) &one, sizeof(one) ) == -1 )
+            (char*) &one, sizeof(one) ) )
     {
         CIPSTER_TRACE_ERR(
                 "error setting socket option SO_REUSEADDR on udp_broadcast_listener\n" );
@@ -659,7 +663,7 @@ EipStatus NetworkHandlerInitialize()
 
     // enable the UDP socket to receive broadcast messages
     if( setsockopt( s_sockets.udp_global_broadcast_listener,
-            SOL_SOCKET, SO_BROADCAST, (char*) &one, sizeof(one) ) == -1 )
+            SOL_SOCKET, SO_BROADCAST, (char*) &one, sizeof(one) ) )
     {
         CIPSTER_TRACE_ERR(
                 "error with setting broadcast receive for UDP socket: %s\n",
@@ -670,7 +674,7 @@ EipStatus NetworkHandlerInitialize()
     {
         SockAddr address( kEIP_Reserved_Port, INADDR_BROADCAST );
 
-        if( ( bind( s_sockets.udp_global_broadcast_listener, address, SADDRZ ) ) == -1 )
+        if( bind( s_sockets.udp_global_broadcast_listener, address, SADDRZ ) )
         {
             CIPSTER_TRACE_ERR(
                     "error with global broadcast UDP bind: %s\n",
@@ -692,7 +696,7 @@ EipStatus NetworkHandlerInitialize()
 
     // Activates address reuse
     if( setsockopt( s_sockets.udp_local_broadcast_listener,
-            SOL_SOCKET, SO_REUSEADDR, (char*) &one, sizeof(one) ) == -1 )
+            SOL_SOCKET, SO_REUSEADDR, (char*) &one, sizeof(one) ) )
     {
         CIPSTER_TRACE_ERR(
                 "error setting socket option SO_REUSEADDR on udp_broadcast_listener\n" );
@@ -703,7 +707,7 @@ EipStatus NetworkHandlerInitialize()
         SockAddr address(   kEIP_Reserved_Port,
                             ntohl( c.ip_address | ~c.network_mask ) );
 
-        if( bind( s_sockets.udp_local_broadcast_listener, address, SADDRZ ) == -1 )
+        if( bind( s_sockets.udp_local_broadcast_listener, address, SADDRZ ) )
         {
             CIPSTER_TRACE_ERR(
                     "error with udp_local_broadcast_listener bind: %s\n",
@@ -724,7 +728,7 @@ EipStatus NetworkHandlerInitialize()
 
     // Activates address reuse
     if( setsockopt( s_sockets.udp_unicast_listener, SOL_SOCKET, SO_REUSEADDR,
-            (char*) &one, sizeof(one) ) == -1 )
+            (char*) &one, sizeof(one) ) )
     {
         CIPSTER_TRACE_ERR(
                 "error setting socket option SO_REUSEADDR on udp_unicast_listener\n" );
@@ -734,7 +738,7 @@ EipStatus NetworkHandlerInitialize()
     {
         SockAddr address( kEIP_Reserved_Port, ntohl( c.ip_address ) );
 
-        if( bind( s_sockets.udp_unicast_listener, address, SADDRZ ) == -1 )
+        if( bind( s_sockets.udp_unicast_listener, address, SADDRZ ) )
         {
             CIPSTER_TRACE_ERR(
                 "error with udp_unicast_listener bind: %s\n",
@@ -746,7 +750,7 @@ EipStatus NetworkHandlerInitialize()
     //-----</udp_unicast_listener>---------------------------------------------
 
     // switch socket in listen mode
-    if( listen( s_sockets.tcp_listener, MAX_NO_OF_TCP_SOCKETS ) == -1 )
+    if( listen( s_sockets.tcp_listener, MAX_NO_OF_TCP_SOCKETS ) )
     {
         CIPSTER_TRACE_ERR( "%s: error with listen: %s\n",
                 __func__, strerrno().c_str() );
@@ -788,7 +792,13 @@ EipStatus NetworkHandlerProcessOnce()
 {
     read_set = master_set;
 
-    static timeval tv;
+    timeval tv;
+
+    // On  Linux,  select()  modifies timeout to reflect the amount of time
+    // not slept; most other implementations do not do this.
+    // Consider timeout to be undefined after select() returns.
+    tv.tv_sec  = 0;
+    tv.tv_usec = 0;
 
     int ready_count = select( highest_socket_handle + 1, &read_set, 0, 0, &tv );
 
@@ -894,6 +904,7 @@ EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput
     int sent_count = sendto( aSocket, (char*) aOutput.data(), aOutput.size(), 0,
                         aSockAddr, SADDRZ );
 
+#if 0
     CIPSTER_TRACE_INFO( "%s[%d]: %d bytes to:%s:%d\n",
         __func__,
         aSocket,
@@ -901,6 +912,7 @@ EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput
         aSockAddr.AddrStr().c_str(),
         aSockAddr.Port()
         );
+#endif
 
     if( sent_count < 0 )
     {
@@ -930,6 +942,9 @@ UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* 
 
     if( iface )
     {
+        CIPSTER_TRACE_INFO( "%s: found %s:%d\n",
+            __func__, aSockAddr.AddrStr().c_str(), aSockAddr.Port() );
+
         ++iface->m_ref_count;
     }
     else
@@ -944,6 +959,9 @@ UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* 
 
         iface = alloc( aSockAddr, sock );
         m_sockets.push_back( iface );
+
+        CIPSTER_TRACE_INFO( "%s: alloc %s:%d\n",
+            __func__, aSockAddr.AddrStr().c_str(), aSockAddr.Port() );
     }
 
     if( aMulticast )
@@ -1009,6 +1027,12 @@ bool UdpSocketMgr::ReleaseSocket( UdpSocket* aUdpSocket )
     sock_iter   it;
     UdpSocket*  group = NULL;
     UdpSocket*  iface = NULL;
+
+    CIPSTER_TRACE_INFO( "%s: %s:%d\n",
+            __func__,
+            aUdpSocket->m_sockaddr.AddrStr().c_str(),
+            aUdpSocket->m_sockaddr.Port()
+            );
 
     if( aUdpSocket->m_sockaddr.IsMulticast() )
     {

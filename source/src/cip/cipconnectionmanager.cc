@@ -45,20 +45,14 @@ CipConn* CipConnMgrClass::FindExistingMatchingConnection( const ConnectionData& 
 }
 
 
-EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
+EipStatus CipConnMgrClass::RecvConnectedData( UdpSocket* aSocket,
         const SockAddr& aFromAddress, BufReader aCommand )
 {
-    CIPSTER_TRACE_INFO( "%s[%d]: %zd bytes from %s:%d\n",
-        __func__, aSocket->h(),
-        aCommand.size(),
-        aFromAddress.AddrStr().c_str(),
-        aFromAddress.Port()
-        );
-
     Cpf cpfd( aFromAddress, 0 );
 
     if( cpfd.DeserializeCpf( aCommand ) <= 0 )
     {
+        CIPSTER_TRACE_ERR( "%s[%d]: unable to DeserializeCpf()\n", __func__, aSocket->h() );
         return kEipStatusError;
     }
 
@@ -72,6 +66,15 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
 
         if( cpfd.DataType() == kCpfIdConnectedDataItem ) // connected data item received
         {
+            CIPSTER_TRACE_INFO( "%s[%d]@%u:  CID:0x%08x  len:%zd  src:%s:%d  seq:%d\n",
+                __func__, aSocket->h(), CurrentUSecs32(),
+                cpfd.AddrConnId(),
+                aCommand.size(),
+                aFromAddress.AddrStr().c_str(),
+                aFromAddress.Port(),
+                cpfd.AddrEncapSeqNum()
+                );
+
             CipConn* conn = GetConnectionByConsumingId( cpfd.AddrConnId() );
 
             if( !conn )
@@ -112,6 +115,7 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
                 return kEipStatusError;
             }
 
+            /*
             CIPSTER_TRACE_INFO( "%s[%d]: CID:0x%08x  cpf.seq=0x%08x  encap.seq=0x%08x\n",
                 __func__,
                 aSocket->h(),
@@ -119,6 +123,7 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
                 cpfd.AddrEncapSeqNum(),
                 conn->eip_level_sequence_count_consuming
                 );
+            */
 
             // if this is the first received frame
             if( conn->eip_level_sequence_count_consuming_first )
@@ -135,7 +140,7 @@ EipStatus CipConnMgrClass::HandleReceivedConnectedData( UdpSocket* aSocket,
                           conn->eip_level_sequence_count_consuming ) )
             {
                 // reset the watchdog timer
-                conn->SetInactivityWatchDogTimerUSecs( conn->TimeoutUSecs() );
+                conn->SetInactivityWatchDogTimerUSecs( conn->RxTimeoutUSecs() );
 
                 conn->eip_level_sequence_count_consuming = cpfd.AddrEncapSeqNum();
 
@@ -178,8 +183,6 @@ EipStatus CipConnMgrClass::ManageConnections()
             // maybe check inactivity watchdog timer.
             if( active->HasInactivityWatchDogTimer() )
             {
-                active->AddToInactivityWatchDogTimerUSecs( -kCIPsterTimerTickInMicroSeconds );
-
                 if( active->InactivityWatchDogTimerUSecs() <= 0 )
                 {
                     // we have a timed out connection while performing watchdog check
@@ -187,10 +190,11 @@ EipStatus CipConnMgrClass::ManageConnections()
                     if( active->trigger.Class() == kConnTransportClass3 )
                     {
                         CIPSTER_TRACE_INFO(
-                            "%s<%d>: >>> c-class:%d timeOut on session id:%d\n",
+                            "%s<%d>: >>> c-class:%d timeOut@%u on session id:%d\n",
                             __func__,
                             active->instance_id,
                             active->trigger.Class(),
+                            CurrentUSecs32(),
                             active->SessionHandle()
                             );
                     }
@@ -199,10 +203,11 @@ EipStatus CipConnMgrClass::ManageConnections()
                         // If this shows -1 as socket values, its because the other end
                         // closed the transport and we closed it in response already.
                         CIPSTER_TRACE_INFO(
-                            "%s<%d>: >>> c-class:%d timeOut\n",
+                            "%s<%d>: >>> c-class:%d timeOut@%u\n",
                             __func__,
                             active->instance_id,
-                            active->trigger.Class()
+                            active->trigger.Class(),
+                            CurrentUSecs32()
                             );
                     }
 
@@ -221,18 +226,7 @@ EipStatus CipConnMgrClass::ManageConnections()
                     // only produce for the master connection
                     && active->ProducingUdp() )
                 {
-                    if( active->trigger.Trigger() != kConnTriggerTypeCyclic )
-                    {
-                        // non cyclic connections have to decrement production inhibit timer
-                        if( active->production_inhibit_timer_usecs >= 0 )
-                        {
-                            active->production_inhibit_timer_usecs -= kCIPsterTimerTickInMicroSeconds;
-                        }
-                    }
-
-                    active->AddToTransmissionTriggerTimerUSecs( -kCIPsterTimerTickInMicroSeconds );
-
-                    if( active->TransmissionTriggerTimerUSecs() <= 0 ) // need to send package
+                    if( active->TransmissionTriggerTimerUSecs() <= 0 ) // need to send packet
                     {
                         eip_status = active->SendConnectedData();
 
@@ -242,12 +236,12 @@ EipStatus CipConnMgrClass::ManageConnections()
                                 __func__, active->instance_id );
                         }
 
-                        active->SetTransmissionTriggerTimerUSecs( active->ExpectedPacketRateUSecs() );
+                        active->SetTransmissionTriggerTimerUSecs( active->ProducingRPI() );
 
                         if( active->trigger.Trigger() != kConnTriggerTypeCyclic )
                         {
                             // non cyclic connections have to reload the production inhibit timer
-                            active->production_inhibit_timer_usecs = active->GetPIT_USecs();
+                            active->SetProductionInhibitTimerUSecs( active->GetPIT_USecs() );
                         }
                     }
                 }
@@ -451,7 +445,7 @@ EipStatus TriggerConnections( int aOutputAssembly, int aInputAssembly )
             if( c->Transport().Trigger() == kConnTriggerTypeApplication )
             {
                 // produce at the next allowed occurrence
-                c->SetTransmissionTriggerTimerUSecs( c->production_inhibit_timer_usecs );
+                c->SetTransmissionTriggerTimerUSecs( c->ProductionInhibitTimerUSecs() );
                 ret = kEipStatusOk;
             }
 
@@ -472,6 +466,9 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     // general and extended status.
     CipError        gen_status  = kCipErrorConnectionFailure;
     ConnMgrStatus   ext_status  = kConnMgrStatusSuccess;
+
+    uint32_t        consuming_API_usecs;
+    uint32_t        producing_API_usecs;
 
     unsigned        conn_path_byte_count;
     ConnectionData  params;
@@ -512,7 +509,8 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     }
 
     CIPSTER_TRACE_INFO(
-        "ForwardOpen: ConnSerNo:%x VendorId:%x OriginatorSerNum:%x CID:0x%08x PID:0x%08x\n",
+        "%s: ConnSerNo:%x VendorId:%x OriginatorSerNum:%x CID:0x%08x PID:0x%08x\n",
+        __func__,
         params.connection_serial_number,
         params.originator_vendor_id,
         params.originator_serial_number,
@@ -544,6 +542,66 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
 
         ext_status = kConnMgrStatusErrorTransportTriggerNotSupported;
         goto forward_open_response;
+    }
+
+    // Vol1 3-5.4.1.2  Requested and Actual Packet Intervals
+    // The actual packet interval parameter needs to be a multiple of
+    // kCIPsterTimerTickInMicroSeconds from the user's header file
+
+    consuming_API_usecs = params.consuming_RPI_usecs;
+
+    if( consuming_API_usecs % kCIPsterTimerTickInMicroSeconds )
+    {
+        // find next "faster" multiple
+        consuming_API_usecs = (consuming_API_usecs / kCIPsterTimerTickInMicroSeconds)
+            * kCIPsterTimerTickInMicroSeconds;
+
+        if( consuming_API_usecs == 0 )
+        {
+            CIPSTER_TRACE_ERR(
+                "%s: consuming_RPI of %d less than minimum of %d usecs\n",
+                __func__,  params.consuming_RPI_usecs, kCIPsterTimerTickInMicroSeconds );
+
+            ext_status = kConnMgrStatusErrorRPINotSupported;
+            goto forward_open_response;
+        }
+
+        if( consuming_API_usecs != params.consuming_RPI_usecs )
+        {
+            CIPSTER_TRACE_INFO(
+                "%s: consuming_RPI was adjusted downward to %d usecs\n",
+                __func__, consuming_API_usecs );
+
+            params.consuming_RPI_usecs = consuming_API_usecs;
+        }
+    }
+
+    producing_API_usecs = params.producing_RPI_usecs;
+
+    if( producing_API_usecs % kCIPsterTimerTickInMicroSeconds )
+    {
+        // find next "faster" multiple
+        producing_API_usecs = (producing_API_usecs / kCIPsterTimerTickInMicroSeconds)
+            * kCIPsterTimerTickInMicroSeconds;
+
+        if( producing_API_usecs == 0 )
+        {
+            CIPSTER_TRACE_ERR(
+                "%s: producing_RPI of %d less than minimum of %d usecs\n",
+                __func__,  params.producing_RPI_usecs, kCIPsterTimerTickInMicroSeconds );
+
+            ext_status = kConnMgrStatusErrorRPINotSupported;
+            goto forward_open_response;
+        }
+
+        if( producing_API_usecs != params.producing_RPI_usecs )
+        {
+            CIPSTER_TRACE_INFO(
+                "%s: producing_RPI was adjusted downward to %d usecs\n",
+                __func__, producing_API_usecs );
+
+            params.producing_RPI_usecs = producing_API_usecs;
+        }
     }
 
     if( conn_path_byte_count < in.size() )
@@ -589,16 +647,15 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
 
     CIPSTER_TRACE_INFO( "%s: trigger_class:%d\n", __func__, params.trigger.Class() );
 
-    CIPSTER_TRACE_INFO( "%s: o_to_t RPI_usecs:%u\n", __func__, params.consuming_RPI_usecs );
-    CIPSTER_TRACE_INFO( "%s: o_to_t size:%d\n", __func__, params.consuming_ncp.ConnectionSize() );
-    CIPSTER_TRACE_INFO( "%s: o_to_t priority:%d\n", __func__, params.consuming_ncp.Priority() );
-    CIPSTER_TRACE_INFO( "%s: o_to_t type:%s\n", __func__, params.consuming_ncp.ShowConnectionType() );
+    CIPSTER_TRACE_INFO( "%s: o_t RPI_usecs:%u\n", __func__, params.consuming_RPI_usecs );
+    CIPSTER_TRACE_INFO( "%s: o_t size:%d\n", __func__, params.consuming_ncp.ConnectionSize() );
+    CIPSTER_TRACE_INFO( "%s: o_t priority:%d\n", __func__, params.consuming_ncp.Priority() );
+    CIPSTER_TRACE_INFO( "%s: o_t type:%s\n", __func__, params.consuming_ncp.ShowConnectionType() );
 
-    CIPSTER_TRACE_INFO( "%s: t_to_o RPI_usecs:%u\n", __func__, params.producing_RPI_usecs );
-    CIPSTER_TRACE_INFO( "%s: t_to_o size:%d\n", __func__, params.producing_ncp.ConnectionSize() );
-    CIPSTER_TRACE_INFO( "%s: t_to_o priority:%d\n", __func__, params.producing_ncp.Priority() );
-    CIPSTER_TRACE_INFO( "%s: t_to_o type:%s\n", __func__, params.producing_ncp.ShowConnectionType() );
-
+    CIPSTER_TRACE_INFO( "%s: t_o RPI_usecs:%u\n", __func__, params.producing_RPI_usecs );
+    CIPSTER_TRACE_INFO( "%s: t_o size:%d\n", __func__, params.producing_ncp.ConnectionSize() );
+    CIPSTER_TRACE_INFO( "%s: t_o priority:%d\n", __func__, params.producing_ncp.Priority() );
+    CIPSTER_TRACE_INFO( "%s: t_o type:%s\n", __func__, params.producing_ncp.ShowConnectionType() );
 
     CipClass* clazz;
     clazz = GetCipClass( params.mgmnt_class );
@@ -670,10 +727,8 @@ forward_open_response:
 
     if( gen_status == kCipErrorSuccess )
     {
-        // Set the APIs (actual packet intervals) to caller's unadjusted rates.
-        // Vol1 3-5.4.1.2 & Vol1 3-5.4.3 are not clear enough here.
-        out.put32( params.consuming_RPI_usecs );
-        out.put32( params.producing_RPI_usecs );
+        out.put32( consuming_API_usecs );
+        out.put32( producing_API_usecs );
 
         out.put8( 0 );   // Application Reply Size
     }
@@ -777,7 +832,8 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
 #endif
 
     CIPSTER_TRACE_INFO(
-        "ForwardClose: ConnSerNo:%x VendorId:%x OriginatorSerNum:%x\n",
+        "%s: ConnSerNo:%x VendorId:%x OriginatorSerNum:%x\n",
+        __func__,
         params.connection_serial_number,
         params.originator_vendor_id,
         params.originator_serial_number
@@ -789,7 +845,8 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
     if( !match )
     {
         ext_status =  kConnMgrStatusErrorConnectionNotFoundAtTargetApplication;
-        // goto forward_close_response;
+
+        CIPSTER_TRACE_INFO( "%s: no match\n", __func__ );
     }
     else
     {
@@ -801,6 +858,11 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
             gen_status = kCipErrorPrivilegeViolation;
             goto forward_close_response;
         }
+
+        CIPSTER_TRACE_INFO( "%s: CID:0x%08x PID:0x%08x\n",
+            __func__,
+            match->ConsumingConnectionId(),
+            match->ProducingConnectionId() );
 
         match->Close();
         gen_status = kCipErrorSuccess;
