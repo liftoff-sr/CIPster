@@ -279,7 +279,7 @@ static CipInstance* check_path( const CipAppPath& aPath,
         CIPSTER_TRACE_ERR( "%s: aPath is not sufficient %s\n", __func__, aCaller );
 
         if( aExtError )
-            *aExtError = kConnMgrStatusErrorInvalidSegmentTypeInPath;
+            *aExtError = kConnMgrStatusInvalidSegmentTypeInPath;
         return NULL;
     }
 
@@ -294,7 +294,7 @@ static CipInstance* check_path( const CipAppPath& aPath,
         if( class_id >= 0xc8 )   // reserved range of class ids
         {
             if( aExtError )
-                *aExtError =  kConnMgrStatusErrorInvalidSegmentTypeInPath;
+                *aExtError =  kConnMgrStatusInvalidSegmentTypeInPath;
         }
         else
         {
@@ -315,7 +315,7 @@ static CipInstance* check_path( const CipAppPath& aPath,
 
         // according to the test tool we should respond with this extended error code
         if( aExtError )
-            *aExtError = kConnMgrStatusErrorInvalidSegmentTypeInPath;
+            *aExtError = kConnMgrStatusInvalidSegmentTypeInPath;
 
         return NULL;
     }
@@ -818,7 +818,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
 L_exit_invalid:
 
     // Add CIPSTER_TRACE statements at specific goto sites above, not here.
-    *aExtError = kConnMgrStatusErrorInvalidSegmentTypeInPath;
+    *aExtError = kConnMgrStatusInvalidSegmentTypeInPath;
 
 L_exit_error:
     return kCipErrorConnectionFailure;
@@ -844,7 +844,7 @@ CipError ConnectionData::VerifyForwardOpenParams( ConnMgrStatus* aExtError )
         else if( conn_path.port_segs.GetPIT_USecs() > producing_RPI_usecs )
         {
             // see section C-1.4.3.3
-            *aExtError = kConnMgrStatusErrorPITGreaterThanRPI;
+            *aExtError = kConnMgrStatusPITGreaterThanRPI;
             return kCipErrorConnectionFailure;
         }
     }
@@ -897,7 +897,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             // wrong connection size
             corrected_consuming_size = attr_data->size() + diff_size;
 
-            *aExtError = kConnMgrStatusErrorInvalidOToTConnectionSize;
+            *aExtError = kConnMgrStatusInvalidOToTConnectionSize;
 
             CIPSTER_TRACE_INFO(
                 "%s: assembly size(%d) != requested conn_size(%d) for consuming:'%s'\n"
@@ -961,7 +961,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             // wrong connection size
             corrected_producing_size = attr_data->size() + diff_size;
 
-            *aExtError = kConnMgrStatusErrorInvalidTToOConnectionSize;
+            *aExtError = kConnMgrStatusInvalidTToOConnectionSize;
 
             CIPSTER_TRACE_INFO(
                 "%s: assembly size(%d) != requested conn_size(%d) for producing:'%s'\n"
@@ -1095,7 +1095,7 @@ ConnMgrStatus CipConn::handleConfigData()
             memcmp( bytes.data(), words.data(), bytes.size() ) != 0 )
         {
             CIPSTER_TRACE_INFO( "%s: config data mismatch\n", __func__ );
-            result = kConnMgrStatusErrorOwnershipConflict;
+            result = kConnMgrStatusOwnershipConflict;
         }
     }
 
@@ -1710,7 +1710,7 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
                 "%s: missing required T->O SockAddr Info Item for consuming.\n",
                 __func__ );
 
-            *aExtError = kConnMgrStatusErrorParameterErrorInUnconnectedSendService;
+            *aExtError = kConnMgrStatusParameterErrorInUnconnectedSendService;
             return kCipErrorConnectionFailure;
         }
 
@@ -1722,7 +1722,7 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
                 "%s: originator's T->O SockAddr Info Item has invalid sin_family.\n",
                 __func__ );
 
-            *aExtError = kConnMgrStatusErrorParameterErrorInUnconnectedSendService;
+            *aExtError = kConnMgrStatusParameterErrorInUnconnectedSendService;
             return kCipErrorConnectionFailure;
         }
 
@@ -1732,7 +1732,7 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
                 "%s: originator's T->O SockAddr Info Item has invalid multicast address.\n",
                 __func__ );
 
-            *aExtError = kConnMgrStatusErrorParameterErrorInUnconnectedSendService;
+            *aExtError = kConnMgrStatusParameterErrorInUnconnectedSendService;
             return kCipErrorConnectionFailure;
         }
 

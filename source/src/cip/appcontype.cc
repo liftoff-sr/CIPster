@@ -202,7 +202,7 @@ CipConn* ExclusiveOwner::GetConnection( ConnectionData* aConnData, ConnMgrStatus
                 CIPSTER_TRACE_INFO( "%s:ERROR. Matching consuming assembly id:%d\n",
                     __func__, aConnData->ConsumingPath().GetInstanceOrConnPt() );
 
-                *aExtError = kConnMgrStatusErrorOwnershipConflict;
+                *aExtError = kConnMgrStatusOwnershipConflict;
                 break;
             }
 

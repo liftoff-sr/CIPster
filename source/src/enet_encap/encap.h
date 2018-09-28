@@ -301,38 +301,7 @@ public:
     std::string             product_name;
     uint8_t                 state;
 
-    int DeserializeListIdendityResponse( BufReader aInput )
-    {
-        BufReader in = aInput;
-
-        int cip_id = in.get16();
-
-        if( cip_id != 0xc )
-            throw std::invalid_argument( "ListIdentity 'Item ID' not 0x0C" );
-
-        int length = in.get16();
-
-        protocol_ver = in.get16();
-
-        sockaddr.SetFamily( in.get16BE() );
-        sockaddr.SetPort( in.get16BE() );
-        sockaddr.SetAddr( in.get32BE() );
-
-        in += 8;    // sin_zero "ignored by receiver".
-
-        vendor_id    = in.get16();
-        device_type  = in.get16();
-        product_code = in.get16();
-        revision     = in.get16();
-        status       = in.get16();
-        serial_num   = in.get32();
-        product_name = in.get_SHORT_STRING();
-        state        = in.get8();
-
-        (void) length;
-
-        return in.data() - aInput.data();
-    }
+    int DeserializeListIdendityResponse( BufReader aInput );
 };
 
 

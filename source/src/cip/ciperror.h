@@ -1,5 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2009, Rockwell Automation, Inc.
+ * Copyright (c) 2018, SoftPLC Corporation.
  *
  ******************************************************************************/
 #ifndef CIPSTER_CIPERROR_H_
@@ -59,4 +60,43 @@ enum CipError
 
     kCipErrorGeneralError = 0xff,
 };
+
+
+/// Connection Manager Status codes, aka extended status values
+enum ConnMgrStatus
+{
+    kConnMgrStatusSuccess = 0,
+    kConnMgrStatusConnectionInUse                          = 0x0100,
+    kConnMgrStatusTransportTriggerNotSupported             = 0x0103,
+    kConnMgrStatusOwnershipConflict                        = 0x0106,
+    kConnMgrStatusConnectionNotFoundAtTargetApplication    = 0x0107,
+    kConnMgrStatusInvalidNetworkConnectionParameter        = 0x0108,
+    kConnMgrStatusRPINotSupported                          = 0x0111,
+    kConnMgrStatusRPIValuesNotAcceptable                   = 0x0112,
+    kConnMgrStatusNoMoreConnectionsAvailable               = 0x0113,
+    kConnMgrStatusVendorIdOrProductcodeError               = 0x0114,
+    kConnMgrStatusDeviceTypeError                          = 0x0115,
+    kConnMgrStatusRevisionMismatch                         = 0x0116,
+    kConnMgrStatusNonListenOnlyConnectionNotOpened         = 0x0119,
+    kConnMgrStatusTargetObjectOutOfConnections             = 0x011a,
+    kConnMgrStatusPITGreaterThanRPI                        = 0x011b,
+    kConnMgrStatusInvalidOToTConnectionType                = 0x0123,
+    kConnMgrStatusInvalidTToOConnectionType                = 0x0124,
+    kConnMgrStatusInvalidOToTConnectionSize                = 0x0127,
+    kConnMgrStatusInvalidTToOConnectionSize                = 0x0128,
+    kConnMgrStatusInvalidConfigurationApplicationPath      = 0x0129,
+    kConnMgrStatusInvalidConsumingApllicationPath          = 0x012a,
+    kConnMgrStatusInvalidProducingApplicationPath          = 0x012b,
+    kConnMgrStatusInconsistentApplicationPathCombo         = 0x012f,
+    kConnMgrStatusNullForwardOpenFunctionNotSupported      = 0x0132,
+    kConnMgrStatusConnectionTimeoutMultiplierNotAcceptable = 0x0133,
+    kConnMgrStatusParameterErrorInUnconnectedSendService   = 0x0205,
+    kConnMgrStatusInvalidSegmentTypeInPath                 = 0x0315,
+    kConnMgrStatusInForwardClosePathMismatch               = 0x0316,
+};
+
+
+/// Return a string explaining @a aExtStatus
+const char* ExtStatusStr( ConnMgrStatus aExtStatus );
+
 #endif // CIPSTER_CIPERROR_H_

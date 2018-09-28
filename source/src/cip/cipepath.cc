@@ -40,7 +40,6 @@ enum DataSegmentType
 };
 
 
-
 CipAppPath& CipAppPath::operator = ( const CipAppPath& other )
 {
     pbits = other.pbits;
@@ -652,7 +651,7 @@ ConnMgrStatus CipElectronicKeySegment::Check() const
     if( ( vendor_id != 0     && vendor_id    != vendor_id_ )
      || ( product_code != 0  && product_code != product_code_ ) )
     {
-        return kConnMgrStatusErrorVendorIdOrProductcodeError;
+        return kConnMgrStatusVendorIdOrProductcodeError;
     }
 
     // VendorID and ProductCode are correct
@@ -660,7 +659,7 @@ ConnMgrStatus CipElectronicKeySegment::Check() const
     // Check DeviceType, must match or 0
     if( device_type != 0 && device_type != device_type_ )
     {
-        return kConnMgrStatusErrorDeviceTypeError;
+        return kConnMgrStatusDeviceTypeError;
     }
 
     // VendorID, ProductCode and DeviceType are correct
@@ -669,7 +668,7 @@ ConnMgrStatus CipElectronicKeySegment::Check() const
         if( ( mjr_revision   != 0 && mjr_revision   != revision_.major_revision )
          || ( minor_revision != 0 && minor_revision != revision_.minor_revision ) )
         {
-            return kConnMgrStatusErrorRevisionMismatch;
+            return kConnMgrStatusRevisionMismatch;
         }
     }
 
@@ -680,7 +679,7 @@ ConnMgrStatus CipElectronicKeySegment::Check() const
          || minor_revision == 0
          || minor_revision > revision_.minor_revision )
         {
-            return kConnMgrStatusErrorRevisionMismatch;
+            return kConnMgrStatusRevisionMismatch;
         }
     }
 

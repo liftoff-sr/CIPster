@@ -211,10 +211,10 @@ public:
     double get_double();
 
     /// Deserialize a CIP SHORT_STRING
-    std::string get_SHORT_STRING( bool ExpectPossiblePaddingToEvenByteCount = true );
+    std::string get_SHORT_STRING( bool ExpectPossiblePaddingToEvenByteCount );
 
     /// Deserialize a CIP STRING
-    std::string get_STRING( bool ExpectPossiblePaddingToEvenByteCount = true );
+    std::string get_STRING( bool ExpectPossiblePaddingToEvenByteCount );
 
     /// Deserialize a CIP STRING2 and encode the result as UTF8 within a std::string.
     std::string get_STRING2();

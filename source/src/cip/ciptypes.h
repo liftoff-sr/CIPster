@@ -51,39 +51,6 @@ enum SegmentType
     kSegmentTypeSegmentTypeReserved = 0xE0
 };
 
-/// Connection Manager Status codes
-enum ConnMgrStatus
-{
-    kConnMgrStatusSuccess = 0,
-    kConnMgrStatusErrorConnectionInUse                          = 0x0100,
-    kConnMgrStatusErrorTransportTriggerNotSupported             = 0x0103,
-    kConnMgrStatusErrorOwnershipConflict                        = 0x0106,
-    kConnMgrStatusErrorConnectionNotFoundAtTargetApplication    = 0x0107,
-    kConnMgrStatusInvalidNetworkConnectionParameter             = 0x0108,
-    kConnMgrStatusErrorRPINotSupported                          = 0x0111,
-    kConnMgrStatusErrorRPIValuesNotAcceptable                   = 0x0112,
-    kConnMgrStatusErrorNoMoreConnectionsAvailable               = 0x0113,
-    kConnMgrStatusErrorVendorIdOrProductcodeError               = 0x0114,
-    kConnMgrStatusErrorDeviceTypeError                          = 0x0115,
-    kConnMgrStatusErrorRevisionMismatch                         = 0x0116,
-    kConnMgrStatusNonListenOnlyConnectionNotOpened              = 0x0119,
-    kConnMgrStatusTargetObjectOutOfConnections                  = 0x011a,
-    kConnMgrStatusErrorPITGreaterThanRPI                        = 0x011b,
-    kConnMgrStatusErrorInvalidOToTConnectionType                = 0x0123,
-    kConnMgrStatusErrorInvalidTToOConnectionType                = 0x0124,
-    kConnMgrStatusErrorInvalidOToTConnectionSize                = 0x0127,
-    kConnMgrStatusErrorInvalidTToOConnectionSize                = 0x0128,
-    kConnMgrStatusInvalidConfigurationApplicationPath           = 0x0129,
-    kConnMgrStatusInvalidConsumingApllicationPath               = 0x012a,
-    kConnMgrStatusInvalidProducingApplicationPath               = 0x012b,
-    kConnMgrStatusInconsistentApplicationPathCombo              = 0x012f,
-    kConnMgrStatusNullForwardOpenFunctionNotSupported           = 0x0132,
-    kConnMgrStatusConnectionTimeoutMultiplierNotAcceptable      = 0x0133,
-    kConnMgrStatusErrorParameterErrorInUnconnectedSendService   = 0x0205,
-    kConnMgrStatusErrorInvalidSegmentTypeInPath                 = 0x0315,
-    kConnMgrStatusErrorInForwardClosePathMismatch               = 0x0316,
-};
-
 
 /**
  * Enum CipDataType

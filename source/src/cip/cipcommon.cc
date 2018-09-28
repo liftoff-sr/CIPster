@@ -234,11 +234,11 @@ int DecodeData( CipDataType aDataType, void* data, BufReader& aBuf )
         break;
 
     case kCipString:
-        *(std::string*) data = aBuf.get_STRING();
+        *(std::string*) data = aBuf.get_STRING( true );
         break;
 
     case kCipShortString:
-        *(std::string*) data = aBuf.get_SHORT_STRING();
+        *(std::string*) data = aBuf.get_SHORT_STRING( true );
         break;
 
     case kCipString2:

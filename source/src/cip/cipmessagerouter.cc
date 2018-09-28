@@ -204,7 +204,7 @@ CipError CipMessageRouterClass::OpenConnection( ConnectionData* aConnData,
     if( !new_explicit )
     {
         ret = kCipErrorConnectionFailure;
-        *aExtError = kConnMgrStatusErrorNoMoreConnectionsAvailable;
+        *aExtError = kConnMgrStatusNoMoreConnectionsAvailable;
     }
 
     else

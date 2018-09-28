@@ -494,7 +494,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     // first check if we have already a connection with the given params
     if( FindExistingMatchingConnection( params ) )
     {
-        ext_status = kConnMgrStatusErrorConnectionInUse;
+        ext_status = kConnMgrStatusConnectionInUse;
         goto forward_open_response;
     }
 
@@ -504,7 +504,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
        CIPSTER_TRACE_INFO( "%s: invalid connection timeout multiplier: %u\n",
            __func__, params.connection_timeout_multiplier_value );
 
-       ext_status = kConnMgrStatusErrorInvalidOToTConnectionType;
+       ext_status = kConnMgrStatusInvalidOToTConnectionType;
        goto forward_open_response;
     }
 
@@ -522,7 +522,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     {
         CIPSTER_TRACE_INFO( "%s: invalid O to T connection type\n", __func__ );
 
-        ext_status = kConnMgrStatusErrorInvalidOToTConnectionType;
+        ext_status = kConnMgrStatusInvalidOToTConnectionType;
         goto forward_open_response;
     }
 
@@ -530,7 +530,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     {
         CIPSTER_TRACE_INFO( "%s: invalid T to O connection type\n", __func__ );
 
-        ext_status = kConnMgrStatusErrorInvalidTToOConnectionType;
+        ext_status = kConnMgrStatusInvalidTToOConnectionType;
         goto forward_open_response;
     }
 
@@ -540,7 +540,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         CIPSTER_TRACE_INFO( "%s: trigger 0x%02x not supported\n",
             __func__, params.trigger.Bits() );
 
-        ext_status = kConnMgrStatusErrorTransportTriggerNotSupported;
+        ext_status = kConnMgrStatusTransportTriggerNotSupported;
         goto forward_open_response;
     }
 
@@ -559,10 +559,10 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         if( consuming_API_usecs == 0 )
         {
             CIPSTER_TRACE_ERR(
-                "%s: consuming_RPI of %d less than minimum of %d usecs\n",
+                "%s: consuming_RPI of %d is less than minimum of %d usecs\n",
                 __func__,  params.consuming_RPI_usecs, kCIPsterTimerTickInMicroSeconds );
 
-            ext_status = kConnMgrStatusErrorRPINotSupported;
+            ext_status = kConnMgrStatusRPINotSupported;
             goto forward_open_response;
         }
 
@@ -587,10 +587,10 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
         if( producing_API_usecs == 0 )
         {
             CIPSTER_TRACE_ERR(
-                "%s: producing_RPI of %d less than minimum of %d usecs\n",
+                "%s: producing_RPI of %d is less than minimum of %d usecs\n",
                 __func__,  params.producing_RPI_usecs, kCIPsterTimerTickInMicroSeconds );
 
-            ext_status = kConnMgrStatusErrorRPINotSupported;
+            ext_status = kConnMgrStatusRPINotSupported;
             goto forward_open_response;
         }
 
@@ -703,12 +703,12 @@ forward_open_response:
         default:
             switch( ext_status )
             {
-            case kConnMgrStatusErrorInvalidOToTConnectionSize:
+            case kConnMgrStatusInvalidOToTConnectionSize:
                 response->AddAdditionalSts( ext_status );
                 response->AddAdditionalSts( params.corrected_consuming_size );
                 break;
 
-            case kConnMgrStatusErrorInvalidTToOConnectionSize:
+            case kConnMgrStatusInvalidTToOConnectionSize:
                 response->AddAdditionalSts( ext_status );
                 response->AddAdditionalSts( params.corrected_producing_size );
                 break;
@@ -844,7 +844,7 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
 
     if( !match )
     {
-        ext_status =  kConnMgrStatusErrorConnectionNotFoundAtTargetApplication;
+        ext_status =  kConnMgrStatusConnectionNotFoundAtTargetApplication;
 
         CIPSTER_TRACE_INFO( "%s: no match\n", __func__ );
     }

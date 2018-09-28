@@ -12,6 +12,7 @@ set( CIP_SRCS
     cip/cipconnection.cc
     cip/cipconnectionmanager.cc
     cip/cipepath.cc
+    cip/ciperror.cc
     cip/cipethernetlink.cc
     cip/cipidentity.cc
     cip/cipmessagerouter.cc

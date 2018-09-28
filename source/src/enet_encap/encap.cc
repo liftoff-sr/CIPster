@@ -1088,6 +1088,46 @@ int Encapsulation::Serialize( BufWriter aDst, int aCtl ) const
 }
 
 
+//-----<ListIdentity>-----------------------------------------------------------
+
+int ListIdentity::DeserializeListIdendityResponse( BufReader aInput )
+{
+    BufReader in = aInput;
+
+    int item_count = in.get16();
+    int cip_id     = in.get16();
+
+    if( item_count != 1 )
+        throw std::invalid_argument( "'Item Count' not 1" );
+
+    if( cip_id != 0xc )
+        throw std::invalid_argument( "'Item ID' not 0x0C" );
+
+    int length = in.get16();
+
+    protocol_ver = in.get16();
+
+    sockaddr.SetFamily( in.get16BE() );
+    sockaddr.SetPort( in.get16BE() );
+    sockaddr.SetAddr( in.get32BE() );
+
+    in += 8;    // sin_zero "ignored by receiver".
+
+    vendor_id    = in.get16();
+    device_type  = in.get16();
+    product_code = in.get16();
+    revision     = in.get16();
+    status       = in.get16();
+    serial_num   = in.get32();
+    product_name = in.get_SHORT_STRING( false );
+    state        = in.get8();
+
+    (void) length;
+
+    return in.data() - aInput.data();
+}
+
+
 void ManageEncapsulationMessages()
 {
     for( int i = 0; i < DIM( DelayedMsg::messages );  ++i )

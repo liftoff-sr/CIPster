@@ -590,7 +590,7 @@ public:
     static unsigned RequestMSecs( unsigned aTickTime, unsigned aTickCount )
     {
         // Vol1 3-5.4.1.2.1
-        return unsigned( 1 << aTickTime ) * aTickCount;
+        return ( 1u << aTickTime ) * aTickCount;
     }
 
     /**
@@ -615,7 +615,7 @@ public:
     CipUdint    ConsumingConnectionId() const                   { return consuming_connection_id; }
     ConnectionData& SetConsumingConnectionId( CipUdint aCid )
     {
-        CIPSTER_TRACE_INFO( "%s: 0x%08x\n", __func__, aCid );
+        //CIPSTER_TRACE_INFO( "%s: 0x%08x\n", __func__, aCid );
         consuming_connection_id = aCid;
         return *this;
     }
@@ -623,7 +623,7 @@ public:
     CipUdint    ProducingConnectionId() const                   { return producing_connection_id; }
     ConnectionData& SetProducingConnectionId( CipUdint aCid )
     {
-        CIPSTER_TRACE_INFO( "%s: 0x%08x\n", __func__, aCid );
+        //CIPSTER_TRACE_INFO( "%s: 0x%08x\n", __func__, aCid );
         producing_connection_id = aCid;
         return *this;
     }
@@ -907,9 +907,9 @@ public:
         //CIPSTER_TRACE_INFO( "%s<%d>: %d\n", __func__, instance_id, ret );
         return ret;
     }
-    CipConn& SetProductionInhibitTimerUSecs( int32_t aValue )
+    CipConn& SetProductionInhibitTimerUSecs( int32_t aFuture )
     {
-        production_inhibit_timer_usecs = CurrentUSecs32() + aValue;
+        production_inhibit_timer_usecs = CurrentUSecs32() + aFuture;
         return *this;
     }
 
@@ -919,10 +919,10 @@ public:
         //CIPSTER_TRACE_INFO( "%s<%d>: %d\n", __func__, instance_id, ret );
         return ret;
     }
-    CipConn& SetTransmissionTriggerTimerUSecs( int32_t aValue )
+    CipConn& SetTransmissionTriggerTimerUSecs( int32_t aFuture )
     {
-        //CIPSTER_TRACE_INFO( "%s<%d>( %d ) CID:0x%08x PID:0x%08x\n", __func__, instance_id, aValue, consuming_connection_id, producing_connection_id );
-        transmission_trigger_timer_usecs = CurrentUSecs32() + aValue;
+        //CIPSTER_TRACE_INFO( "%s<%d>( %d ) CID:0x%08x PID:0x%08x\n", __func__, instance_id, aFuture, consuming_connection_id, producing_connection_id );
+        transmission_trigger_timer_usecs = CurrentUSecs32() + aFuture;
         return *this;
     }
 
@@ -932,10 +932,10 @@ public:
         //CIPSTER_TRACE_INFO( "%s<%d>: %d\n", __func__, instance_id, ret );
         return ret;
     }
-    CipConn& SetInactivityWatchDogTimerUSecs( int32_t aUSecs )
+    CipConn& SetInactivityWatchDogTimerUSecs( int32_t aFuture )
     {
-        //CIPSTER_TRACE_INFO( "%s<%d>( %d )\n", __func__, instance_id, aUSecs );
-        inactivity_watchdog_timer_usecs = CurrentUSecs32() + aUSecs;
+        //CIPSTER_TRACE_INFO( "%s<%d>( %d )\n", __func__, instance_id, aFuture );
+        inactivity_watchdog_timer_usecs = CurrentUSecs32() + aFuture;
         return *this;
     }
 
@@ -1097,12 +1097,12 @@ protected:
 
     uint32_t    expected_packet_rate_usecs;
 
-    int32_t     inactivity_watchdog_timer_usecs;    // signed 32 bits, in usecs
-    int32_t     transmission_trigger_timer_usecs;   // signed 32 bits, in usecs
+    uint32_t    inactivity_watchdog_timer_usecs;
+    uint32_t    transmission_trigger_timer_usecs;
 
     // Timer for the production inhibition of application triggered or
     // change-of-state I/O connections.
-    int32_t     production_inhibit_timer_usecs;
+    uint32_t    production_inhibit_timer_usecs;
 
     UdpSocket*  consuming_socket;
     UdpSocket*  producing_socket;
