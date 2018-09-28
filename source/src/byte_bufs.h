@@ -256,6 +256,8 @@ enum
     CTL_OMIT_CONN_PATH          = (1<<0),
     CTL_FORWARD_OPEN            = (1<<1),
     CTL_FORWARD_CLOSE           = (1<<2),
+    CTL_OMIT_CLASS              = (1<<3),
+    CTL_USE_CONN_PT             = (1<<4),   // when class is assembly, use conn_pt not instance
 };
 
 

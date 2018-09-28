@@ -24,7 +24,7 @@ const char* ExtStatusStr( ConnMgrStatus aExtStatus )
     case kConnMgrStatusVendorIdOrProductcodeError:              rs = "vendor id or product code error"; break;
     case kConnMgrStatusDeviceTypeError:                         rs = "device type error"; break;
     case kConnMgrStatusRevisionMismatch:                        rs = "revision mismatch"; break;
-    case kConnMgrStatusNonListenOnlyConnectionNotOpened:        rs = "listen only connection not opened"; break;
+    case kConnMgrStatusNonListenOnlyConnectionNotOpened:        rs = "non-listen only connection not opened"; break;
     case kConnMgrStatusTargetObjectOutOfConnections:            rs = "target out of connections"; break;
     case kConnMgrStatusPITGreaterThanRPI:                       rs = "PIT greater than RPI"; break;
     case kConnMgrStatusInvalidOToTConnectionType:               rs = "invalid O->T connection type"; break;

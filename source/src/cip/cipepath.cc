@@ -184,17 +184,22 @@ int CipAppPath::Serialize( BufWriter aOutput, int aCtl ) const
 
     else    // is logical
     {
-        if( HasClass() )
+        if( HasClass() && !(aCtl & CTL_OMIT_CLASS) )
             serialize( out, kLogicalSegmentTypeClassId, GetClass() );
 
         if( HasInstance() )
-            serialize( out, kLogicalSegmentTypeInstanceId, GetInstance() );
+        {
+            if( GetClass() == kCipAssemblyClass && (aCtl & CTL_USE_CONN_PT) )
+                serialize( out, kLogicalSegmentTypeConnectionPoint, GetInstance() );
+            else
+                serialize( out, kLogicalSegmentTypeInstanceId, GetInstance() );
+        }
+
+        else if( HasConnPt() )
+            serialize( out, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
 
         if( HasAttribute() )
             serialize( out, kLogicalSegmentTypeAttributeId, GetAttribute() );
-
-        if( HasConnPt() )
-            serialize( out, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
     }
 
     return out.data() - aOutput.data();

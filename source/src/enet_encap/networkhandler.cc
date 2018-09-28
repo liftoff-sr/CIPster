@@ -516,7 +516,7 @@ static void checkAndHandleUdpSockets()
                     s, from_addr, BufReader( s_buf, byte_count ) );
             }
 
-            if( attempt == limit )
+            if( attempt && attempt == limit )
             {
                 CIPSTER_TRACE_ERR( "%s[%d]: too much inbound UDP traffic\n",
                     __func__, s->h() );

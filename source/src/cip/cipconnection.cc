@@ -102,19 +102,43 @@ int ConnectionPath::Deserialize( BufReader aInput )
 
 int ConnectionPath::Serialize( BufWriter aOutput, int aCtl ) const
 {
+    int class1 = 0;
+    int class2 = 0;
+    int class3 = 0;
+
     BufWriter out = aOutput;
 
     if( port_segs.HasAny() )
         out += port_segs.Serialize( out, aCtl );
 
     if( app_path1.HasAny() )
+    {
+        class1 = app_path1.GetClass();
         out += app_path1.Serialize( out, aCtl );
+    }
 
     if( app_path2.HasAny() )
-        out += app_path2.Serialize( out, aCtl );
+    {
+        int ctl = aCtl;
+
+        class2 = app_path2.GetClass();
+
+        if( class1 == kCipAssemblyClass && class2 == kCipAssemblyClass )
+            ctl |= CTL_OMIT_CLASS | CTL_USE_CONN_PT;
+
+        out += app_path2.Serialize( out, ctl );
+    }
 
     if( app_path3.HasAny() )
-        out += app_path3.Serialize( out, aCtl );
+    {
+        int ctl = aCtl;
+
+        class3 = app_path3.GetClass();
+
+        if( class2 == kCipAssemblyClass && class3 == kCipAssemblyClass )
+            ctl |= CTL_OMIT_CLASS | CTL_USE_CONN_PT;
+        out += app_path3.Serialize( out, ctl );
+    }
 
     if( data_seg.HasAny() )
         out += data_seg.Serialize( out, aCtl );
@@ -125,19 +149,44 @@ int ConnectionPath::Serialize( BufWriter aOutput, int aCtl ) const
 
 int ConnectionPath::SerializedCount( int aCtl ) const
 {
+    int class1 = 0;
+    int class2 = 0;
+    int class3 = 0;
+
     int count = 0;
 
     if( port_segs.HasAny() )
         count += port_segs.SerializedCount( aCtl );
 
     if( app_path1.HasAny() )
+    {
+        class1 = app_path1.GetClass();
         count += app_path1.SerializedCount( aCtl );
+    }
 
     if( app_path2.HasAny() )
-        count += app_path2.SerializedCount( aCtl );
+    {
+        int ctl = aCtl;
+
+        class2 = app_path2.GetClass();
+
+        if( class1 == kCipAssemblyClass && class2 == kCipAssemblyClass )
+            ctl |= CTL_OMIT_CLASS | CTL_USE_CONN_PT;
+
+        count += app_path2.SerializedCount( ctl );
+    }
 
     if( app_path3.HasAny() )
-        count += app_path3.SerializedCount( aCtl );
+    {
+        int ctl = aCtl;
+
+        class3 = app_path3.GetClass();
+
+        if( class2 == kCipAssemblyClass && class3 == kCipAssemblyClass )
+            ctl |= CTL_OMIT_CLASS | CTL_USE_CONN_PT;
+
+        count += app_path3.SerializedCount( ctl );
+    }
 
     if( data_seg.HasAny() )
         count += data_seg.SerializedCount( aCtl );
@@ -769,6 +818,11 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
                     *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
                     goto L_exit_error;
                 }
+
+                // There is no data segment, so we ignore app_path1, per spec.
+                CIPSTER_TRACE_INFO(
+                    "%s: ignoring config_path because of missing data segment\n",
+                    __func__ );
 
                 consuming_path = 1;     // conn_path.app_path2;
                 producing_path = 2;     // conn_path.app_path3;
