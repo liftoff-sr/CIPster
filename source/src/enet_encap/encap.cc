@@ -1116,7 +1116,10 @@ int ListIdentity::DeserializeListIdendityResponse( BufReader aInput )
     vendor_id    = in.get16();
     device_type  = in.get16();
     product_code = in.get16();
-    revision     = in.get16();
+
+    revision.major_revision = in.get8();
+    revision.minor_revision = in.get8();
+
     status       = in.get16();
     serial_num   = in.get32();
     product_name = in.get_SHORT_STRING( false );

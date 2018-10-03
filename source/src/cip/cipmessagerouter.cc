@@ -269,25 +269,16 @@ EipStatus CipMessageRouterClass::NotifyMR(
 
     if( aRequest->Path().HasSymbol() )
     {
-        instance_id = 0;   // talk to class 06b instance 0
-
         // Per Rockwell Automation Publication 1756-PM020D-EN-P - June 2016:
         // Symbol Class Id is 0x6b.  Forward this request to that class.
         // This class is not implemented in CIPster stack, but can be added by
         // an application using simple RegisterCipClass( CipClass* aClass );
         // Instances of this class are tags.
         // I have such an implementation in my application.
+
+        instance_id = 0;   // talk to class 0x6b instance 0
+
         clazz = GetCipClass( 0x6b );
-
-#if 0
-        // We cannot know the instance number without looking it up in the
-        // the symbol class.  If that lookup is a service of the class, not
-        // of each instance, then enable this.  Any service for a class is
-        // always held in the meta-class, given by owning_class on the clazz.
-        if( clazz )
-            clazz = clazz->owning_class;
-#endif
-
     }
     else if( aRequest->Path().HasInstance() )
     {

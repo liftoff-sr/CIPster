@@ -79,6 +79,16 @@ public:
     int SerializedCount( int aCtl = 0 ) const;
     //-----</Serializeable>-----------------------------------------------------
 
+    void AddWord( CipWord aWord )
+    {
+        pbits = 1;
+        words.push_back( aWord );
+    }
+
+    const Words& Data() const   { return words; }
+
+protected:
+
     Words       words;
 };
 

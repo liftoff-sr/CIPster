@@ -467,8 +467,8 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     CipError        gen_status  = kCipErrorConnectionFailure;
     ConnMgrStatus   ext_status  = kConnMgrStatusSuccess;
 
-    uint32_t        consuming_API_usecs;
-    uint32_t        producing_API_usecs;
+    uint32_t        consuming_API_usecs = 0;
+    uint32_t        producing_API_usecs = 0;
 
     unsigned        conn_path_byte_count;
     ConnectionData  params;

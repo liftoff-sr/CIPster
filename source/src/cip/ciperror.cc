@@ -18,6 +18,7 @@ const char* ExtStatusStr( ConnMgrStatus aExtStatus )
     case kConnMgrStatusOwnershipConflict:                       rs = "ownership conflict";  break;
     case kConnMgrStatusConnectionNotFoundAtTargetApplication:   rs = "connection not found at target application";  break;
     case kConnMgrStatusInvalidNetworkConnectionParameter:       rs = "invalid network connection parameter"; break;
+    case kConnMgrStatusInvalidConnectionSize:                   rs = "invalid connection size"; break;
     case kConnMgrStatusRPINotSupported:                         rs = "RPI not supported";   break;
     case kConnMgrStatusRPIValuesNotAcceptable:                  rs = "RPI value not acceptable"; break;
     case kConnMgrStatusNoMoreConnectionsAvailable:              rs = "no more connections available"; break;

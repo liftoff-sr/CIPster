@@ -71,6 +71,7 @@ enum ConnMgrStatus
     kConnMgrStatusOwnershipConflict                        = 0x0106,
     kConnMgrStatusConnectionNotFoundAtTargetApplication    = 0x0107,
     kConnMgrStatusInvalidNetworkConnectionParameter        = 0x0108,
+    kConnMgrStatusInvalidConnectionSize                    = 0x0109,
     kConnMgrStatusRPINotSupported                          = 0x0111,
     kConnMgrStatusRPIValuesNotAcceptable                   = 0x0112,
     kConnMgrStatusNoMoreConnectionsAvailable               = 0x0113,

@@ -102,14 +102,31 @@ int ConnectionPath::Deserialize( BufReader aInput )
 
 int ConnectionPath::Serialize( BufWriter aOutput, int aCtl ) const
 {
-    int class1 = 0;
-    int class2 = 0;
-    int class3 = 0;
-
     BufWriter out = aOutput;
 
     if( port_segs.HasAny() )
         out += port_segs.Serialize( out, aCtl );
+
+#if 0
+    int last_class = -1;
+    int app_path_count = app_path[0].HasAny() + app_path[1].HasAny() + app_path[2].HasAny();
+
+    for( int i=0; i<3; ++i )
+    {
+        if( !app_path[i].HasAny() )
+            continue;
+
+        int ctl = ( last_class == app_path[i].GetClass() ) ? CTL_OMIT_CLASS : 0;
+
+        out += app_path[i].Serialize( out, ctl );
+
+        last_class = app_path[i].GetClass();
+    }
+
+#else
+    int class1 = 0;
+    int class2 = 0;
+    int class3 = 0;
 
     if( app_path1.HasAny() )
     {
@@ -139,6 +156,7 @@ int ConnectionPath::Serialize( BufWriter aOutput, int aCtl ) const
             ctl |= CTL_OMIT_CLASS | CTL_USE_CONN_PT;
         out += app_path3.Serialize( out, ctl );
     }
+#endif
 
     if( data_seg.HasAny() )
         out += data_seg.Serialize( out, aCtl );
@@ -1135,7 +1153,7 @@ ConnMgrStatus CipConn::handleConfigData()
 
     AssemblyInstance* instance = static_cast<AssemblyInstance*>( config_instance );
 
-    Words& words = conn_path.data_seg.words;
+    const Words& words = conn_path.data_seg.Data();
 
     if( ConnectionWithSameConfigPointExists( ConfigPath().GetInstanceOrConnPt() ) )
     {

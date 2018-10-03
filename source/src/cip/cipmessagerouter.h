@@ -240,6 +240,10 @@ public:
     static EipStatus Init();
 
     CipInstance* CreateInstance( int aInstanceId );
+
+    static EipStatus multiple_service_packet_service( CipInstance* instance,
+        CipMessageRouterRequest*  request,
+        CipMessageRouterResponse* response );
 };
 
 #endif // CIPSTER_CIPMESSAGEROUTER_H_

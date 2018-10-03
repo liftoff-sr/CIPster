@@ -269,7 +269,7 @@ public:
         vendor_id( 0 ),
         device_type( 0 ),
         product_code( 0 ),
-        revision( 0 ),
+        revision(),
         status( 0 ),
         serial_num( 0 ),
         state( 0 )
@@ -283,19 +283,21 @@ public:
         vendor_id( aVendorId ),
         device_type( aDeviceType ),
         product_code( aProductCode ),
-        revision( aRevision ),
         status( aStatus ),
         serial_num( aSerialNum ),
         product_name( aProductName ),
         state( aState )
-    {}
+    {
+        revision.major_revision = aRevision;
+        revision.minor_revision = aRevision >> 8;
+    }
 
     CipUint                 protocol_ver;
     SockAddr                sockaddr;
     CipUint                 vendor_id;
     CipUint                 device_type;
     CipUint                 product_code;
-    CipUint                 revision;
+    CipRevision             revision;
     CipUint                 status;
     CipUdint                serial_num;
     std::string             product_name;
