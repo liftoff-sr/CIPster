@@ -76,6 +76,10 @@ extern int g_my_io_udp_port;
 
 extern uint64_t g_current_usecs;
 
+/// The run/idle mode sent when our producing half is kRealTimeFmt32BitHeader,
+/// which is likely only when we are acting as a scanner.
+extern uint32_t g_run_idle_state;
+
 /// Return the least significant 32 bits of uint64_t g_current_usecs
 inline uint32_t CurrentUSecs32()    { return uint32_t( g_current_usecs ); }
 

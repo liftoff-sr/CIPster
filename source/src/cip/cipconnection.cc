@@ -17,8 +17,6 @@
 #include "cipcommon.h"
 
 
-uint32_t g_run_idle_state;    //*< buffer for holding the run idle information.
-
 //-----<ConnectionPath>---------------------------------------------------------
 
 int ConnectionPath::Deserialize( BufReader aInput )

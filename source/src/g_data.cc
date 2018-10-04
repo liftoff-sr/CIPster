@@ -15,3 +15,5 @@ int g_my_io_udp_port = kEIP_IoUdpPort;
 /// established, while still preserving the two on kEIP_Reserved_Port.
 // int g_my_enip_port = kEIP_Reserved_Port;  not yet
 
+
+uint32_t g_run_idle_state;
