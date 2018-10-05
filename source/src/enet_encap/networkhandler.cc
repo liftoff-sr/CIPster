@@ -1129,8 +1129,6 @@ UdpSocket* UdpSocketMgr::find( const SockAddr& aSockAddr, const sockets& aList )
 // @see: https://stackoverflow.com/questions/6140734/cannot-bind-to-multicast-address-windows
 int UdpSocketMgr::createSocket( const SockAddr& aSockAddr )
 {
-   const int one = 1;
-
    int udp_sock = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
 
    if( udp_sock == kSocketInvalid )
@@ -1142,6 +1140,11 @@ int UdpSocketMgr::createSocket( const SockAddr& aSockAddr )
 
     SocketAsync( udp_sock );
 
+    /*  I know of no place where we have to assign an ip address or port more
+        than once in the UDP IO connection realm.  The point of UdpSocketMgr
+        class is to share sockets when they can be shared.
+    const int one = 1;
+
     if( setsockopt( udp_sock, SOL_SOCKET, SO_REUSEADDR, (char*) &one, sizeof(one) ) )
     {
         CIPSTER_TRACE_ERR(
@@ -1150,6 +1153,7 @@ int UdpSocketMgr::createSocket( const SockAddr& aSockAddr )
 
         goto close_and_exit;
     }
+    */
 
     if( bind( udp_sock, aSockAddr, SADDRZ ) )
     {
