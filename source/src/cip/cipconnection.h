@@ -112,10 +112,66 @@ enum ConnPriority
  */
 enum IOConnRealTimeFmt
 {
-    kRealTimeFmtModeless,
-    kRealTimeFmtZeroLengthData,
-    kRealTimeFmtHeartbeat,
-    kRealTimeFmt32BitHeader,
+    kRealTimeFmtModeless        = 0,
+    kRealTimeFmtZeroLengthData  = 1,
+    // 2 is reserved, see Vol1 7-3.6.10.1.2  Connection parameters (for EDS)
+    kRealTimeFmtHeartbeat       = 3,
+    kRealTimeFmt32BitHeader     = 4,
+    kRealTimeSafety             = 5,
+};
+
+
+/**
+ * Enum OpMode
+ * is the set of values associated with the 32 bit header in the
+ * kRealTimeFmt32BitHeader io connection half.
+ */
+enum OpMode
+{
+    kOpModeIdle,
+    kOpModeRun,
+    kOpModeUnknown,
+};
+
+
+/**
+ * Class Header32Bit
+ * is from Vol1 3-6.1.4 and is present in any datagram using
+ * kRealTimeFmt32BitHeader format.
+ */
+class Header32Bit
+{
+public:
+    Header32Bit( int aInitialValue = 7 ) :
+        bits( aInitialValue )
+    {
+    }
+
+    void Set( uint32_t aValue )             { bits = aValue; }
+
+    OpMode Mode() const                     { return (bits & 1) ? kOpModeRun : kOpModeIdle; }
+    Header32Bit& SetMode( OpMode aMode )
+    {
+        bits = (bits & ~1) | ((aMode == kOpModeRun) << 0);
+        return *this;
+    }
+
+    bool HasCOO()   const                   { return bits & (1<<1); }
+    Header32Bit& SetCOO( bool on )
+    {
+        bits = (bits & ~(1 << 1)) | (on << 1);
+        return *this;
+    }
+
+    int ROO() const                         { return (bits >> 2) & 3; }
+    Header32Bit& SetROO( int aValue )
+    {
+        bits = (bits & ~(3 << 2)) | (aValue << 2);
+        return *this;
+    }
+
+protected:
+    uint32_t    bits;
 };
 
 
@@ -921,9 +977,11 @@ public:
     }
     CipConn& SetTransmissionTriggerTimerUSecs( int32_t aFuture )
     {
-        //CIPSTER_TRACE_INFO( "%s<%d>( %d ) CID:0x%08x PID:0x%08x\n", __func__, instance_id, aFuture, consuming_connection_id, producing_connection_id );
-        transmission_trigger_timer_usecs = CurrentUSecs32() + aFuture;
-        return *this;
+        return setTransmissionTriggerTimerUSecs( CurrentUSecs32() + aFuture );
+    }
+    CipConn& BumpTransmissionTriggerTimerUSecs( int32_t aDeltaUSecs )
+    {
+        return setTransmissionTriggerTimerUSecs( transmission_trigger_timer_usecs + aDeltaUSecs );
     }
 
     int32_t InactivityWatchDogTimerUSecs() const
@@ -934,8 +992,8 @@ public:
     }
     CipConn& SetInactivityWatchDogTimerUSecs( int32_t aFuture )
     {
-        //CIPSTER_TRACE_INFO( "%s<%d>( %d )\n", __func__, instance_id, aFuture );
         inactivity_watchdog_timer_usecs = CurrentUSecs32() + aFuture;
+        //CIPSTER_TRACE_INFO( "%s<%d>( %d )\n", __func__, instance_id, inactivity_watchdog_timer_usecs );
         return *this;
     }
 
@@ -987,6 +1045,7 @@ public:
      */
     static uint32_t NewConnectionId();
 
+
     //LinkObject      link_object;
 
     WatchdogTimeoutAction watchdog_timeout_action;
@@ -1009,6 +1068,12 @@ public:
 
     /// sequence Count for Class 1 consuming connections
     uint16_t sequence_count_consuming;
+
+    OpMode Mode() const                         { return consuming_header.Mode(); }
+
+    // This tracks the scanner's mode when it uses the kRealTimeFmt32BitHeader
+    // in its producing half, talking to our consuming half.
+    Header32Bit consuming_header;
 
     /**
      * Function GetProductionInhibitTimeUSecs
@@ -1047,6 +1112,15 @@ public:
     int instance_id;
 
 protected:
+
+    uint32_t transmissionTriggerTimerUSecs() const { return transmission_trigger_timer_usecs; }
+
+    CipConn& setTransmissionTriggerTimerUSecs( int32_t aUSecs )
+    {
+        //CIPSTER_TRACE_INFO( "%s<%d>( %d ) CID:0x%08x PID:0x%08x\n", __func__, instance_id, aFuture, consuming_connection_id, producing_connection_id );
+        transmission_trigger_timer_usecs = aUSecs;
+        return *this;
+    }
 
     void timeOut();
 

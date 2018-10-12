@@ -90,12 +90,13 @@ void NotifyIoConnectionEvent( CipConn* aConn, IoConnectionEvent aEvent )
 }
 
 
-EipStatus AfterAssemblyDataReceived( AssemblyInstance* instance )
+EipStatus AfterAssemblyDataReceived( AssemblyInstance* aInstance,
+    OpMode aMode, int aBytesReceivedCount )
 {
     EipStatus status = kEipStatusOk;
 
     // handle the data received e.g., update outputs of the device
-    switch( instance->Id() )
+    switch( aInstance->Id() )
     {
     case DEMO_APP_OUTPUT_ASSEMBLY_NUM:
         /* Data for the output assembly has been received.

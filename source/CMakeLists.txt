@@ -110,14 +110,4 @@ if( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
 
 endif()
 
-
-# Internal cache holding the available CIP objects ##############
-set( CIPster_ADD_CIP_OBJECTS "" CACHE INTERNAL STRING )
-
-
-# Add custom CIP objects  #######################################
-set( CIPster_CIP_OBJECTS_DIR ${PROJECT_SOURCE_DIR}/src/cip_objects )
-include( ${CMAKE_MODULE_PATH}/CIPster_CIP_Object_generator.cmake )
-
-
 add_subdirectory( src )

@@ -6,6 +6,9 @@
 
 #include "ciperror.h"
 
+// This function is in its own file so that it can be omited during linking
+// if not referenced elsewhere.
+
 const char* ExtStatusStr( ConnMgrStatus aExtStatus )
 {
     const char* rs = "?";

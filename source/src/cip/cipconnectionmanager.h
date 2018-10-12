@@ -87,13 +87,14 @@ public:
 protected:
 
     /**
-     * Function forward_open_common
-     * checks if resources for new connection are available, and
-     * generates a ForwardOpen Reply message.
+     * Function forward_open
+     * is a client of both forward_open_service() and large_forward_open_service()
+     * and checks if resources for new connection are available, and
+     * generates a forward_open reply message.
      *
-     * @param instance CIP object instance
-     * @param request CipMessageRouterRequest.
-     * @param response CipMessageRouterResponse.
+     * @param aInstance CIP object instance
+     * @param aRequest CipMessageRouterRequest.
+     * @param aResponse CipMessageRouterResponse.
      * @param isLarge is true when called from largeForwardOpen(), false when called from forwardOpen()
      *  and the distinction is whether to expect 32 or 16 bits of "network connection parameters".
      *
@@ -101,9 +102,9 @@ protected:
      *     -  >0 .. success, 0 .. no reply to send back
      *     -  -1 .. error
      */
-    static EipStatus forward_open_common( CipInstance* instance,
-            CipMessageRouterRequest* request,
-            CipMessageRouterResponse* response, bool isLarge );
+    static EipStatus forward_open( CipInstance* aInstance,
+            CipMessageRouterRequest* aRequest,
+            CipMessageRouterResponse* aResponse, bool isLarge );
 
     /**
      * Function assembleForwardOpenResponse
@@ -117,9 +118,9 @@ protected:
 
 /**
  * Macros for comparing 32 bit sequence numbers according to CIP spec Vol2 3-4.2.
- * @define SEQ_LEQ32(a, b) Checks if sequence number a is less or equal than b
- * @define SEQ_GEQ32(a, b) Checks if sequence number a is greater or equal than
- * @define SEQ_GT32(a, b) Checks if sequence number a is greater than b
+ * @def SEQ_LEQ32(a, b) Checks if sequence number a is less or equal than b
+ * @def SEQ_GEQ32(a, b) Checks if sequence number a is greater or equal than
+ * @def SEQ_GT32(a, b) Checks if sequence number a is greater than b
  */
 #define SEQ_LEQ32( a, b )   ( (int) ( (a) - (b) ) <= 0 )
 #define SEQ_GEQ32( a, b )   ( (int) ( (a) - (b) ) >= 0 )
@@ -128,8 +129,8 @@ protected:
 
 /**
  * Macros for comparing 16 bit sequence numbers.
- * @define SEQ_LEQ16(a, b) Checks if sequence number a is less or equal than b
- * @define SEQ_GEQ16(a, b) Checks if sequence number a is greater or equal than
+ * @def SEQ_LEQ16(a, b) Checks if sequence number a is less or equal than b
+ * @def SEQ_GEQ16(a, b) Checks if sequence number a is greater or equal than
  */
 #define SEQ_LEQ16( a, b )   ( (short) ( (a) - (b) ) <= 0 )
 #define SEQ_GEQ16( a, b )   ( (short) ( (a) - (b) ) >= 0 )

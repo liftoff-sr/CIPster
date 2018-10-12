@@ -91,23 +91,24 @@ void NotifyIoConnectionEvent( CipConn* aConn, IoConnectionEvent io_connection_ev
 }
 
 
-EipStatus AfterAssemblyDataReceived( AssemblyInstance* instance )
+EipStatus AfterAssemblyDataReceived( AssemblyInstance* aInstance,
+    OpMode aMode, int aBytesReceivedCount )
 {
     EipStatus status = kEipStatusOk;
 
     // handle the data received e.g., update outputs of the device
-    switch( instance->Id() )
+    switch( aInstance->Id() )
     {
     case DEMO_APP_OUTPUT_ASSEMBLY_NUM:
-        /* Data for the output assembly has been received.
-         * Mirror it to the inputs */
+        // Data for the output assembly has been received.
+        // Mirror it to the inputs
         memcpy( &g_assembly_data064[0], &g_assembly_data096[0],
                 sizeof(g_assembly_data064) );
         break;
 
     case DEMO_APP_EXPLICT_ASSEMBLY_NUM:
-        /* do something interesting with the new data from
-         * the explicit set-data-attribute message */
+        // do something interesting with the new data from
+        // the explicit set-data-attribute message
         break;
 
     case DEMO_APP_CONFIG_ASSEMBLY_NUM:

@@ -3,6 +3,7 @@ Volunteer contributions welcome for these:
 
 *) Enhance documentation.  Note that @brief is ugly and it is being removed.
    We have Javadoc flag enabled in Doxygen which does basically the same thing.
+   Need to get rid of numerous Doxygen errors.
 
 *) Revive and/or replace unit tests.
 
@@ -11,5 +12,3 @@ Volunteer contributions welcome for these:
 *) Enhance sample applications to at least know their own IP address.
 
 *) I don't see where PIT production limiting is done.
-
-

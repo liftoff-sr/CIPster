@@ -49,8 +49,22 @@ EipStatus CipConnMgrClass::RecvConnectedData( UdpSocket* aSocket,
         const SockAddr& aFromAddress, BufReader aCommand )
 {
     Cpf cpfd( aFromAddress, 0 );
+    int result;
 
-    if( cpfd.DeserializeCpf( aCommand ) <= 0 )
+    try
+    {
+        result = cpfd.DeserializeCpf( aCommand );
+    }
+    catch( const std::exception& e )
+    {
+        // This can happen if the item_count in DeserializeCpf() is erroneous.
+        CIPSTER_TRACE_ERR( "%s[%d]: exception: %s in DeserializeCpf()\n",
+            __func__, aSocket->h(), e.what()
+            );
+        return kEipStatusError;
+    }
+
+    if( result <= 0 )
     {
         CIPSTER_TRACE_ERR( "%s[%d]: unable to DeserializeCpf()\n", __func__, aSocket->h() );
         return kEipStatusError;
@@ -64,9 +78,10 @@ EipStatus CipConnMgrClass::RecvConnectedData( UdpSocket* aSocket,
         // found connected address item or found sequenced address item
         // -> for now the sequence number will be ignored
 
-        if( cpfd.DataType() == kCpfIdConnectedDataItem ) // connected data item received
+        if( cpfd.DataType() == kCpfIdConnectedDataItem )
         {
-            CIPSTER_TRACE_INFO( "%s[%d]@%u:  CID:0x%08x  len:%zd  src:%s:%d  seq:%d\n",
+            CIPSTER_TRACE_INFO(
+                "%s[%d]@%u CID:0x%08x len:%-3zd src:%s:%d seq:%d\n",
                 __func__, aSocket->h(), CurrentUSecs32(),
                 cpfd.AddrConnId(),
                 aCommand.size(),
@@ -236,7 +251,7 @@ EipStatus CipConnMgrClass::ManageConnections()
                                 __func__, active->instance_id );
                         }
 
-                        active->SetTransmissionTriggerTimerUSecs( active->ProducingRPI() );
+                        active->BumpTransmissionTriggerTimerUSecs( active->ProducingRPI() );
 
                         if( active->trigger.Trigger() != kConnTriggerTypeCyclic )
                         {
@@ -457,7 +472,7 @@ EipStatus TriggerConnections( int aOutputAssembly, int aInputAssembly )
 }
 
 
-EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
+EipStatus CipConnMgrClass::forward_open( CipInstance* instance,
         CipMessageRouterRequest* request,
         CipMessageRouterResponse* response, bool isLarge )
 {
@@ -501,11 +516,10 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     if( params.connection_timeout_multiplier_value > 7 )
     {
         // Vol1 3-5.4.1.4
-       CIPSTER_TRACE_INFO( "%s: invalid connection timeout multiplier: %u\n",
-           __func__, params.connection_timeout_multiplier_value );
+        //CIPSTER_TRACE_INFO( "%s: invalid connection timeout multiplier: %u\n", __func__, params.connection_timeout_multiplier_value );
 
-       ext_status = kConnMgrStatusInvalidOToTConnectionType;
-       goto forward_open_response;
+        ext_status = kConnMgrStatusConnectionTimeoutMultiplierNotAcceptable;
+        goto forward_open_response;
     }
 
     CIPSTER_TRACE_INFO(
@@ -520,16 +534,12 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
 
     if( params.consuming_ncp.ConnectionType() == kIOConnTypeInvalid )
     {
-        CIPSTER_TRACE_INFO( "%s: invalid O to T connection type\n", __func__ );
-
         ext_status = kConnMgrStatusInvalidOToTConnectionType;
         goto forward_open_response;
     }
 
     if( params.producing_ncp.ConnectionType() == kIOConnTypeInvalid )
     {
-        CIPSTER_TRACE_INFO( "%s: invalid T to O connection type\n", __func__ );
-
         ext_status = kConnMgrStatusInvalidTToOConnectionType;
         goto forward_open_response;
     }
@@ -537,8 +547,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
     // check for undocumented trigger bits
     if( 0x4c & params.trigger.Bits() )
     {
-        CIPSTER_TRACE_INFO( "%s: trigger 0x%02x not supported\n",
-            __func__, params.trigger.Bits() );
+        //CIPSTER_TRACE_INFO( "%s: trigger 0x%02x not supported\n", __func__, params.trigger.Bits() );
 
         ext_status = kConnMgrStatusTransportTriggerNotSupported;
         goto forward_open_response;
@@ -664,8 +673,7 @@ EipStatus CipConnMgrClass::forward_open_common( CipInstance* instance,
 
     if( gen_status != kCipErrorSuccess )
     {
-        CIPSTER_TRACE_INFO( "%s: OpenConnection() failed. ext_status:0x%x\n",
-            __func__, ext_status );
+        //CIPSTER_TRACE_INFO( "%s: OpenConnection() failed. ext_status:0x%x\n", __func__, ext_status );
 
         goto forward_open_response;
     }
@@ -686,10 +694,13 @@ forward_open_response:
     else
     {
         CIPSTER_TRACE_INFO(
-            "%s: sending error response, gen_status:0x%x ext_status:0x%x\n",
+            "%s: sending error response\n"
+            " gen_status:0x%x\n"
+            " ext_status:0x%x (%s)\n",
             __func__,
             gen_status,
-            ext_status
+            ext_status,
+            ExtStatusStr( ext_status )
             );
 
         response->SetGenStatus( gen_status );
@@ -758,14 +769,14 @@ forward_open_response:
 EipStatus CipConnMgrClass::forward_open_service( CipInstance* instance,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    return forward_open_common( instance, request, response, false );
+    return forward_open( instance, request, response, false );
 }
 
 
 EipStatus CipConnMgrClass::large_forward_open_service( CipInstance* instance,
         CipMessageRouterRequest* request, CipMessageRouterResponse* response )
 {
-    return forward_open_common( instance, request, response, true );
+    return forward_open( instance, request, response, true );
 }
 
 

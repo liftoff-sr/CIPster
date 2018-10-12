@@ -13,18 +13,19 @@
  */
 
 
-/** @def CIPSTER_TRACE_LEVEL_ERROR Enable tracing of error messages. This is the
- *  default if no trace level is given.
+/**
+ * CIPSTER_TRACE_LEVEL_ERROR Enable tracing of error messages. This is the
+ * default if no trace level is given.
  */
 #define CIPSTER_TRACE_LEVEL_ERROR       (1<<0)
 
-//* @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of warning messages
+/// @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of warning messages
 #define CIPSTER_TRACE_LEVEL_WARNING     (1<<1)
 
-//* @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of state messages
+/// @def CIPSTER_TRACE_LEVEL_WARNING Enable tracing of state messages
 #define CIPSTER_TRACE_LEVEL_STATE       (1<<2)
 
-//* @def CIPSTER_TRACE_LEVEL_INFO Enable tracing of info messages
+/// @def CIPSTER_TRACE_LEVEL_INFO Enable tracing of info messages
 #define CIPSTER_TRACE_LEVEL_INFO        (1<<3)
 
 

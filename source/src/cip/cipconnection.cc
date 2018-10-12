@@ -1170,8 +1170,9 @@ ConnMgrStatus CipConn::handleConfigData()
     }
 
     // Put the data into the configuration assembly object
-    else if( kEipStatusOk != NotifyAssemblyConnectedDataReceived( instance,
-             BufReader( (uint8_t*)  words.data(),  words.size() * 2 ) ) )
+    else if( kEipStatusOk != instance->RecvData(
+                this,
+                BufReader( (uint8_t*)  words.data(),  words.size() * 2 ) ) )
     {
         CIPSTER_TRACE_WARN( "Configuration data was invalid\n" );
         result = kConnMgrStatusInvalidConfigurationApplicationPath;
@@ -1308,8 +1309,8 @@ void CipConn::Close()
 
                     SetProducingUdp( NULL );
 
-                    next_non_control_master->SetTransmissionTriggerTimerUSecs(
-                        TransmissionTriggerTimerUSecs() );
+                    next_non_control_master->setTransmissionTriggerTimerUSecs(
+                        transmissionTriggerTimerUSecs() );
                 }
 
                 else
@@ -1470,7 +1471,7 @@ EipStatus CipConn::SendConnectedData()
     length += data_len;
 
     CIPSTER_TRACE_INFO(
-        "%s[%d]@%u:  PID:0x%08x  len:%d  dst:%s:%d\n",
+        "%s[%d]@%u PID:0x%08x len:%-3d dst:%s:%d\n",
         __func__,
         ProducingUdp()->h(),
         (uint32_t)g_current_usecs,
@@ -1515,20 +1516,30 @@ EipStatus CipConn::HandleReceivedIoConnectionData( BufReader aInput )
         {
             uint32_t new_run_idle = aInput.get32();
 
+            //-----<new logic>---------------------------------------
+            // saves mode in each connection.
+            consuming_header.Set( new_run_idle );
+
+            //-----<old logic>---------------------------------------
+            // has no ability to track multiple scanner's modes.
             if( g_run_idle_state != new_run_idle )
             {
                 RunIdleChanged( new_run_idle );
             }
 
             g_run_idle_state = new_run_idle;
+            //-----</old logic>---------------------------------------
         }
         else
         {
             // It is kRealTimeFmtModeless
         }
 
-        if( NotifyAssemblyConnectedDataReceived(
-                static_cast<AssemblyInstance*>( consuming_instance ), aInput ) != 0 )
+        AssemblyInstance* assembly = static_cast<AssemblyInstance*>( consuming_instance );
+
+        EipStatus status = assembly->RecvData( this, aInput );
+
+        if( status != kEipStatusOk )
         {
             return kEipStatusError;
         }
@@ -1576,8 +1587,8 @@ void CipConn::timeOut()
                         next_non_control_master->SetProducingUdp( ProducingUdp() );
                         SetProducingUdp( NULL );
 
-                        next_non_control_master->SetTransmissionTriggerTimerUSecs(
-                            TransmissionTriggerTimerUSecs() );
+                        next_non_control_master->setTransmissionTriggerTimerUSecs(
+                            transmissionTriggerTimerUSecs() );
                     }
 
                     // this was the last master connection close all listen only

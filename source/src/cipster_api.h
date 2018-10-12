@@ -175,7 +175,7 @@ int DecodeData( CipDataType aDataType, void* cip_data, BufReader& aBuf );
  * assembly object.  In order to support a configuration assembly object it
  * has to be created with this function.
  * The notification on received configuration data is handled with the
- * NotifyAssemblyConnectedDataReceived() function.
+ * AssemblyInstance::RecvData() function.
  */
 inline AssemblyInstance* CreateAssemblyInstance( int aInstanceId, ByteBuf aByteBuf )
 {
@@ -307,18 +307,29 @@ void NotifyIoConnectionEvent( CipConn* aConn, IoConnectionEvent aEvent );
  * This function has to be implemented by the user of the CIP-stack.
  *
  * @param aInstance the assembly instance that data was received for
+ * @param aMode is the operating mode of the io connection peer.
+ *   This can be one of: kModeRun, KModeIdle, or kModeUnknown.  If kModeUnknown this
+ *   typically means either that the consuming connection half is not
+ *   kRealTimeFmt32BitHeader or that the peer is setting assembly data using
+ *   explicit messaging not implicity messaging.  In such a situation you can
+ *   use the mode received via RunIdleChanged() earlier.
+ *
+ * @param aBytesReceivedCount is how many bytes were copied into the assembly.
  *
  * @return EipStatus - whether data could be processed
  *     - kEipStatusOk the received data was ok
  *     - EIP_ERROR the received data was wrong (especially needed for
- * configuration data assembly objects)
+ * configuration data assembly objects), or the received byte count did not
+ * match a fixed size io connection.  For variable size connection, the received
+ * size can legally be smaller than the connection size.
  *
  * Assembly Objects for Configuration Data:
  * The CIP-stack uses this function to inform on received configuration data.
  * The length of the data is already checked within the stack. Therefore the
  * user only has to check if the data is valid.
  */
-EipStatus AfterAssemblyDataReceived( AssemblyInstance* aInstance );
+EipStatus AfterAssemblyDataReceived( AssemblyInstance* aInstance,
+    OpMode aMode, int aBytesReceivedCount );
 
 /** @ingroup CIP_CALLBACK_API
  * Function BeforeAssemblyDataSend
@@ -554,7 +565,7 @@ inline bool CloseSession( int aSocket )
  * guarding conditions for using CIPster in own products. For this please look
  * in license text as shown below:
  *
- * @include "../../license.txt"
+ * @verbinclude "license.txt"
  *
  */
 

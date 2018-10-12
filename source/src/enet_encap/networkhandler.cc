@@ -140,7 +140,8 @@ static unsigned usecs_now()
 
 static void master_set_add( const char* aType, int aSocket )
 {
-    CIPSTER_TRACE_INFO( "%s[%d]: %s socket\n", __func__, aSocket, aType );
+    //CIPSTER_TRACE_INFO( "%s[%d]: %s socket\n", __func__, aSocket, aType );
+
     (void) aType;
 
     FD_SET( aSocket, &master_set );
@@ -155,7 +156,7 @@ static void master_set_add( const char* aType, int aSocket )
 static void master_set_rem( int aSocket )
 {
     CIPSTER_ASSERT( aSocket >= 0 );
-    CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, aSocket );
+    //CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, aSocket );
 
     FD_CLR( aSocket, &master_set );
 
@@ -942,8 +943,7 @@ UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* 
 
     if( iface )
     {
-        CIPSTER_TRACE_INFO( "%s: found %s:%d\n",
-            __func__, aSockAddr.AddrStr().c_str(), aSockAddr.Port() );
+        //CIPSTER_TRACE_INFO( "%s: found %s:%d\n", __func__, aSockAddr.AddrStr().c_str(), aSockAddr.Port() );
 
         ++iface->m_ref_count;
     }
@@ -960,8 +960,7 @@ UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* 
         iface = alloc( aSockAddr, sock );
         m_sockets.push_back( iface );
 
-        CIPSTER_TRACE_INFO( "%s: alloc %s:%d\n",
-            __func__, aSockAddr.AddrStr().c_str(), aSockAddr.Port() );
+        //CIPSTER_TRACE_INFO( "%s: alloc %s:%d\n", __func__, aSockAddr.AddrStr().c_str(), aSockAddr.Port() );
     }
 
     if( aMulticast )
@@ -1028,11 +1027,13 @@ bool UdpSocketMgr::ReleaseSocket( UdpSocket* aUdpSocket )
     UdpSocket*  group = NULL;
     UdpSocket*  iface = NULL;
 
+#if defined(DEBUG) && 0
     CIPSTER_TRACE_INFO( "%s: %s:%d\n",
             __func__,
             aUdpSocket->m_sockaddr.AddrStr().c_str(),
             aUdpSocket->m_sockaddr.Port()
             );
+#endif
 
     if( aUdpSocket->m_sockaddr.IsMulticast() )
     {
@@ -1167,8 +1168,10 @@ int UdpSocketMgr::createSocket( const SockAddr& aSockAddr )
         goto close_and_exit;
     }
 
+    /*
     CIPSTER_TRACE_INFO( "%s[%d]: bound on %s:%d\n",
         __func__, udp_sock, aSockAddr.AddrStr().c_str(), aSockAddr.Port() );
+    */
 
     {
         char ttl = CipTCPIPInterfaceClass::TTL(1);

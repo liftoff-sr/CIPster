@@ -6,6 +6,32 @@
 #include <byte_bufs.h>
 #include <trace.h>
 
+
+#if defined(DEBUG) && defined(__linux__)
+#include <execinfo.h>
+
+static void stack_dump( const char* aContext )
+{
+    void*   trace[32];
+    char**  strings;
+
+    // see http://www.linuxjournal.com/article/6391 for info on backtrace()
+    // in a signal handler.
+    int trace_size = backtrace( trace, DIM(trace) );
+
+    strings = backtrace_symbols( trace, trace_size );
+
+    printf( "%s:\n", aContext );
+    for( int i = 0; i < trace_size; ++i )
+        printf( " bt[%d] %s\n", i, strings[i] );
+
+    free( strings );
+}
+#else
+inline void stack_dump( const char* aContext ) {}      // nothing
+#endif
+
+
 #ifdef HAVE_ICONV
 #include <iconv.h>
 
@@ -96,6 +122,7 @@ const int WORKZ = 256;
 
 void BufWriter::overrun() const
 {
+    stack_dump( "write > limit" );
     throw std::overflow_error( "write > limit" );
 }
 
@@ -169,6 +196,7 @@ BufWriter& BufWriter::put_STRING2( const std::string& aString )
 
 void BufReader::overrun() const
 {
+    stack_dump( "read > limit" );
     throw std::range_error( "read > limit" );
 }
 

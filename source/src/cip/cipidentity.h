@@ -9,7 +9,7 @@
 #include "typedefs.h"
 #include "ciptypes.h"
 
-// * @brief Status of the CIP Identity object
+/// Status of the CIP Identity object
 enum CipIdentityStatus
 {
     kOwned = 0x0001,                    ///< Indicates that the device has an owner

@@ -23,6 +23,24 @@ AssemblyInstance::AssemblyInstance( int aInstanceId, ByteBuf aBuffer ) :
 }
 
 
+EipStatus AssemblyInstance::RecvData( CipConn* aConn, BufReader aBuffer )
+{
+    if( ( aConn->ConsumingNCP().IsFixed() && SizeBytes() != aBuffer.size()) ||
+        (!aConn->ConsumingNCP().IsFixed() && SizeBytes() < aBuffer.size()) )
+    {
+        CIPSTER_TRACE_ERR(
+            "%s: wrong data amount: %zd bytes arrived for assembly id: %d\n",
+            __func__, aBuffer.size(), Id() );
+        return kEipStatusError;
+    }
+
+    memcpy( Buffer().data(), aBuffer.data(), aBuffer.size() );
+
+    // notify application that new data arrived
+    return AfterAssemblyDataReceived( this, aConn->Mode(), aBuffer.size() );
+}
+
+
 CipAssemblyClass::CipAssemblyClass() :
     CipClass( kCipAssemblyClass,
         "Assembly",
@@ -136,7 +154,8 @@ EipStatus CipAssemblyClass::set_assembly_data_attr( CipInstance* aInstance, CipA
         memcpy( assembly->byte_array.data(), request->Data().data(),
                 assembly->byte_array.size() );
 
-        if( AfterAssemblyDataReceived( assembly ) != kEipStatusOk )
+        if( AfterAssemblyDataReceived( assembly,
+                kOpModeUnknown, request->Data().size() ) != kEipStatusOk )
         {
             // NOTE: the attribute's data has already been overwritten.
             // Application did not like it.
@@ -145,26 +164,4 @@ EipStatus CipAssemblyClass::set_assembly_data_attr( CipInstance* aInstance, CipA
     }
 
     return kEipStatusOkSend;
-}
-
-
-EipStatus NotifyAssemblyConnectedDataReceived( AssemblyInstance* aInstance, BufReader aBuffer )
-{
-    CIPSTER_ASSERT( aInstance->Class()->ClassId() == kCipAssemblyClass );
-
-    if( aInstance->SizeBytes() != aBuffer.size() )
-    {
-        CIPSTER_TRACE_ERR( "%s: wrong amount of data arrived for assembly object\n", __func__ );
-        return kEipStatusError;
-
-        // TODO question should we notify the application that
-        // wrong data has been recieved???
-    }
-    else
-    {
-        memcpy( aInstance->Buffer().data(), aBuffer.data(), aBuffer.size() );
-    }
-
-    // notify application that new data arrived
-    return AfterAssemblyDataReceived( aInstance );
 }

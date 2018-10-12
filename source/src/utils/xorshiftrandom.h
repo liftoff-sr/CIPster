@@ -16,15 +16,17 @@
 #define CIPSTER_XORSHIFTRANDOM_H_
 
 /**
- * @brief Sets the initial seed for the XOR shift pseudo-random algorithm
- * @param pa_nSeed The initial seed value
+ * Function SetXorShiftSeed
+ * sets the initial seed for the XOR shift pseudo-random algorithm
+ * @param aSeed The initial seed value
  */
-void SetXorShiftSeed(uint32_t seed);
+void SetXorShiftSeed( uint32_t aSeed );
 
 /**
- * @brief Returns the next generated pseudo-random number
- * @return The next pseudo-random number
+ * Function NextXorShiftUint32
+ * returns the next generated pseudo-random number
+ * @return uint32_t - The next pseudo-random number
  */
-uint32_t NextXorShiftUint32(void);
+uint32_t NextXorShiftUint32();
 
 #endif // CIPSTER__XORSHIFTRANDOM_H_

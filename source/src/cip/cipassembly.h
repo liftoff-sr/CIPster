@@ -27,28 +27,29 @@ public:
     unsigned SizeBytes() const      { return byte_array.size(); }
     const ByteBuf& Buffer() const   { return byte_array; }
 
+    /**
+     * Function RecvData
+     * notifies an AssemblyInstance that data has been received for it.
+     *
+     * The data will be copied into the assembly instance's attribute 3 and
+     * the application will be informed with the AfterAssemblyDataReceived() function.
+     *
+     * @param aConn which connection did the io connection datagram come in on?
+     *  It has the scanner specific Header32Bit info in it.
+     *
+     * @param aInput the byte data received and its length
+     * @return
+     *     - kEipStatusOk the received data was okay
+     *     - EIP_ERROR the received data was wrong
+     */
+    EipStatus RecvData( CipConn* aConn, BufReader aInput );
+
 protected:
     ByteBuf     byte_array;
 };
 
 
 // public functions
-
-/**
- * Function NofityAssemblyConnectedDataReceived
- * notifies an Assembly object that data has been received for it.
- *
- *  The data will be copied into the assembly instance's attribute 3 and
- *  the application will be informed with the IApp_after_assembly_data_received function.
- *
- *  @param aInstance the assembly instance for which the data was received
- *  @param aInput the byte data received and its length
- *  @return
- *     - kEipStatusOk the received data was okay
- *     - EIP_ERROR the received data was wrong
- */
-EipStatus NotifyAssemblyConnectedDataReceived( AssemblyInstance* aInstance, BufReader aInput );
-
 
 
 class CipAssemblyClass : public CipClass
@@ -60,6 +61,7 @@ public:
                 Cpf* aCpf, ConnMgrStatus* aExtError ); // override
 
     static AssemblyInstance* CreateInstance( int aInstanceId, ByteBuf aBuffer );
+
 
     /**
      * Function Init
