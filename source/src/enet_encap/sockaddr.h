@@ -10,6 +10,7 @@
 #include <string>
 
 #if defined(__linux__)
+ #include <errno.h>
  #include <arpa/inet.h>
 #elif defined(_WIN32)
  #undef _WINSOCKAPI_    // suppress Mingw32's "Please include winsock2.h before windows.h"
@@ -33,7 +34,7 @@ public:
 #if defined(__linux__)
         error_code( errno )
 #elif defined(_WIN32)
-    error_code( WSAGetLastError() )
+        error_code( WSAGetLastError() )
 #endif
     {}
 

@@ -17,6 +17,7 @@ set( CIP_SRCS
     cip/cipidentity.cc
     cip/cipmessagerouter.cc
     cip/ciptcpipinterface.cc
+    cip/cipvendors.cc
     )
 
 set( ENCAP_SRCS

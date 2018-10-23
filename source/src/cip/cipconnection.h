@@ -901,7 +901,7 @@ public:
 
     CipConn& SetState( ConnState aNewState )
     {
-        CIPSTER_TRACE_INFO( "   CipConn::%s<%d>(%s)\n", __func__, instance_id, ShowState( aNewState ) );
+        CIPSTER_TRACE_INFO( "CipConn::%s<%d>(%s)\n", __func__, instance_id, ShowState( aNewState ) );
         state = aNewState;
         return *this;
     }
@@ -1117,7 +1117,7 @@ protected:
 
     CipConn& setTransmissionTriggerTimerUSecs( int32_t aUSecs )
     {
-        //CIPSTER_TRACE_INFO( "%s<%d>( %d ) CID:0x%08x PID:0x%08x\n", __func__, instance_id, aFuture, consuming_connection_id, producing_connection_id );
+        //CIPSTER_TRACE_INFO( "%s<%d>( %d ) CID:0x%08x PID:0x%08x\n", __func__, instance_id, aUSecs, consuming_connection_id, producing_connection_id );
         transmission_trigger_timer_usecs = aUSecs;
         return *this;
     }

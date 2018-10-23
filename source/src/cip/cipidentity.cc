@@ -45,9 +45,9 @@ uint16_t device_type_ = CIPSTER_DEVICE_TYPE;            //*< Attribute 2: Device
 
 uint16_t product_code_ = CIPSTER_DEVICE_PRODUCT_CODE;   //*< Attribute 3: Product Code
 
-CipRevision revision_ =
+/// Attribute 4: Revision / USINT Major, USINT Minor
+CipRevision revision_
 {
-    //*< Attribute 4: Revision / USINT Major, USINT Minor
     CIPSTER_DEVICE_MAJOR_REVISION,
     CIPSTER_DEVICE_MINOR_REVISION
 };

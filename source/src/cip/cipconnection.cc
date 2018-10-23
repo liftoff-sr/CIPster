@@ -274,6 +274,7 @@ ConnectionData::ConnectionData(
     consuming_instance( 0 ),
     producing_instance( 0 ),
     config_instance( 0 ),
+    connection_timeout_multiplier_value( 0 ),
     mgmnt_class( 0 ),
 
     // kRealTimeFmtHeartbeat is set later when applicable.
@@ -283,7 +284,6 @@ ConnectionData::ConnectionData(
     consuming_fmt( kCIPsterConsumedDataHasRunIdleHeader ?
         kRealTimeFmt32BitHeader : kRealTimeFmtModeless )
 {
-    SetTimeoutMultiplier( aConnectionTimeoutMultiplier );
 }
 
 
@@ -329,7 +329,7 @@ ConnectionData& ConnectionData::SetTimeoutMultiplier( ConnTimeoutMultiplier aMul
         m >>= 1;
     }
 
-    // CIPSTER_TRACE_INFO( "%s: value=%d\n", __func__, value );
+    //CIPSTER_TRACE_INFO( "%s: value=%d\n", __func__, value );
 
     connection_timeout_multiplier_value = value;
     return *this;

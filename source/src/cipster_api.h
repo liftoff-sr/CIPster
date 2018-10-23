@@ -391,6 +391,7 @@ inline bool CloseSession( int aSocket )
     return SessionMgr::CloseBySocket( aSocket );
 }
 
+
 /** @mainpage CIPster - Open Source EtherNet/IP(TM) Communication Stack
  * Documentation
  *
