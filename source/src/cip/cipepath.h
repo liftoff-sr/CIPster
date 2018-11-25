@@ -65,6 +65,9 @@ public:
      *
      * @param aInput starts at a possible data segment, if any, and can extend beyond it.
      *
+     * @param aCtl is a set of flags from enum CTL_FLAGS.  Most important to this
+     *  function would be CTL_PACKED_EPATH, if not present then padded path is assumed.
+     *
      * @return int - Number of decoded bytes, or < 0 if error.  If error, then
      *  the absolute value of this result is the byte offset of the problem starting
      *  from aSrc at zero.  If positive, it is not an error, even though not all the
@@ -72,7 +75,7 @@ public:
      *  segment type not allowed into this SegmentGroup which can be before aLimit is reached.
      *  If zero, then the first bytes at aInput were not pertinent to this class.
      */
-    int DeserializeDataSegment( BufReader aInput );
+    int DeserializeDataSegment( BufReader aInput, int aCtl = 0 );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
@@ -97,6 +100,18 @@ protected:
  * Class CipAppPath
  * holds, serializes and deserializes a CIP Application Path.
  * <p>
+ * @see Vol1 C-1.3:
+ * <p>
+ * A path (data type EPATH) can be represented in two different formats: Padded
+ * Path (indicated as data type Padded EPATH) Packed Path (indicated as data
+ * type Packed EPATH) Each segment of a Padded Path shall be 16-bit word
+ * aligned. If a pad byte is required to achieve the alignment, the segment
+ * shall specify the location of the pad byte. A Packed Path shall not contain
+ * any pad bytes. When a component is defined as data type EPATH, it shall
+ * indicate the format (Packed or Padded).
+ * <p>
+ * @see Vol1 C-1.6
+ * <p>
  * When multiple encoded paths are concatenated the delineation between paths is
  * where a segment at a higher level in the hierarchy is encountered. Multiple
  * encoded paths may be compacted when each path shares the same values at the
@@ -104,8 +119,6 @@ protected:
  * in compressed paths. When a segment is encountered which is at the same or
  * higher level but not at the top level in the hierarchy, the preceding higher
  * levels are used for that next encoded path.
- * <p>
- * Per C-1.6 of Vol1_3.19, implemented herein.
  */
 class CipAppPath : public SegmentGroup
 {
@@ -128,6 +141,9 @@ public:
      *
      * @param aInput starts at a possible app_path and can extend beyond it.
      *
+     * @param aCtl is a set of flags and for this function the presence or
+     *  absence of CTL_PACKED_EPATH is most important.
+     *
      * @param aPreviousToInheritFrom is typically an immediately preceding CipAppPath
      *  that this one is to inherit logical segment values from.  The values
      *  inherited are the "more significant" fields than the first one encountered
@@ -139,7 +155,7 @@ public:
      * @throw std::runtime_error if problem with aInput, or
      *    std::overrun() from BufReader on buffer overrun.
      */
-    int DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom = NULL );
+    int DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom = NULL, int aCtl = 0 );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
@@ -309,12 +325,14 @@ private:
 
     char    tag[42];
 
-    int deserialize_symbolic( BufReader aInput );
-    int deserialize_logical( BufReader aInput, Stuff aField, int aFormat );
+    int deserialize_symbolic( BufReader aInput, int aCtl );
 
-    void inherit( int aStart, CipAppPath* from );
+    int deserialize_logical( BufReader aInput, int aCtl, Stuff aField, int aFormat );
+    static int serialize_logical( BufWriter aOutput, int aCtl, int aSegType, unsigned aValue );
 
-    void inherit_assembly( int aStart, CipAppPath* from );
+    void inherit( Stuff aStart, CipAppPath* from );
+
+    void inherit_assembly( Stuff aStart, CipAppPath* from );
 };
 
 
@@ -338,11 +356,11 @@ struct CipElectronicKeySegment
      * Function DeserializeElectronicKey
      * parses an electronic key into this structure.
      *
-     * @param aSource gives the bytes to parse and their length.
+     * @param aInput gives the bytes to parse and their length.
      * @return int - number of bytes consumed.  If zero, this means bytes
      *  given by aSource were not an electronic key.
      */
-    int DeserializeElectronicKey( BufReader aSource );
+    int DeserializeElectronicKey( BufReader aInput, int aCtl = 0 );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
@@ -386,7 +404,7 @@ public:
             link_address.push_back( *aSrc++ );
     }
 
-    int DeserializePortSegment( BufReader aInput );
+    int DeserializePortSegment( BufReader aInput, int aCtl = 0 );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;
@@ -423,6 +441,9 @@ public:
      *
      * @param aInput starts at a possible port segment group and can extend beyond it.
      *
+     * @param aCtl is a set of flags from enum CTL_FLAGS.  Most important to this
+     *  function would be CTL_PACKED_EPATH, if not present then padded path is assumed.
+     *
      * @return int - Number of decoded bytes.  Not all the bytes available from aInput
      *  will necessarily be consumed.  Parsing may stop at the first
      *  segment type not allowed into this SegmentGroup which can be before
@@ -431,7 +452,7 @@ public:
      *
      * @throw whatever BufReader will throw on buffer overrun.
      */
-    int DeserializePortSegmentGroup( BufReader aInput );
+    int DeserializePortSegmentGroup( BufReader aInput, int aCtl );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;

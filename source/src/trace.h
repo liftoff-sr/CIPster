@@ -90,8 +90,6 @@ extern int g_CIPSTER_TRACE_LEVEL;       // defined in g_data.cc
 
 #else       // define the tracing macros empty in order to save space
 
-#pragma message( "CIPSTER_WITH_TRACES was not defined" )
-
 #undef CIPSTER_TRACE_LEVEL
 #define CIPSTER_TRACE_LEVEL 0
 

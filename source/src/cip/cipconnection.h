@@ -524,11 +524,14 @@ public:
      *   so this function knows when to stop consuming input bytes. Construct this
      *   BufReader using the word count which precedes most connection_paths.
      *
+     * @param aCtl is a set of flags from enum CTL_FLAGS.  Most important to this
+     *  function would be CTL_PACKED_EPATH, if not present then padded path is assumed.
+     *
      * @return int - the count of consumed bytes from aInput
      * @throw std::overflow_error - on aInput overrrun or
      *        std::range_error    - if problem with aInput's contents.
      */
-    int Deserialize( BufReader aInput );
+    int Deserialize( BufReader aInput, int aCtl = 0 );
 
     //-----<Serializeable>------------------------------------------------------
     int Serialize( BufWriter aOutput, int aCtl = 0 ) const;

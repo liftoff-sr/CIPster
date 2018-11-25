@@ -19,7 +19,7 @@
 
 //-----<ConnectionPath>---------------------------------------------------------
 
-int ConnectionPath::Deserialize( BufReader aInput )
+int ConnectionPath::Deserialize( BufReader aInput, int aCtl )
 {
     BufReader       in = aInput;
     const char*     working_on;     // for catch blocks.
@@ -32,7 +32,7 @@ int ConnectionPath::Deserialize( BufReader aInput )
         if( in.size() )
         {
             working_on = "PortSegmentGroup: ";
-            in += port_segs.DeserializePortSegmentGroup( in );
+            in += port_segs.DeserializePortSegmentGroup( in, aCtl );
         }
 
         /*
@@ -49,25 +49,25 @@ int ConnectionPath::Deserialize( BufReader aInput )
         if( in.size() )
         {
             working_on = "app_path1: ";
-            in += app_path1.DeserializeAppPath( in );
+            in += app_path1.DeserializeAppPath( in, NULL, aCtl );
         }
 
         if( in.size() )
         {
             working_on = "app_path2: ";
-            in += app_path2.DeserializeAppPath( in, &app_path1 );
+            in += app_path2.DeserializeAppPath( in, &app_path1, aCtl );
         }
 
         if( in.size() )
         {
             working_on = "app_path3: ";
-            in += app_path3.DeserializeAppPath( in, &app_path2 );
+            in += app_path3.DeserializeAppPath( in, &app_path2, aCtl );
         }
 
         if( in.size() )     // There could be a data segment
         {
             working_on = "data_segment: ";
-            in += data_seg.DeserializeDataSegment( in );
+            in += data_seg.DeserializeDataSegment( in, aCtl );
         }
     }
     catch( const std::overflow_error& ov )
@@ -89,9 +89,20 @@ int ConnectionPath::Deserialize( BufReader aInput )
 
     if( in.size() )   // should have consumed all of it by now
     {
-        std::string m = __func__;
-        m += ": unknown extra segments in connection path";
-        throw std::runtime_error( m );
+        // Generally a connection_path will always be an even number of bytes
+        // because it is specified as a number of words in normal use. So if
+        // there is another single byte and we were given an even number to
+        // parse, assume it is a pad byte.
+        if( in.size() == 1 && !(aInput.size() & 1) )
+        {
+            ++in;   // padding
+        }
+        else
+        {
+            std::string m = __func__;
+            m += ": unknown extra segments in connection path";
+            throw std::runtime_error( m );
+        }
     }
 
     return in.data() - aInput.data();
@@ -105,56 +116,48 @@ int ConnectionPath::Serialize( BufWriter aOutput, int aCtl ) const
     if( port_segs.HasAny() )
         out += port_segs.Serialize( out, aCtl );
 
-#if 0
-    int last_class = -1;
-    int app_path_count = app_path[0].HasAny() + app_path[1].HasAny() + app_path[2].HasAny();
-
-    for( int i=0; i<3; ++i )
+    if( !(aCtl & CTL_UNCOMPRESSED_EPATH) )
     {
-        if( !app_path[i].HasAny() )
-            continue;
+        const CipAppPath* prev = NULL;
 
-        int ctl = ( last_class == app_path[i].GetClass() ) ? CTL_OMIT_CLASS : 0;
+        for( int i=0; i < DIM(app_path);  ++i )
+        {
+            if( !app_path[i].HasAny() )
+                continue;
 
-        out += app_path[i].Serialize( out, ctl );
+            const CipAppPath& cur = app_path[i];
 
-        last_class = app_path[i].GetClass();
+            int ctl = aCtl;
+
+            if(  prev )
+            {
+                if( prev->GetClass() == cur.GetClass() )
+                    ctl |= CTL_OMIT_CLASS;
+
+                if( ( cur.HasConnPt() || cur.HasAttribute() ) && prev->GetInstance() == cur.GetInstance() )
+                    ctl |= CTL_OMIT_INSTANCE;
+
+                if( cur.HasAttribute() && prev->GetConnPt() == cur.GetConnPt() )
+                    ctl |= CTL_OMIT_CONN_PT;
+            }
+
+            out += cur.Serialize( out, ctl );
+
+            prev = &cur;
+        }
     }
 
-#else
-    int class1 = 0;
-    int class2 = 0;
-    int class3 = 0;
-
-    if( app_path1.HasAny() )
+    else
     {
-        class1 = app_path1.GetClass();
-        out += app_path1.Serialize( out, aCtl );
+        if( app_path1.HasAny() )
+            out += app_path1.Serialize( out, aCtl );
+
+        if( app_path2.HasAny() )
+            out += app_path2.Serialize( out, aCtl );
+
+        if( app_path3.HasAny() )
+            out += app_path3.Serialize( out, aCtl );
     }
-
-    if( app_path2.HasAny() )
-    {
-        int ctl = aCtl;
-
-        class2 = app_path2.GetClass();
-
-        if( class1 == kCipAssemblyClass && class2 == kCipAssemblyClass )
-            ctl |= CTL_OMIT_CLASS | CTL_USE_CONN_PT;
-
-        out += app_path2.Serialize( out, ctl );
-    }
-
-    if( app_path3.HasAny() )
-    {
-        int ctl = aCtl;
-
-        class3 = app_path3.GetClass();
-
-        if( class2 == kCipAssemblyClass && class3 == kCipAssemblyClass )
-            ctl |= CTL_OMIT_CLASS | CTL_USE_CONN_PT;
-        out += app_path3.Serialize( out, ctl );
-    }
-#endif
 
     if( data_seg.HasAny() )
         out += data_seg.Serialize( out, aCtl );
@@ -170,6 +173,8 @@ int ConnectionPath::SerializedCount( int aCtl ) const
     int class3 = 0;
 
     int count = 0;
+
+    // @todo fix this
 
     if( port_segs.HasAny() )
         count += port_segs.SerializedCount( aCtl );
@@ -187,7 +192,7 @@ int ConnectionPath::SerializedCount( int aCtl ) const
         class2 = app_path2.GetClass();
 
         if( class1 == kCipAssemblyClass && class2 == kCipAssemblyClass )
-            ctl |= CTL_OMIT_CLASS | CTL_USE_CONN_PT;
+            ctl |= CTL_OMIT_CLASS;
 
         count += app_path2.SerializedCount( ctl );
     }
@@ -199,7 +204,7 @@ int ConnectionPath::SerializedCount( int aCtl ) const
         class3 = app_path3.GetClass();
 
         if( class2 == kCipAssemblyClass && class3 == kCipAssemblyClass )
-            ctl |= CTL_OMIT_CLASS | CTL_USE_CONN_PT;
+            ctl |= CTL_OMIT_CLASS;
 
         count += app_path3.SerializedCount( ctl );
     }

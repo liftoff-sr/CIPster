@@ -251,13 +251,19 @@ inline BufWriter& BufWriter::append( const BufReader& aReader )
 }
 
 /// Control bits for Serializeable::Serialize(), or SerializeCount()'s aCtl
-enum
+enum CTL_FLAGS
 {
-    CTL_OMIT_CONN_PATH          = (1<<0),
-    CTL_FORWARD_OPEN            = (1<<1),
-    CTL_FORWARD_CLOSE           = (1<<2),
-    CTL_OMIT_CLASS              = (1<<3),
-    CTL_USE_CONN_PT             = (1<<4),   // when class is assembly, use conn_pt not instance
+    CTL_OMIT_CLASS              = (1<<0),
+    CTL_OMIT_INSTANCE           = (1<<1),
+    CTL_OMIT_CONN_PT            = (1<<2),
+    CTL_OMIT_ATTRIBUTE          = (1<<3),
+    CTL_UNCOMPRESSED_EPATH      = (1<<4),
+    CTL_PACKED_EPATH            = (1<<5),
+
+    CTL_OMIT_CONN_PATH          = (1<<6),
+
+    CTL_FORWARD_OPEN            = (1<<7),
+    CTL_FORWARD_CLOSE           = (1<<8),
 };
 
 

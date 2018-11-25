@@ -12,31 +12,51 @@
 #include <cipidentity.h>
 #include <cipclass.h>
 
+/**
+ * Enum SegmentType
+ * is the set of bits 7-5 in the Segment Type/Format byte
+ */
+enum SegmentType
+{
+    // Segments
+    kSegmentPort                = 0x00,     ///< Port segment
+    kSegmentLogical             = 0x20,     ///< Logical segment
+    kSegmentNetwork             = 0x40,     ///< Network segment
+    kSegmentSymbolic            = 0x60,     ///< Symbolic segment
+    kSegmentData                = 0x80,     ///< Data segment
+    kSegmentDataTypeConstructed = 0xA0,     ///< Data type constructed
+    kSegmentDataTypeElementary  = 0xC0,     ///< Data type elementary
+    kSegmentSegmentTypeReserved = 0xE0,
+};
 
-//* @brief Enum containing values which kind of logical segment is encoded
+
+/**
+ * Enum LogicalSegmentType
+ * is the set of logical segment types.
+ */
 enum LogicalSegmentType
 {
-    kLogicalSegmentTypeClassId         = 0x00 + kSegmentTypeLogical,    ///< Class ID
-    kLogicalSegmentTypeInstanceId      = 0x04 + kSegmentTypeLogical,    ///< Instance ID
-    kLogicalSegmentTypeMemberId        = 0x08 + kSegmentTypeLogical,    ///< Member ID
-    kLogicalSegmentTypeConnectionPoint = 0x0C + kSegmentTypeLogical,    ///< Connection Point
-    kLogicalSegmentTypeAttributeId     = 0x10 + kSegmentTypeLogical,    ///< Attribute ID
-    kLogicalSegmentTypeSpecial         = 0x14 + kSegmentTypeLogical,    ///< Special
-    kLogicalSegmentTypeService         = 0x18 + kSegmentTypeLogical,    ///< Service ID
-    kLogicalSegmentTypeExtendedLogical = 0x1C + kSegmentTypeLogical,    ///< Extended Logical
+    kLogicalSegmentClassId         = 0x00 + kSegmentLogical,    ///< Class ID
+    kLogicalSegmentInstanceId      = 0x04 + kSegmentLogical,    ///< Instance ID
+    kLogicalSegmentMemberId        = 0x08 + kSegmentLogical,    ///< Member ID
+    kLogicalSegmentConnectionPoint = 0x0C + kSegmentLogical,    ///< Connection Point
+    kLogicalSegmentAttributeId     = 0x10 + kSegmentLogical,    ///< Attribute ID
+    kLogicalSegmentSpecial         = 0x14 + kSegmentLogical,    ///< Special
+    kLogicalSegmentService         = 0x18 + kSegmentLogical,    ///< Service ID
+    kLogicalSegmentExtendedLogical = 0x1C + kSegmentLogical,    ///< Extended Logical
 };
 
 
 enum NetworkSegmentSubType
 {
-    kProductionTimeInhibitTimeNetworkSegment = 0x43 ///< production inhibit time network segment
+    kProductionTimeInhibitTimeNetwork = 0x43,   ///< production inhibit time network segment
 };
 
 
 enum DataSegmentType
 {
-    kDataSegmentTypeSimpleDataMessage         = kSegmentTypeData + 0x00,
-    kDataSegmentTypeAnsiExtendedSymbolMessage = kSegmentTypeData + 0x11
+    kDataSegmentSimpleData         = kSegmentData + 0x00,
+    kDataSegmentANSIExtendedSymbol = kSegmentData + 0x11,
 };
 
 
@@ -126,24 +146,34 @@ CipAttribute* CipAppPath::Attribute( int aAttrId ) const
 
 
 // make static so compiler has option of inlining this
-static int serialize( BufWriter& out, int seg_type, unsigned aValue )
+int CipAppPath::serialize_logical( BufWriter aOutput, int aCtl, int aSegType, unsigned aValue )
 {
-    uint8_t* start = out.data();
+    BufWriter out = aOutput;
 
     if( aValue < 256 )
     {
-        out.put8( seg_type ).put8( aValue );
+        out.put8( aSegType ).put8( aValue );
     }
     else if( aValue < 65536 )
     {
-        out.put8( seg_type | 1 ).put16( aValue );
+        out.put8( aSegType | 1 );
+
+        if( !(aCtl & CTL_PACKED_EPATH) )
+            out.put8( 0 );
+
+        out.put16( aValue );
     }
     else
     {
-        out.put8( seg_type | 2 ).put32( aValue );
+        out.put8( aSegType | 2 );
+
+        if( !(aCtl & CTL_PACKED_EPATH) )
+            out.put8( 0 );
+
+        out.put32( aValue );
     }
 
-    return out.data() - start;
+    return out.data() - aOutput.data();
 }
 
 
@@ -151,55 +181,87 @@ int CipAppPath::Serialize( BufWriter aOutput, int aCtl ) const
 {
     BufWriter out = aOutput;
 
-    if( HasSymbol() )
+    // see Vol1 C-1.5 for "application_path" grammar
+    if( HasSymbol() )   // symbolic_application_path
     {
         int tag_size = strlen( tag );
 
-        out.put8( kDataSegmentTypeAnsiExtendedSymbolMessage );
+        out.put8( kDataSegmentANSIExtendedSymbol );
         out.put8( tag_size );
 
         out.append( (uint8_t*) tag, tag_size );
 
+        // Vol1 C-1.4.5.2 does not say that the pad byte is conditional
+        // on CTL_PACKED_EPATH, but the spec could be deficient there.
         if( (out.data() - aOutput.data()) & 1 )
             out.put8( 0 );               // output possible pad byte
 
         if( HasConnPt() )
-            serialize( out, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
+            out += serialize_logical( out, aCtl, kLogicalSegmentConnectionPoint, GetConnPt() );
 
         if( HasMember1() )
         {
-            serialize( out, kLogicalSegmentTypeMemberId, GetMember1() );
+            out += serialize_logical( out, aCtl, kLogicalSegmentMemberId, GetMember1() );
 
             if( HasMember2() )
             {
-                serialize( out, kLogicalSegmentTypeMemberId, GetMember2() );
+                out += serialize_logical( out, aCtl, kLogicalSegmentMemberId, GetMember2() );
 
                 if( HasMember3() )
                 {
-                    serialize( out, kLogicalSegmentTypeMemberId, GetMember3() );
+                    out += serialize_logical( out, aCtl, kLogicalSegmentMemberId, GetMember3() );
                 }
             }
         }
     }
 
-    else    // is logical
+    else if( GetClass() == kCipAssemblyClass )   // "assembly_class_application_path"
     {
         if( HasClass() && !(aCtl & CTL_OMIT_CLASS) )
-            serialize( out, kLogicalSegmentTypeClassId, GetClass() );
+            out += serialize_logical( out, aCtl, kLogicalSegmentClassId, GetClass() );
 
-        if( HasInstance() )
-        {
-            if( GetClass() == kCipAssemblyClass && (aCtl & CTL_USE_CONN_PT) )
-                serialize( out, kLogicalSegmentTypeConnectionPoint, GetInstance() );
-            else
-                serialize( out, kLogicalSegmentTypeInstanceId, GetInstance() );
-        }
+        // "assembly_attribute_specification" includes _either_:
+        // Instance ID or Connection Point, not both.
 
-        else if( HasConnPt() )
-            serialize( out, kLogicalSegmentTypeConnectionPoint, GetConnPt() );
+        if( HasInstance() && !(aCtl & CTL_OMIT_INSTANCE) )
+            out += serialize_logical( out, aCtl, kLogicalSegmentInstanceId, GetInstance() );
+
+        else if( HasConnPt() && !(aCtl & CTL_OMIT_CONN_PT)  )
+            out += serialize_logical( out, aCtl, kLogicalSegmentConnectionPoint, GetConnPt() );
 
         if( HasAttribute() )
-            serialize( out, kLogicalSegmentTypeAttributeId, GetAttribute() );
+            out += serialize_logical( out, aCtl, kLogicalSegmentAttributeId, GetAttribute() );
+    }
+
+    else        // "class_application_path"
+    {
+        if( HasClass() && !(aCtl & CTL_OMIT_CLASS) )
+            out += serialize_logical( out, aCtl, kLogicalSegmentClassId, GetClass() );
+
+        // "item_specification ::= CHOICE {attribute_specification, connection_point_specification}"
+
+        if( !HasConnPt() )  // "attribute_specification"
+        {
+            // attribute_specification ::=
+            //     Instance ID [[Attribute ID] [member_specification][bit_specification]]
+            if( HasInstance() && !(aCtl & CTL_OMIT_INSTANCE) )
+                out += serialize_logical( out, aCtl, kLogicalSegmentInstanceId, GetInstance() );
+
+            if( HasAttribute() )
+                out += serialize_logical( out, aCtl, kLogicalSegmentAttributeId, GetAttribute() );
+        }
+        else
+        {
+            // connection_point_specification ::=
+            //    [Instance ID] Connection Point [member_specification][bit_specification]
+            if( HasInstance() && !(aCtl & CTL_OMIT_INSTANCE) )
+            {
+                out += serialize_logical( out, aCtl, kLogicalSegmentInstanceId, GetInstance() );
+            }
+
+            if( HasConnPt() )
+                out += serialize_logical( out, aCtl, kLogicalSegmentConnectionPoint, GetConnPt() );
+        }
     }
 
     return out.data() - aOutput.data();
@@ -217,7 +279,7 @@ int CipAppPath::SerializedCount( int aCtl ) const
 }
 
 
-int CipAppPath::deserialize_logical( BufReader aInput, CipAppPath::Stuff aField, int aFormat )
+int CipAppPath::deserialize_logical( BufReader aInput, int aCtl, CipAppPath::Stuff aField, int aFormat )
 {
     CIPSTER_ASSERT( aFormat >= 0 && aFormat <= 2 );
     CIPSTER_ASSERT( aField==MEMBER1 || aField==MEMBER2 || aField==MEMBER3 ||
@@ -231,21 +293,20 @@ int CipAppPath::deserialize_logical( BufReader aInput, CipAppPath::Stuff aField,
         value = in.get8();
     else if( aFormat == 1 )
     {
-        ++in;
+        if( !(aCtl & CTL_PACKED_EPATH) )
+            ++in;
         value = in.get16();
     }
     else if( aFormat == 2 )
     {
+        if( !(aCtl & CTL_PACKED_EPATH) )
+            ++in;
         ++in;
         value = in.get32();
     }
     else
     {
-#if 1
         throw std::runtime_error( "unsupported logical segment format" );
-#else
-        value = 0;
-#endif
     }
 
     stuff[aField] = value;
@@ -255,13 +316,13 @@ int CipAppPath::deserialize_logical( BufReader aInput, CipAppPath::Stuff aField,
 }
 
 
-inline int CipAppPath::deserialize_symbolic( BufReader aInput )
+inline int CipAppPath::deserialize_symbolic( BufReader aInput, int aCtl )
 {
     BufReader in = aInput;
 
     int first = *in;
 
-    if( first == kDataSegmentTypeAnsiExtendedSymbolMessage )
+    if( first == kDataSegmentANSIExtendedSymbol )
     {
         ++in;     // ate first
 
@@ -274,13 +335,15 @@ inline int CipAppPath::deserialize_symbolic( BufReader aInput )
         tag[byte_count] = 0;
         in += byte_count;
 
+        // Vol1 C-1.4.5.2 does not say that the pad byte is conditional
+        // on CTL_PACKED_EPATH, but the spec could be deficient there.
         if( (in.data() - aInput.data()) & 1 )
             ++in;    // consume pad byte if any
 
         pbits |= (1<<TAG);
     }
 
-    else if( (first & 0xe0) == kSegmentTypeSymbolic )   // Symbolic Segment
+    else if( (first & 0xe0) == kSegmentSymbolic )   // Symbolic Segment
     {
         // "and"ing clamps at 31, which is less than max of nul terminated 'this->tag'
         int symbol_size = first & 0x1f;
@@ -308,13 +371,13 @@ inline int CipAppPath::deserialize_symbolic( BufReader aInput )
 }
 
 
-int CipAppPath::DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom )
+int CipAppPath::DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom, int aCtl )
 {
     BufReader in = aInput;
                                                 // is seen, C-1.6 of Vol1_3.19
     Clear();
 
-    int result = deserialize_symbolic( in );
+    int result = deserialize_symbolic( in, aCtl );
 
     if( result < 0 )
         return result;
@@ -328,10 +391,10 @@ int CipAppPath::DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInh
             int first = *in;
 
             // Grammar in C.1.5 shows we can have Connection_Point optionally here:
-            if( (first & 0xfc) == kLogicalSegmentTypeConnectionPoint )
+            if( (first & 0xfc) == kLogicalSegmentConnectionPoint )
             {
                 ++in;       // ate first
-                in += deserialize_logical( in, CONN_PT, first & 3 );
+                in += deserialize_logical( in, aCtl, CONN_PT, first & 3 );
             }
 
             Stuff   last_member;
@@ -351,10 +414,10 @@ int CipAppPath::DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInh
                 */
                 first = *in;
 
-                if( (first & 0xfc) == kLogicalSegmentTypeMemberId )
+                if( (first & 0xfc) == kLogicalSegmentMemberId )
                 {
                     ++in;   // ate first
-                    in += deserialize_logical( in, last_member, first & 3 );
+                    in += deserialize_logical( in, aCtl, last_member, first & 3 );
                 }
                 else
                     break;
@@ -370,17 +433,21 @@ int CipAppPath::DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInh
         {
             int first = *in;
 
-            int seg_type = 0xfc & first;
+            LogicalSegmentType seg_type = LogicalSegmentType( 0xfc & first );
             int format   = 0x03 & first;
 
             Stuff   next;
 
             switch( seg_type )
             {
-            case kLogicalSegmentTypeClassId:            next = CLASS;       break;
-            case kLogicalSegmentTypeInstanceId:         next = INSTANCE;    break;
-            case kLogicalSegmentTypeAttributeId:        next = ATTRIBUTE;   break;
-            case kLogicalSegmentTypeConnectionPoint:    next = CONN_PT;     break;
+            case kLogicalSegmentClassId:            next = CLASS;       break;
+            case kLogicalSegmentInstanceId:         next = INSTANCE;    break;
+            case kLogicalSegmentAttributeId:        next = ATTRIBUTE;   break;
+            case kLogicalSegmentConnectionPoint:    next = CONN_PT;     break;
+
+            case kLogicalSegmentSpecial:
+            case kLogicalSegmentService:
+            case kLogicalSegmentExtendedLogical:
 
             default:
                 // C-1.6 of Vol1_3.19; is an expected termination point, not an error.
@@ -403,7 +470,7 @@ int CipAppPath::DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInh
 
             ++in;  // ate first
 
-            in += deserialize_logical( in, next, format );
+            in += deserialize_logical( in, aCtl, next, format );
 
             last_member = next;
         }
@@ -411,16 +478,14 @@ int CipAppPath::DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInh
 logical_exit:
         if( in.data() > aInput.data() && aPreviousToInheritFrom )
         {
-            if( aPreviousToInheritFrom->GetClass() == 4 )
-                inherit_assembly( last_member + 1, aPreviousToInheritFrom );
+            if( aPreviousToInheritFrom->GetClass() == kCipAssemblyClass )
+                inherit_assembly( Stuff(last_member + 1), aPreviousToInheritFrom );
             else
-                inherit( last_member + 1, aPreviousToInheritFrom );
+                inherit( Stuff(last_member + 1), aPreviousToInheritFrom );
         }
     }
 
-    int byte_count = in.data() - aInput.data();
-
-    return byte_count;
+    return in.data() - aInput.data();
 }
 
 
@@ -468,11 +533,11 @@ std::string CipAppPath::Format() const
 }
 
 
-void CipAppPath::inherit( int aStart, CipAppPath* aPreviousToInheritFrom )
+void CipAppPath::inherit( Stuff aStart, CipAppPath* aPreviousToInheritFrom )
 {
     CIPSTER_ASSERT( aPreviousToInheritFrom );
 
-    for( int i=aStart;  i < LOGICAL_END;  ++i )
+    for( Stuff i = aStart;  i < LOGICAL_END;  i = Stuff(i+1) )
     {
         if( !( pbits & (1<<i) ) && ( aPreviousToInheritFrom->pbits & (1<<i) ) )
         {
@@ -483,11 +548,11 @@ void CipAppPath::inherit( int aStart, CipAppPath* aPreviousToInheritFrom )
 }
 
 
-void CipAppPath::inherit_assembly( int aStart, CipAppPath* aPreviousToInheritFrom )
+void CipAppPath::inherit_assembly( Stuff aStart, CipAppPath* aPreviousToInheritFrom )
 {
     CIPSTER_ASSERT( aPreviousToInheritFrom );
 
-    for( int i=aStart;  i < LOGICAL_END;  ++i )
+    for( Stuff i = aStart;  i < LOGICAL_END;  i = Stuff(i+1) )
     {
         if( aStart == INSTANCE && i == INSTANCE )
             continue;
@@ -503,7 +568,7 @@ void CipAppPath::inherit_assembly( int aStart, CipAppPath* aPreviousToInheritFro
 
 // Only called from a context which is certain of segment type, so eating first
 // is handled a bit differently, advancing 'in' with read is ok.
-int CipPortSegment::DeserializePortSegment( BufReader aInput )
+int CipPortSegment::DeserializePortSegment( BufReader aInput, int aCtl )
 {
     BufReader   in = aInput;
     int         first = in.get8();
@@ -524,7 +589,7 @@ int CipPortSegment::DeserializePortSegment( BufReader aInput )
     }
 
     // skip a byte if not an even number of them have been consumed.
-    if( (in.data() - aInput.data()) & 1 )
+    if( !(aCtl & CTL_PACKED_EPATH) && ((in.data() - aInput.data()) & 1) )
         ++in;
 
     return in.data() - aInput.data();
@@ -571,16 +636,18 @@ int CipPortSegment::Serialize( BufWriter aOutput, int aCtl ) const
     for( unsigned i = 0; i < link_address.size();  ++i )
         out.put8( link_address[i] );
 
-    // output a pad if odd number so far
-    int byte_count = out.data() - aOutput.data();
-
-    if( byte_count & 1 )
+    if( !(aCtl & CTL_PACKED_EPATH) )
     {
-        out.put8( 0 );
-        ++byte_count;
+        // output a pad if odd number so far
+        int byte_count = out.data() - aOutput.data();
+
+        if( byte_count & 1 )
+        {
+            out.put8( 0 );
+        }
     }
 
-    return byte_count;
+    return out.data() - aOutput.data();
 }
 
 
@@ -592,7 +659,7 @@ int CipPortSegment::SerializedCount( int aCtl ) const
 }
 
 
-int CipElectronicKeySegment::DeserializeElectronicKey( BufReader aInput )
+int CipElectronicKeySegment::DeserializeElectronicKey( BufReader aInput, int aCtl )
 {
     BufReader in = aInput;
 
@@ -692,7 +759,7 @@ ConnMgrStatus CipElectronicKeySegment::Check() const
 }
 
 
-int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
+int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput, int aCtl )
 {
     BufReader in = aInput;
 
@@ -705,9 +772,9 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
         int result;
         int first = *in;
 
-        if( (first & 0xe0) == kSegmentTypePort )
+        if( (first & 0xe0) == kSegmentPort )
         {
-            in += port.DeserializePortSegment( in );
+            in += port.DeserializePortSegment( in, aCtl );
             pbits |= (1<<PORT);
         }
         else
@@ -715,7 +782,7 @@ int CipPortSegmentGroup::DeserializePortSegmentGroup( BufReader aInput )
             switch( first )
             {
             case 0x34:      // electronic key
-                result = key.DeserializeElectronicKey( in );
+                result = key.DeserializeElectronicKey( in, aCtl );
 
                 if( result < 0 )
                     return result;
@@ -827,7 +894,7 @@ int CipPortSegmentGroup::SerializedCount( int aCtl ) const
 
 
 // Vol1 C-1.4.5.1
-int CipSimpleDataSegment::DeserializeDataSegment( BufReader aInput )
+int CipSimpleDataSegment::DeserializeDataSegment( BufReader aInput, int aCtl )
 {
     BufReader in = aInput;
 
@@ -835,7 +902,7 @@ int CipSimpleDataSegment::DeserializeDataSegment( BufReader aInput )
 
     int first = *in;
 
-    if( first == kDataSegmentTypeSimpleDataMessage )
+    if( first == kDataSegmentSimpleData )
     {
         ++in;   // ate first
 
@@ -867,13 +934,15 @@ int CipSimpleDataSegment::Serialize( BufWriter aOutput, int aCtl ) const
                 );
     }
 
-    out.put8( kDataSegmentTypeSimpleDataMessage );
+    out.put8( kDataSegmentSimpleData );
     out.put8( words.size() );
+
     for( unsigned i = 0; i < words.size();  ++i )
         out.put16( words[i] );
 
     return out.data() - aOutput.data();
 }
+
 
 int CipSimpleDataSegment::SerializedCount( int aCtl ) const
 {

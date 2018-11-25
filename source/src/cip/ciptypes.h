@@ -35,24 +35,6 @@ enum ClassIds
 
 
 /**
- * Enum SegmentType
- * is the set of bits 7-5 in the Segment Type/Format byte
- */
-enum SegmentType
-{
-    // Segments
-    kSegmentTypePort = 0x00,                    ///< Port segment
-    kSegmentTypeLogical  = 0x20,                ///< Logical segment
-    kSegmentTypeNetwork  = 0x40,                ///< Network segment
-    kSegmentTypeSymbolic = 0x60,                ///< Symbolic segment
-    kSegmentTypeData = 0x80,                    ///< Data segment
-    kSegmentTypeDataTypeConstructed = 0xA0,     ///< Data type constructed
-    kSegmentTypeDataTypeElementary  = 0xC0,     ///< Data type elementary
-    kSegmentTypeSegmentTypeReserved = 0xE0
-};
-
-
-/**
  * Enum CipDataType
  * is the set of encoded CIP data types for CIP Messages
  */

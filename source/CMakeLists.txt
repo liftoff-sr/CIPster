@@ -73,6 +73,8 @@ endif()
 set( CIPster_TRACES OFF CACHE BOOL "Activate CIPster traces" )
 if(CIPster_TRACES)
     createTraceLevelOptions()
+else()
+    message( "CIPster_TRACES is OFF" )
 endif()
 
 
