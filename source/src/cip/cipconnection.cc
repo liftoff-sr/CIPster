@@ -168,51 +168,14 @@ int ConnectionPath::Serialize( BufWriter aOutput, int aCtl ) const
 
 int ConnectionPath::SerializedCount( int aCtl ) const
 {
-    int class1 = 0;
-    int class2 = 0;
-    int class3 = 0;
+    uint8_t     stack_buf[128];
+    BufWriter   out( stack_buf, sizeof stack_buf );
 
-    int count = 0;
-
-    // @todo fix this
-
-    if( port_segs.HasAny() )
-        count += port_segs.SerializedCount( aCtl );
-
-    if( app_path1.HasAny() )
-    {
-        class1 = app_path1.GetClass();
-        count += app_path1.SerializedCount( aCtl );
-    }
-
-    if( app_path2.HasAny() )
-    {
-        int ctl = aCtl;
-
-        class2 = app_path2.GetClass();
-
-        if( class1 == kCipAssemblyClass && class2 == kCipAssemblyClass )
-            ctl |= CTL_OMIT_CLASS;
-
-        count += app_path2.SerializedCount( ctl );
-    }
-
-    if( app_path3.HasAny() )
-    {
-        int ctl = aCtl;
-
-        class3 = app_path3.GetClass();
-
-        if( class2 == kCipAssemblyClass && class3 == kCipAssemblyClass )
-            ctl |= CTL_OMIT_CLASS;
-
-        count += app_path3.SerializedCount( ctl );
-    }
-
-    if( data_seg.HasAny() )
-        count += data_seg.SerializedCount( aCtl );
-
-    return count;
+    // Hose it to a junk buffer and measure it.  This strategy:
+    // 1) simplifies code maintenance
+    // 2) ensures agreement between the 2 functions
+    // 3) is compact.
+    return Serialize( out, aCtl );
 }
 
 
