@@ -82,7 +82,12 @@ int Cpf::NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply )
         {
             CipMessageRouterRequest request;
 
-            int consumed = request.DeserializeMRReq( DataItemPayload() );
+            int consumed = 0;
+            try {
+                consumed = request.DeserializeMRReq( DataItemPayload() );
+            } catch (...) {
+                
+            }
 
             if( consumed <= 0 )
             {

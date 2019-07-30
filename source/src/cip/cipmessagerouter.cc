@@ -65,19 +65,23 @@ int CipMessageRouterRequest::DeserializeMRReq( BufReader aRequest )
 
     // Vol1 2-4.1.1
     CipElectronicKeySegment key;
+    int result;
+    try {
+        result = key.DeserializeElectronicKey( rpath );
 
-    int result = key.DeserializeElectronicKey( rpath );
+        if( result < 0 )
+            return result;
 
-    if( result < 0 )
-        return result;
+        rpath += result;
 
-    rpath += result;
+        result = path.DeserializeAppPath( rpath );
 
-    result = path.DeserializeAppPath( rpath );
-
-    if( result < 0 )
-        return result;
-
+        if( result < 0 ) {
+            return result;
+        }
+    } catch (...) {
+        return -1;
+    }
     int bytes_consumed = rpath.data() - aRequest.data() + result;
 
     // set this->data for service functions, it consists of the remaining
