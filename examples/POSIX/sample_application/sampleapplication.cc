@@ -11,8 +11,8 @@
 #define DEMO_APP_INPUT_ASSEMBLY_NUM                 100 // 0x064
 #define DEMO_APP_OUTPUT_ASSEMBLY_NUM                150 // 0x096
 #define DEMO_APP_CONFIG_ASSEMBLY_NUM                151 // 0x097
-#define DEMO_APP_HEARTBEAT_INPUT_ONLY_ASSEMBLY_NUM   152 // 0x098
-#define DEMO_APP_HEARTBEAT_LISTEN_ONLY_ASSEMBLY_NUM  153 // 0x099
+#define DEMO_APP_HEARTBEAT_INPUT_ONLY_ASSEMBLY_NUM  152 // 0x098
+#define DEMO_APP_HEARTBEAT_LISTEN_ONLY_ASSEMBLY_NUM 153 // 0x099
 #define DEMO_APP_EXPLICT_ASSEMBLY_NUM               154 // 0x09A
 
 // global variables for demo application (4 assembly data fields)  ***********
