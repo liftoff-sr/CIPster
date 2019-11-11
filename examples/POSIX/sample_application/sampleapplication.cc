@@ -11,8 +11,8 @@
 #define DEMO_APP_INPUT_ASSEMBLY_NUM                 100 // 0x064
 #define DEMO_APP_OUTPUT_ASSEMBLY_NUM                150 // 0x096
 #define DEMO_APP_CONFIG_ASSEMBLY_NUM                151 // 0x097
-#define DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM   152 // 0x098
-#define DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM  153 // 0x099
+#define DEMO_APP_HEARTBEAT_INPUT_ONLY_ASSEMBLY_NUM  152 // 0x098
+#define DEMO_APP_HEARTBEAT_LISTEN_ONLY_ASSEMBLY_NUM 153 // 0x099
 #define DEMO_APP_EXPLICT_ASSEMBLY_NUM               154 // 0x09A
 
 // global variables for demo application (4 assembly data fields)  ***********
@@ -39,11 +39,11 @@ EipStatus ApplicationInitialization()
         ByteBuf( g_assembly_data097, sizeof(g_assembly_data097) ) );
 
     // Heart-beat output assembly for Input only connections
-    CreateAssemblyInstance( DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM,
+    CreateAssemblyInstance( DEMO_APP_HEARTBEAT_INPUT_ONLY_ASSEMBLY_NUM,
         ByteBuf( 0, 0 ) );
 
     // Heart-beat output assembly for Listen only connections
-    CreateAssemblyInstance( DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM,
+    CreateAssemblyInstance( DEMO_APP_HEARTBEAT_LISTEN_ONLY_ASSEMBLY_NUM,
         ByteBuf( 0, 0 ) );
 
     // assembly for explicit messaging
@@ -64,12 +64,12 @@ EipStatus ApplicationInitialization()
             -1 );                           // config path may be omitted
 
     ConfigureInputOnlyConnectionPoint(
-            DEMO_APP_HEARBEAT_INPUT_ONLY_ASSEMBLY_NUM,
+            DEMO_APP_HEARTBEAT_INPUT_ONLY_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             DEMO_APP_CONFIG_ASSEMBLY_NUM );
 
     ConfigureListenOnlyConnectionPoint(
-            DEMO_APP_HEARBEAT_LISTEN_ONLY_ASSEMBLY_NUM,
+            DEMO_APP_HEARTBEAT_LISTEN_ONLY_ASSEMBLY_NUM,
             DEMO_APP_INPUT_ASSEMBLY_NUM,
             DEMO_APP_CONFIG_ASSEMBLY_NUM );
 
