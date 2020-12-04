@@ -5,10 +5,10 @@
 
 #ifndef BYTE_BUFS_H_
 #define BYTE_BUFS_H_
-
+#include <sys/errno.h>
+#include <unistd.h>
 #include <string>
 #include <stdexcept>    // for the convenience of clients of these classes, which throw
-
 #include "typedefs.h"
 
 class BufReader;

@@ -62,4 +62,6 @@ target_link_libraries( test_byte_bufs
 
 message( "CMAKE_INSTALL_PREFIX:${CMAKE_INSTALL_PREFIX}" )
 
-install( TARGETS eip DESTINATION . )
+#Mac changed . to lib
+#install( TARGETS eip DESTINATION . )
+install( TARGETS eip DESTINATION lib )

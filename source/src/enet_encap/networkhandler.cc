@@ -4,11 +4,13 @@
  *
  ******************************************************************************/
 
+
 #include "networkhandler.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <fcntl.h>
 
@@ -17,6 +19,21 @@
  #include <sys/time.h>
  #include <time.h>
 #endif
+
+#if defined(__APPLE__)
+ #include <unistd.h>
+ #include <sys/cdefs.h>
+ #include <arpa/inet.h>
+ #include <sys/socket.h>
+ #include <sys/sockio.h>
+ #include <net/if.h>
+ #include <sys/ioctl.h>
+ #include <sys/uio.h>
+ #include <netinet/in.h>
+#endif
+
+#include <sys/select.h>
+
 
 
 #include <cipster_api.h>
@@ -91,6 +108,10 @@ std::string strerrno()
         len = snprintf( buf, sizeof buf, "%d", WSAGetLastError() );
 
     return std::string( buf, len );
+#else //mac os x can use the linux branch I believe
+    // There are two versions of sterror_r() depending on age of glibc, try
+    // and handle both of them with this:
+    return std::string("not supported yet");
 #endif
 }
 
@@ -101,7 +122,7 @@ std::string strerrno()
 /// will make implementing this function easier under other OS's.
 static unsigned usecs_now()
 {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
     struct timespec	now;
 
     clock_gettime( CLOCK_MONOTONIC, &now );
@@ -169,7 +190,7 @@ static void master_set_rem( int aSocket )
 
 bool SocketAsync( int aSocket, bool isAsync )
 {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
     int flags   = isAsync ? (O_RDWR | O_NONBLOCK) : O_RDWR;
     int ret     = fcntl( aSocket, F_SETFL, flags );
 #elif defined(_WIN32)
@@ -195,7 +216,7 @@ void CloseSocket( int aSocket )
 
         master_set_rem( aSocket );
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
         shutdown( aSocket, SHUT_RDWR );
         close( aSocket );
 #elif defined(_WIN32)

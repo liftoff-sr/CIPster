@@ -16,6 +16,9 @@
  #undef _WINSOCKAPI_    // suppress Mingw32's "Please include winsock2.h before windows.h"
  #include <winsock2.h>
  #include <ws2tcpip.h>
+#else
+ #include <netinet/in.h>
+ #include <errno.h>
 #endif
 
 #include <stdexcept>
@@ -35,6 +38,8 @@ public:
         error_code( errno )
 #elif defined(_WIN32)
         error_code( WSAGetLastError() )
+#else
+        error_code( errno )
 #endif
     {}
 
