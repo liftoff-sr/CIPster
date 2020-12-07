@@ -53,8 +53,11 @@ class IConv
 public:
     IConv()
     {
+	try{
         to_unicode = iconv_open( UNICODE, UTF8 );
-
+	} catch (...) {
+            throw std::runtime_error( "error from iconv_open(\"" UNICODE "\", \"" UTF8 "\")" );
+	}
         if( to_unicode == iconv_t(-1) )
             throw std::runtime_error( "error from iconv_open(\"" UNICODE "\", \"" UTF8 "\")" );
 
