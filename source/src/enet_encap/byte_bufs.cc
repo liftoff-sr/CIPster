@@ -35,8 +35,11 @@ inline void stack_dump( const char* aContext ) {}      // nothing
 #ifdef HAVE_ICONV
 #include <iconv.h>
 
-#define UNICODE     "UTF16LE"   // UTF16LE is UNICODE with fixes to shortsighted-ness.
-
+#if defined(__APPLE__)
+	#define UNICODE     "UTF-16LE"   // UTF16LE is UNICODE with fixes to shortsighted-ness.
+#else
+	#define UNICODE     "UTF16LE"   // UTF16LE is UNICODE with fixes to shortsighted-ness.
+#endif
 #define UTF8        "UTF8"      // The best way to deal with all unicode chars in a
                                 // platform independent way using 8 bit multibyte
                                 // characters.
