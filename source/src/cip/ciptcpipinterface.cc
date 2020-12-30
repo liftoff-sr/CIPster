@@ -16,7 +16,11 @@
 #include <cipethernetlink.h>
 #include <cipster_api.h>
 
-#include <arpa/inet.h>
+#if defined(_WIN32) || defined(WIN32)
+    #include <Winsock2.h>
+#else
+    #include <arpa/inet.h>
+#endif
 
 #undef  INSTANCE_CLASS
 #define INSTANCE_CLASS  CipTCPIPInterfaceInstance

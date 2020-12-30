@@ -32,7 +32,11 @@
  #include <netinet/in.h>
 #endif
 
-#include <sys/select.h>
+#if defined(_WIN32) || defined(WIN32)
+
+#else
+	#include <sys/select.h>
+#endif
 
 
 

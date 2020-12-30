@@ -5,7 +5,11 @@
 
 #ifndef BYTE_BUFS_H_
 #define BYTE_BUFS_H_
-#include <sys/errno.h>
+
+#if !defined(_WIN32) && !defined(WIN32)
+	#include <sys/errno.h>
+#endif
+
 #include <unistd.h>
 #include <string>
 #include <stdexcept>    // for the convenience of clients of these classes, which throw
