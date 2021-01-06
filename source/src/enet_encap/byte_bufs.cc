@@ -35,7 +35,7 @@ inline void stack_dump( const char* aContext ) {}      // nothing
 #ifdef HAVE_ICONV
 #include <iconv.h>
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32) || defined(WIN32)
 	#define UNICODE     "UTF-16LE"   // UTF16LE is UNICODE with fixes to shortsighted-ness.
 #else
 	#define UNICODE     "UTF16LE"   // UTF16LE is UNICODE with fixes to shortsighted-ness.
