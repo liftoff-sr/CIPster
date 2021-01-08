@@ -40,10 +40,16 @@ inline void stack_dump( const char* aContext ) {}      // nothing
 #else
 	#define UNICODE     "UTF16LE"   // UTF16LE is UNICODE with fixes to shortsighted-ness.
 #endif
-#define UTF8        "UTF8"      // The best way to deal with all unicode chars in a
+
+#if defined(_WIN32) || defined(WIN32)
+	#define UTF8        "UTF-8"      // The best way to deal with all unicode chars in a
                                 // platform independent way using 8 bit multibyte
                                 // characters.
-
+#else
+	#define UTF8        "UTF8"      // The best way to deal with all unicode chars in a
+                                // platform independent way using 8 bit multibyte
+                                // characters.
+#endif
 /**
  * Class IConv
  * is a wrapper to customize the general iconv library to convert to and
