@@ -5,7 +5,6 @@
  ******************************************************************************/
 
 #include "encap.h"
-
 #include <string.h>
 #include <stdlib.h>
 
@@ -416,7 +415,7 @@ static int disposeOfLargePacket( int aSocket, unsigned aCount )
     while( aCount )
     {
         // toss in chunks.
-        int readz = std::min( aCount, unsigned( sizeof chunk ) );
+        int readz = (std::min)( aCount, unsigned( sizeof chunk ) );
 
         int num_read = Encapsulation::EnsuredTcpRecv( aSocket, chunk, readz );
 

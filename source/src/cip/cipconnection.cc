@@ -6,7 +6,7 @@
 
 #include <string.h>
 #include <algorithm>
-
+#include <unistd.h> //ZACH
 #include "cipconnection.h"
 
 #include <cipster_api.h>
@@ -1228,7 +1228,7 @@ void CipConn::GeneralConfiguration( ConnectionData* aConnData, ConnInstanceType 
     // "expected_packet_rate x connection_timeout_multiplier".  Initial value
     // is called a "pre-consumption" timeout value.
     if( RxTimeoutUSecs() )
-        SetInactivityWatchDogTimerUSecs( std::max( RxTimeoutUSecs(), 10000000u ) );
+        SetInactivityWatchDogTimerUSecs( (std::max)( RxTimeoutUSecs(), 10000000u ) );
     else
     {
         // this is not an erro

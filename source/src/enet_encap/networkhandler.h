@@ -9,6 +9,7 @@
 
 #include <string>
 
+#include <unistd.h> //ZACH
 #include "sockaddr.h"
 #include "../cip/ciptypes.h"
 

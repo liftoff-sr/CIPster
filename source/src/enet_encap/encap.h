@@ -7,6 +7,8 @@
 #define CIPSTER_ENCAP_H_
 
 //#include <string>
+
+#include <unistd.h> //ZACH
 #include "networkhandler.h"
 #include "typedefs.h"
 #include "../cip/cipcommon.h"

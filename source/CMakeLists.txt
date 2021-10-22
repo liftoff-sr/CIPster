@@ -70,6 +70,7 @@ else()
         and BufWriter::put_STRING2() will not be full featured" )
 endif()
 
+include_directories( ${UNISTD_INCLUDE_DIR} )
 set( CIPster_TRACES OFF CACHE BOOL "Activate CIPster traces" )
 if(CIPster_TRACES)
     createTraceLevelOptions()

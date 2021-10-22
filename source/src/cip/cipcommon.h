@@ -9,7 +9,7 @@
 /** @file cipcommon.h
  * Common CIP object interface
  */
-
+#include <unistd.h> //ZACH
 #include <typedefs.h>
 #include "ciptypes.h"
 #include <byte_bufs.h>
