@@ -125,10 +125,12 @@ class CipAppPath : public SegmentGroup
 public:
     CipAppPath()
     {
+        tag[0] = 0;
     }
 
     CipAppPath( int aClassId, int aInstanceId, int aAttributeId = 0 )
     {
+        tag[0] = 0;
         SetClass( aClassId );
         SetInstance( aInstanceId );
         if( aAttributeId )
