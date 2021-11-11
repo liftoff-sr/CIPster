@@ -63,38 +63,6 @@ struct NetworkStatus
 static NetworkStatus s_sockets;
 
 
-std::string strerrno()
-{
-    char    buf[256];
-
-    buf[0] = 0;
-
-#if defined(__linux__)
-    // There are two versions of sterror_r() depending on age of glibc, try
-    // and handle both of them with this:
-    uintptr_t result = (uintptr_t) strerror_r( errno, buf, sizeof buf );
-
-    return buf[0] ? buf : (char*) result;
-
-#elif defined(_WIN32)
-
-    int len = FormatMessage(
-        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL,                       // lpsource
-        WSAGetLastError(),          // message id
-        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        buf,
-        sizeof buf,
-        NULL );
-
-    if( !buf[0] )
-        len = snprintf( buf, sizeof buf, "%d", WSAGetLastError() );
-
-    return std::string( buf, len );
-#endif
-}
-
-
 /// Return a monotonically increasing usecs time that wraps around
 /// after overflow.  Just use 32 bits here, 64 bits are kept in
 /// g_current_usecs which is global.  This a cross platform concern which
@@ -140,7 +108,7 @@ static unsigned usecs_now()
 
 static void master_set_add( const char* aType, int aSocket )
 {
-    //CIPSTER_TRACE_INFO( "%s[%d]: %s socket\n", __func__, aSocket, aType );
+    CIPSTER_TRACE_INFO( "%s[%d]: %s socket\n", __func__, aSocket, aType );
 
     (void) aType;
 
@@ -156,7 +124,7 @@ static void master_set_add( const char* aType, int aSocket )
 static void master_set_rem( int aSocket )
 {
     CIPSTER_ASSERT( aSocket >= 0 );
-    //CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, aSocket );
+    CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, aSocket );
 
     FD_CLR( aSocket, &master_set );
 
@@ -483,9 +451,11 @@ static void checkAndHandleUdpSockets()
     {
         UdpSocket*  s = *it;
 
+        s->Show();
+
         if( checkSocketSet( s->h() ) )
         {
-            //CIPSTER_TRACE_INFO( "%s[%d]\n", __func__, s->h() );
+            CIPSTER_TRACE_INFO( "GOT ONE %s[%d]\n", __func__, s->h() );
 
             // Since it is non-blocking, call Recv() until
             // byte_count is <= 0.  Keep socket open for every case.
@@ -494,7 +464,7 @@ static void checkAndHandleUdpSockets()
             // This strategy contemplates that somebody might be bombing us,
             // maybe even maliciously.  Anything we don't fetch out now
             // will likely still be there on the next call to
-            // NetworkHandlerProcessOnce().
+            // NetworkHandlerProcessOnce() and we should eventually catch up.
             int limit = 64 * s->RefCount();
 
             int attempt;
@@ -904,7 +874,7 @@ EipStatus NetworkHandlerFinish()
 }
 
 
-EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput )
+void SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput )
 {
     int sent_count = sendto( aSocket, (char*) aOutput.data(), aOutput.size(), 0,
                         aSockAddr, SADDRZ );
@@ -921,22 +891,28 @@ EipStatus SendUdpData( const SockAddr& aSockAddr, int aSocket, BufReader aOutput
 
     if( sent_count < 0 )
     {
-        CIPSTER_TRACE_ERR( "%s[%d]: errno with sendto(): '%s'\n",
-                __func__, aSocket, strerrno().c_str() );
+        socket_error se;
 
-        return kEipStatusError;
+        CIPSTER_TRACE_ERR( "%s[%d]: sendto(): '%s'\n",
+                __func__, aSocket, se.what() );
+
+        throw se;
     }
 
+    // This is highly unlikely to occur after any use of aOutput is trimmed to
+    // a supported UDP maximum size.  i.e. it will be a testing bug, should not
+    // be a runtime bug.  More likely all errors go through sent_count < 0 above.
+    // Could probably comment this whole block out.
     if( sent_count != aOutput.size() )
     {
-        CIPSTER_TRACE_WARN(
+        std::string msg = StrPrintf(
                 "%s[%d]: data_length != sent_count mismatch, sent %d of %d\n",
                 __func__, aSocket, sent_count, (int) aOutput.size() );
 
-        return kEipStatusError;
+        // Since the OS probably has no "errno" for this situation, we use -1.
+        socket_error se( msg, -1 );
+        throw se;
     }
-
-    return kEipStatusOk;
 }
 
 //-----<UdpSocketMgr<-----------------------------------------------------------
@@ -977,10 +953,6 @@ UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* 
         }
         else
         {
-            in_addr ip;
-            ip.s_addr = CipTCPIPInterfaceClass::IpAddress( 1 );
-            setsockopt( iface->m_socket, IPPROTO_IP, IP_MULTICAST_IF, (char*)&ip, sizeof ip );
-
             // Note that you can join several groups to the same socket, not just one.
             ip_mreq mreq;
 
@@ -990,24 +962,51 @@ UdpSocket* UdpSocketMgr::GrabSocket( const SockAddr& aSockAddr, const SockAddr* 
             if( setsockopt( iface->m_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP,
                     (char*) &mreq,  sizeof mreq ) )
             {
-                CIPSTER_TRACE_ERR( "%s[%d]: unable to add group %s to interface %s\n",
-                    __func__,
-                    iface->m_socket,
-                    aMulticast->AddrStr().c_str(),
-                    iface->m_sockaddr.AddrStr().c_str() );
+                // https://developerweb.net/viewtopic.php?id=5784
+                // https://stackoverflow.com/questions/3187919/error-no-such-device-in-call-setsockopt
+
+                socket_error    serror;
+
+                if( serror.error_code == ENXIO )        // "No such device or address"
+                {
+#if 0
+                    in_addr ip;
+                    ip.s_addr = CipTCPIPInterfaceClass::IpAddress( 1 );
+                    setsockopt( iface->m_socket, IPPROTO_IP, IP_MULTICAST_IF, (char*)&ip, sizeof ip );
+#else
+                    CIPSTER_TRACE_ERR(
+                        "%s[%d]: unable to add group %s to interface %s. Please add:\n"
+                        " 'route add -net 224.0.0.0 netmask 224.0.0.0 eth0'\n"
+                        "OR a 'default route' to an init file.\n",
+                        __func__,
+                        iface->m_socket,
+                        aMulticast->AddrStr().c_str(),
+                        iface->m_sockaddr.AddrStr().c_str()
+                        );
+#endif
+                }
+                else
+                {
+                    CIPSTER_TRACE_ERR(
+                        "%s[%d]: unable to add group %s to interface %s. Error:'%s'\n",
+                        __func__,
+                        iface->m_socket,
+                        aMulticast->AddrStr().c_str(),
+                        iface->m_sockaddr.AddrStr().c_str(),
+                        serror.what()
+                        );
+                }
 
                 // reverse m_ref_count increment above, and keep socket close policy in one place.
                 ReleaseSocket( iface );
                 return NULL;
             }
 
-            CIPSTER_TRACE_ERR( "%s[%d]: added group %s:%d membership to interface %s:%d OK.\n",
+            CIPSTER_TRACE_ERR( "%s[%d]: added group %s membership to interface %s OK.\n",
                 __func__,
                 iface->m_socket,
                 aMulticast->AddrStr().c_str(),
-                aMulticast->Port(),
-                iface->m_sockaddr.AddrStr().c_str(),
-                iface->m_sockaddr.Port()
+                iface->m_sockaddr.AddrStr().c_str()
                 );
 
             char loop = 0;
@@ -1172,10 +1171,7 @@ int UdpSocketMgr::createSocket( const SockAddr& aSockAddr )
         goto close_and_exit;
     }
 
-    /*
-    CIPSTER_TRACE_INFO( "%s[%d]: bound on %s:%d\n",
-        __func__, udp_sock, aSockAddr.AddrStr().c_str(), aSockAddr.Port() );
-    */
+    CIPSTER_TRACE_INFO( "%s[%d]: bound on %s\n", __func__, udp_sock, aSockAddr.Format().c_str() );
 
     {
         char ttl = CipTCPIPInterfaceClass::TTL(1);
@@ -1215,7 +1211,6 @@ UdpSocket* UdpSocketMgr::alloc( const SockAddr& aSockAddr, int aSocket )
 
         m_free.pop_back();
 
-        //new (result)  UdpSocket( aSockAddr, aSocket );    // in place construction
         new(result) UdpSocket( aSockAddr, aSocket );    // in place construction
     }
     else
