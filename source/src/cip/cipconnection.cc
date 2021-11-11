@@ -129,7 +129,7 @@ int ConnectionPath::Serialize( BufWriter aOutput, int aCtl ) const
 
             int ctl = aCtl;
 
-            if(  prev )
+            if( prev )
             {
                 if( prev->GetClass() == cur.GetClass() )
                     ctl |= CTL_OMIT_CLASS;
@@ -1062,9 +1062,9 @@ void CipConn::Clear( bool doConnectionDataToo )
     SetInactivityWatchDogTimerUSecs( 0 );
     SetProductionInhibitTimerUSecs( 0 );
 
-    memset( &send_address,    0, sizeof send_address );
-    memset( &recv_address,    0, sizeof recv_address );
-    memset( &openers_address, 0, sizeof openers_address );
+    send_address.Clear();
+    recv_address.Clear();
+    openers_address.Clear();
 
     SetConsumingUdp( NULL );
     SetProducingUdp( NULL );
@@ -1357,7 +1357,7 @@ EipStatus CipConn::SendConnectedData()
 
     AssemblyInstance* assembly = static_cast<AssemblyInstance*>( producing_instance );
 
-    EipStatus result;
+    EipStatus result = kEipStatusOk;
 
     BufWriter out( g_message_data_reply_buffer, sizeof g_message_data_reply_buffer );
 
@@ -1450,9 +1450,19 @@ EipStatus CipConn::SendConnectedData()
         );
 
     // send out onto UDP wire
-    result = ProducingUdp()->Send( send_address,
+    try
+    {
+        ProducingUdp()->Send( send_address,
                 BufReader( g_message_data_reply_buffer, length )
                 );
+    }
+    catch( const socket_error& se )
+    {
+        // Send() does logging on error, don't also do it here.
+
+        // @todo switch more of the API over to exceptions, not error codes.
+        result = kEipStatusError;
+    }
 
     return result;
 }
@@ -1829,6 +1839,7 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
                 ntohl( CipTCPIPInterfaceClass::MultiCast( 1 ).starting_multicast_address )
                 );
 
+        //UdpSocket* socket = UdpSocketMgr::GrabSocket( source, &destination );
         UdpSocket* socket = UdpSocketMgr::GrabSocket( source );
 
         if( !socket )
@@ -1857,55 +1868,52 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
 
 CipError CipConn::openCommunicationChannels( Cpf* aCpf, ConnMgrStatus* aExtError )
 {
-    IOConnType  o_t = consuming_ncp.ConnectionType();
-    IOConnType  t_o = producing_ncp.ConnectionType();
-
     // one, both, or no consuming/producing ends based on IOConnType for each
 
     //----<Consuming End>-------------------------------------------------------
 
-    if( o_t == kIOConnTypeMulticast )
+    if( consuming_ncp.ConnectionType() == kIOConnTypeMulticast )
     {
         CipError result = openMulticastConnection( kUdpConsuming, aCpf, aExtError );
 
         if( result )
         {
-            CIPSTER_TRACE_ERR( "%s: error in O->T Multicast connection\n", __func__ );
+            CIPSTER_TRACE_ERR( "%s: error in consuming Multicast connection\n", __func__ );
             return result;
         }
     }
 
-    else if( o_t == kIOConnTypePointToPoint )
+    else if( consuming_ncp.ConnectionType() == kIOConnTypePointToPoint )
     {
         CipError result = openConsumingPointToPointConnection( aCpf, aExtError );
 
         if( result )
         {
-            CIPSTER_TRACE_ERR( "%s: error in O->T PointToPoint connection\n", __func__ );
+            CIPSTER_TRACE_ERR( "%s: error in consuming PointToPoint connection\n", __func__ );
             return result;
         }
     }
 
     //----<Producing End>-------------------------------------------------------
 
-    if( t_o == kIOConnTypeMulticast )
+    if( producing_ncp.ConnectionType() == kIOConnTypeMulticast )
     {
         CipError result = openProducingMulticastConnection( aCpf, aExtError );
 
         if( result )
         {
-            CIPSTER_TRACE_ERR( "%s: error in T->O Multicast connection\n", __func__ );
+            CIPSTER_TRACE_ERR( "%s: error in producing Multicast connection\n", __func__ );
             return result;
         }
     }
 
-    else if( t_o == kIOConnTypePointToPoint )
+    else if( producing_ncp.ConnectionType() == kIOConnTypePointToPoint )
     {
         CipError result = openProducingPointToPointConnection( aCpf, aExtError );
 
         if( result )
         {
-            CIPSTER_TRACE_ERR( "%s: error in T->O PointToPoint connection\n", __func__ );
+            CIPSTER_TRACE_ERR( "%s: error in producing PointToPoint connection\n", __func__ );
             return result;
         }
     }
