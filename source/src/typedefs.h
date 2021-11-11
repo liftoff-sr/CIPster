@@ -67,7 +67,7 @@ enum EipStatus
 
 
 /// The count of elements in a single dimension array:
-#define DIM(x)          int(      sizeof(x)/sizeof(x[0]) )
-#define UDIM(x)         unsigned( sizeof(x)/sizeof(x[0]) )
+#define DIM(x)          int(      sizeof(x)/sizeof((x)[0]) )
+#define UDIM(x)         unsigned( sizeof(x)/sizeof((x)[0]) )
 
 #endif // CIPSTER_TYPEDEFS_H_
