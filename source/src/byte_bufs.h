@@ -7,7 +7,8 @@
 #define BYTE_BUFS_H_
 
 #if !defined(_WIN32) && !defined(WIN32)
-	#include <sys/errno.h>
+	//#include <sys/errno.h> Warnings about incorrect usage of sys/errno.h -> errno.h
+        #include <errno.h>
 #endif
 
 #include <unistd.h>
