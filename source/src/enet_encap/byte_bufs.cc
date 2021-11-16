@@ -12,6 +12,7 @@
 
 static void stack_dump( const char* aContext )
 {
+    /* Disabled, backtrace missing on musl libc
     void*   trace[32];
     char**  strings;
 
@@ -26,6 +27,7 @@ static void stack_dump( const char* aContext )
         printf( " bt[%d] %s\n", i, strings[i] );
 
     free( strings );
+    */
 }
 #else
 inline void stack_dump( const char* aContext ) {}      // nothing
