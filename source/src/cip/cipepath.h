@@ -185,7 +185,7 @@ public:
         return *this;
     }
 
-    CipAppPath& SetConnPoint( int aConnPt )
+    CipAppPath& SetConnPt( int aConnPt )
     {
         stuff[CONN_PT] = aConnPt;
         pbits |= 1 << CONN_PT;
