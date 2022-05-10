@@ -504,7 +504,11 @@ static void checkAndHandleUdpSockets()
 
                 if( byte_count <= 0 )
                 {
-                    if( errno != EAGAIN && errno != EWOULDBLOCK )
+#if defined(_WIN32)
+                    if (WSAGetLastError () != WSAEWOULDBLOCK)
+#else
+                    if (errno != EAGAIN && errno != EWOULDBLOCK)
+#endif
                     {
                         CIPSTER_TRACE_ERR( "%s[%d]: errno: '%s'\n",
                             __func__, s->h(), strerrno().c_str() );
