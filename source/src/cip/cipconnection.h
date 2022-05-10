@@ -239,7 +239,7 @@ public:
             ConnPriority aPriority = kPriorityLow
             ) :
         bits( 0 ),
-        not_large( aSize <= 0x1fff )
+        not_large( aSize <= 0x1ff )
     {
         SetConnectionType( aType );
         SetConnectionSize( aSize );
