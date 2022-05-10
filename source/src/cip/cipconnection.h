@@ -338,7 +338,7 @@ public:
         //CIPSTER_TRACE_INFO( "%s: aSize:%d\n", __func__, aSize );
 
         if( not_large )
-            bits = (bits & ~0x1fff) | aSize;
+            bits = (bits & ~0x1ff) | aSize;
         else
             bits = (bits & ~0xffff) | aSize;
         return *this;
