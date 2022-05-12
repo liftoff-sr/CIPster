@@ -22,7 +22,7 @@
 int ConnectionPath::Deserialize( BufReader aInput, int aCtl )
 {
     BufReader       in = aInput;
-    const char*     working_on;     // for catch blocks.
+    const char*     working_on = "nothing yet";     // for catch blocks.
 
     // clear all CipAppPaths and later assign those seen below
     Clear();
