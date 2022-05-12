@@ -714,7 +714,7 @@ int Encapsulation::handleReceivedListServicesCommand( BufWriter aReply )
 
         return out.data() - aReply.data();
     }
-    catch( const std::runtime_error& e )
+    catch( const std::runtime_error& /*e*/ )
     {
         CIPSTER_TRACE_ERR( "%s: buffer overrun\n", __func__ );
         return -1;

@@ -495,12 +495,12 @@ EipStatus CipConnMgrClass::forward_open( CipInstance* instance,
         in += params.DeserializeForwardOpenRequest( in, isLarge );
         conn_path_byte_count = in.get8() * 2;
     }
-    catch( const std::range_error& e )
+    catch( const std::range_error& /*e*/ )
     {
         // do not even send a reply, the params where not all supplied in the request.
         return kEipStatusError;
     }
-    catch( const std::runtime_error& e )
+    catch( const std::runtime_error& /*e*/ )
     {
         // currently cannot happen except under Murphy's law.
         return kEipStatusError;
@@ -803,17 +803,17 @@ EipStatus CipConnMgrClass::forward_close_service( CipInstance* instance,
 
         ++in;   // skip "reserved" byte.  Note: forward_open does not have this.
     }
-    catch( const std::range_error& e )
+    catch( const std::range_error& /*e*/ )
     {
         // do not even send a reply, the params where not all supplied in the request.
         return kEipStatusError;
     }
-    catch( const std::runtime_error& e )
+    catch( const std::runtime_error& /*e*/ )
     {
         // currently cannot happen except under Murphy's law.
         return kEipStatusError;
     }
-    catch( const std::exception& e )
+    catch( const std::exception& /*e*/ )
     {
         return kEipStatusError;
     }
