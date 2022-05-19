@@ -12,9 +12,9 @@ cmake_minimum_required( VERSION 2.8.3 )
 
 project( CIPster )
 
-if( CMAKE_VERSION VERSION_GREATER 3.1 )
-    cmake_policy(SET CMP0056 OLD)
-endif()
+#if( CMAKE_VERSION VERSION_GREATER 3.1 )
+#    cmake_policy(SET CMP0056 OLD)
+#endif()
 
 set( CIPster_VERSION_MAJOR 1 )
 set( CIPster_VERSION_MINOR 0 )
