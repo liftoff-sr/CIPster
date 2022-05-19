@@ -728,15 +728,17 @@ ConnMgrStatus CipElectronicKeySegment::Check() const
 
     // VendorID and ProductCode are correct
 
-    // Check DeviceType, must match or 0
+    // Check DeviceType, must match or be 0
     if( device_type != 0 && device_type != device_type_ )
     {
         return kConnMgrStatusDeviceTypeError;
     }
 
-    // VendorID, ProductCode and DeviceType are correct
+    // VendorID, ProductCode and DeviceType are correct at this point
+
     if( !compatiblity_mode )
     {
+        // non-compatibility mode: mjr and minor must match if they are not zero
         if( ( mjr_revision   != 0 && mjr_revision   != revision_.major_revision )
          || ( minor_revision != 0 && minor_revision != revision_.minor_revision ) )
         {
