@@ -1635,7 +1635,7 @@ CipError CipConn::openConsumingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
     // using a port different than the 0x08AE.
     if( g_my_io_udp_port != kEIP_IoUdpPort )
     {
-        // See Vol1 table 3-3.3.
+        // See Vol2 table 3-3.3.
         // Originator ignores the IP address portion of peers_destination
         aCpf->AddTx( kSockAddr_O_T, peers_destination );
     }
