@@ -35,11 +35,10 @@ inline void stack_dump( const char* aContext ) {}      // nothing
 #ifdef HAVE_ICONV
 #include <iconv.h>
 
-#define UNICODE     "UTF16LE"   // UTF16LE is UNICODE with fixes to shortsighted-ness.
+#define UNICODE     "UTF-16LE"  // UTF-16LE is UNICODE with fixes to shortsighted-ness.
 
-#define UTF8        "UTF8"      // The best way to deal with all unicode chars in a
-                                // platform independent way using 8 bit multibyte
-                                // characters.
+#define UTF8        "UTF-8"     // A way to deal with all unicode chars in a
+                                // platform independent way.
 
 /**
  * Class IConv
