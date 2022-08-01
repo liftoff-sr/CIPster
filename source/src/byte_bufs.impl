@@ -5,11 +5,10 @@
 
 #include <string.h>
 
-
 #if BYTEBUFS_INLINE
- #define MAYBE_INLINE       inline
+#   define MAYBE_INLINE       inline
 #else
- #define MAYBE_INLINE       /* nothing, so therefore not inline */
+#   define MAYBE_INLINE       /* nothing, so therefore not inline */
 #endif
 
 MAYBE_INLINE BufWriter& BufWriter::operator+=( size_t advance )
@@ -29,7 +28,7 @@ MAYBE_INLINE BufWriter BufWriter::operator+( size_t n )
     return ret;
 }
 
-MAYBE_INLINE CipByte& BufWriter::operator * ()
+MAYBE_INLINE uint8_t& BufWriter::operator * ()
 {
     if( start >= limit )
         overrun();
@@ -59,7 +58,7 @@ MAYBE_INLINE BufWriter BufWriter::operator++(int)  // postfix ++
 }
 
 
-MAYBE_INLINE BufWriter& BufWriter::put8( CipByte aValue )
+MAYBE_INLINE BufWriter& BufWriter::put8( uint8_t aValue )
 {
     if( start + 1 > limit )
         overrun();
@@ -72,8 +71,8 @@ MAYBE_INLINE BufWriter& BufWriter::put16( uint16_t aValue )
 {
     if( start + 2 > limit )
         overrun();
-    start[0] = (CipByte) (aValue >> 0);
-    start[1] = (CipByte) (aValue >> 8);
+    start[0] = (uint8_t) (aValue >> 0);
+    start[1] = (uint8_t) (aValue >> 8);
     start += 2;
     return *this;
 }
@@ -82,10 +81,10 @@ MAYBE_INLINE BufWriter& BufWriter::put32( uint32_t aValue )
 {
     if( start + 4 > limit )
         overrun();
-    start[0] = (CipByte) (aValue >> 0);
-    start[1] = (CipByte) (aValue >> 8);
-    start[2] = (CipByte) (aValue >> 16);
-    start[3] = (CipByte) (aValue >> 24);
+    start[0] = (uint8_t) (aValue >> 0);
+    start[1] = (uint8_t) (aValue >> 8);
+    start[2] = (uint8_t) (aValue >> 16);
+    start[3] = (uint8_t) (aValue >> 24);
     start += 4;
     return *this;
 }
@@ -94,14 +93,14 @@ MAYBE_INLINE BufWriter& BufWriter::put64( uint64_t aValue )
 {
     if( start + 8 > limit )
         overrun();
-    start[0] = (CipByte) (aValue >> 0);
-    start[1] = (CipByte) (aValue >> 8);
-    start[2] = (CipByte) (aValue >> 16);
-    start[3] = (CipByte) (aValue >> 24);
-    start[4] = (CipByte) (aValue >> 32);
-    start[5] = (CipByte) (aValue >> 40);
-    start[6] = (CipByte) (aValue >> 48);
-    start[7] = (CipByte) (aValue >> 56);
+    start[0] = (uint8_t) (aValue >> 0);
+    start[1] = (uint8_t) (aValue >> 8);
+    start[2] = (uint8_t) (aValue >> 16);
+    start[3] = (uint8_t) (aValue >> 24);
+    start[4] = (uint8_t) (aValue >> 32);
+    start[5] = (uint8_t) (aValue >> 40);
+    start[6] = (uint8_t) (aValue >> 48);
+    start[7] = (uint8_t) (aValue >> 56);
     start += 8;
     return *this;
 }
@@ -135,8 +134,8 @@ MAYBE_INLINE BufWriter& BufWriter::put16BE( uint16_t aValue )
 {
     if( start + 2 > limit )
         overrun();
-    start[1] = (CipByte) (aValue >> 0);
-    start[0] = (CipByte) (aValue >> 8);
+    start[1] = (uint8_t) (aValue >> 0);
+    start[0] = (uint8_t) (aValue >> 8);
     start += 2;
     return *this;
 }
@@ -146,10 +145,10 @@ MAYBE_INLINE BufWriter& BufWriter::put32BE( uint32_t aValue )
 {
     if( start + 4 > limit )
         overrun();
-    start[3] = (CipByte) (aValue >> 0);
-    start[2] = (CipByte) (aValue >> 8);
-    start[1] = (CipByte) (aValue >> 16);
-    start[0] = (CipByte) (aValue >> 24);
+    start[3] = (uint8_t) (aValue >> 0);
+    start[2] = (uint8_t) (aValue >> 8);
+    start[1] = (uint8_t) (aValue >> 16);
+    start[0] = (uint8_t) (aValue >> 24);
     start += 4;
     return *this;
 }
@@ -186,12 +185,14 @@ MAYBE_INLINE BufReader& BufReader::operator += ( size_t advance )
     return *this;
 }
 
+
 MAYBE_INLINE BufReader BufReader::operator+( size_t n )
 {
     BufReader ret = *this;
     ret += n;
     return ret;
 }
+
 
 MAYBE_INLINE BufReader& BufReader::operator++()  // prefix ++
 {
@@ -211,19 +212,21 @@ MAYBE_INLINE BufReader BufReader::operator++(int)  // postfix ++
 }
 
 
-MAYBE_INLINE CipByte BufReader::operator * () const
+MAYBE_INLINE uint8_t BufReader::operator * () const
 {
     if( start >= limit )
         overrun();
     return *start;
 }
 
-MAYBE_INLINE CipByte BufReader::get8()
+
+MAYBE_INLINE uint8_t BufReader::get8()
 {
     if( start + 1 > limit )
         overrun();
     return *start++;
 }
+
 
 MAYBE_INLINE uint16_t BufReader::get16()
 {
@@ -235,6 +238,7 @@ MAYBE_INLINE uint16_t BufReader::get16()
     start += 2;
     return ret;
 }
+
 
 MAYBE_INLINE uint32_t BufReader::get32()
 {
@@ -248,6 +252,7 @@ MAYBE_INLINE uint32_t BufReader::get32()
     start += 4;
     return ret;
 }
+
 
 MAYBE_INLINE uint64_t BufReader::get64()
 {
@@ -266,6 +271,7 @@ MAYBE_INLINE uint64_t BufReader::get64()
     return ret;
 }
 
+
 MAYBE_INLINE float BufReader::get_float()
 {
     union {
@@ -278,6 +284,7 @@ MAYBE_INLINE float BufReader::get_float()
     return t.f;
 }
 
+
 MAYBE_INLINE double BufReader::get_double()
 {
     union {
@@ -289,6 +296,7 @@ MAYBE_INLINE double BufReader::get_double()
     return t.d;
 }
 
+
 MAYBE_INLINE uint16_t BufReader::get16BE()
 {
     if( start + 2 > limit )
@@ -299,6 +307,7 @@ MAYBE_INLINE uint16_t BufReader::get16BE()
     start += 2;
     return ret;
 }
+
 
 MAYBE_INLINE uint32_t BufReader::get32BE()
 {

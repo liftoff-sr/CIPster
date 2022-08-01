@@ -9,8 +9,6 @@
 #include <string>
 #include <stdexcept>    // for the convenience of clients of these classes, which throw
 
-#include "typedefs.h"
-
 class BufReader;
 class BufWriter;
 
@@ -80,6 +78,7 @@ public:
     /// the size().
     BufWriter& operator+=( size_t advance );
 
+    /// Construct a new BufWriter from this one but advance its start by n bytes.
     BufWriter operator+( size_t n );
 
     uint8_t& operator * ();
@@ -181,7 +180,8 @@ public:
     /// the size().
     BufReader& operator += ( size_t advance );
 
-    BufReader operator+( size_t n );
+    /// Construct a new BufReader from this one but advance its start by n bytes.
+    BufReader operator + ( size_t n );
 
     /// prefix ++
     BufReader& operator++();
@@ -282,7 +282,7 @@ public:
      * returns the total byte count of this item if it were to be Serialize()ed, but does
      * the calculation without actually doing the serialization.
      *
-     * @param aCtl is set of class specific bits that act as boolean flags to
+     * @param aCtl is a set of class specific bits that act as boolean flags to
      *      tune the nature of the serialization.
      * @return int - the number of bytes consumed should this object be serialized
      *      using the same provided aCtl flags.
@@ -296,7 +296,7 @@ public:
      *
      * @param aWriter is a BufWriter indicating size and location of a place to
      *      put the serialized bytes.
-     * @param aCtl is set of class specific bits that act as boolean flags to
+     * @param aCtl is a set of class specific bits that act as boolean flags to
      *      tune the nature of the serialization.
      * @return int - the number of bytes consumed during the serialization.
      */
