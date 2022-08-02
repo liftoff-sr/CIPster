@@ -316,7 +316,7 @@ EipStatus CipMessageRouterClass::NotifyMR(
 
     if( !service )
     {
-#if 1
+#if 0
         if( aRequest->Service() == kGetAttributeSingle &&
             instance_id     > 7 &&
             clazz->ClassId() == kCipTcpIpInterfaceClass )

@@ -16,6 +16,9 @@
  #undef _WINSOCKAPI_    // suppress Mingw32's "Please include winsock2.h before windows.h"
  #include <winsock2.h>
  #include <ws2tcpip.h>
+#elif defined(__APPLE__)
+ #include <netinet/in.h>
+ #include <errno.h>
 #endif
 
 #include <stdexcept>
@@ -51,7 +54,7 @@ public:
 
     socket_error( const std::string& aMessage ) :
         std::runtime_error( aMessage ),
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
         error_code( errno )
 #elif defined(_WIN32)
         error_code( WSAGetLastError() )

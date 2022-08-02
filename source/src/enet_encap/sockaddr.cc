@@ -6,8 +6,12 @@
 
 #include "sockaddr.h"
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
  #include <netdb.h>
+#endif
+
+#if defined(__APPLE__)
+ #include <arpa/inet.h>
 #endif
 
 std::string IpAddrStr( in_addr aIP )
