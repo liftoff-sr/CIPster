@@ -1,6 +1,5 @@
 Volunteer contributions welcome for these:
 
-
 *) Enhance documentation.  Note that @brief is ugly and it is being removed.
    We have Javadoc flag enabled in Doxygen which does basically the same thing.
    Need to get rid of numerous Doxygen errors.
