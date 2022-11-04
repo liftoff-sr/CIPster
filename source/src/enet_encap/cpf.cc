@@ -430,5 +430,7 @@ int Cpf::deserialize_sockaddr( SockAddr* aSockAddr, BufReader aInput )
     aSockAddr->SetPort( in.get16BE() );
     aSockAddr->SetAddr( in.get32BE() );
 
+    in += 8;        // ignore 8 bytes of sin_zero
+
     return in.data() - aInput.data();
 }
