@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016-2018, SoftPLC Corportion.
+ * Copyright (c) 2016-2023, SoftPLC Corportion.
  *
  ******************************************************************************/
 
@@ -219,6 +219,13 @@ MAYBE_INLINE uint8_t BufReader::operator * () const
     return *start;
 }
 
+
+MAYBE_INLINE uint8_t BufReader::operator[] (int aIndex) const
+{
+    if( start + (unsigned) aIndex >= limit )
+        overrun();
+    return start[aIndex];
+}
 
 MAYBE_INLINE uint8_t BufReader::get8()
 {

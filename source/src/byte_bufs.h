@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2016-2018, SoftPLC Corporation.
+ * Copyright (c) 2016-2023, SoftPLC Corporation.
  *
  ******************************************************************************/
 
@@ -75,7 +75,7 @@ public:
     ssize_t     capacity() const    { return limit - start; }
 
     /// Advance the start of the buffer by the specified number of bytes and trim
-    /// the size().
+    /// the capacity().
     BufWriter& operator+=( size_t advance );
 
     /// Construct a new BufWriter from this one but advance its start by n bytes.
@@ -190,6 +190,8 @@ public:
     BufReader operator++(int);
 
     uint8_t operator * () const;
+
+    uint8_t operator[](int aIndex) const;
 
     BufReader& operator=( const ByteBuf& aRange )
     {
