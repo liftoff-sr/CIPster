@@ -15,7 +15,6 @@
 #include <byte_bufs.h>
 #include <cipethernetlink.h>
 #include <cipster_api.h>
-#include <arpa/inet.h>
 
 #undef  INSTANCE_CLASS
 #define INSTANCE_CLASS  CipTCPIPInterfaceInstance

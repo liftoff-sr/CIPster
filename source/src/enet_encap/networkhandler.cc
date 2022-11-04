@@ -12,12 +12,12 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/select.h>
 
 #if defined(__linux__)
  #include <unistd.h>
  #include <sys/time.h>
  #include <time.h>
+ #include <sys/select.h>
 #endif
 
 #if defined(__APPLE__)
