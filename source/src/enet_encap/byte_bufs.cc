@@ -10,14 +10,16 @@
 #if defined(DEBUG) && defined(__linux__)
 #include <execinfo.h>
 
+#define TRACEZ      32
+
 static void stack_dump( const char* aContext )
 {
-    void*   trace[32];
+    void*   trace[TRACEZ];
     char**  strings;
 
     // see http://www.linuxjournal.com/article/6391 for info on backtrace()
     // in a signal handler.
-    int trace_size = backtrace( trace, DIM(trace) );
+    int trace_size = backtrace( trace, TRACEZ );
 
     strings = backtrace_symbols( trace, trace_size );
 
