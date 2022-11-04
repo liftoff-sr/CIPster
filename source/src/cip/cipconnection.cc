@@ -1760,8 +1760,9 @@ CipError CipConn::openMulticastConnection( UdpDirection aDirection,
     {
         const SockAddr* saii = aCpf->SaiiRx( kSockAddr_T_O );
 
-        // For consuming multicast connections the originator chooses the
-        // multicast address to use, so *must* supply the kSockAddr_T_O
+        // For our consuming multicast connections the producer chooses the
+        // multicast address to use, so it *must* be in the aCpf as retrieved
+        // above, else error
 
         if( !saii )
         {
