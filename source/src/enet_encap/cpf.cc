@@ -208,7 +208,7 @@ int Cpf::DeserializeCpf( BufReader aSrc )
     BufReader in = aSrc;
 
     Clear();
-
+    try {
     int received_item_count = in.get16();
 
     for( int item=0; item < received_item_count;  ++item )
@@ -259,7 +259,11 @@ int Cpf::DeserializeCpf( BufReader aSrc )
             goto error;
         }
     }
-
+    }
+    catch(const std::runtime_error&) {
+        CIPSTER_TRACE_ERR("%s:buffer overrun\n", __func__);
+        return -1;
+    }
     return in.data() - aSrc.data();
 
 error:
