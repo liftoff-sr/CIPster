@@ -140,6 +140,7 @@ on Windows.)
     $ mkdir /tmp/build-win-cip
     $ cd /tmp/build-win-cip
     $ cmake -DCMAKE_TOOLCHAIN_FILE=<path-to-CIPster>/source/buildsupport/Toolchain/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Debug <path-to-CIPster>/examples/WINDOWS
+    $ make
 
 Then if you have 64 bit Wine installed, simply run the program as if it were a linux binary on linux.
 
