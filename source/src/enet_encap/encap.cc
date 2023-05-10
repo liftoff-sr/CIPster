@@ -575,19 +575,22 @@ int Encapsulation::registerSession( int socket, BufReader aCommand, BufWriter aR
     BufWriter out = aReply;
 
     int version, options;
-    try {
+
+    try
+    {
         version = aCommand.get16();
         options = aCommand.get16();
     }
-    catch(const std::runtime_error&) {
-        CIPSTER_TRACE_ERR("%s:buffer overrun\n", __func__);
+    catch( const std::runtime_error& )
+    {
+        CIPSTER_TRACE_ERR( "%s: bad 'register session' format\n", __func__ );
         return -1;
     }
 
     // Check if requested protocol version is supported and the
     // register session option parameter is zero.
     if( version && version <= kSupportedProtocolVersion && !options )
-    {   
+    {
         *aEncapError = SessionMgr::RegisterSession( socket, aSessionHandleResult );
     }
     else    // protocol not supported
@@ -979,7 +982,7 @@ int Encapsulation::HandleReceivedExplicitUdpData( int aSocket,
             result = handleReceivedListIdentityCommandImmediate( reply );
         }
         else
-        {   
+        {
             unsigned maxMSecs = encap.TimeoutMS();
             unsigned timeoutMSecs = determineDelayTimeMSecs( maxMSecs );
 

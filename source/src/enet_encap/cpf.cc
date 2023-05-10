@@ -208,60 +208,62 @@ int Cpf::DeserializeCpf( BufReader aSrc )
     BufReader in = aSrc;
 
     Clear();
-    try {
-    int received_item_count = in.get16();
-
-    for( int item=0; item < received_item_count;  ++item )
+    try
     {
-        CpfId   type_id = (CpfId) in.get16();
-        int     length  = in.get16();
+        int received_item_count = (uint16_t) in.get16();
 
-        switch( type_id )
+        for( int item=0; item < received_item_count;  ++item )
         {
-        //case kCpfIdListIdentityResponse
-        //case kCpfIdListServiceResponse:
-        case kCpfIdNullAddress:
-        case kCpfIdConnectedAddress:
-        case kCpfIdSequencedAddress:
-            address_item.type_id = type_id;
-            address_item.length  = length;
-            if( length >= 4 )
-                address_item.connection_identifier = in.get32();
-            if( length == 8 )
-                address_item.encap_sequence_number = in.get32();
-            break;
+            CpfId   type_id = (CpfId) in.get16();
+            int     length  = in.get16();
 
-        case kCpfIdConnectedDataItem:
-        case kCpfIdUnconnectedDataItem:
-            SetDataType( type_id );
-            SetDataRange( ByteBuf( (uint8_t*) in.data(), length ) );
-            in += length;               // might throw exception
-            break;
-
-        case kCpfIdSockAddrInfo_O_T:
-        case kCpfIdSockAddrInfo_T_O:
+            switch( type_id )
             {
-                if( length == 16 )
+            //case kCpfIdListIdentityResponse
+            //case kCpfIdListServiceResponse:
+            case kCpfIdNullAddress:
+            case kCpfIdConnectedAddress:
+            case kCpfIdSequencedAddress:
+                address_item.type_id = type_id;
+                address_item.length  = length;
+                if( length >= 4 )
+                    address_item.connection_identifier = in.get32();
+                if( length == 8 )
+                    address_item.encap_sequence_number = in.get32();
+                break;
+
+            case kCpfIdConnectedDataItem:
+            case kCpfIdUnconnectedDataItem:
+                SetDataType( type_id );
+                SetDataRange( ByteBuf( (uint8_t*) in.data(), length ) );
+                in += length;               // might throw exception
+                break;
+
+            case kCpfIdSockAddrInfo_O_T:
+            case kCpfIdSockAddrInfo_T_O:
                 {
-                    SockAddr saii;
+                    if( length == 16 )
+                    {
+                        SockAddr saii;
 
-                    in += deserialize_sockaddr( &saii, in );
-                    AddRx( SockAddrId( type_id ), saii );
+                        in += deserialize_sockaddr( &saii, in );
+                        AddRx( SockAddrId( type_id ), saii );
+                    }
+                    else
+                        goto error;
                 }
-                else
-                    goto error;
-            }
-            break;
+                break;
 
-        default:
-            // Vol 2 Table 2-6.10 says reply with 0x0003 in encap status.
-            // Leave item_count at zero.
-            goto error;
+            default:
+                // Vol 2 Table 2-6.10 says reply with 0x0003 in encap status.
+                // Leave item_count at zero.
+                goto error;
+            }
         }
     }
-    }
-    catch(const std::runtime_error&) {
-        CIPSTER_TRACE_ERR("%s:buffer overrun\n", __func__);
+    catch( const std::runtime_error& )
+    {
+        CIPSTER_TRACE_ERR( "%s: bad CPF format\n", __func__ );
         return -1;
     }
     return in.data() - aSrc.data();
