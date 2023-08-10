@@ -420,7 +420,7 @@ bool CipConnBox::Remove( CipConn* aConn )
 
 bool IsConnectedInputAssembly( int aInstanceId )
 {
-    CipConn* c = g_active_conns.begin();
+    CipConnBox::iterator c = g_active_conns.begin();
 
     for(  ; c != g_active_conns.end();  ++c )
     {
