@@ -29,6 +29,7 @@ enum ClassIds
     kCipAssemblyClass           = 0x04,
     kCipConnectionClass         = 0x05,
     kCipConnectionManagerClass  = 0x06,
+    kCipRegisterClass           = 0x07,
     kCipTcpIpInterfaceClass     = 0xF5,
     kCipEthernetLinkClass       = 0xF6,
 };
