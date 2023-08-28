@@ -49,7 +49,7 @@ CipAssemblyClass::CipAssemblyClass() :
         )
 {
     // Attribute 3 is the byte array transfer of the assembly data itself
-    AttributeInsert( _I, 3, get_assembly_data_attr, false, set_assembly_data_attr, memb_offs(byte_array) );
+    AttributeInsert( _I, 3, get_assembly_data_attr, false, set_assembly_data_attr, memb_offs(byte_array),  true, kCipByteArray);
 
     // Attribute 4: is no. of bytes in Attribute 3
     AttributeInsert( _I, 4, kCipByteArrayLength, memb_offs(byte_array), true, false );

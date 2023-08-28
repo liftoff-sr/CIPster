@@ -1030,7 +1030,10 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
 int CipConn::constructed_count;         // CipConn::instance_id is only for debugging
 
 CipConn::CipConn() :
-    instance_id( ++constructed_count )
+    instance_id( ++constructed_count ),
+    next(NULL),
+    prev(NULL),
+    on_list(false)
 {
     Clear( false );
 }
