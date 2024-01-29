@@ -19,7 +19,7 @@
  */
 EipStatus NetworkHandlerInitialize();
 
-EipStatus NetworkHandlerProcessOnce();
+EipStatus NetworkHandlerProcessOnce(int timeoutInSeconds = 0);
 
 EipStatus NetworkHandlerFinish();
 

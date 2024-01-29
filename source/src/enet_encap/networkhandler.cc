@@ -776,7 +776,7 @@ error:
 }
 
 
-EipStatus NetworkHandlerProcessOnce()
+EipStatus NetworkHandlerProcessOnce(int timeoutInSeconds)
 {
     read_set = master_set;
 
@@ -785,7 +785,7 @@ EipStatus NetworkHandlerProcessOnce()
     // On  Linux,  select()  modifies timeout to reflect the amount of time
     // not slept; most other implementations do not do this.
     // Consider timeout to be undefined after select() returns.
-    tv.tv_sec  = 0;
+    tv.tv_sec  = timeoutInSeconds;
     tv.tv_usec = 0;
 
     int ready_count = select( highest_socket_handle + 1, &read_set, 0, 0, &tv );
