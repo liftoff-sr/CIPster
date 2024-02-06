@@ -33,7 +33,7 @@ public:
 
     uint8_t*    data() const    { return start; }
     uint8_t*    end() const     { return limit; }
-    ssize_t     size() const    { return limit - start; }   // ssize_t is signed
+    uint16_t     size() const    { return limit - start; }   // uint16_t is signed
 
 protected:
     uint8_t*    start;
@@ -72,7 +72,7 @@ public:
     /// Return the unused size of the buffer, the remaining capacity which is empty.
     /// A negative value would indicate an overrun, but that also indicates a bug in
     /// in this class because protections are everywhere to prevent overruns.
-    ssize_t     capacity() const    { return limit - start; }
+    uint16_t     capacity() const    { return limit - start; }
 
     /// Advance the start of the buffer by the specified number of bytes and trim
     /// the capacity().
@@ -174,7 +174,7 @@ public:
     /// in the buffer.
     /// A negative value would indicate an overrun, but that also indicates a bug in
     /// in this class because protections are everywhere to prevent overruns.
-    ssize_t     size() const        { return limit - start; }
+    uint16_t     size() const        { return limit - start; }
 
     /// Advance the start of the buffer by the specified number of bytes and trim
     /// the size().
