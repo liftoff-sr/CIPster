@@ -26,8 +26,8 @@ bool parse_mac( const char* mac_str, uint8_t mac_out[6] )
 {
     int b[6];
 
-    if( 6 == sscanf( mac_str, "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5] ) ||
-        6 == sscanf( mac_str, "%x-%x-%x-%x-%x-%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5] ) )
+    if( 6 == sscanf_s( mac_str, "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5] ) ||
+        6 == sscanf_s( mac_str, "%x-%x-%x-%x-%x-%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5] ) )
     {
         for( int i=0; i<6; ++i )
             mac_out[i] = b[i];
