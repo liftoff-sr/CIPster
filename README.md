@@ -135,7 +135,12 @@ There is one supplied for 64 bit Windows, so here we build a 64 bit windows
 sample program, and actually run in on Linux under Wine. (You can copy the
 toolchain file and modify it for your toolchain. Or if building on Windows, omit
 it. Truth be told, it is easier to build a Windows console binary on Linux than
-on Windows.)
+on Windows.)  On Ubuntu or Debian the mingw tools are installed with the following
+command:
+
+    $ sudo apt install g++-mingw-w64-x86-64
+
+Then follow these steps:
 
     $ mkdir /tmp/build-win-cip
     $ cd /tmp/build-win-cip
