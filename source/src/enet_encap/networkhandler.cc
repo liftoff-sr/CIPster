@@ -581,6 +581,12 @@ EipStatus NetworkHandlerInitialize()
     wVersionRequested = MAKEWORD(2, 2);
 
     WSAStartup( wVersionRequested, &wsaData );
+
+    // Windows doesn't seem to like binding broadcast udp sockets to INADDR_BROADCAST, or the broadcast
+    // address of any interface so we bind to INADDR_ANY.
+    long udp_broadcast_addr = INADDR_ANY;
+#else
+    long udp_broadcast_addr = INADDR_BROADCAST;
 #endif
 
     static const int one = 1;
@@ -660,8 +666,7 @@ EipStatus NetworkHandlerInitialize()
     }
 
     {
-        // Windows doesn't let us bind to INADDR_BROADCAST, so we build the broadcast address
-        SockAddr address( kEIP_Reserved_Port, (c.ip_address & c.network_mask) | ~c.network_mask);
+        SockAddr address( kEIP_Reserved_Port, udp_broadcast_addr);
 
         if( bind( s_sockets.udp_global_broadcast_listener, address, SADDRZ ) )
         {
