@@ -660,7 +660,8 @@ EipStatus NetworkHandlerInitialize()
     }
 
     {
-        SockAddr address( kEIP_Reserved_Port, INADDR_BROADCAST );
+        // Windows doesn't let us bind to INADDR_BROADCAST, so we build the broadcast address
+        SockAddr address( kEIP_Reserved_Port, (c.ip_address & c.network_mask) | ~c.network_mask);
 
         if( bind( s_sockets.udp_global_broadcast_listener, address, SADDRZ ) )
         {
