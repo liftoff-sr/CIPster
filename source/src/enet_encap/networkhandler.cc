@@ -581,12 +581,6 @@ EipStatus NetworkHandlerInitialize()
     wVersionRequested = MAKEWORD(2, 2);
 
     WSAStartup( wVersionRequested, &wsaData );
-
-    // Windows doesn't seem to like binding broadcast udp sockets to INADDR_BROADCAST, or the broadcast
-    // address of any interface so we bind to INADDR_ANY.
-    long udp_broadcast_addr = INADDR_ANY;
-#else
-    long udp_broadcast_addr = INADDR_BROADCAST;
 #endif
 
     static const int one = 1;
@@ -666,7 +660,11 @@ EipStatus NetworkHandlerInitialize()
     }
 
     {
-        SockAddr address( kEIP_Reserved_Port, udp_broadcast_addr);
+#if defined(_WIN32)
+        SockAddr address(kEIP_Reserved_Port, INADDR_ANY);
+#else
+        SockAddr address( kEIP_Reserved_Port, INADDR_BROADCAST);
+#endif
 
         if( bind( s_sockets.udp_global_broadcast_listener, address, SADDRZ ) )
         {
@@ -677,6 +675,7 @@ EipStatus NetworkHandlerInitialize()
         }
     }
 
+#if !defined(_WIN32)
     //-----<udp_local_broadcast_listener>---------------------------------------
     // create a new UDP socket
     s_sockets.udp_local_broadcast_listener = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
@@ -709,6 +708,7 @@ EipStatus NetworkHandlerInitialize()
             goto error;
         }
     }
+#endif
 
     //-----<udp_unicast_listener>----------------------------------------------
     // create a new UDP socket
@@ -754,7 +754,7 @@ EipStatus NetworkHandlerInitialize()
     // add the listener socket to the master set
     master_set_add( "TCP", s_sockets.tcp_listener );
     master_set_add( "UDP", s_sockets.udp_unicast_listener );
-    master_set_add( "UDP", s_sockets.udp_local_broadcast_listener );
+    if (s_sockets.udp_local_broadcast_listener != -1) master_set_add( "UDP", s_sockets.udp_local_broadcast_listener );
     master_set_add( "UDP", s_sockets.udp_global_broadcast_listener );
 
     CIPSTER_TRACE_INFO( "%s:\n"
