@@ -128,6 +128,11 @@ public:
         tag[0] = 0;
     }
 
+    CipAppPath(const CipAppPath &rhs)
+    {
+        *this = rhs;
+    }
+
     CipAppPath( int aClassId, int aInstanceId, int aAttributeId = 0 )
     {
         tag[0] = 0;
