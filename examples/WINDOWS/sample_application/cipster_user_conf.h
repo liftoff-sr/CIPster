@@ -129,6 +129,15 @@ const bool kCIPsterConsumedDataHasRunIdleHeader = true;
  */
 const bool kCIPsterProducedDataHasRunIdleHeader = false;
 
+/**
+ * The setting of this affects point to point connections with a FANUC robot
+ * configured as a scanner by adding an O->T Saii in the forward_open reply
+ * even if the port is 0x08AE. FANUC always needs this parameter to work
+ * properly.
+ * @see Vol2 3-3.9.6
+ */
+const bool kCIPsterFanucScanner = false; 
+
 #ifdef CIPSTER_WITH_TRACES
 // If we have tracing enabled provide print tracing macro
 #include <stdio.h>

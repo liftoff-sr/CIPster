@@ -443,7 +443,7 @@ int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
 
         out.put32( ConsumingRPI() );
         ConsumingNCP().Serialize( out );
-
+        
         trigger.Serialize( out );
 
         if( !(CTL_OMIT_CONN_PATH & aCtl) )
@@ -1636,7 +1636,8 @@ CipError CipConn::openConsumingPointToPointConnection( Cpf* aCpf, ConnMgrStatus*
 
     // Vol2 3-3.9.6 return O->T Saii in the forward_open reply if I am
     // using a port different than the 0x08AE.
-    if( g_my_io_udp_port != kEIP_IoUdpPort )
+    // Handle special case for FANUC robots.
+    if( g_my_io_udp_port != kEIP_IoUdpPort || kCIPsterFanucScanner )
     {
         // See Vol2 table 3-3.3.
         // Originator ignores the IP address portion of peers_destination
