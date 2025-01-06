@@ -660,7 +660,11 @@ EipStatus NetworkHandlerInitialize()
     }
 
     {
-        SockAddr address( kEIP_Reserved_Port, INADDR_BROADCAST );
+#if defined(_WIN32)
+        SockAddr address(kEIP_Reserved_Port, INADDR_ANY);
+#else
+        SockAddr address( kEIP_Reserved_Port, INADDR_BROADCAST);
+#endif
 
         if( bind( s_sockets.udp_global_broadcast_listener, address, SADDRZ ) )
         {
@@ -671,6 +675,7 @@ EipStatus NetworkHandlerInitialize()
         }
     }
 
+#if !defined(_WIN32)
     //-----<udp_local_broadcast_listener>---------------------------------------
     // create a new UDP socket
     s_sockets.udp_local_broadcast_listener = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
@@ -703,6 +708,7 @@ EipStatus NetworkHandlerInitialize()
             goto error;
         }
     }
+#endif
 
     //-----<udp_unicast_listener>----------------------------------------------
     // create a new UDP socket
@@ -748,7 +754,7 @@ EipStatus NetworkHandlerInitialize()
     // add the listener socket to the master set
     master_set_add( "TCP", s_sockets.tcp_listener );
     master_set_add( "UDP", s_sockets.udp_unicast_listener );
-    master_set_add( "UDP", s_sockets.udp_local_broadcast_listener );
+    if (s_sockets.udp_local_broadcast_listener != -1) master_set_add( "UDP", s_sockets.udp_local_broadcast_listener );
     master_set_add( "UDP", s_sockets.udp_global_broadcast_listener );
 
     CIPSTER_TRACE_INFO( "%s:\n"
@@ -776,7 +782,7 @@ error:
 }
 
 
-EipStatus NetworkHandlerProcessOnce()
+EipStatus NetworkHandlerProcessOnce(int timeoutInSeconds)
 {
     read_set = master_set;
 
@@ -785,7 +791,7 @@ EipStatus NetworkHandlerProcessOnce()
     // On  Linux,  select()  modifies timeout to reflect the amount of time
     // not slept; most other implementations do not do this.
     // Consider timeout to be undefined after select() returns.
-    tv.tv_sec  = 0;
+    tv.tv_sec  = timeoutInSeconds;
     tv.tv_usec = 0;
 
     int ready_count = select( highest_socket_handle + 1, &read_set, 0, 0, &tv );

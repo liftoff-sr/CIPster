@@ -1231,7 +1231,11 @@ void CipConn::GeneralConfiguration( ConnectionData* aConnData, ConnInstanceType 
     // "expected_packet_rate x connection_timeout_multiplier".  Initial value
     // is called a "pre-consumption" timeout value.
     if( RxTimeoutUSecs() )
+#ifdef _MSC_VER
+        SetInactivityWatchDogTimerUSecs(max(RxTimeoutUSecs(), 10000000u));
+#else
         SetInactivityWatchDogTimerUSecs( std::max( RxTimeoutUSecs(), 10000000u ) );
+#endif
     else
     {
         // this is not an erro
