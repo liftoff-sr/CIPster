@@ -24,21 +24,48 @@ void LeaveStack( int signal );
 volatile bool g_end_stack;
 
 
-
 bool parse_mac( const char* mac_str, uint8_t mac_out[6] )
 {
-    int b[6];
+    const char* current = mac_str;
 
-    if( 6 == sscanf_s( mac_str, "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5] ) ||
-        6 == sscanf_s( mac_str, "%x-%x-%x-%x-%x-%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5] ) )
+    for( int i = 0; i < 6; ++i )
     {
-        for( int i=0; i<6; ++i )
-            mac_out[i] = b[i];
+        char* next_char;
 
-        return true;
+        // Parse the next hex token
+        unsigned long val = strtoul( current, &next_char, 16 );
+
+        // Fail if no digits were consumed or if the value exceeds 1 byte
+        if( current == next_char || val > 0xFF )
+        {
+            return false;
+        }
+
+        mac_out[i] = (uint8_t) val;
+
+        // Check the trailing delimiter character
+        if( i < 5 )
+        {
+            // Must have a delimiter, and it must be ':' or '-'
+            if( *next_char != ':' && *next_char != '-' )
+            {
+                return false;
+            }
+
+            // Move pointer past the delimiter for the next iteration
+            current = next_char + 1;
+        }
+        else
+        {
+            // The 6th byte must be the end of the string (or a trailing space/newline)
+            if( *next_char != '\0' && *next_char != '\n' && *next_char != '\r' )
+            {
+                return false;
+            }
+        }
     }
 
-    return false;
+    return true;
 }
 
 
