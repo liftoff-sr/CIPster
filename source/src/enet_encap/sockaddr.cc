@@ -4,6 +4,7 @@
  *
  ******************************************************************************/
 
+#include <cstdint>
 #include "sockaddr.h"
 
 #if defined(__linux__) || defined(__APPLE__)
