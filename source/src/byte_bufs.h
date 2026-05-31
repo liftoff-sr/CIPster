@@ -8,6 +8,7 @@
 
 #include <string>
 #include <stdexcept>    // for the convenience of clients of these classes, which throw
+#include <cstdint>
 
 class BufReader;
 class BufWriter;
