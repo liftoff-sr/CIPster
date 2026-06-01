@@ -447,7 +447,7 @@ int Encapsulation::ReceiveTcpMsg( int aSocket, BufWriter aMsg )
     if( aMsg.capacity() < ENCAPSULATION_HEADER_LENGTH )
     {
         CIPSTER_TRACE_ERR( "%s[%d]: aMsg size is too small\n", __func__, aSocket );
-        return -1;
+        return kEipStatusError;
     }
 
     int num_read = EnsuredTcpRecv( aSocket, aMsg.data(), ENCAPSULATION_HEADER_LENGTH );
@@ -456,14 +456,14 @@ int Encapsulation::ReceiveTcpMsg( int aSocket, BufWriter aMsg )
     {
         CIPSTER_TRACE_ERR( "%s[%d]: other end of socket closed by client\n",
                 __func__, aSocket );
-        return -1;
+        return kEipStatusError;
     }
 
     if( num_read < ENCAPSULATION_HEADER_LENGTH )
     {
         CIPSTER_TRACE_ERR( "%s[%d]: recv() error: %s\n",
                 __func__, aSocket, strerror(errno) );
-        return -1;
+        return kEipStatusError;
     }
 
     unsigned remaining = start[2] | (start[3] << 8);
@@ -493,10 +493,11 @@ int Encapsulation::ReceiveTcpMsg( int aSocket, BufWriter aMsg )
             ShowEncapCmd( start[0] | (start[1] << 8) )
             );
 
-        if( disposeOfLargePacket( aSocket, remaining ) != remaining )
-            return kEipStatusError;
-        else
-            return remaining + ENCAPSULATION_HEADER_LENGTH;
+        disposeOfLargePacket( aSocket, remaining );
+
+        // Do not report a full packet length here.
+        // The body was discarded, so this packet must not be parsed.
+        return kEipStatusError;
     }
 
     num_read = EnsuredTcpRecv( aSocket, aMsg.data(), remaining );

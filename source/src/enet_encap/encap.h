@@ -120,7 +120,8 @@ public:
      * reads an Encapsulation message in from a TCP socket into caller's aMessage buffer.
      * @param aSocket is the open socket to read from, data is known to be available.
      * @param aMessage is where to put the Encapsulation header and payload.
-     * @return int - the number of bytes in the total message or -1 if error.
+     * @return int - the number of bytes in the total message or
+     *    kEipStatusError (-1) if error.
      */
     static int ReceiveTcpMsg( int aSocket, BufWriter aMessage );
 
