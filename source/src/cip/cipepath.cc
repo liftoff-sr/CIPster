@@ -667,23 +667,31 @@ int CipElectronicKeySegment::DeserializeElectronicKey( BufReader aInput, int aCt
 
     if( first == 0x34 )
     {
-        ++in;   // ate first
 
-        int key_format = in.get8();
-
-        if( key_format != 4 )
+        try
         {
-            CIPSTER_TRACE_ERR( "%s: unknown electronic key format: %d\n",
-                __func__, key_format );
+            ++in;   // ate first
 
-            return aInput.data() - (in.data() - 1);    // return negative byte offset of error
+            int key_format = in.get8();
+
+            if( key_format != 4 )
+            {
+                CIPSTER_TRACE_ERR( "%s: unknown electronic key format: %d\n",
+                    __func__, key_format );
+
+                return aInput.data() - (in.data() - 1);    // return negative byte offset of error
+            }
+
+            vendor_id      = in.get16();
+            device_type    = in.get16();
+            product_code   = in.get16();
+            major_revision = in.get8();
+            minor_revision = in.get8();
         }
-
-        vendor_id      = in.get16();
-        device_type    = in.get16();
-        product_code   = in.get16();
-        major_revision = in.get8();
-        minor_revision = in.get8();
+        catch( const std::range_error& re )
+        {
+            return -1;
+        }
     }
 
     return in.data() - aInput.data();

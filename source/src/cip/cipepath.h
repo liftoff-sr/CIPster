@@ -155,7 +155,7 @@ public:
      *  at aInput were not an application_path, or at least not supported.
      *
      * @throw std::runtime_error if problem with aInput, or
-     *    std::overrun() from BufReader on buffer overrun.
+     *    std::range_error() from BufReader on buffer overrun.
      */
     int DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom = NULL, int aCtl = 0 );
 
@@ -360,7 +360,8 @@ struct CipElectronicKeySegment
      *
      * @param aInput gives the bytes to parse and their length.
      * @return int - number of bytes consumed.  If zero, this means bytes
-     *  given by aSource were not an electronic key.
+     *  given by aSource were not an electronic key.  If -1, this means
+     *  @a aInput was incomplete, too short.
      */
     int DeserializeElectronicKey( BufReader aInput, int aCtl = 0 );
 
