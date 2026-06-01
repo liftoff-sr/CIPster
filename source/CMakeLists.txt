@@ -87,6 +87,16 @@ if( CIPster_TESTS )
     add_subdirectory( tests )
 endif()
 
+# Standalone security regression test (attribute-API hardening).  Independent of
+# CIPster_TESTS / CppUTest: links only against eip, so it builds with just a C++
+# compiler and the headers.
+set( CIPster_SECURITY_TESTS OFF CACHE BOOL "Build the standalone attribute-API security regression test" )
+if( CIPster_SECURITY_TESTS )
+    enable_testing()
+    enable_language( CXX )
+    add_subdirectory( tests/security )
+endif()
+
 
 if( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
 
