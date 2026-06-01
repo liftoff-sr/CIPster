@@ -34,9 +34,9 @@ CipEthernetLinkClass::CipEthernetLinkClass() :
               1                     // version
               )
 {
-    AttributeInsert( _I, 1, kCipUdint,  memb_offs(interface_speed) );
-    AttributeInsert( _I, 2, kCipDword,  memb_offs(interface_flags) );
-    AttributeInsert( _I, 3, kCip6Usint, memb_offs(physical_address) );
+    AttributeInsertUdint(  _I, 1, &CipEthernetLinkInstance::interface_speed );
+    AttributeInsertDword(  _I, 2, &CipEthernetLinkInstance::interface_flags );
+    AttributeInsert6Usint( _I, 3, &CipEthernetLinkInstance::physical_address );
 }
 
 

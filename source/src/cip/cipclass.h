@@ -10,7 +10,31 @@
 #include "cipinstance.h"
 #include "cipservice.h"
 
+#ifndef CIPSTER_DEPRECATED
+ #if defined(__GNUC__) || defined(__clang__)
+  #define CIPSTER_DEPRECATED(msg) __attribute__((deprecated(msg)))
+ #else
+  #define CIPSTER_DEPRECATED(msg)
+ #endif
+#endif
+
 class ConnectionData;
+
+
+/**
+ * Function memberOffset
+ * returns the byte offset of a data member within its (single-inheritance)
+ * CipInstance-derived class, computed from a pointer-to-member.  This is the
+ * type-safe replacement for the memb_offs() macro, used by the typed
+ * AttributeInsert<Type>() inserters.  It carries the same assumption memb_offs()
+ * always relied on: CipInstance is the first, non-virtual base subobject.
+ */
+template<typename I, typename M>
+inline uint16_t memberOffset( M I::* aMember )
+{
+    return uint16_t(
+        reinterpret_cast<uintptr_t>( &(reinterpret_cast<I*>(1)->*aMember) ) - 1 );
+}
 
 
 /**
@@ -247,6 +271,12 @@ public:
         );
 
 
+    // DEPRECATED: these two bind an arbitrary void*/offset cookie to an arbitrary
+    // CipDataType with no type checking, which allowed the reported attribute-aliasing
+    // memory-corruption defect.  Prefer a typed AttributeInsert<Type>() inserter (below).
+    // They are retained (and still correct) for scalar types as a migration aid, but they
+    // refuse kCipByteArray / kCipByteArrayLength outright, since the backing type is now
+    // CipByteArray (a void* ByteBuf would compile-but-corrupt) -- use AttributeInsertByteArray.
     CipAttribute* AttributeInsert( _CI aCI,
         int             aAttributeId,
         CipDataType     aCipType,
@@ -254,7 +284,7 @@ public:
         bool            isGetableSingle = true,
         bool            isGetableAll = true,
         bool            isSetableSingle = false
-        );
+        ) CIPSTER_DEPRECATED( "use a typed AttributeInsert<Type>() inserter" );
     CipAttribute* AttributeInsert( _CI aCI,
         int             aAttributeId,
         CipDataType     aCipType,
@@ -263,7 +293,7 @@ public:
         bool            isGetableSingle = true,
         bool            isGetableAll = true,
         bool            isSetableSingle = false
-        );
+        ) CIPSTER_DEPRECATED( "use a typed AttributeInsert<Type>() inserter" );
 
     /**
      * Function AttributeInsert
@@ -280,6 +310,58 @@ public:
      *  same attribute_id will be deleted in favour of this one.
      */
     bool AttributeInsert( _CI aCI, CipAttribute* aAttribute );
+
+    //-----<Typed attribute inserters>------------------------------------------
+    // Bind the C++ storage type to the CIP wire type at compile time, so a mismatch
+    // (e.g. registering a CipByteArray as a kCipUdint, the reported aliasing defect)
+    // cannot be expressed.  The wire type lives in the function-name suffix, which also
+    // disambiguates the families where one C++ type maps to several CIP types
+    // (uint32_t -> Udint/Dword, std::string -> String/ShortString/String2, ...).
+    // Each name has two overloads: a pointer to static/global storage, and a
+    // pointer-to-member for instance data (offset computed via memberOffset()).
+
+#define CIP_INSERTER( Suffix, CppType, CipEnum )                                        \
+    CipAttribute* AttributeInsert##Suffix( _CI aCI, int aId, CppType* aStorage,         \
+            bool aGetable = true, bool aGetableAll = true, bool aSetable = false )       \
+    { return attrInsertPtr( aCI, aId, CipEnum, (void*) aStorage,                         \
+                            aGetable, aGetableAll, aSetable ); }                         \
+    template<typename I>                                                                \
+    CipAttribute* AttributeInsert##Suffix( _CI aCI, int aId, CppType I::* aMember,       \
+            bool aGetable = true, bool aGetableAll = true, bool aSetable = false )       \
+    { return attrInsertOff( aCI, aId, CipEnum, memberOffset( aMember ),                  \
+                            aGetable, aGetableAll, aSetable ); }
+
+    CIP_INSERTER( Bool,  CipBool,  kCipBool  )
+    CIP_INSERTER( Sint,  int8_t,   kCipSint  )
+    CIP_INSERTER( Usint, CipUsint, kCipUsint )
+    CIP_INSERTER( Byte,  uint8_t,  kCipByte  )
+    CIP_INSERTER( Int,   CipInt,   kCipInt   )
+    CIP_INSERTER( Uint,  CipUint,  kCipUint  )
+    CIP_INSERTER( Word,  CipWord,  kCipWord  )
+    CIP_INSERTER( Dint,  int32_t,  kCipDint  )
+    CIP_INSERTER( Udint, CipUdint, kCipUdint )
+    CIP_INSERTER( Dword, CipDword, kCipDword )
+    CIP_INSERTER( Real,  float,    kCipReal  )
+    CIP_INSERTER( Lint,  int64_t,  kCipLint  )
+    CIP_INSERTER( Ulint, uint64_t, kCipUlint )
+    CIP_INSERTER( Lword, uint64_t, kCipLword )
+    CIP_INSERTER( Lreal, double,   kCipLreal )
+    CIP_INSERTER( Revision,        CipRevision,  kCipUsintUsint  )
+    CIP_INSERTER( ShortString,     std::string,  kCipShortString )
+    CIP_INSERTER( String,          std::string,  kCipString      )
+    CIP_INSERTER( String2,         std::string,  kCipString2     )
+    CIP_INSERTER( ByteArray,       CipByteArray, kCipByteArray   )
+    CIP_INSERTER( ByteArrayLength, CipByteArray, kCipByteArrayLength )
+
+#undef CIP_INSERTER
+
+    /// kCip6Usint (e.g. a MAC address) backed by a 6-byte instance array member.
+    template<typename I>
+    CipAttribute* AttributeInsert6Usint( _CI aCI, int aId, uint8_t (I::*aMember)[6],
+            bool aGetable = true, bool aGetableAll = true, bool aSetable = false )
+    { return attrInsertOff( aCI, aId, kCip6Usint, memberOffset( aMember ),
+                            aGetable, aGetableAll, aSetable ); }
+    //-----</Typed attribute inserters>-----------------------------------------
 
     /**
      * Function FindUniqueFreeId
@@ -318,7 +400,7 @@ protected:
         CipMessageRouterRequest* request, CipMessageRouterResponse* response );
     //-----</AttributeFuncs>----------------------------------------------------
 
-    int             revision;               ///< class revision
+    uint16_t        revision;               ///< class revision (CIP UINT)
     int             class_id;               ///< class ID
     std::string     class_name;             ///< class name
 
@@ -352,6 +434,14 @@ protected:
     }
 
 private:
+    // Non-deprecated internal workers shared by the typed inserters and the deprecated
+    // generic overloads.  attrInsertPtr binds an absolute pointer (pointer mode);
+    // attrInsertOff binds an instance-relative offset (offset mode).
+    CipAttribute* attrInsertPtr( _CI aCI, int aId, CipDataType aType, void* aPtr,
+        bool aGetable, bool aGetableAll, bool aSetable );
+    CipAttribute* attrInsertOff( _CI aCI, int aId, CipDataType aType, uint16_t aOffset,
+        bool aGetable, bool aGetableAll, bool aSetable );
+
     CipClass( CipClass& );                      // private because not implemented
     CipClass& operator=( const CipClass& );
 };

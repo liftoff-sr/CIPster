@@ -305,12 +305,12 @@ CipTCPIPInterfaceClass::CipTCPIPInterfaceClass() :
     // overload an instance service
     ServiceInsert( _I, kGetAttributeAll, CipTCPIPInterfaceInstance::get_all, "GetAttributeAll" );
 
-    AttributeInsert( _I, 1, kCipDword, memb_offs(status) );
-    AttributeInsert( _I, 2, kCipDword, memb_offs(configuration_capability) );
-    AttributeInsert( _I, 3, kCipDword, memb_offs(configuration_control) );
+    AttributeInsertDword( _I, 1, &CipTCPIPInterfaceInstance::status );
+    AttributeInsertDword( _I, 2, &CipTCPIPInterfaceInstance::configuration_capability );
+    AttributeInsertDword( _I, 3, &CipTCPIPInterfaceInstance::configuration_control );
     AttributeInsert( _I, 4, CipTCPIPInterfaceInstance::get_attr_4 );
     AttributeInsert( _I, 5, CipTCPIPInterfaceInstance::get_attr_5 );
-    AttributeInsert( _I, 6, kCipString, &CipTCPIPInterfaceInstance::hostname );
+    AttributeInsertString( _I, 6, &CipTCPIPInterfaceInstance::hostname );
 
     //AttributeInsert( _I, 7, get_attr_7 );
 

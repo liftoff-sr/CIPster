@@ -183,13 +183,13 @@ CipIdentityClass::CipIdentityClass() :
 
     ServiceInsert( _I, kReset, reset_service, "Reset" );
 
-    AttributeInsert( _I, 1, kCipUint, &vendor_id_ );
-    AttributeInsert( _I, 2, kCipUint, &device_type_ );
-    AttributeInsert( _I, 3, kCipUint, &product_code_ );
-    AttributeInsert( _I, 4, kCipUsintUsint, &revision_ );
-    AttributeInsert( _I, 5, kCipWord, &status_ );
-    AttributeInsert( _I, 6, kCipUdint, &serial_number_ );
-    AttributeInsert( _I, 7, kCipShortString, &product_name_ );
+    AttributeInsertUint( _I, 1, &vendor_id_ );
+    AttributeInsertUint( _I, 2, &device_type_ );
+    AttributeInsertUint( _I, 3, &product_code_ );
+    AttributeInsertRevision( _I, 4, &revision_ );
+    AttributeInsertWord( _I, 5, &status_ );
+    AttributeInsertUdint( _I, 6, &serial_number_ );
+    AttributeInsertShortString( _I, 7, &product_name_ );
 }
 
 

@@ -15,6 +15,30 @@
 static uint16_t Zero = 0;
 
 
+/// Storage footprint in bytes of an attribute's backing object for a given CIP type,
+/// or 0 for variable/unknown types that the overlap guard should skip.
+static size_t CipTypeSize( CipDataType aType )
+{
+    switch( aType )
+    {
+    case kCipBool: case kCipSint: case kCipUsint: case kCipByte:    return 1;
+    case kCipInt:  case kCipUint: case kCipWord:                    return 2;
+    case kCipDint: case kCipUdint: case kCipDword: case kCipReal:   return 4;
+    case kCipLint: case kCipUlint: case kCipLword: case kCipLreal:  return 8;
+    case kCipUsintUsint:                                            return sizeof(CipRevision);
+    case kCip6Usint:                                               return 6;
+    case kCipByteArray: case kCipByteArrayLength:                  return sizeof(CipByteArray);
+    case kCipString: case kCipShortString: case kCipString2:       return sizeof(std::string);
+    default:                                                       return 0;
+    }
+}
+
+static bool isByteArrayType( CipDataType aType )
+{
+    return aType == kCipByteArray || aType == kCipByteArrayLength;
+}
+
+
 
 /**
  * Class CipClassRegistry
@@ -99,7 +123,7 @@ CipClass::CipClass(
     // See Vol 1 Table 4-4.2
 
     if( aClassAttributesMask & (1<<1) )
-        AttributeInsert( _C, 1, kCipUint, &revision );
+        AttributeInsertUint( _C, 1, &revision );
 
     // largest instance id
     if( aClassAttributesMask & (1<<2) )
@@ -111,11 +135,11 @@ CipClass::CipClass(
 
     // optional attribute list - default = 0
     if( aClassAttributesMask & (1<<4) )
-        AttributeInsert( _C, 4, kCipUint, &Zero );
+        AttributeInsertUint( _C, 4, &Zero );
 
     // optional service list - default = 0
     if( aClassAttributesMask & (1<<5) )
-        AttributeInsert( _C, 5, kCipUint, &Zero );
+        AttributeInsertUint( _C, 5, &Zero );
 
     // max class attribute number
     if( aClassAttributesMask & (1<<6) )
@@ -403,6 +427,53 @@ bool CipClass::AttributeInsert(  _CI aCI, CipAttribute* aAttribute )
 
     bool is_class = (aCI == _C);
 
+    // Backstop for the attribute-aliasing defect: refuse a registration whose backing
+    // storage overlaps an already-registered attribute's storage under an incompatible
+    // CIP type.  Same-type overlap is harmless (both views agree), and the byte-array
+    // data/length pair legitimately shares one CipByteArray, so both are permitted.
+    {
+        size_t newSize = CipTypeSize( aAttribute->type );
+
+        if( newSize )
+        {
+            for( CipAttributes::iterator j = a.begin();  j != a.end();  ++j )
+            {
+                CipAttribute* e = *j;
+
+                if( e->Id() == aAttribute->Id() )
+                    continue;       // same-id override, handled below
+
+                // Offset-mode and pointer-mode live in different address spaces and
+                // therefore cannot overlap.
+                if( e->is_offset_from_instance_start != aAttribute->is_offset_from_instance_start )
+                    continue;
+
+                size_t eSize = CipTypeSize( e->type );
+                if( !eSize )
+                    continue;
+
+                uintptr_t aLo = aAttribute->where, aHi = aLo + newSize;
+                uintptr_t eLo = e->where,          eHi = eLo + eSize;
+
+                bool overlap = aLo < eHi && eLo < aHi;
+
+                if( overlap
+                    && aAttribute->type != e->type
+                    && !( isByteArrayType( aAttribute->type ) && isByteArrayType( e->type ) ) )
+                {
+                    CIPSTER_TRACE_ERR(
+                        "%s: class '%s' attribute %d storage overlaps attribute %d under "
+                        "incompatible CIP types (0x%02x vs 0x%02x); rejecting.\n",
+                        __func__, owning_class->ClassName().c_str(),
+                        aAttribute->Id(), e->Id(),
+                        aAttribute->type, e->type );
+
+                    return false;   // caller deletes the rejected attribute
+                }
+            }
+        }
+    }
+
     // Keep sorted by id
     for( it = a.begin(); it != a.end();  ++it )
     {
@@ -506,22 +577,17 @@ CipAttribute* CipClass::AttributeInsert( _CI aCI,
 #endif
 
 
-CipAttribute* CipClass::AttributeInsert( _CI aCI,
-        int             aAttributeId,
-        CipDataType     aCipType,
-        void*           aCookie,
-        bool            isGetableSingle,
-        bool            isGetableAll,
-        bool            isSetableSingle
-        )
+// Non-deprecated worker: bind an absolute pointer (pointer mode).
+CipAttribute* CipClass::attrInsertPtr( _CI aCI, int aId, CipDataType aType, void* aPtr,
+        bool aGetable, bool aGetableAll, bool aSetable )
 {
     CipAttribute* attribute = new CipAttribute(
-            aAttributeId,
-            aCipType,
-            isGetableSingle ? CipAttribute::GetAttrData : NULL,
-            isSetableSingle ? CipAttribute::SetAttrData : NULL,
-            (uintptr_t) aCookie,
-            isGetableAll,
+            aId,
+            aType,
+            aGetable ? CipAttribute::GetAttrData : NULL,
+            aSetable ? CipAttribute::SetAttrData : NULL,
+            (uintptr_t) aPtr,
+            aGetableAll,
             false                   // isDataAnInstanceOffset
             );
 
@@ -535,22 +601,17 @@ CipAttribute* CipClass::AttributeInsert( _CI aCI,
 }
 
 
-CipAttribute* CipClass::AttributeInsert( _CI aCI,
-        int             aAttributeId,
-        CipDataType     aCipType,
-        uint16_t        aCookie,
-        bool            isGetableSingle,
-        bool            isGetableAll,
-        bool            isSetableSingle
-        )
+// Non-deprecated worker: bind an instance-relative offset (offset mode).
+CipAttribute* CipClass::attrInsertOff( _CI aCI, int aId, CipDataType aType, uint16_t aOffset,
+        bool aGetable, bool aGetableAll, bool aSetable )
 {
     CipAttribute* attribute = new CipAttribute(
-            aAttributeId,
-            aCipType,
-            isGetableSingle ? CipAttribute::GetAttrData : NULL,
-            isSetableSingle ? CipAttribute::SetAttrData : NULL,
-            aCookie,
-            isGetableAll,
+            aId,
+            aType,
+            aGetable ? CipAttribute::GetAttrData : NULL,
+            aSetable ? CipAttribute::SetAttrData : NULL,
+            aOffset,
+            aGetableAll,
             true                    // isDataAnInstanceOffset
             );
 
@@ -561,6 +622,53 @@ CipAttribute* CipClass::AttributeInsert( _CI aCI,
     }
 
     return attribute;
+}
+
+
+// DEPRECATED generic overloads.  Still correct for scalar types, but they refuse byte
+// arrays: the backing type is now CipByteArray, so a void*/offset ByteBuf would
+// compile-but-corrupt -- callers must use AttributeInsertByteArray() instead.
+CipAttribute* CipClass::AttributeInsert( _CI aCI,
+        int             aAttributeId,
+        CipDataType     aCipType,
+        void*           aCookie,
+        bool            isGetableSingle,
+        bool            isGetableAll,
+        bool            isSetableSingle
+        )
+{
+    if( isByteArrayType( aCipType ) )
+    {
+        CIPSTER_TRACE_ERR( "%s: kCipByteArray/Length must use AttributeInsertByteArray()\n",
+            __func__ );
+        CIPSTER_ASSERT( !"byte array registered via deprecated void* overload" );
+        return NULL;
+    }
+
+    return attrInsertPtr( aCI, aAttributeId, aCipType, aCookie,
+            isGetableSingle, isGetableAll, isSetableSingle );
+}
+
+
+CipAttribute* CipClass::AttributeInsert( _CI aCI,
+        int             aAttributeId,
+        CipDataType     aCipType,
+        uint16_t        aCookie,
+        bool            isGetableSingle,
+        bool            isGetableAll,
+        bool            isSetableSingle
+        )
+{
+    if( isByteArrayType( aCipType ) )
+    {
+        CIPSTER_TRACE_ERR( "%s: kCipByteArray/Length must use AttributeInsertByteArray()\n",
+            __func__ );
+        CIPSTER_ASSERT( !"byte array registered via deprecated offset overload" );
+        return NULL;
+    }
+
+    return attrInsertOff( aCI, aAttributeId, aCipType, aCookie,
+            isGetableSingle, isGetableAll, isSetableSingle );
 }
 
 
