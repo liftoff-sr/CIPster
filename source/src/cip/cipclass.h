@@ -243,21 +243,42 @@ public:
 
     /**
      * Functions AttributeInsert
-     * insert either an instance or class attribute and returns a pointer to
-     * it if succes, else NULL.
+     * insert either an instance or class attribute and return a pointer to it on
+     * success, else NULL.  @a aCI is either _I or _C indicating "instance" or "class".
+     * An attribute that shares the @a aAttributeId of an existing one overrides (deletes)
+     * it.  There are three families, in order of preference:
      *
-     * @param aCI is either _I or _C indicating "instance" or "class" respectively.
+     * 1) PREFERRED -- the typed AttributeInsert<Type>() inserters below
+     *    (AttributeInsertUint, AttributeInsertUdint, AttributeInsertByteArray, ...).
+     *    The CIP wire type is in the function-name suffix and the storage parameter is
+     *    strongly typed, so the C++ storage type is bound to the CIP type at compile
+     *    time -- a mismatch (e.g. a CipByteArray bound to a scalar) will not compile.
+     *    Each takes either a pointer to static/global storage, or a pointer-to-member
+     *    for instance data (the instance offset is computed from the pointer-to-member):
      *
-     * @param aCookie is saved in the data member of the Attribute and will
-     *  later be passed to either AttributeFunc provided.  It can point to anything
-     *  convenient.
-     * @param isCookieAnInstanceOffset should be set to true if aCookie is a
-     *   data member of a CipInstance derivative
-
-     * @return CipAttribute* - dynamically allocated by this function,
-     * or NULL if failure. Currently attributes may be overrridden, so any
-     * existing CipAttribute in the target container with the same attribute id
-     * will be deleted in favour of this one.
+     *      AttributeInsertUint( _I, 1, &vendor_id_ );                  // static/global
+     *      AttributeInsertUdint( _I, 1, &MyInstance::speed );          // instance member
+     *
+     *      // byte array whose length is exposed (and settable) as a 2nd attribute;
+     *      // CipByteArray carries the physical capacity, so the length can never be
+     *      // pushed past the backing store:
+     *      static uint8_t buf[64];
+     *      static CipByteArray ba( buf, sizeof buf );
+     *      AttributeInsertByteArray(       _I, 3, &ba, true, true, true );
+     *      AttributeInsertByteArrayLength( _I, 4, &ba, true, true, true );
+     *
+     *    The trailing bool parameters are (aGetable, aGetableAll, aSetable).
+     *
+     * 2) The AttributeFunc overload (just below) for attributes needing custom getter
+     *    and/or setter functions; @a aCookie is passed to those functions and
+     *    @a isCookieAnInstanceOffset tells whether it is an instance-member offset
+     *    (see memb_offs()) or an absolute address.
+     *
+     * 3) DEPRECATED -- the generic (CipDataType, void*) / (CipDataType, uint16_t)
+     *    overloads.  They bind an untyped cookie to an arbitrary CipDataType, which
+     *    allowed the reported attribute-aliasing memory-corruption defect; prefer (1).
+     *
+     * @return CipAttribute* - dynamically allocated by this function, or NULL on failure.
      */
 
     CipAttribute* AttributeInsert( _CI aCI,
