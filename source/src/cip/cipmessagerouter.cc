@@ -73,10 +73,15 @@ int CipMessageRouterRequest::DeserializeMRReq( BufReader aRequest )
 
     rpath += result;
 
-    result = path.DeserializeAppPath( rpath );
-
-    if( result < 0 )
-        return result;
+    try
+    {
+        result = path.DeserializeAppPath( rpath );
+    }
+    // this catches std::range_error also
+    catch( const std::runtime_error& ex )
+    {
+        return -1;
+    }
 
     int bytes_consumed = rpath.data() - aRequest.data() + result;
 
