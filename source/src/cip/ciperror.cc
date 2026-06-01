@@ -36,7 +36,7 @@ const char* ExtStatusStr( ConnMgrStatus aExtStatus )
     case kConnMgrStatusInvalidOToTConnectionSize:               rs = "invalid O->T connection size"; break;
     case kConnMgrStatusInvalidTToOConnectionSize:               rs = "invalid T->O connection size"; break;
     case kConnMgrStatusInvalidConfigurationApplicationPath:     rs = "invalid configuration app_path"; break;
-    case kConnMgrStatusInvalidConsumingApllicationPath:         rs = "invalid consuming app_path"; break;
+    case kConnMgrStatusInvalidConsumingApplicationPath:         rs = "invalid consuming app_path"; break;
     case kConnMgrStatusInvalidProducingApplicationPath:         rs = "invalid producing app_path"; break;
     case kConnMgrStatusInconsistentApplicationPathCombo:        rs = "inconsisten app_path combo"; break;
     case kConnMgrStatusNullForwardOpenFunctionNotSupported:     rs = "null forward open function not supported"; break;

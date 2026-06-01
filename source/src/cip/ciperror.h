@@ -86,7 +86,7 @@ enum ConnMgrStatus
     kConnMgrStatusInvalidOToTConnectionSize                = 0x0127,
     kConnMgrStatusInvalidTToOConnectionSize                = 0x0128,
     kConnMgrStatusInvalidConfigurationApplicationPath      = 0x0129,
-    kConnMgrStatusInvalidConsumingApllicationPath          = 0x012a,
+    kConnMgrStatusInvalidConsumingApplicationPath          = 0x012a,
     kConnMgrStatusInvalidProducingApplicationPath          = 0x012b,
     kConnMgrStatusInconsistentApplicationPathCombo         = 0x012f,
     kConnMgrStatusNullForwardOpenFunctionNotSupported      = 0x0132,

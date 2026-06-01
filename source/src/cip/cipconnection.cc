@@ -443,7 +443,7 @@ int ConnectionData::Serialize( BufWriter aOutput, int aCtl ) const
 
         out.put32( ConsumingRPI() );
         ConsumingNCP().Serialize( out );
-        
+
         trigger.Serialize( out );
 
         if( !(CTL_OMIT_CONN_PATH & aCtl) )
@@ -613,7 +613,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
                 instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T->O(null)" );
                 if( !instance2 )
                 {
-                    *aExtError = kConnMgrStatusInvalidConsumingApllicationPath;
+                    *aExtError = kConnMgrStatusInvalidConsumingApplicationPath;
                     goto L_exit_error;
                 }
 
@@ -719,7 +719,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
                 instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T->O(non-null)" );
                 if( !instance2 )
                 {
-                    *aExtError = kConnMgrStatusInvalidConsumingApllicationPath;
+                    *aExtError = kConnMgrStatusInvalidConsumingApplicationPath;
                     goto L_exit_error;
                 }
 
@@ -737,7 +737,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
                 instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T->O(non-null)" );
                 if( !instance2 )
                 {
-                    *aExtError = kConnMgrStatusInvalidConsumingApllicationPath;
+                    *aExtError = kConnMgrStatusInvalidConsumingApplicationPath;
                     goto L_exit_error;
                 }
 
@@ -792,7 +792,7 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
                 instance2 = check_path( conn_path.app_path2, NULL, "app_path2 O->T(non-null) T->O(non-null)" );
                 if( !instance2 )
                 {
-                    *aExtError = kConnMgrStatusInvalidConsumingApllicationPath;
+                    *aExtError = kConnMgrStatusInvalidConsumingApplicationPath;
                     goto L_exit_error;
                 }
 
@@ -840,6 +840,27 @@ CipError ConnectionData::ResolveInstances( ConnMgrStatus* aExtError )
         // Vol1 3-5.4.1.12
         // "The direction bit should be Client (0) but in either case shall be ignored."
         trigger.SetServer( false );
+
+        if( config_instance &&
+            ConfigPath().GetClass() != kCipAssemblyClass )
+        {
+            *aExtError = kConnMgrStatusInvalidConfigurationApplicationPath;
+            goto L_exit_error;
+        }
+
+        if( consuming_instance &&
+            ConsumingPath().GetClass() != kCipAssemblyClass )
+        {
+            *aExtError = kConnMgrStatusInvalidConsumingApplicationPath;
+            goto L_exit_error;
+        }
+
+        if( producing_instance &&
+            ProducingPath().GetClass() != kCipAssemblyClass )
+        {
+            *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
+            goto L_exit_error;
+        }
         break;
 
     default:
