@@ -110,6 +110,59 @@ struct CipRevision
 };
 
 
+/**
+ * Class CipByteArray
+ * is the backing store for kCipByteArray / kCipByteArrayLength attributes.
+ * Unlike ByteBuf (which is only a {start,limit} view) it permanently records the
+ * physical @a capacity of the application-owned memory, separately from the logical
+ * @a length.  A wire-supplied length (the settable kCipByteArrayLength attribute) can
+ * therefore never enlarge the writable window beyond what was actually allocated,
+ * which closes the byte-array overrun reported against the prior ByteBuf-based design.
+ *
+ * It does not own the memory it points to; the application supplies and outlives it.
+ */
+class CipByteArray
+{
+public:
+    CipByteArray() :
+        start( 0 ), cap( 0 ), len( 0 )
+    {}
+
+    /// length defaults to the full capacity (matches the fixed-buffer idiom)
+    CipByteArray( uint8_t* aData, uint16_t aCapacity ) :
+        start( aData ), cap( aCapacity ), len( aCapacity )
+    {}
+
+    CipByteArray( uint8_t* aData, uint16_t aCapacity, uint16_t aLength ) :
+        start( aData ), cap( aCapacity ),
+        len( aLength <= aCapacity ? aLength : aCapacity )
+    {}
+
+    uint8_t*    data()      const   { return start; }
+    uint16_t    capacity()  const   { return cap; }
+    uint16_t    length()    const   { return len; }
+    ssize_t     size()      const   { return len; }     ///< alias for length()
+
+    /// Set the logical length.  Returns false (and changes nothing) if @a aLength
+    /// would exceed capacity(); the caller should reject with kCipErrorInvalidAttributeValue.
+    bool SetLength( uint16_t aLength )
+    {
+        if( aLength > cap )
+            return false;
+        len = aLength;
+        return true;
+    }
+
+    BufReader Reader() const { return BufReader( start, len ); }     ///< emits length() bytes
+    BufWriter Writer() const { return BufWriter( start, cap ); }     ///< bounded by capacity()
+
+private:
+    uint8_t*    start;
+    uint16_t    cap;        ///< immutable physical capacity
+    uint16_t    len;        ///< logical valid length, 0 .. cap
+};
+
+
 class CipInstance;
 class CipAttribute;
 class CipClass;

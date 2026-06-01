@@ -18,7 +18,9 @@
 
 AssemblyInstance::AssemblyInstance( int aInstanceId, ByteBuf aBuffer ) :
     CipInstance( aInstanceId ),
-    byte_array( aBuffer )
+    // The assembly's ByteBuf spans the full application-owned allocation, so its size
+    // is the true capacity (capacity == length for a fixed assembly buffer).
+    byte_array( aBuffer.data(), (uint16_t) aBuffer.size() )
 {
 }
 

@@ -161,17 +161,17 @@ int EncodeData( CipDataType aDataType, const void* input, BufWriter& aBuf )
     case kCipMemberList:
         break;
 
-    // The CipByteArray is implemented using a ByteBuf instance.
+    // CipByteArray carries its own capacity and length; emit length() bytes only.
     case kCipByteArray:
         {
-            BufReader rdr = *(ByteBuf*) input;
+            const CipByteArray* ba = static_cast<const CipByteArray*>( input );
 
-            aBuf.append( rdr );
+            aBuf.append( ba->data(), ba->length() );
         }
         break;
 
     case kCipByteArrayLength:
-        aBuf.put16( ((ByteBuf*) input)->size() );
+        aBuf.put16( static_cast<const CipByteArray*>( input )->length() );
         break;
 
     default:
@@ -215,21 +215,29 @@ int DecodeData( CipDataType aDataType, void* data, BufReader& aBuf )
         *(uint64_t*) data = aBuf.get64();
         break;
 
-    // The CipByteArray is implemented using a ByteBuf instance.
+    // CipByteArray write is bounded by capacity(), never by the wire-supplied length.
     case kCipByteArray:
         {
-            BufWriter w = *(ByteBuf*) data;
+            CipByteArray* ba = static_cast<CipByteArray*>( data );
 
-            w.append( aBuf );
-            aBuf += ((ByteBuf*)data)->size();
+            if( aBuf.size() > ba->capacity() )
+                return -1;          // reject: would overrun the backing store
+
+            size_t n = aBuf.size();
+
+            BufWriter w = ba->Writer();
+            w.append( aBuf.data(), n );
+            ba->SetLength( (uint16_t) n );
+            aBuf += n;
         }
         break;
 
     case kCipByteArrayLength:
         {
-            ByteBuf* bb = (ByteBuf*) data;
+            CipByteArray* ba = static_cast<CipByteArray*>( data );
 
-            *bb = ByteBuf( bb->data(), aBuf.get16() );
+            if( !ba->SetLength( aBuf.get16() ) )
+                return -1;          // reject: requested length exceeds capacity()
         }
         break;
 

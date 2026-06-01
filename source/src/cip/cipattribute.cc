@@ -61,8 +61,13 @@ EipStatus CipAttribute::SetAttrData( CipInstance* aInstance, CipAttribute* attr,
 
     if( out_count >= 0 )
         return kEipStatusOkSend;
-    else
-        return kEipStatusError;
+
+    // DecodeData rejected the value (e.g. a kCipByteArray / kCipByteArrayLength set that
+    // would exceed the backing store's capacity).  Report it to the client as a CIP error
+    // status rather than as a silent stack error, consistent with how other setters
+    // (e.g. set_assembly_data_attr) surface a bad value.
+    response->SetGenStatus( kCipErrorInvalidAttributeValue );
+    return kEipStatusOkSend;
 }
 
 

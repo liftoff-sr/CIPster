@@ -25,7 +25,10 @@ public:
     AssemblyInstance( int aInstanceId, ByteBuf aBuf );
 
     unsigned SizeBytes() const      { return byte_array.size(); }
-    const ByteBuf& Buffer() const   { return byte_array; }
+
+    /// Return a ByteBuf view spanning the assembly's valid bytes.  Returned by value
+    /// (not a reference to the member) because the member is now a CipByteArray.
+    ByteBuf Buffer() const          { return ByteBuf( byte_array.data(), byte_array.length() ); }
 
     /**
      * Function RecvData
@@ -45,7 +48,7 @@ public:
     EipStatus RecvData( CipConn* aConn, BufReader aInput );
 
 protected:
-    ByteBuf     byte_array;
+    CipByteArray    byte_array;
 };
 
 
