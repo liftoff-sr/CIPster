@@ -8,3 +8,7 @@ contrib/
 *~
 CMakeCache.txt
 *.patch
+
+# editor / local agent config (personal, machine-specific)
+.vscode/
+.claude/settings.local.json
