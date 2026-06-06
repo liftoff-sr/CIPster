@@ -30,12 +30,16 @@ CipAttribute::CipAttribute(
     /*
         Is there a problem with one of the calls to CipClass::AttributeInsert()?
         Likely you want either:
-        1) an offset from instance start, in which case aData's upper bits should be 0.
+        1) an offset from instance start (is_offset_from_instance_start == true), which is
+           produced as a uint16_t by memb_offs()/memberOffset() and so fits in <= 0xffff.
         2) a full address in aData with is_offset_from_instance_start == false.
+
+        The discriminator is the magnitude of aData: an instance offset is small, a real
+        pointer is large.
     */
 
-    CIPSTER_ASSERT( ( is_offset_from_instance_start && !(0xffff0000 & aData))
-        ||          (!is_offset_from_instance_start &&  (0xffff0000 & aData)) );
+    CIPSTER_ASSERT( ( is_offset_from_instance_start && aData <= 0xffff)
+        ||          (!is_offset_from_instance_start && aData >  0xffff) );
 
     CIPSTER_ASSERT( aAttributeId > 0 && aAttributeId <= 65535 );
 }

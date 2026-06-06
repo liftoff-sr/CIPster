@@ -11,6 +11,13 @@ target_link_libraries( attr_security_test eip )
 
 add_test( NAME attr_security_test COMMAND attr_security_test )
 
+# Regression for the CipAttribute offset/pointer constructor assert.  Meaningfully
+# exercises the assert only with CIPster_TRACES=ON; passes trivially otherwise.
+add_executable( attr_ctor_assert_test attr_ctor_assert_test.cpp )
+target_link_libraries( attr_ctor_assert_test eip )
+
+add_test( NAME attr_ctor_assert_test COMMAND attr_ctor_assert_test )
+
 # Compile-time guarantee for issue #2 (typed inserters reject the alias).
 add_test( NAME attr_security_compile_fail
     COMMAND ${CMAKE_COMMAND} -E env

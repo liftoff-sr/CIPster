@@ -171,11 +171,13 @@ static void test_issue2_runtime()
     CipAttribute* alias = c.AttributeInsert( CipInstance::_I, 3, kCipUdint, (void*) &ba );
     CHECK( alias == NULL );
 
-    // A byte array routed through the deprecated overload is refused outright
-    // (the backing type is CipByteArray now; the assert is compiled out in a
-    // no-traces library build, so this returns NULL rather than aborting).
+#ifndef CIPSTER_WITH_TRACES
+    // A byte array routed through the deprecated overload is refused outright.  Its
+    // hard-fail uses CIPSTER_ASSERT, which aborts when asserts are enabled, so only
+    // assert the NULL-return contract when asserts are compiled out (no-traces build).
     CipAttribute* bad_ba = c.AttributeInsert( CipInstance::_I, 4, kCipByteArray, (void*) &ba );
     CHECK( bad_ba == NULL );
+#endif
 #pragma GCC diagnostic pop
 
     // Same-type views of one address are harmless and allowed.
