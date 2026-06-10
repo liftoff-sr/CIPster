@@ -929,11 +929,11 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         // an assembly object should always have an attribute 3
         CIPSTER_ASSERT( attribute );
 
-        ByteBuf* attr_data = (ByteBuf*) consuming_instance->Data( attribute );
+        int attr_size = static_cast<AssemblyInstance*>(consuming_instance)->SizeBytes();
 
         data_size    = consuming_ncp.ConnectionSize();
         diff_size    = 0;
-        is_heartbeat = ( attr_data->size() == 0 );
+        is_heartbeat = ( attr_size == 0 );
 
         if( trigger.Class() == kConnTransportClass1 )
         {
@@ -950,11 +950,11 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             diff_size += 4;
         }
 
-        if( ( consuming_ncp.IsFixed() && data_size != attr_data->size() )
-          ||  data_size >  attr_data->size() )
+        if( ( consuming_ncp.IsFixed() && data_size != attr_size )
+          ||  data_size > attr_size )
         {
             // wrong connection size
-            corrected_consuming_size = attr_data->size() + diff_size;
+            corrected_consuming_size = attr_size + diff_size;
 
             *aExtError = kConnMgrStatusInvalidOToTConnectionSize;
 
@@ -962,7 +962,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
                 "%s: assembly size(%d) != requested conn_size(%d) for consuming:'%s'\n"
                 " corrected_o_t:%d\n",
                 __func__,
-                (int) attr_data->size(),
+                attr_size,
                 data_size,
                 ConsumingPath().Format().c_str(),
                 corrected_consuming_size
@@ -991,13 +991,13 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         // an assembly object should always have an attribute 3
         CIPSTER_ASSERT( attribute );
 
-        ByteBuf* attr_data = (ByteBuf*) producing_instance->Data( attribute );
+        int attr_size = static_cast<AssemblyInstance*>(producing_instance)->SizeBytes();
 
         data_size    = producing_ncp.ConnectionSize();
         diff_size    = 0;
 
         // Note: spec never talks about a heartbeat t_o connection, so why this?
-        is_heartbeat = ( attr_data->size() == 0 );
+        is_heartbeat = ( attr_size == 0 );
 
         if( trigger.Class() == kConnTransportClass1 )
         {
@@ -1010,15 +1010,15 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             // and is not kRealTimeFmtModeless
             && !is_heartbeat )
         {
-            data_size -= 4;   // remove the 4 bytes needed for run/idle header
+            data_size -= 4; // remove the 4 bytes needed for run/idle header
             diff_size += 4;
         }
 
-        if( ( producing_ncp.IsFixed() && data_size != attr_data->size() )
-          ||  data_size > attr_data->size() )
+        if( ( producing_ncp.IsFixed() && data_size != attr_size )
+          ||  data_size > attr_size )
         {
             // wrong connection size
-            corrected_producing_size = attr_data->size() + diff_size;
+            corrected_producing_size = attr_size + diff_size;
 
             *aExtError = kConnMgrStatusInvalidTToOConnectionSize;
 
@@ -1026,7 +1026,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
                 "%s: assembly size(%d) != requested conn_size(%d) for producing:'%s'\n"
                 " corrected_t_o:%d\n",
                 __func__,
-                (int) attr_data->size(),
+                attr_size,
                 data_size,
                 ProducingPath().Format().c_str(),
                 corrected_producing_size
