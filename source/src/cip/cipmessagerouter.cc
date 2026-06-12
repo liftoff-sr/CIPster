@@ -51,45 +51,44 @@ int CipMessageRouterRequest::DeserializeMRReq( BufReader aRequest )
 {
     BufReader in = aRequest;
 
-    service = (CIPServiceCode) in.get8();
-
-    unsigned byte_count = in.get8() * 2;     // word count x 2
-
-    if( byte_count > in.size() )
-    {
-        return -1;
-    }
-
-    // limit the length of the request input so it pertains only to request path
-    BufReader rpath( in.data(), byte_count );
-
-    // Vol1 2-4.1.1
-    CipElectronicKeySegment key;
-
-    int result = key.DeserializeElectronicKey( rpath );
-
-    if( result < 0 )
-        return result;
-
-    rpath += result;
-
     try
     {
+        service = (CIPServiceCode) in.get8();
+
+        unsigned byte_count = in.get8() * 2;     // word count x 2
+
+        if( byte_count > in.size() )
+        {
+            return -1;
+        }
+
+        // limit the length of the request input so it pertains only to request path
+        BufReader rpath( in.data(), byte_count );
+
+        // Vol1 2-4.1.1
+        CipElectronicKeySegment key;
+
+        int result = key.DeserializeElectronicKey( rpath );
+
+        if( result < 0 )
+            return result;
+
+        rpath += result;
+
         result = path.DeserializeAppPath( rpath );
+
+        int bytes_consumed = rpath.data() - aRequest.data() + result;
+
+        // set this->data for service functions, it consists of the remaining
+        // part of the message, the part identified as "Request_Data" in Vol1 2-4.1
+        data = aRequest + bytes_consumed;
+
+        return bytes_consumed;
     }
-    // this catches std::range_error also
-    catch( const std::runtime_error& ex )
+    catch( const std::range_error& ex )
     {
         return -1;
     }
-
-    int bytes_consumed = rpath.data() - aRequest.data() + result;
-
-    // set this->data for service functions, it consists of the remaining
-    // part of the message, the part identified as "Request_Data" in Vol1 2-4.1
-    data = aRequest + bytes_consumed;
-
-    return bytes_consumed;
 }
 
 
