@@ -261,10 +261,10 @@ int Cpf::DeserializeCpf( BufReader aSrc )
             }
         }
     }
-    catch( const std::runtime_error& )
+    catch( const std::range_error& )
     {
         CIPSTER_TRACE_ERR( "%s: bad CPF format\n", __func__ );
-        return -1;
+        return  aSrc.data() - in.data();     // negative offset of problem;
     }
     return in.data() - aSrc.data();
 
