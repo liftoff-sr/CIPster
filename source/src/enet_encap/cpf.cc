@@ -124,82 +124,102 @@ int Cpf::NotifyCommonPacketFormat( BufReader aCommand, BufWriter aReply )
 
 int Cpf::NotifyConnectedCommonPacketFormat( BufReader aCommand, BufWriter aReply )
 {
-    int result = DeserializeCpf( aCommand );
-
-    if( result <= 0 )
-        return -kEncapErrorIncorrectData;
-
-    // Check if ConnectedAddressItem received, otherwise it is no connected
-    // message and should not be here
-    if( AddrType() != kCpfIdConnectedAddress )
+    try
     {
-        CIPSTER_TRACE_ERR(
-                "notifyConnectedCPF: got something besides the expected CIP_ITEM_ID_NULL\n" );
-        return -kEncapErrorIncorrectData;
-    }
+        int result = DeserializeCpf( aCommand );
 
-    // ConnectedAddressItem item
-    CipConn* conn = GetConnectionByConsumingId( address_item.connection_identifier );
+        if( result <= 0 )
+            return -kEncapErrorIncorrectData;
 
-    if( conn )
-    {
-        // reset the watchdog timer
-        conn->SetInactivityWatchDogTimerUSecs( conn->RxTimeoutUSecs() );
-
-        // TODO check connection id  and sequence count
-        if( DataType() == kCpfIdConnectedDataItem )
+        // Check if ConnectedAddressItem received, otherwise it is no connected
+        // message and should not be here
+        if( AddrType() != kCpfIdConnectedAddress )
         {
-            // connected data item received
-            BufReader   command( DataItemPayload() );
+            CIPSTER_TRACE_ERR(
+                    "notifyConnectedCPF: got something besides the expected CIP_ITEM_ID_NULL\n" );
+            return -kEncapErrorIncorrectData;
+        }
 
-            address_item.encap_sequence_number = command.get16();
+        // ConnectedAddressItem item
+        CipConn* conn = GetConnectionByConsumingId( address_item.connection_identifier );
 
-            CipMessageRouterResponse response( this );  // give Cpf to response
-            CipMessageRouterRequest  request;
+        if( conn )
+        {
+            // reset the watchdog timer
+            conn->SetInactivityWatchDogTimerUSecs( conn->RxTimeoutUSecs() );
 
-            // command is advanced by 2 here because of above get16().
-            int consumed = request.DeserializeMRReq( command );
-
-            if( consumed <= 0 )
+            // TODO check connection id  and sequence count
+            if( DataType() == kCpfIdConnectedDataItem )
             {
-                CIPSTER_TRACE_ERR( "%s: error from DeserializeMRReq()\n", __func__ );
-                response.SetGenStatus( kCipErrorPathSegmentError );
+                // connected data item received
+                BufReader   command( DataItemPayload() );
+
+                address_item.encap_sequence_number = command.get16();
+
+                CipMessageRouterResponse response( this );  // give Cpf to response
+                CipMessageRouterRequest  request;
+
+                // command is advanced by 2 here because of above get16().
+                int consumed = request.DeserializeMRReq( command );
+
+                if( consumed <= 0 )
+                {
+                    CIPSTER_TRACE_ERR( "%s: error from DeserializeMRReq()\n", __func__ );
+                    response.SetGenStatus( kCipErrorPathSegmentError );
+                }
+                else
+                {
+                    EipStatus s = CipMessageRouterClass::NotifyMR( &request, &response );
+
+                    if( s == kEipStatusError )
+                        return -kEncapErrorIncorrectData;
+
+                    address_item.connection_identifier = conn->ProducingConnectionId();
+                }
+
+                SetPayload( &response );
+
+                result = Serialize( aReply );  // this Cpf
             }
             else
             {
-                EipStatus s = CipMessageRouterClass::NotifyMR( &request, &response );
+                // wrong data item detected
+                CIPSTER_TRACE_ERR(
+                        "%s: got DataItemType()=%d instead of expected kCpfIdConnectedDataItem\n",
+                        __func__, DataType() );
 
-                if( s == kEipStatusError )
-                    return -kEncapErrorIncorrectData;
-
-                address_item.connection_identifier = conn->ProducingConnectionId();
+                return -kEncapErrorIncorrectData;
             }
-
-            SetPayload( &response );
-
-            result = Serialize( aReply );  // this Cpf
         }
         else
         {
-            // wrong data item detected
             CIPSTER_TRACE_ERR(
-                    "%s: got DataItemType()=%d instead of expected kCpfIdConnectedDataItem\n",
-                    __func__, DataType() );
+                    "%s: CID:0x%08x could not be found\n",
+                    __func__,
+                    address_item.connection_identifier );
 
             return -kEncapErrorIncorrectData;
         }
+
+        return result;
     }
-    else
+    catch( const std::range_error& e )
     {
         CIPSTER_TRACE_ERR(
-                "%s: CID:0x%08x could not be found\n",
-                __func__,
-                address_item.connection_identifier );
+                "%s: aCommand is too short\n",
+                __func__ );
 
         return -kEncapErrorIncorrectData;
     }
+    catch( const std::overflow_error& e )
+    {
+        // Serialize() seems to have ran out of memory
+        CIPSTER_TRACE_ERR(
+                "%s: aReply is too short\n",
+                __func__ );
 
-    return result;
+        return -kEncapErrorInsufficientMemory;
+    }
 }
 
 
