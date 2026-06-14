@@ -155,7 +155,7 @@ public:
      *  at aInput were not an application_path, or at least not supported.
      *
      * @throw std::runtime_error if problem with aInput, or
-     *    std::range_error() from BufReader on buffer overrun.
+     *    std::range_error() from BufReader on buffer over-read.
      */
     int DeserializeAppPath( BufReader aInput, CipAppPath* aPreviousToInheritFrom = NULL, int aCtl = 0 );
 

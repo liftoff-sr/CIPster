@@ -331,9 +331,8 @@ inline int CipAppPath::deserialize_symbolic( BufReader aInput, int aCtl )
         if( byte_count > (int) sizeof(tag)-1 )
             throw std::runtime_error( "CipAppPath has too big AnsiExtendedSymbol" );
 
-        memcpy( tag, in.data(), byte_count );
+        in.get_bytes( (uint8_t*) tag, byte_count );
         tag[byte_count] = 0;
-        in += byte_count;
 
         // Vol1 C-1.4.5.2 does not say that the pad byte is conditional
         // on CTL_PACKED_EPATH, but the spec could be deficient there.
@@ -348,18 +347,12 @@ inline int CipAppPath::deserialize_symbolic( BufReader aInput, int aCtl )
         // "and"ing clamps at 31, which is less than max of nul terminated 'this->tag'
         int symbol_size = first & 0x1f;
 
-#if 0
-        if( symbol_size == 0 )
-        {
-            throw std::runtime_error( "zero length 'extended' Symbolic Segment" );
-        }
-#endif
+        CIPSTER_ASSERT( sizeof(tag) > 31 );
 
         ++in;    // ate first
 
-        memcpy( tag, in.data(), symbol_size );
+        in.get_bytes( (uint8_t*) tag, symbol_size );
         tag[symbol_size] = 0;
-        in += symbol_size;
 
         if( (in.data() - aInput.data()) & 1 )
             ++in;              // skip pad byte if any

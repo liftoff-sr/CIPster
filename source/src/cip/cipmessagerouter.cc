@@ -75,7 +75,7 @@ int CipMessageRouterRequest::DeserializeMRReq( BufReader aRequest )
 
         rpath += result;
 
-        result = path.DeserializeAppPath( rpath );
+        result = path.DeserializeAppPath( rpath );      // throws, does not "return" an error
 
         int bytes_consumed = rpath.data() - aRequest.data() + result;
 
@@ -87,6 +87,12 @@ int CipMessageRouterRequest::DeserializeMRReq( BufReader aRequest )
     }
     catch( const std::range_error& ex )
     {
+        CIPSTER_TRACE_ERR( "%s: over-read error from DeserializeAppPath()\n", __func__ );
+        return -1;
+    }
+    catch( const std::runtime_error& ex )
+    {
+        // problem with input
         return -1;
     }
 }
