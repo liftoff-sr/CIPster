@@ -328,3 +328,12 @@ MAYBE_INLINE uint32_t BufReader::get32BE()
     start += 4;
     return ret;
 }
+
+
+MAYBE_INLINE void BufReader::get_bytes( uint8_t* aDest, size_t aCount )
+{
+    if( start + aCount > limit )
+        overrun();
+    memcpy( aDest, start, aCount );
+    start += aCount;
+}

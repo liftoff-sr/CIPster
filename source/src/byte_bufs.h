@@ -228,6 +228,9 @@ public:
     /// Get a 32 bit integer as Big Endian
     uint32_t get32BE();
 
+    /// Copy @a aCount bytes from buffer into @a aDest, advancing the read position.
+    void get_bytes( uint8_t* aDest, size_t aCount );
+
 protected:
     const uint8_t*  start;
     const uint8_t*  limit;          // points to one past last byte
