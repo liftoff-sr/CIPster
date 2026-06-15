@@ -98,16 +98,28 @@ EipStatus CipAttribute::Get( CipInstance* aInstance,
             aInstance->Id()
             );
 
+        try
+        {
 #if USE_MEMBER_FUNC_FOR_ATTRIBUTE_FUNC
-        EipStatus ret = (aInstance->*getter)( this, request, response );
+            EipStatus ret = (aInstance->*getter)( this, request, response );
 #else
-        EipStatus ret = getter( aInstance, this, request, response );
+            EipStatus ret = getter( aInstance, this, request, response );
 #endif
 
-        CIPSTER_TRACE_INFO( "%s: attribute_id:%d  len:%u\n",
-            __func__, Id(), response->WrittenSize() );
+            CIPSTER_TRACE_INFO( "%s: attribute_id:%d  len:%u\n",
+                __func__, Id(), response->WrittenSize() );
 
-        return ret;
+            return ret;
+        }
+        catch( const std::range_error& e )
+        {
+            response->SetGenStatus( kCipErrorNotEnoughData );
+            return kEipStatusOkSend;
+        }
+        catch( const std::overflow_error& e )
+        {
+            return kEipStatusError;
+        }
     }
 }
 
@@ -123,6 +135,14 @@ EipStatus CipAttribute::Set( CipInstance* aInstance,
     }
     else
     {
-        return setter( aInstance, this, request, response );
+        try
+        {
+            return setter( aInstance, this, request, response );
+        }
+        catch( const std::range_error& e )
+        {
+            response->SetGenStatus( kCipErrorNotEnoughData );
+            return kEipStatusOkSend;
+        }
     }
 }
