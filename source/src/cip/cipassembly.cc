@@ -31,7 +31,7 @@ EipStatus AssemblyInstance::RecvData( CipConn* aConn, BufReader aBuffer )
         (!aConn->ConsumingNCP().IsFixed() && SizeBytes() < aBuffer.size()) )
     {
         CIPSTER_TRACE_ERR(
-            "%s: wrong data amount: %zd bytes arrived for assembly id: %d\n",
+            "%s: wrong data amount: %d bytes arrived for assembly id: %d\n",
             __func__, aBuffer.size(), Id() );
         return kEipStatusError;
     }

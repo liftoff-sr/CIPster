@@ -81,7 +81,7 @@ EipStatus CipConnMgrClass::RecvConnectedData( UdpSocket* aSocket,
         if( cpfd.DataType() == kCpfIdConnectedDataItem )
         {
             CIPSTER_TRACE_INFO(
-                "%s[%d]@%u CID:0x%08x len:%-3zd src:%s:%d seq:%d\n",
+                "%s[%d]@%u CID:0x%08x len:%-3d src:%s:%d seq:%d\n",
                 __func__, aSocket->h(), CurrentUSecs32(),
                 cpfd.AddrConnId(),
                 aCommand.size(),

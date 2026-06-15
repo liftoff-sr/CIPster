@@ -171,7 +171,7 @@ public:
             CIPSTER_TRACE_INFO( " additional_status[%d]:0x%x\n", i, additional_status[i] );
         }
 
-        CIPSTER_TRACE_INFO( " msg len:%zd\n", Reader().size() );
+        CIPSTER_TRACE_INFO( " msg len:%d\n", Reader().size() );
     }
 
     /// Return a BufReader holding the received Serialize()d CIP reply minus

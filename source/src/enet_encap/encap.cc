@@ -416,8 +416,11 @@ static int disposeOfLargePacket( int aSocket, unsigned aCount )
     while( aCount )
     {
         // toss in chunks.
+#ifdef _MSC_VER
+        int readz = min(aCount, unsigned(sizeof chunk));
+#else
         int readz = std::min( aCount, unsigned( sizeof chunk ) );
-
+#endif
         int num_read = Encapsulation::EnsuredTcpRecv( aSocket, chunk, readz );
 
         if( num_read != readz )

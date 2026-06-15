@@ -7,7 +7,7 @@ else()
 endif()
 
 
-cmake_minimum_required( VERSION 2.8.3 )
+cmake_minimum_required( VERSION 3.5 )
 
 
 project( CIPster )
@@ -122,7 +122,8 @@ if( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
         # enable clock_gettime:
         add_definitions( -D_POSIX_C_SOURCE=199309L )
     endif()
-
+elseif (MSVC)
+    add_definitions( -D_CRT_SECURE_NO_WARNINGS )
 endif()
 
 add_subdirectory( src )
