@@ -12,7 +12,7 @@ project( "CIPster on Windows" )
 
 include(ExternalProject)
 
-cmake_minimum_required( VERSION 2.8.3 )
+cmake_minimum_required( VERSION 2.8.3...3.10 FATAL_ERROR )
 
 
 set( CIPSTER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../ )
