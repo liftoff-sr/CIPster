@@ -925,9 +925,8 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         // Vol1 3-5.4.1.10.2 Assumed Assembly Object Attribute (== 3)
         ConsumingPath().SetAttribute( 3 );
 
-        CipAttribute* attribute = consuming_instance->Attribute( 3 );
         // an assembly object should always have an attribute 3
-        CIPSTER_ASSERT( attribute );
+        CIPSTER_ASSERT( consuming_instance->Attribute( 3 ) );
 
         int attr_size = static_cast<AssemblyInstance*>(consuming_instance)->SizeBytes();
 
@@ -937,8 +936,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
 
         if( trigger.Class() == kConnTransportClass1 )
         {
-            data_size -= 2;     // remove 16-bit sequence count length
-            diff_size += 2;
+            diff_size += 2;     // 16-bit sequence count length
         }
 
         if( consuming_fmt == kRealTimeFmt32BitHeader
@@ -946,9 +944,29 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             // and is not kRealTimeFmtModeless
             && !is_heartbeat )
         {
-            data_size -= 4;     // remove the 4 bytes needed for run/idle header
-            diff_size += 4;
+            diff_size += 4;     // 4 bytes needed for run/idle header
         }
+
+        if( data_size < diff_size )
+        {
+            // requested connection size cannot even cover the required overhead
+            corrected_consuming_size = attr_size + diff_size;
+
+            *aExtError = kConnMgrStatusInvalidOToTConnectionSize;
+
+            CIPSTER_TRACE_INFO(
+                "%s: requested conn_size(%d) is smaller than required overhead(%d)"
+                " for consuming:'%s'\n",
+                __func__,
+                data_size,
+                diff_size,
+                ConsumingPath().Format().c_str()
+                );
+
+            return kCipErrorConnectionFailure;
+        }
+
+        data_size -= diff_size;
 
         if( ( consuming_ncp.IsFixed() && data_size != attr_size )
           ||  data_size > attr_size )
@@ -986,10 +1004,8 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         // Vol1 3-5.4.1.10.2 Assumed Assembly Object Attribute (== 3)
         ProducingPath().SetAttribute( 3 );
 
-        CipAttribute* attribute = producing_instance->Attribute( 3 );
-
         // an assembly object should always have an attribute 3
-        CIPSTER_ASSERT( attribute );
+        CIPSTER_ASSERT( producing_instance->Attribute( 3 ) );
 
         int attr_size = static_cast<AssemblyInstance*>(producing_instance)->SizeBytes();
 
@@ -1001,8 +1017,7 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
 
         if( trigger.Class() == kConnTransportClass1 )
         {
-            data_size -= 2; // remove 16-bit sequence count length
-            diff_size += 2;
+            diff_size += 2; // 16-bit sequence count length
         }
 
         if( producing_fmt == kRealTimeFmt32BitHeader
@@ -1010,9 +1025,29 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             // and is not kRealTimeFmtModeless
             && !is_heartbeat )
         {
-            data_size -= 4; // remove the 4 bytes needed for run/idle header
-            diff_size += 4;
+            diff_size += 4; // 4 bytes needed for run/idle header
         }
+
+        if( data_size < diff_size )
+        {
+            // requested connection size cannot even cover the required overhead
+            corrected_producing_size = attr_size + diff_size;
+
+            *aExtError = kConnMgrStatusInvalidTToOConnectionSize;
+
+            CIPSTER_TRACE_INFO(
+                "%s: requested conn_size(%d) is smaller than required overhead(%d)"
+                " for producing:'%s'\n",
+                __func__,
+                data_size,
+                diff_size,
+                ProducingPath().Format().c_str()
+                );
+
+            return kCipErrorConnectionFailure;
+        }
+
+        data_size -= diff_size;
 
         if( ( producing_ncp.IsFixed() && data_size != attr_size )
           ||  data_size > attr_size )
