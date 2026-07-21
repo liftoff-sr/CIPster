@@ -216,21 +216,26 @@ CipConn* ExclusiveOwner::GetConnection( ConnectionData* aConnData, ConnMgrStatus
 
 CipConn* InputOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrStatus* aExtError )
 {
+    bool output_matches = false;
+    bool input_matches = false;
+
     for( InputOnlyConnSet::iterator it = s_input_only.begin();  it != s_input_only.end();  ++it )
     {
         // we have the same output assembly?
         if( it->output_assembly == aConnData->ConsumingPath().GetInstanceOrConnPt() )
         {
+            output_matches = true;
+
             if( it->input_assembly != aConnData->ProducingPath().GetInstanceOrConnPt() )
             {
-                *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
-                break;
+                continue;
             }
+
+            input_matches = true;
 
             if( it->config_assembly != aConnData->ConfigPath().GetInstanceOrConnPt() )
             {
-                *aExtError = kConnMgrStatusInconsistentApplicationPathCombo;
-                break;
+                continue;
             }
 
             CipConn* in = it->Alloc();
@@ -239,9 +244,14 @@ CipConn* InputOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrStat
                 return in;
 
             *aExtError = kConnMgrStatusTargetObjectOutOfConnections;
-            break;
+            return NULL;
         }
     }
+
+    if( input_matches )
+        *aExtError = kConnMgrStatusInconsistentApplicationPathCombo;
+    else if( output_matches )
+        *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
 
     return NULL;
 }
@@ -257,27 +267,32 @@ CipConn* ListenOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrSta
         return NULL;
     }
 
+    bool output_matches = false;
+    bool input_matches = false;
+
     for( ListenOnlyConnSet::iterator it = s_listen_only.begin();  it != s_listen_only.end(); ++it )
     {
-                // we have the same output assembly?
+        // we have the same output assembly?
         if( it->output_assembly == aConnData->ConsumingPath().GetInstanceOrConnPt() )
         {
+            output_matches = true;
+
             if( it->input_assembly != aConnData->ProducingPath().GetInstanceOrConnPt() )
             {
-                *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
-                break;
+                continue;
             }
+
+            input_matches = true;
 
             if( it->config_assembly != aConnData->ConfigPath().GetInstanceOrConnPt() )
             {
-                *aExtError = kConnMgrStatusInconsistentApplicationPathCombo;
-                break;
+                continue;
             }
 
             if( NULL == GetExistingProducerMulticastConnection( aConnData->ProducingPath().GetInstanceOrConnPt() ) )
             {
                 *aExtError = kConnMgrStatusNonListenOnlyConnectionNotOpened;
-                break;
+                return NULL;
             }
 
             CipConn* listener = it->Alloc();
@@ -286,9 +301,14 @@ CipConn* ListenOnlyConnSet::GetConnection( ConnectionData* aConnData, ConnMgrSta
                 return listener;
 
             *aExtError = kConnMgrStatusTargetObjectOutOfConnections;
-            break;
+            return NULL;
         }
     }
+
+    if( input_matches )
+        *aExtError = kConnMgrStatusInconsistentApplicationPathCombo;
+    else if( output_matches )
+        *aExtError = kConnMgrStatusInvalidProducingApplicationPath;
 
     return NULL;
 }
