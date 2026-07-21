@@ -9,6 +9,34 @@
 
 #include "appcontype.h"
 #include <cipster_api.h>            // NotifyIoConnectionEvent()
+#include "cipassembly.h"
+
+
+static void AddAssemblyConnectionPointRole( int aInstanceId,
+        AssemblyInstance::ConnectionPointRole aRole )
+{
+    if( aInstanceId < 0 )
+        return;
+
+    CipClass* assembly_class = GetCipClass( kCipAssemblyClass );
+    if( !assembly_class )
+        return;
+
+    AssemblyInstance* assembly = static_cast<AssemblyInstance*>(
+            assembly_class->Instance( aInstanceId ) );
+
+    if( assembly )
+        assembly->AddConnectionPointRole( aRole );
+}
+
+
+static void AddAssemblyConnectionPointRoles( int aOutputAssembly,
+        int aInputAssembly, int aConfigAssembly )
+{
+    AddAssemblyConnectionPointRole( aOutputAssembly, AssemblyInstance::kRoleConsumed );
+    AddAssemblyConnectionPointRole( aInputAssembly, AssemblyInstance::kRoleProduced );
+    AddAssemblyConnectionPointRole( aConfigAssembly, AssemblyInstance::kRoleConfiguration );
+}
 
 /**
  * Class ExclusiveOwner
@@ -299,7 +327,13 @@ bool ConfigureExclusiveOwnerConnectionPoint(
         int input_assembly,
         int config_assembly )
 {
-    return ExclusiveOwner::AddExpectation( output_assembly, input_assembly, config_assembly );
+    bool added = ExclusiveOwner::AddExpectation(
+            output_assembly, input_assembly, config_assembly );
+
+    if( added )
+        AddAssemblyConnectionPointRoles( output_assembly, input_assembly, config_assembly );
+
+    return added;
 }
 
 
@@ -308,7 +342,13 @@ bool ConfigureInputOnlyConnectionPoint(
         int input_assembly,
         int config_assembly )
 {
-    return InputOnlyConnSet::AddExpectation( output_assembly, input_assembly, config_assembly );
+    bool added = InputOnlyConnSet::AddExpectation(
+            output_assembly, input_assembly, config_assembly );
+
+    if( added )
+        AddAssemblyConnectionPointRoles( output_assembly, input_assembly, config_assembly );
+
+    return added;
 }
 
 
@@ -317,7 +357,13 @@ bool ConfigureListenOnlyConnectionPoint(
         int input_assembly,
         int config_assembly )
 {
-    return ListenOnlyConnSet::AddExpectation( output_assembly, input_assembly, config_assembly );
+    bool added = ListenOnlyConnSet::AddExpectation(
+            output_assembly, input_assembly, config_assembly );
+
+    if( added )
+        AddAssemblyConnectionPointRoles( output_assembly, input_assembly, config_assembly );
+
+    return added;
 }
 
 
