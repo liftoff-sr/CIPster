@@ -925,9 +925,8 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         // Vol1 3-5.4.1.10.2 Assumed Assembly Object Attribute (== 3)
         ConsumingPath().SetAttribute( 3 );
 
-        CipAttribute* attribute = consuming_instance->Attribute( 3 );
         // an assembly object should always have an attribute 3
-        CIPSTER_ASSERT( attribute );
+        CIPSTER_ASSERT( consuming_instance->Attribute( 3 ) );
 
         int attr_size = static_cast<AssemblyInstance*>(consuming_instance)->SizeBytes();
 
@@ -1005,10 +1004,8 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
         // Vol1 3-5.4.1.10.2 Assumed Assembly Object Attribute (== 3)
         ProducingPath().SetAttribute( 3 );
 
-        CipAttribute* attribute = producing_instance->Attribute( 3 );
-
         // an assembly object should always have an attribute 3
-        CIPSTER_ASSERT( attribute );
+        CIPSTER_ASSERT( producing_instance->Attribute( 3 ) );
 
         int attr_size = static_cast<AssemblyInstance*>(producing_instance)->SizeBytes();
 
