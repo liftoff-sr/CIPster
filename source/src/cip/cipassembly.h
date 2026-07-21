@@ -22,6 +22,14 @@ class AssemblyInstance : public CipInstance
 {
     friend class CipAssemblyClass;
 public:
+    enum ConnectionPointRole
+    {
+        kRoleNone          = 0,
+        kRoleConsumed      = 1,    ///< O-to-T Output Assembly
+        kRoleProduced      = 2,    ///< T-to-O Input Assembly
+        kRoleConfiguration = 4     ///< Configuration Assembly
+    };
+
     AssemblyInstance( int aInstanceId, ByteBuf aBuf );
 
     unsigned SizeBytes() const      { return byte_array.size(); }
@@ -29,6 +37,16 @@ public:
     /// Return a ByteBuf view spanning the assembly's valid bytes.  Returned by value
     /// (not a reference to the member) because the member is now a CipByteArray.
     ByteBuf Buffer() const          { return ByteBuf( byte_array.data(), byte_array.length() ); }
+
+    void AddConnectionPointRole( ConnectionPointRole aRole )
+    {
+        connection_point_roles |= aRole;
+    }
+
+    bool HasConnectionPointRole( ConnectionPointRole aRole ) const
+    {
+        return 0 != ( connection_point_roles & aRole );
+    }
 
     /**
      * Function RecvData
@@ -49,6 +67,7 @@ public:
 
 protected:
     CipByteArray    byte_array;
+    unsigned        connection_point_roles;
 };
 
 

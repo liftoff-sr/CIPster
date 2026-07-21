@@ -20,7 +20,8 @@ AssemblyInstance::AssemblyInstance( int aInstanceId, ByteBuf aBuffer ) :
     CipInstance( aInstanceId ),
     // The assembly's ByteBuf spans the full application-owned allocation, so its size
     // is the true capacity (capacity == length for a fixed assembly buffer).
-    byte_array( aBuffer.data(), (uint16_t) aBuffer.size() )
+    byte_array( aBuffer.data(), (uint16_t) aBuffer.size() ),
+    connection_point_roles( kRoleNone )
 {
 }
 
@@ -126,9 +127,15 @@ EipStatus CipAssemblyClass::set_assembly_data_attr( CipInstance* aInstance, CipA
 {
     AssemblyInstance* assembly = static_cast<AssemblyInstance*>( aInstance );
 
-    if( IsConnectedInputAssembly( assembly->Id() ) )
+    if( assembly->HasConnectionPointRole( AssemblyInstance::kRoleProduced ) )
     {
-        CIPSTER_TRACE_WARN( "%s: received data for connected input assembly\n", __func__ );
+        CIPSTER_TRACE_WARN( "%s: cannot set produced assembly data\n", __func__ );
+        response->SetGenStatus( kCipErrorAttributeNotSetable );
+    }
+    else if( assembly->HasConnectionPointRole( AssemblyInstance::kRoleConsumed )
+          && IsConnectedOutputAssembly( assembly->Id() ) )
+    {
+        CIPSTER_TRACE_WARN( "%s: received data for connected output assembly\n", __func__ );
         response->SetGenStatus( kCipErrorAttributeNotSetable );
     }
     else if( request->Data().size() < assembly->byte_array.size() )
