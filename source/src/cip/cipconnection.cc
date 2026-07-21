@@ -1346,6 +1346,7 @@ CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError )
         if( kConnMgrStatusSuccess != *aExtError )
         {
             CIPSTER_TRACE_INFO( "%s: extended_error != 0\n", __func__ );
+            Clear( false );
             return kCipErrorConnectionFailure;
         }
     }
@@ -1359,6 +1360,14 @@ CipError CipConn::Activate( Cpf* aCpf, ConnMgrStatus* aExtError )
     if( result )
     {
         // CIPSTER_TRACE_ERR( "%s: openCommunicationChannels() failed.  \n", __func__ );
+
+        if( ConsumingUdp() )
+            UdpSocketMgr::ReleaseSocket( ConsumingUdp() );
+
+        if( ProducingUdp() )
+            UdpSocketMgr::ReleaseSocket( ProducingUdp() );
+
+        Clear( false );
         return result;
     }
 
