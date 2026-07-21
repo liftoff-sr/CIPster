@@ -937,7 +937,6 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
 
         if( trigger.Class() == kConnTransportClass1 )
         {
-            data_size -= 2;     // remove 16-bit sequence count length
             diff_size += 2;
         }
 
@@ -946,9 +945,27 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             // and is not kRealTimeFmtModeless
             && !is_heartbeat )
         {
-            data_size -= 4;     // remove the 4 bytes needed for run/idle header
             diff_size += 4;
         }
+
+        if( data_size < diff_size )
+        {
+            corrected_consuming_size = attr_data->size() + diff_size;
+            *aExtError = kConnMgrStatusInvalidOToTConnectionSize;
+
+            CIPSTER_TRACE_INFO(
+                "%s: requested conn_size(%d) is smaller than required overhead(%d)"
+                " for consuming:'%s'\n",
+                __func__,
+                data_size,
+                diff_size,
+                ConsumingPath().Format().c_str()
+                );
+
+            return kCipErrorConnectionFailure;
+        }
+
+        data_size -= diff_size;
 
         if( ( consuming_ncp.IsFixed() && data_size != attr_data->size() )
           ||  data_size >  attr_data->size() )
@@ -1001,7 +1018,6 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
 
         if( trigger.Class() == kConnTransportClass1 )
         {
-            data_size -= 2; // remove 16-bit sequence count length
             diff_size += 2;
         }
 
@@ -1010,9 +1026,27 @@ CipError ConnectionData::CorrectSizes( ConnMgrStatus* aExtError )
             // and is not kRealTimeFmtModeless
             && !is_heartbeat )
         {
-            data_size -= 4;   // remove the 4 bytes needed for run/idle header
             diff_size += 4;
         }
+
+        if( data_size < diff_size )
+        {
+            corrected_producing_size = attr_data->size() + diff_size;
+            *aExtError = kConnMgrStatusInvalidTToOConnectionSize;
+
+            CIPSTER_TRACE_INFO(
+                "%s: requested conn_size(%d) is smaller than required overhead(%d)"
+                " for producing:'%s'\n",
+                __func__,
+                data_size,
+                diff_size,
+                ProducingPath().Format().c_str()
+                );
+
+            return kCipErrorConnectionFailure;
+        }
+
+        data_size -= diff_size;
 
         if( ( producing_ncp.IsFixed() && data_size != attr_data->size() )
           ||  data_size > attr_data->size() )
