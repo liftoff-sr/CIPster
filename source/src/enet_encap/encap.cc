@@ -970,6 +970,11 @@ int Encapsulation::HandleReceivedExplicitUdpData( int aSocket,
     //BufReader   command = aCommand + ENCAPSULATION_HEADER_LENGTH;
     BufWriter   reply = aReply + ENCAPSULATION_HEADER_LENGTH;
 
+    // result still holds the deserialized header length; reset to "no reply"
+    // so any command that does not produce a payload (e.g. non-zero Options)
+    // is not sent with a stale length exposing old buffer contents.
+    result = -1;
+
     switch( encap.Command() )
     {
     case kEncapCmdListServices:

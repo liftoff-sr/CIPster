@@ -42,6 +42,14 @@ target_link_libraries( overhead_guard_test eip )
 
 add_test( NAME overhead_guard_test COMMAND overhead_guard_test )
 
+# Regression for a UDP reply-length disclosure: HandleReceivedExplicitUdpData() must
+# not return a stale header length for ListServices/ListInterfaces with non-zero
+# Options, which sent residual shared-buffer bytes from a prior request to the client.
+add_executable( udp_reply_length_test udp_reply_length_test.cpp )
+target_link_libraries( udp_reply_length_test eip )
+
+add_test( NAME udp_reply_length_test COMMAND udp_reply_length_test )
+
 # Compile-time guarantee for issue #2 (typed inserters reject the alias).
 add_test( NAME attr_security_compile_fail
     COMMAND ${CMAKE_COMMAND} -E env
